@@ -1,7 +1,8 @@
 # Critério CRM — Anexo Técnico de Encaminhamento
 
 > **Este anexo é de uso interno da equipe técnica e não precisa ser lido ou aprovado pelo cliente.**
-> Versão 2.6 · 19/09/2026 · espelha o `documento-de-negocio.md` da mesma pasta.
+> Versão 2.7 · 19/09/2026 · espelha o `documento-de-negocio.md` da mesma pasta.
+> **Mudou da 2.6:** **gates cumpridos** — amostra das telas e PAD-002 aprovados por Eduardo em 19/09/2026; o projeto passa a PF-08 Arquitetura. Repostas as restrições de design e de marca, que haviam sumido do documento de negócio na reescrita da 2.0.
 > **Mudou da 2.5:** três planilhas auditáveis da classificação lidas. O modelo completo — fórmulas, cortes, réguas, agregação e dois defeitos — está em `modelo-classificacao-carteira.md`, documento próprio. A classificação passa a ser **calculada no CRM**, por decisão de Eduardo.
 > **Mudou da 2.4:** recebida a **Matriz de Objeções** (17 registros, 18 campos) — seção (b2.6). Entra como base viva, com separação entre catálogo e ocorrência. Tensão identificada entre a matriz e o MP-SC-01 sobre absorção de esforço extra.
 > **Mudou da 2.3:** adotados os **12 KPIs oficiais** (`KPI de Head de Novos Negócios`) — seção (b2.5). Decididos: cadência de reunião por classe, quem atribui as notas humanas do Score, e a entrada de KYC, PRA e dashboard contábil. Quatro entidades novas exigidas pelos KPIs.
@@ -86,7 +87,7 @@ Reformulada por resultado, e não por dependência técnica — a versão anteri
 | Aprovação | **Eduardo** valida requisitos, telas e entregas. Satisfaz a regra de que quem constrói não aprova |
 | Precificação | Etapa 1 registra porte, direcionadores e preço, **guardando os dois valores quando há reajuste** (medir desconto). Cálculo automático na etapa 3. **Planilhas lidas em 19/09/2026** — modelo na (b0), defeitos na (b1.1). Nenhuma fórmula é traduzida antes de decisão humana. **Preço de tabela é o praticado, sujeito a desconto em negociação** |
 | Dados de precificação | Tabela de preço/hora, custo por profissional e margem **não são copiados** para este workspace. Fonte é o SharePoint |
-| Design das telas | PAD-002 — `vault/06-Padroes/PAD-002 - Design Criterio CRM.md`. **Status `proposto`, aprovação pendente.** Fonte da verdade é o artefato |
+| Design das telas | PAD-002 — **aprovado por Eduardo em 19/09/2026**. Fonte da verdade é o artefato do sistema, não a nota. ⚠️ A nota está na branch `docs/PAD-002-design-criterio-crm`, **não mesclada à `main`**: aprovado mas não publicado |
 | Design de proposta e contrato | Manual da marca. Logomarca sozinha |
 | Integrações | E-mail, WhatsApp Business, Granola, assinatura digital. **Sem Omie** |
 | Fronteira — implantação | CRM **acompanha** etapas, responsável e prazo **até o cliente operar**. Não gere a rotina recorrente do cliente depois disso |
@@ -511,7 +512,7 @@ Origem (tipo de canal, canal, captador) · linha C1 ou C2 · serviço e tipo de 
 
 ```json
 {
-  "versao_documento": "2.6",
+  "versao_documento": "2.7",
   "necessidade_principal": "CRM proprio da Critério cobrindo o cliente do primeiro contato ate a carteira madura, tendo o GRUPO ECONOMICO como unidade: (1) comercial — entrevista no Granola, lead, ficha de volumetria, porte, preco, proposta, contrato no Clicksign; (2) implantacao acompanhada por responsavel de area ate o cliente operar; (3) carteira e Sucesso do Cliente — classificacao viva por score/semaforo/eixo de acao, alertas de churn e inadimplencia, e reunioes de resultado com cadencia ligada a classe.",
   "necessidades_secundarias": [
     "Cálculo automático de preço a partir dos direcionadores — depende de existir tabela ou fórmula hoje",
@@ -725,7 +726,9 @@ Origem (tipo de canal, canal, captador) · linha C1 ou C2 · serviço e tipo de 
     "cadencia_reunioes": "Mensal para classe A, trimestral para B, semestral para C (decisao de Eduardo, 19/09/2026).",
     "notas_humanas_score": "Area tecnica atribui complexidade operacional, disciplina do cliente e risco tecnico. Comercial atribui potencial de cross-sell. Frequencia mensal.",
     "matriz_de_objecoes": "Entra no CRM como base viva (decisao de Eduardo, 19/09/2026). Duas entidades: catalogo (17 objecoes, 18 campos) e ocorrencia (cada aparicao numa negociacao real). A matriz orienta e registra alcada — precedente 'nao' ou faixa ESCALAR avisam antes da concessao e exigem registro de quem decidiu; o CRM nunca concede automaticamente. Nao substitui parecer juridico; itens 'A VALIDAR' seguem pendentes de decisao humana.",
-    "classificacao_carteira": "Calculada DENTRO do CRM (decisao de Eduardo, 19/09/2026); notas humanas alimentadas nele. Especificacao completa em modelo-classificacao-carteira.md, extraida das planilhas auditaveis. Parametros (pesos, cortes 3,95/3,35, reguas, matriz de horas, fator de atrito, imposto 11%) versionados com vigencia: cada classificacao guarda qual versao a produziu. DOIS DEFEITOS registrados: (1) o churn nao tem celula — esta literal dentro da formula, e o ISC le de outra fonte; (2) o fator de atrito parece indexar Disciplina sem a inversao 6-disc, o que inverteria o custo entre cliente organizado e desorganizado. Nenhuma formula e traduzida antes de decisao humana."
+    "classificacao_carteira": "Calculada DENTRO do CRM (decisao de Eduardo, 19/09/2026); notas humanas alimentadas nele. Especificacao completa em modelo-classificacao-carteira.md, extraida das planilhas auditaveis. Parametros (pesos, cortes 3,95/3,35, reguas, matriz de horas, fator de atrito, imposto 11%) versionados com vigencia: cada classificacao guarda qual versao a produziu. DOIS DEFEITOS registrados: (1) o churn nao tem celula — esta literal dentro da formula, e o ISC le de outra fonte; (2) o fator de atrito parece indexar Disciplina sem a inversao 6-disc, o que inverteria o custo entre cliente organizado e desorganizado. Nenhuma formula e traduzida antes de decisao humana.",
+    "design": "Telas seguem o PAD-002, APROVADO por Eduardo em 19/09/2026; fonte da verdade e o artefato do sistema. A nota vive na branch docs/PAD-002-design-criterio-crm, nao mesclada a main — aprovado mas nao publicado para a casa. Proposta e contrato seguem o manual da marca, com a logomarca sempre sozinha.",
+    "gates_cumpridos": "PF-01 Suficiencia (documento validado) e PF-07 Amostra aprovada — ambos por Eduardo em 19/09/2026. Proximo gate humano: PF-09.5 Proposta, antes da implementacao."
   },
   "oportunidades": {
     "melhoria": [
@@ -853,6 +856,8 @@ Origem (tipo de canal, canal, captador) · linha C1 ou C2 · serviço e tipo de 
     }
   ],
   "pontos_a_confirmar": [
+    "Mesclar o PAD-002 a main e marcar a nota como ativo — exige autorizacao explicita (a main nunca e atualizada sem ela)",
+    "As amostras de Skeleton e Combobox citadas no PAD-002 seguem pendentes; a aprovacao da amostra do CRM nao as cobre",
     "DEFEITO 7.2: conferir se a coluna Disciplina ja e preenchida invertida — basta olhar a nota de um cliente reconhecidamente organizado",
     "Definir a escala 1-5 de disciplina, risco tecnico, cross-sell e adimplencia — as reguas de receita e rentabilidade existem, as humanas nao",
     "Definir o criterio do semaforo operacional (1, 2, 3)",

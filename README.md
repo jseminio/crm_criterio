@@ -10,17 +10,19 @@ listas para campanha.
 
 | Item | Situação |
 |---|---|
-| Fase do pipeline | 🟦 Definição PF-07 Desenho da Solução |
+| Fase do pipeline | 🟦 Definição PF-08 Arquitetura |
 | Gate cumprido | ✅ Suficiência — documento validado por Eduardo em 19/09/2026 |
-| Gate à frente | ⛔ **Amostra aprovada** — a amostra existe e aguarda decisão de Eduardo |
+| Gate cumprido | ⛔ **Amostra aprovada** — aprovada por **Eduardo em 19/09/2026** |
 | Amostra | https://claude.ai/artifact/2EiCBrFhPdvbniQWZgtgTK — 6 telas, privada |
+| Gate à frente | ⛔ **Aprovação humana** em PF-09.5 Proposta, antes da implementação |
+| Design | **PAD-002 aprovado por Eduardo em 19/09/2026.** A nota ainda vive na branch `docs/PAD-002-design-criterio-crm`, **não mesclada à main** — ver pendência 1 |
 | Classe | a definir na próxima fase |
 | Branch | `feat/crm-descoberta-negocio` |
 
 ## Conteúdo
 
-- `documento-de-negocio.md` — versão 2.6, para leitura e aprovação de Eduardo.
-- `anexo-tecnico.md` — versão 2.6, uso interno: resumo estruturado, mapa de
+- `documento-de-negocio.md` — versão 2.7, **validado por Eduardo em 19/09/2026**.
+- `anexo-tecnico.md` — versão 2.7, uso interno: resumo estruturado, mapa de
   campos derivado do roteiro de entrevista e bloco JSON.
 - `proposta-secao-9-questionario.md` — texto pronto dos oito campos que entram
   no questionário (**decisão de 19/09/2026**), pedidos pela implantação.
@@ -99,7 +101,10 @@ derivados da estrutura das notas, sem nenhum valor de cliente.
 
 ## Pendências que travam o avanço
 
-1. Validação do `documento-de-negocio.md` por Eduardo (gate de Suficiência).
+1. **Mesclar o PAD-002 à `main` e marcar a nota como `ativo`.** Ele foi
+   aprovado, mas a nota existe só na branch `docs/PAD-002-design-criterio-crm`
+   — enquanto não for mesclada, o padrão não está disponível para ninguém.
+   **Mesclar na `main` exige autorização explícita** (regra da casa).
 2. As perguntas da seção 19 do documento, em dois blocos: as que travam o
    código (bloco A) e as que travam a modelagem.
 3. **Decidir sobre as divergências das planilhas de precificação** (anexo
@@ -109,7 +114,6 @@ derivados da estrutura das notas, sem nenhum valor de cliente.
    inverte a disciplina. Afeta margem, Score e classe.
 5. **Definir as escalas 1–5 das notas humanas**, o critério do semáforo e a
    escala de churn. Sem elas o CRM calcula, mas ninguém sabe o que avaliar.
-6. Aprovação do PAD-002 e da amostra, antes de construir tela.
 6. Versões oficiais do questionário de volumetria, dos modelos de proposta e
    do contrato.
 7. Escolha da ferramenta de assinatura digital, com validade jurídica, trilha

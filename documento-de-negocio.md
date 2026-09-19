@@ -1,6 +1,9 @@
 # Critério CRM — Documento de Negócio
 
-**Versão 2.6 · 19/09/2026 · Status: aguardando validação de Eduardo Luiz Silva**
+**Versão 2.7 · 19/09/2026 · Status: ✅ validado por Eduardo Luiz Silva em 19/09/2026**
+
+> **O que mudou da 2.6 para a 2.7.** **Dois gates humanos cumpridos:** a amostra das telas e o PAD-002, ambos aprovados por Eduardo em 19/09/2026. O projeto passa de PF-07 para PF-08.
+> **Correção de um defeito meu:** as restrições de **design das telas** e de **marca** — logomarca sempre sozinha — tinham desaparecido do documento na reescrita da versão 2.0. Foram repostas na seção 13.
 
 > **O que mudou da 2.5 para a 2.6.** Recebidas as três planilhas auditáveis da classificação da carteira. O modelo deixou de ser descrição de deck e virou **especificação completa**, em [`modelo-classificacao-carteira.md`](modelo-classificacao-carteira.md). **Decisão sua:** a classificação passa a ser **calculada dentro do CRM**, com as notas alimentadas nele — não mais mantida em planilha. Dois defeitos foram encontrados nas fórmulas e estão registrados. Entraram também as telas de entrada de lead na amostra.
 
@@ -394,6 +397,9 @@ Os 12 KPIs medem **resultado**. Faltam os que medem se o processo está sendo se
 - **Política de horas de conforto não formalizada.** Também pendência do fluxo: falta saldo por cliente, unidade, registro do débito e quem autoriza. O CRM precisa dela para controlar o saldo.
 - **Alçadas de aprovação são presumidas** no fluxo, a validar com a Alta Direção. Isso inclui quem aprova aditivo e quem aprova absorção fora da política.
 - **Tecnologias:** PostgreSQL, Python e React.
+- **Design das telas: padrão Critério CRM (PAD-002), aprovado por Eduardo em 19/09/2026.** **(decisão tomada)** A fonte da verdade é o artefato do sistema, não a nota. *Ressalva:* a nota do PAD-002 vive na branch `docs/PAD-002-design-criterio-crm`, **ainda não mesclada à `main`** — enquanto isso não for feito, o padrão está aprovado mas não publicado para a casa.
+- **Proposta e contrato seguem o manual da marca da Critério**, não o design do CRM. **A logomarca aparece sempre sozinha.**
+- **Amostra das telas aprovada por Eduardo em 19/09/2026** — gate PF-07 cumprido. Seis telas em <https://claude.ai/artifact/2EiCBrFhPdvbniQWZgtgTK>. *As amostras de `Skeleton` e `Combobox` citadas no PAD-002 são item separado e seguem pendentes.*
 - **Infraestrutura:** nuvem já reservada para esta aplicação. **(decisão tomada)** Provedor e **região do servidor** ainda pendentes — a região é onde ficam dados de clientes.
 - **Ambientes separados** para teste e produção. **(decisão tomada)**
 - **Backup automático**, nunca dependente de pessoa. **(decisão tomada)**

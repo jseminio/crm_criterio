@@ -1,7 +1,8 @@
 # Critério CRM — Anexo Técnico de Encaminhamento
 
 > **Este anexo é de uso interno da equipe técnica e não precisa ser lido ou aprovado pelo cliente.**
-> Versão 2.5 · 19/09/2026 · espelha o `documento-de-negocio.md` da mesma pasta.
+> Versão 2.6 · 19/09/2026 · espelha o `documento-de-negocio.md` da mesma pasta.
+> **Mudou da 2.5:** três planilhas auditáveis da classificação lidas. O modelo completo — fórmulas, cortes, réguas, agregação e dois defeitos — está em `modelo-classificacao-carteira.md`, documento próprio. A classificação passa a ser **calculada no CRM**, por decisão de Eduardo.
 > **Mudou da 2.4:** recebida a **Matriz de Objeções** (17 registros, 18 campos) — seção (b2.6). Entra como base viva, com separação entre catálogo e ocorrência. Tensão identificada entre a matriz e o MP-SC-01 sobre absorção de esforço extra.
 > **Mudou da 2.3:** adotados os **12 KPIs oficiais** (`KPI de Head de Novos Negócios`) — seção (b2.5). Decididos: cadência de reunião por classe, quem atribui as notas humanas do Score, e a entrada de KYC, PRA e dashboard contábil. Quatro entidades novas exigidas pelos KPIs.
 > **Mudou da 2.2:** recebidos o **Macroprocesso Comercial & Sucesso do Cliente** e o deck **Classificação da Carteira por Grupo Econômico** — seção (b2.4). Duas consequências: a **unidade de cliente vira o grupo econômico** e entra um **terceiro módulo, Carteira e CS**. Perfis de acesso resolvidos pelas três visões do deck.
@@ -510,7 +511,7 @@ Origem (tipo de canal, canal, captador) · linha C1 ou C2 · serviço e tipo de 
 
 ```json
 {
-  "versao_documento": "2.5",
+  "versao_documento": "2.6",
   "necessidade_principal": "CRM proprio da Critério cobrindo o cliente do primeiro contato ate a carteira madura, tendo o GRUPO ECONOMICO como unidade: (1) comercial — entrevista no Granola, lead, ficha de volumetria, porte, preco, proposta, contrato no Clicksign; (2) implantacao acompanhada por responsavel de area ate o cliente operar; (3) carteira e Sucesso do Cliente — classificacao viva por score/semaforo/eixo de acao, alertas de churn e inadimplencia, e reunioes de resultado com cadencia ligada a classe.",
   "necessidades_secundarias": [
     "Cálculo automático de preço a partir dos direcionadores — depende de existir tabela ou fórmula hoje",
@@ -723,7 +724,8 @@ Origem (tipo de canal, canal, captador) · linha C1 ou C2 · serviço e tipo de 
     "perfis_de_acesso": "Tres visoes sobre a MESMA classificacao, conforme o deck da carteira: Lideranca (score, margem, trava, alertas, eixo de acao), Customer Success (classe, classe efetiva, alertas, eixo de acao), Operacao (letra, semaforo, complexidade, disciplina, risco tecnico). Uma classificacao, varias projecoes de leitura — nunca duas tabelas.",
     "cadencia_reunioes": "Mensal para classe A, trimestral para B, semestral para C (decisao de Eduardo, 19/09/2026).",
     "notas_humanas_score": "Area tecnica atribui complexidade operacional, disciplina do cliente e risco tecnico. Comercial atribui potencial de cross-sell. Frequencia mensal.",
-    "matriz_de_objecoes": "Entra no CRM como base viva (decisao de Eduardo, 19/09/2026). Duas entidades: catalogo (17 objecoes, 18 campos) e ocorrencia (cada aparicao numa negociacao real). A matriz orienta e registra alcada — precedente 'nao' ou faixa ESCALAR avisam antes da concessao e exigem registro de quem decidiu; o CRM nunca concede automaticamente. Nao substitui parecer juridico; itens 'A VALIDAR' seguem pendentes de decisao humana."
+    "matriz_de_objecoes": "Entra no CRM como base viva (decisao de Eduardo, 19/09/2026). Duas entidades: catalogo (17 objecoes, 18 campos) e ocorrencia (cada aparicao numa negociacao real). A matriz orienta e registra alcada — precedente 'nao' ou faixa ESCALAR avisam antes da concessao e exigem registro de quem decidiu; o CRM nunca concede automaticamente. Nao substitui parecer juridico; itens 'A VALIDAR' seguem pendentes de decisao humana.",
+    "classificacao_carteira": "Calculada DENTRO do CRM (decisao de Eduardo, 19/09/2026); notas humanas alimentadas nele. Especificacao completa em modelo-classificacao-carteira.md, extraida das planilhas auditaveis. Parametros (pesos, cortes 3,95/3,35, reguas, matriz de horas, fator de atrito, imposto 11%) versionados com vigencia: cada classificacao guarda qual versao a produziu. DOIS DEFEITOS registrados: (1) o churn nao tem celula — esta literal dentro da formula, e o ISC le de outra fonte; (2) o fator de atrito parece indexar Disciplina sem a inversao 6-disc, o que inverteria o custo entre cliente organizado e desorganizado. Nenhuma formula e traduzida antes de decisao humana."
   },
   "oportunidades": {
     "melhoria": [
@@ -851,6 +853,12 @@ Origem (tipo de canal, canal, captador) · linha C1 ou C2 · serviço e tipo de 
     }
   ],
   "pontos_a_confirmar": [
+    "DEFEITO 7.2: conferir se a coluna Disciplina ja e preenchida invertida — basta olhar a nota de um cliente reconhecidamente organizado",
+    "Definir a escala 1-5 de disciplina, risco tecnico, cross-sell e adimplencia — as reguas de receita e rentabilidade existem, as humanas nao",
+    "Definir o criterio do semaforo operacional (1, 2, 3)",
+    "Definir a escala de churn (1 a 5) — hoje nao existe como campo",
+    "Decidir a assimetria: classe usa corte fixo (3,95/3,35), receita usa percentil da carteira",
+    "Periodicidade do recalculo e o que o dispara",
     "Tensao a resolver: a matriz alerta que absorver esforco extra 'vira expectativa'; o MP-SC-01 institui absorcao com debito de horas de conforto. Compativeis so se a politica de horas existir — e ela nao existe",
     "As 3 objecoes com precedente 'A VALIDAR' aguardam decisao de Bruno — entram no CRM como pendencia, nao como posicao da casa",
     "Quem pode registrar objecao nova no catalogo, e quem aprova a promocao de 'ocorrencia' para 'precedente'?",

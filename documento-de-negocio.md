@@ -1,6 +1,8 @@
 # Critério CRM — Documento de Negócio
 
-**Versão 2.5 · 19/09/2026 · Status: aguardando validação de Eduardo Luiz Silva**
+**Versão 2.6 · 19/09/2026 · Status: aguardando validação de Eduardo Luiz Silva**
+
+> **O que mudou da 2.5 para a 2.6.** Recebidas as três planilhas auditáveis da classificação da carteira. O modelo deixou de ser descrição de deck e virou **especificação completa**, em [`modelo-classificacao-carteira.md`](modelo-classificacao-carteira.md). **Decisão sua:** a classificação passa a ser **calculada dentro do CRM**, com as notas alimentadas nele — não mais mantida em planilha. Dois defeitos foram encontrados nas fórmulas e estão registrados. Entraram também as telas de entrada de lead na amostra.
 
 > **O que mudou da 2.4 para a 2.5.** Recebida a **Matriz de Objeções** — 17 objeções registradas com esquema de 18 campos. Entra no CRM como **base viva**, enriquecida a cada negociação. Ela fecha o laço do maior motivo de recusa da Critério e revela **uma tensão entre dois documentos da casa**, descrita na seção 5.
 
@@ -397,9 +399,12 @@ Os 12 KPIs medem **resultado**. Faltam os que medem se o processo está sendo se
 - **Backup automático**, nunca dependente de pessoa. **(decisão tomada)**
 - **Login pela conta corporativa** Microsoft. **(decisão tomada)**
 - **Quem aprova:** Eduardo. **(decisão tomada)**
+- **O questionário de volumetria ganha uma seção 9, para a implantação.** **(decisão tomada, 19/09/2026)** Oito campos pedidos por Bruno Soares: estrutura societária, reestruturação em curso, certificado digital, procuração eletrônica, domicílios eletrônicos, documentos para transição, saldos a migrar e quem concede acessos. **Sete deles também alimentam porte ou risco técnico** — o pedido da implantação melhora a precificação de quebra. Texto pronto em [`proposta-secao-9-questionario.md`](proposta-secao-9-questionario.md). **O arquivo oficial não foi alterado:** quem edita é pendência.
 - **Unidade de cliente: grupo econômico.** **(decisão tomada)** Receita e custo somados, sem rateio. O CNPJ continua visível dentro do grupo, porque é onde a empresa deficitária aparece.
 - **Perfis:** Karine administradora; demais usuários com alçada restrita. **(decisão tomada)** **O deck da carteira já resolve boa parte dessa regra:** são três visões sobre o mesmo dado — Liderança vê tudo, CS vê classe e ação, Operação vê só a letra e os quesitos de esforço. Adoto isso como ponto de partida dos perfis.
-- **Classificação viva, não recalculada.** O CRM mantém score, classe, semáforo, classe efetiva e eixo de ação atualizados, com histórico. **A classe é uma só; o que muda é a coluna que cada perfil enxerga.**
+- **A classificação da carteira é calculada dentro do CRM.** **(decisão tomada, 19/09/2026)** As notas humanas são alimentadas no CRM; score, classe, classe efetiva, alertas, eixo de ação e ISC são calculados por ele. A planilha deixa de ser o sistema de registro. Modelo completo em [`modelo-classificacao-carteira.md`](modelo-classificacao-carteira.md).
+- **Parâmetros versionados, não constantes de código.** Pesos, cortes de classe, réguas, matriz de horas e fator de atrito mudam com o tempo. Cada classificação guarda **qual versão dos parâmetros a produziu** — senão reclassificar o passado apaga a história.
+- **Nenhuma fórmula é traduzida antes de decisão sobre os dois defeitos** encontrados nas planilhas (seção 7 do modelo). **A classe é uma só; o que muda é a coluna que cada perfil enxerga.**
 - **Cadência de reuniões de resultado: mensal para A, trimestral para B, semestral para C.** **(decisão tomada, 19/09/2026)**
 - **Quem atribui as notas humanas do Score, uma vez por mês:** **área técnica** avalia complexidade operacional, disciplina do cliente e risco técnico; **comercial** avalia potencial de cross-sell. **(decisão tomada)**
 - **KYC, PRA e dashboard contábil do cliente entram no CRM**, como parte da avaliação de sucesso do cliente. **(decisão tomada)**

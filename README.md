@@ -10,16 +10,28 @@ listas para campanha.
 
 | Item | Situação |
 |---|---|
-| Fase do pipeline | 🟪 Entendimento PF-01 Discovery |
-| Gate à frente | ✅ Suficiência — o documento de negócio precisa da validação de Eduardo |
+| Fase do pipeline | 🟦 Definição PF-07 Desenho da Solução |
+| Gate cumprido | ✅ Suficiência — documento validado por Eduardo em 19/09/2026 |
+| Gate à frente | ⛔ **Amostra aprovada** — a amostra existe e aguarda decisão de Eduardo |
+| Amostra | https://claude.ai/artifact/2EiCBrFhPdvbniQWZgtgTK — 6 telas, privada |
 | Classe | a definir na próxima fase |
 | Branch | `feat/crm-descoberta-negocio` |
 
 ## Conteúdo
 
-- `documento-de-negocio.md` — versão 2.5, para leitura e aprovação de Eduardo.
-- `anexo-tecnico.md` — versão 2.5, uso interno: resumo estruturado, mapa de
+- `documento-de-negocio.md` — versão 2.6, para leitura e aprovação de Eduardo.
+- `anexo-tecnico.md` — versão 2.6, uso interno: resumo estruturado, mapa de
   campos derivado do roteiro de entrevista e bloco JSON.
+- `proposta-secao-9-questionario.md` — texto pronto dos oito campos que entram
+  no questionário (**decisão de 19/09/2026**), pedidos pela implantação.
+  **O arquivo oficial no SharePoint não foi alterado.**
+- `regua-de-porte-e-plano-de-teste.md` — **hipótese**: régua de porte por
+  volume, fator de atrito na proposta, plano de teste em 3 passos e o mapa do
+  questionário servindo preço, atrito e implantação (pedido de Bruno Soares).
+  Nada entra no CRM antes do teste.
+- `modelo-classificacao-carteira.md` — especificação do modelo de saúde da
+  carteira, extraída das planilhas auditáveis: fórmulas, cortes, réguas,
+  agregação por grupo e **dois defeitos encontrados**. É o que o CRM implementa.
 - `rascunho-checklist-implantacao-contabil.md`
 - `rascunho-checklist-implantacao-fiscal.md`
 - `rascunho-checklist-implantacao-dp.md`
@@ -54,6 +66,13 @@ estratégia de negociação. Só o esquema e as regras de comportamento.
 **KPIs:** `KPI de Head de Novos Negócios.xlsx` — SharePoint, site Comercial,
 `01. Ponto de Partida/04_Analises/`. Lida em 19/09/2026. 12 indicadores oficiais.
 
+**Classificação da carteira:** três planilhas auditáveis em
+`…/Classificação Curva ABC/Final/` — `Classificacao_Grupo_COMPLETO.xlsx`,
+`Rentabilidade_Grupo_COMPLETO.xlsx` e `Faturamento_Grupo_COMPLETO.xlsx`.
+Lidas em 19/09/2026. **Fórmulas e parâmetros** foram extraídos para
+`modelo-classificacao-carteira.md`; **nenhum nome de cliente ou valor
+individual** foi copiado.
+
 **Carteira e CS:** `Macroprocesso - Comercial & Sucesso do Cliente.pptx` e
 `Categorizado de clientes Curva ABC_Final.pptx`, no OneDrive Frame Capital,
 lidos em 19/09/2026. Nomes de cliente, receitas e margens **não** foram
@@ -86,8 +105,11 @@ derivados da estrutura das notas, sem nenhum valor de cliente.
 3. **Decidir sobre as divergências das planilhas de precificação** (anexo
    técnico, seção b1.1) e **definir a regra de porte do cliente**. Nenhuma
    fórmula de preço é traduzida antes disso.
-4. **Como a área técnica recebe o cliente hoje** — e se existe checklist.
-5. Aprovação do PAD-002 antes de construir tela.
+4. **Conferir o defeito 7.2 do modelo de carteira** — se o fator de atrito
+   inverte a disciplina. Afeta margem, Score e classe.
+5. **Definir as escalas 1–5 das notas humanas**, o critério do semáforo e a
+   escala de churn. Sem elas o CRM calcula, mas ninguém sabe o que avaliar.
+6. Aprovação do PAD-002 e da amostra, antes de construir tela.
 6. Versões oficiais do questionário de volumetria, dos modelos de proposta e
    do contrato.
 7. Escolha da ferramenta de assinatura digital, com validade jurídica, trilha

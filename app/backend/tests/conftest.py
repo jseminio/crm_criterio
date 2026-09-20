@@ -19,6 +19,22 @@ from sqlalchemy.orm import Session
 from crm.db.modelos import Base
 
 
+@pytest.fixture(autouse=True)
+def ambiente_isolado(tmp_path, monkeypatch):
+    """Nenhum teste enxerga o `.env` nem as variáveis da máquina de quem roda.
+
+    Sem isto a suíte passa ou falha conforme o computador esteja configurado —
+    e foi exatamente o que aconteceu: três testes de configuração passaram
+    enquanto não havia `.env` e quebraram no instante em que ele foi criado.
+    Teste que depende do ambiente local não prova nada.
+    """
+    from crm.db import sessao as modulo
+
+    monkeypatch.setattr(modulo, "ARQUIVO_ENV", tmp_path / "sem-env")
+    for nome in (modulo.VARIAVEL, *modulo.PARTES.values()):
+        monkeypatch.delenv(nome, raising=False)
+
+
 @pytest.fixture
 def engine() -> sa.Engine:
     motor = sa.create_engine("sqlite+pysqlite:///:memory:", future=True)

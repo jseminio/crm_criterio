@@ -11,6 +11,7 @@ import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
+from urllib.parse import quote
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
@@ -21,11 +22,28 @@ __all__ = [
     "criar_fabrica_de_sessao",
     "sessao",
     "VARIAVEL",
+    "PARTES",
     "ARQUIVO_ENV",
     "BancoNaoConfigurado",
 ]
 
 VARIAVEL = "CRM_DATABASE_URL"
+
+#: As partes da conexão, para quem não quer montar um endereço à mão.
+#:
+#: Existe porque senha com caractere especial quebra dentro de uma URL — o "#"
+#: inicia a âncora e **descarta tudo depois dele**, em silêncio, e a
+#: autenticação falha sem dizer por quê. Aqui a senha é escrita crua e quem
+#: codifica é o código.
+PARTES = {
+    "host": "CRM_DB_HOST",
+    "porta": "CRM_DB_PORT",
+    "banco": "CRM_DB_NAME",
+    "usuario": "CRM_DB_USER",
+    "senha": "CRM_DB_PASSWORD",
+}
+
+PADROES = {"host": "localhost", "porta": "5432", "banco": "criterio_crm"}
 
 #: Só para teste e exploração local. Não serve de produção: não persiste.
 URL_DE_MEMORIA = "sqlite+pysqlite:///:memory:"
@@ -42,6 +60,60 @@ class BancoNaoConfigurado(RuntimeError):
 
 #: Onde procurar o arquivo de ambiente: a raiz do backend.
 ARQUIVO_ENV = Path(__file__).resolve().parents[3] / ".env"
+
+
+def _ambiente(arquivo: Path | None = None) -> dict[str, str]:
+    """Junta as variáveis do processo com as do `.env`. O processo vence."""
+    valores = dict(_todas_do_arquivo(arquivo))
+    valores.update(os.environ)
+    return valores
+
+
+def _todas_do_arquivo(arquivo: Path | None = None) -> dict[str, str]:
+    """Lê todas as atribuições do `.env`, quando ele existir.
+
+    **Nenhum valor lido aqui entra em log ou em mensagem de erro.**
+    Formato: uma atribuição por linha, `#` comenta, aspas são opcionais.
+    """
+    arquivo = arquivo or ARQUIVO_ENV
+    if not arquivo.is_file():
+        return {}
+    try:
+        conteudo = arquivo.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    valores: dict[str, str] = {}
+    for linha in conteudo.splitlines():
+        limpa = linha.strip()
+        if not limpa or limpa.startswith("#") or "=" not in limpa:
+            continue
+        chave, _, valor = limpa.partition("=")
+        valor = valor.strip()
+        if len(valor) >= 2 and valor[0] == valor[-1] and valor[0] in "\"'":
+            valor = valor[1:-1]
+        if valor:
+            valores[chave.strip()] = valor
+    return valores
+
+
+def _montar_das_partes(valores: dict[str, str]) -> str | None:
+    """Monta a URL a partir de host, porta, banco, usuário e senha.
+
+    **A senha é codificada aqui**, com `safe=""`, para que nenhum caractere
+    especial — `#`, `@`, `/`, `?`, `:`, `%`, espaço — mude o significado do
+    endereço. Quem escreve o `.env` escreve a senha como ela é.
+    """
+    usuario = valores.get(PARTES["usuario"])
+    senha = valores.get(PARTES["senha"])
+    if not usuario or not senha:
+        return None
+    host = valores.get(PARTES["host"], PADROES["host"])
+    porta = valores.get(PARTES["porta"], PADROES["porta"])
+    banco = valores.get(PARTES["banco"], PADROES["banco"])
+    return (
+        f"postgresql+psycopg://{quote(usuario, safe='')}:{quote(senha, safe='')}"
+        f"@{host}:{porta}/{banco}"
+    )
 
 
 def _ler_do_arquivo(arquivo: Path | None = None) -> str | None:
@@ -76,18 +148,22 @@ def _ler_do_arquivo(arquivo: Path | None = None) -> str | None:
 
 
 def url_do_banco(padrao: str | None = None) -> str:
-    """Devolve a URL de conexão: variável de ambiente, depois `.env`, depois `padrao`.
+    """Devolve a URL de conexão, nesta ordem de precedência:
 
-    `padrao` existe para o teste passar a URL em memória de propósito — nunca
-    para produção adivinhar um destino.
+    1. `CRM_DATABASE_URL` no ambiente — é assim que provedor de nuvem entrega;
+    2. `CRM_DATABASE_URL` no `.env`;
+    3. as partes `CRM_DB_*`, montadas e codificadas aqui — o caminho recomendado
+       em desenvolvimento, porque não exige acertar escape de endereço;
+    4. `padrao`, que só o teste passa. Produção nunca adivinha um destino.
     """
-    url = os.environ.get(VARIAVEL) or _ler_do_arquivo() or padrao
+    valores = _ambiente()
+    url = valores.get(VARIAVEL) or _montar_das_partes(valores) or padrao
     if not url:
         raise BancoNaoConfigurado(
-            f"{VARIAVEL} não está definida, e {ARQUIVO_ENV.name} não a traz. "
-            f"Aponte-a para o PostgreSQL, por exemplo "
-            f"postgresql+psycopg://usuario@localhost:5432/criterio_crm, e "
-            f"mantenha o valor em .env — nunca no código."
+            f"Não sei onde está o banco. Preencha {ARQUIVO_ENV} com "
+            f"{PARTES['usuario']} e {PARTES['senha']} — a senha vai crua, o "
+            f"código codifica — ou defina {VARIAVEL} com o endereço inteiro. "
+            f"Modelo em .env.example. Segredo nunca vai para o código."
         )
     return url
 

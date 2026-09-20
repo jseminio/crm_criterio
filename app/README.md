@@ -138,18 +138,42 @@ fecharia um ciclo deixando os dois sem raiz.
 
 ### Credenciais
 
-`CRM_DATABASE_URL`, lida do ambiente. **Não está no `alembic.ini`**, que é
-versionado. Ver `.env.example`. Sem a variável, o código **para com mensagem
-clara** em vez de gravar dado de cliente num SQLite improvisado.
+Nada disso está no `alembic.ini`, que é versionado. O código lê o `.env`
+sozinho — nenhum comando precisa exportar variável, e a senha não passa por
+linha de comando nem fica no histórico do shell.
 
-O código lê o `.env` sozinho: nenhum comando precisa exportar a variável, e a
-URL — que carrega senha — não passa pela linha de comando nem fica no histórico
-do shell. A ordem de precedência é ambiente, depois `.env`.
+**Em desenvolvimento, use as partes separadas.** A senha vai **crua**, e quem
+codifica é `crm.db.sessao`:
+
+```
+CRM_DB_USER=criterio_crm
+CRM_DB_PASSWORD=a senha como ela é, com # @ / % ou espaço
+```
+
+**Na nuvem, use o endereço inteiro** — é como o provedor entrega — e ele tem
+precedência sobre as partes:
+
+```
+CRM_DATABASE_URL=postgresql+psycopg://usuario:senha@servidor:5432/banco
+```
+
+> **Por que existem os dois.** Senha dentro de uma URL precisa de escape, e
+> errar isso falha de um jeito cruel: o `#` inicia a âncora, **tudo depois dele
+> é descartado em silêncio**, a senha chega truncada e o servidor responde
+> apenas *password authentication failed*. Aconteceu aqui em 20/09/2026. As
+> partes separadas eliminam a classe inteira de problema.
+
+Sem nenhum dos dois, o código **para com mensagem clara** em vez de gravar dado
+de cliente num SQLite improvisado.
 
 ```bash
-cp backend/.env.example backend/.env   # e preencha
+cp backend/.env.example backend/.env   # e preencha CRM_DB_PASSWORD
 cd backend && ~/.venvs/criterio-crm/bin/alembic upgrade head
 ```
+
+`scripts/configurar_env.py` faz o mesmo perguntando a senha sem mostrá-la na
+tela, mas **exige um terminal de verdade** — por botão ou por pipe ele para com
+aviso em vez de morrer com erro de leitura.
 
 ### O servidor desta máquina
 

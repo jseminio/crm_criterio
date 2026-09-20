@@ -37,7 +37,17 @@ def ambiente_isolado(tmp_path, monkeypatch):
 
 @pytest.fixture
 def engine() -> sa.Engine:
-    motor = sa.create_engine("sqlite+pysqlite:///:memory:", future=True)
+    # StaticPool com uma conexão só, compartilhada entre threads.
+    #
+    # SQLite em memória cria um banco **por conexão**: sem isto, o teste grava
+    # num banco e a API, que roda noutra thread, lê de outro vazio. O padrão
+    # `check_same_thread` do driver também proibiria o uso cruzado.
+    motor = sa.create_engine(
+        "sqlite+pysqlite:///:memory:",
+        future=True,
+        poolclass=sa.pool.StaticPool,
+        connect_args={"check_same_thread": False},
+    )
 
     # O SQLite ignora chave estrangeira por padrão. Sem isto, um teste passaria
     # com um vínculo que o PostgreSQL recusaria.

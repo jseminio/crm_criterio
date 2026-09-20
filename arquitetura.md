@@ -10,12 +10,12 @@ código foi escrita.
 
 ## 1. Premissas a confirmar
 
-Uma foi fechada; duas seguem assumidas.
+Duas foram fechadas; uma segue aberta.
 
 | Premissa | Situação | Consequência |
 |---|---|---|
 | **Região do servidor** | ✅ **Brasil — decisão de Eduardo em 19/09/2026** | Banco, arquivos e backup ficam em região brasileira. Vale também para os serviços que tocam dado de cliente |
-| **A virada** | Assumido: paralelo com a planilha, depois corte | Se for corte seco, a carga precisa ser perfeita de primeira e não há rede de segurança |
+| **A virada** | ✅ **Paralelo com a planilha — decisão de 20/09/2026** | A carga roda mais de uma vez: precisa ser **idempotente**, com identidade por conteúdo e não por número de linha |
 | **Prazo e orçamento** | Sem restrição declarada | Define quanto da Etapa 1 cabe na primeira entrega |
 
 Outras premissas menores estão marcadas ao longo do texto com *(a confirmar)*.

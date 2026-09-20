@@ -1,6 +1,10 @@
 # Critério CRM — Planejamento da Etapa 1
 
-**PF-09 · 19/09/2026 · Status: para revisão**
+**PF-09 · 19/09/2026 · atualizado em 20/09/2026 · Status: sequência aprovada**
+
+> **Decisões de Eduardo em 20/09/2026:** a sequência dos cinco incrementos está
+> **aprovada**; a virada será **em paralelo com a planilha**; o de-para dos
+> grupos segue o **caminho 2** — carregar e reagrupar depois.
 
 Recorta a Etapa 1 — *"sair da planilha"* — em cinco incrementos, cada um
 entregando algo que você usa e valida. Alimenta a proposta do PF-09.5, onde
@@ -115,7 +119,7 @@ decisão, não de programação.
 | **E1** | Provedor de nuvem e acesso para criar o ambiente | Nuvem reservada; provedor a confirmar |
 | **E2** | **O de-para dos grupos econômicos** — quais empresas formam quais grupos, nas 154 propostas | ⚠️ Ver seção 5 |
 | **E2** | Aprovar as listas padronizadas | Você autorizou eu propor |
-| **E2** | Decidir a virada: paralelo ou corte seco | Em aberto |
+| **E2** | A virada | ✅ **Paralelo com a planilha** — decisão de 20/09/2026 |
 | **E3** | Confirmar que "Nome da oportunidade" é o nome do cliente | Respondido: falta preencher |
 | **E4** | Modelos oficiais de proposta | Dois PPTX recebidos, a confirmar como oficiais |
 | **E4** | Questionário v3 | ✅ Pronto, em Downloads |
@@ -135,8 +139,9 @@ das 154 são reconhecíveis. Três caminhos:
 
 1. **Agrupar tudo antes de carregar** — base limpa de saída, mais trabalho antes.
 2. **Carregar cada proposta como grupo próprio e reagrupar depois**, com uma
-   função de fundir grupos no CRM. *Recomendo este.* O trabalho vira contínuo em
-   vez de bloqueante, e a fusão é útil de qualquer forma.
+   função de fundir grupos no CRM. ✅ **Caminho escolhido por Eduardo em
+   20/09/2026.** O trabalho vira contínuo em vez de bloqueante, e a fusão de
+   grupos é útil de qualquer forma — empresas mudam de mão.
 3. **Carregar só as 40 aceitas**, que viraram cliente e já estão na carteira.
    Rápido, mas perde a história das recusas — que é justamente onde estão os
    motivos e a matriz de objeções.
@@ -147,7 +152,7 @@ das 154 são reconhecíveis. Três caminhos:
 |---|---|---|
 | **O de-para de grupos é maior do que parece** | Trava o E2, que trava tudo | Caminho 2 da seção 5: carregar e reagrupar depois |
 | **Gerar PowerPoint programaticamente** | O E4 estica sem aviso | Decidir cedo: gerar PDF, preencher um modelo, ou manter o documento fora e só registrar |
-| **A virada indefinida** | Muda o rigor exigido da carga | Fechar antes do E2 |
+| **Carga rodando mais de uma vez** | Paralelo significa reimportar enquanto a planilha continua viva. Sem identidade estável, a segunda carga duplica tudo | A carga precisa ser **idempotente**: identidade por conteúdo, não por número de linha. Ver seção 9 |
 | **Construção intermitente** | Um incremento longo atravessa semanas e perde o fio | Foi por isso que E2 e E3 não viraram um só |
 | **Escopo crescendo durante a construção** | Cada material novo trouxe escopo — e foi bom | A Etapa 1 está fechada aqui. O que aparecer entra na lista da Etapa 2 |
 
@@ -173,10 +178,43 @@ canais novos, cálculo de preço.
 
 ## 8. O que falta para a proposta (PF-09.5)
 
-1. **Prazo e orçamento** — a única premissa da arquitetura ainda aberta que este
-   plano não resolve. É o que transforma tamanho relativo em compromisso.
-2. **Decidir o caminho do de-para** (seção 5).
-3. **A virada:** paralelo ou corte seco.
-4. **Confirmar a sequência** dos cinco incrementos.
+Três das quatro estão fechadas. Resta uma:
 
-Com essas quatro, escrevo a proposta — e ela é o seu próximo gate.
+1. **Prazo e orçamento** — ver seção 10, que explica o que a pergunta quer dizer
+   num projeto construído pelo próprio dono.
+
+## 9. O que a virada em paralelo exige do código
+
+Rodar em paralelo significa que **a planilha continua viva enquanto o CRM já
+existe**, e que a carga vai rodar mais de uma vez — a cada rodada trazendo o que
+mudou na planilha desde a anterior.
+
+Isso impõe uma exigência que o corte seco não teria: **a carga precisa ser
+idempotente.** Importar duas vezes a mesma planilha não pode gerar duas
+oportunidades.
+
+O código escrito hoje ainda **não** atende a isso: ele identifica cada proposta
+pelo número da linha, e número de linha muda quando alguém insere uma linha no
+meio. A identidade precisa vir do conteúdo — nome da oportunidade, data de
+colocação e serviço, ou uma chave que a planilha passe a carregar.
+
+**É a primeira coisa a resolver no E2.** Está registrado como dívida do código
+em `app/README.md`.
+
+## 10. O que "prazo e orçamento" quer dizer aqui
+
+A pergunta estava mal formulada: num projeto contratado, prazo e orçamento são
+contrato. Aqui **quem constrói é o dono**, então as duas palavras significam
+outra coisa.
+
+**Orçamento** são duas contas, e só a segunda costuma doer:
+
+- **Dinheiro recorrente:** nuvem, Clicksign, eventual API de WhatsApp, plano do
+  Granola. É o custo de manter o CRM no ar, todo mês, para sempre.
+- **Seu tempo:** quantas horas por semana você consegue dedicar de fato. É a
+  restrição real — o projeto anda na velocidade disso, e nada mais.
+
+**Prazo** é uma pergunta só: **existe uma data que importa?** Fechamento de
+dezembro, contratação de alguém, uma reunião de sócios. Se existir, ela define
+o que cabe. Se não existir, o plano é ordem sem calendário — o que é legítimo,
+mas significa que não há compromisso a cobrar.

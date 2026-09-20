@@ -17,6 +17,11 @@ from enum import Enum
 
 __all__ = [
     "Situacao",
+    "SituacaoLead",
+    "SituacaoGrupo",
+    "SituacaoEmpresa",
+    "PapelContato",
+    "Origem",
     "TipoCanal",
     "Temperatura",
     "LinhaServico",
@@ -63,6 +68,70 @@ class Situacao(Enum):
     @property
     def ganha(self) -> bool:
         return self is Situacao.ACEITA
+
+
+class SituacaoLead(Enum):
+    """Onde o lead está antes de virar oportunidade.
+
+    ⚠️ **Proposta.** O funil de lead não existe na planilha de 2026 — ela começa
+    na proposta já enviada. Estes cinco estados saem do desenho aprovado em
+    19/09/2026 e ainda não foram usados por ninguém.
+    """
+
+    NOVO = "Novo"
+    EM_CONTATO = "Em contato"
+    QUALIFICADO = "Qualificado"
+    CONVERTIDO = "Convertido"
+    DESCARTADO = "Descartado"
+
+    @property
+    def aberto(self) -> bool:
+        return self in {SituacaoLead.NOVO, SituacaoLead.EM_CONTATO, SituacaoLead.QUALIFICADO}
+
+
+class SituacaoGrupo(Enum):
+    """O que o grupo econômico é para a Critério hoje.
+
+    ``FUNDIDO`` é o estado de um grupo que se revelou parte de outro. Ele não é
+    apagado: a arquitetura proíbe exclusão física. Fica apontando para quem o
+    absorveu, e o histórico continua legível.
+    """
+
+    PROSPECT = "Prospect"
+    CLIENTE = "Cliente"
+    ENCERRADO = "Encerrado"
+    FUNDIDO = "Fundido"
+
+    @property
+    def ativo(self) -> bool:
+        return self in {SituacaoGrupo.PROSPECT, SituacaoGrupo.CLIENTE}
+
+
+class SituacaoEmpresa(Enum):
+    ATIVA = "Ativa"
+    INATIVA = "Inativa"
+    BAIXADA = "Baixada"
+
+
+class PapelContato(Enum):
+    """Para que serve falar com esta pessoa."""
+
+    DECISOR = "Decisor"
+    INFLUENCIADOR = "Influenciador"
+    USUARIO = "Usuário"
+    PONTO_FOCAL = "Ponto focal"
+
+
+class Origem(Enum):
+    """De onde o registro veio.
+
+    Distingue o que a carga trouxe do que nasceu no CRM. Enquanto a planilha e o
+    CRM rodarem em paralelo — decisão de Eduardo em 20/09/2026 — essa diferença
+    é o que permite recarregar sem atropelar o que foi digitado aqui.
+    """
+
+    CARGA_2026 = "Carga 2026"
+    CRM = "CRM"
 
 
 class TipoCanal(Enum):

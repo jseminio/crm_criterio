@@ -69,14 +69,14 @@ desconhecida bloqueia. A distinção é do negócio, não do código.
 - **Não calcula a taxa de conversão.** O denominador é decisão pendente — 38%
   ou 26%. `Situacao.decidida` marca o conceito e para por aí.
 
-## A identidade da proposta — resolvida em 20/09/2026
+## A identidade da proposta
 
-Eduardo decidiu **rodar o CRM em paralelo com a planilha**. A carga passa a
-rodar mais de uma vez, então cada proposta precisa de uma **identidade estável**:
-reimportar não pode duplicar.
+Eduardo decidiu **rodar o CRM em paralelo com a planilha**. A carga roda mais de
+uma vez, então cada proposta precisa de identidade estável: reimportar não pode
+duplicar.
 
-`Proposta.linha` não serve — número de linha muda quando alguém insere uma linha
-no meio. Testei quatro candidatos contra as 157 propostas reais:
+`linha` não serve — número de linha se desloca quando alguém insere uma linha no
+meio. Testei quatro candidatos contra as 157 propostas reais:
 
 | Chave | Chaves distintas | Colisões |
 |---|---|---|
@@ -85,25 +85,78 @@ no meio. Testei quatro candidatos contra as 157 propostas reais:
 | nome + data + serviço | 151 | 6 |
 | **nome + data + serviço + tipo de serviço** | **156** | **1** |
 
-**A chave adotada é a última.** Cinco das seis colisões anteriores eram
-propostas legítimas e distintas — mesmo cliente, mesma data, mesmo serviço,
-**valores diferentes**: são cenários alternativos oferecidos ao cliente, e o
-tipo de serviço os separa. Preservá-los é correto; fundi-los apagaria a
-negociação.
+**Adotada a última**, em `crm/carga/identidade.py`. Cinco das seis colisões
+anteriores eram propostas legítimas e distintas — mesmo cliente, mesma data,
+mesmo serviço, **valores diferentes**: são cenários alternativos oferecidos ao
+cliente. Preservá-los é correto; fundi-los apagaria a negociação.
 
 `linha` continua no modelo para apontar a origem no relatório de conferência.
-Deixa de ser identidade.
+Deixou de ser identidade.
 
-> **Defeito encontrado na planilha.** Sobra **uma colisão real**: as linhas
-> **317 e 318** da aba são idênticas em todos os dezessete campos — mesmo
-> cliente, data, serviço, tipo, captador, canal, situação e valores. É linha
-> duplicada, não cenário alternativo. Efeito: a contagem de propostas e o valor
-> total do funil estão **inflados em uma proposta de consultoria**. A carga vai
-> avisar e importar uma só; **confirme com a Karine antes**, porque só quem
-> digitou sabe se era duplicação ou dois contratos iguais de verdade.
+> **Defeito confirmado na planilha.** Sobra **uma colisão real**: as linhas
+> **317 e 318** são idênticas nos dezessete campos comparados. É linha repetida,
+> não cenário alternativo, e infla a contagem e o valor do funil em uma proposta
+> de consultoria. `detectar_duplicatas` separa os dois casos e **não decide
+> nada** — descreve, para que uma pessoa confirme. **Confirme com a Karine.**
 
-**O que falta implementar:** a chave e o aviso de duplicata. É a primeira coisa
-do E2, antes dos modelos do banco.
+## O banco
+
+Modelos em `crm/db/modelos.py`, migrações em `migrations/`. Cinco tabelas, que
+são o que o E2 e o E3 pedem: `grupo_economico`, `empresa`, `pessoa_contato`,
+`lead`, `oportunidade`.
+
+**Contrato, implantação e carteira classificada não estão aqui.** Estão na
+arquitetura, e cada uma depende de decisão humana ainda pendente.
+
+### Três decisões que valem para todas as tabelas
+
+**Listas controladas viram texto legível, não tipo nativo do banco.** Um `ENUM`
+do PostgreSQL exige `ALTER TYPE` para ganhar um valor novo, e as listas são
+proposta ainda não aprovada: vão mudar. Guardamos `"Enviar proposta"`, não
+`"ENVIAR_PROPOSTA"`, para que uma consulta direta ao banco seja legível.
+
+**Sem restrição de verificação duplicando a lista.** A validação já vive em
+`normalizar_*`. Repeti-la no banco criaria a segunda cópia da mesma regra —
+o oposto da diretriz da casa: *modelo único = manutenção única*.
+
+**Exclusão nunca é física.** Grupo fundido não some: muda de situação e aponta
+para quem o absorveu. É o que preserva o histórico quando uma empresa muda de
+mão — e o que torna o caminho 2 reversível.
+
+### Fundir grupos
+
+A contrapartida do caminho 2. `crm/db/grupos.py` move empresas, oportunidades e
+contatos, e cuida de duas coisas que passariam batidas:
+
+- **um prospect que absorve um cliente vira cliente** — sem isso, reagrupar
+  rebaixaria a carteira sem ninguém ter decidido;
+- **a data de entrada do conjunto é a mais antiga** — é quando a Critério
+  começou a atender, não quando descobriu o vínculo.
+
+Recusa três fusões: um grupo nele mesmo, um grupo já fundido antes, e a que
+fecharia um ciclo deixando os dois sem raiz.
+
+### Credenciais
+
+`CRM_DATABASE_URL`, lida do ambiente. **Não está no `alembic.ini`**, que é
+versionado. Ver `.env.example`. Sem a variável, o código **para com mensagem
+clara** em vez de gravar dado de cliente num SQLite improvisado.
+
+```bash
+cp backend/.env.example backend/.env   # e preencha
+createdb criterio_crm
+cd backend && ~/.venvs/criterio-crm/bin/alembic upgrade head
+```
+
+> ⚠️ **A migração ainda não subiu num PostgreSQL de verdade.** Não há Postgres
+> nesta máquina — é a pendência de segunda-feira. Ela foi gerada e verificada
+> contra SQLite: sobe, desce e sobe de novo, e `alembic check` não acusa deriva
+> entre modelos e esquema.
+>
+> Os modelos usam só tipos genéricos — sem `JSONB`, sem array, sem `ENUM` nativo
+> — exatamente para que o comportamento seja o mesmo nos dois bancos. Mas isso é
+> argumento, não evidência. **O esquema precisa subir uma vez no Postgres real
+> antes de qualquer dado entrar.**
 
 ## Ressalva de processo — resolvida
 

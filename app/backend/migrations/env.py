@@ -8,16 +8,21 @@ from __future__ import annotations
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
 
 from crm.db.modelos import Base  # importa todas as entidades
-from crm.db.sessao import url_do_banco
+from crm.db.sessao import criar_engine, url_do_banco
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", url_do_banco())
+# A URL **não** é gravada em `config`. O `alembic.ini` é lido por configparser,
+# que trata `%` como marcador de interpolação — e a senha chega até aqui
+# codificada para endereço, cheia de `%23` e `%40`. Gravá-la ali derrubava a
+# migração com "invalid interpolation syntax", sem relação aparente com a causa.
+#
+# Aqui a URL vai direto para quem precisa dela, e o `.ini` segue sem credencial
+# nenhuma — que é como tem de ser num arquivo versionado.
 
 #: O alvo da comparação automática. Tudo que estiver em `Base` é candidato.
 target_metadata = Base.metadata
@@ -39,7 +44,7 @@ def _opcoes_comuns() -> dict:
 def migrar_sem_conexao() -> None:
     """Gera o SQL sem tocar no banco — para revisar antes de aplicar."""
     context.configure(
-        url=config.get_main_option("sqlalchemy.url"),
+        url=url_do_banco(),
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         **_opcoes_comuns(),
@@ -49,11 +54,8 @@ def migrar_sem_conexao() -> None:
 
 
 def migrar_com_conexao() -> None:
-    engine = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+
+    engine = criar_engine(url_do_banco())
     with engine.connect() as conexao:
         context.configure(connection=conexao, **_opcoes_comuns())
         with context.begin_transaction():

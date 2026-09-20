@@ -185,16 +185,35 @@ confirmado respondendo. Os binários não estão no `PATH` por padrão:
 sudo mkdir -p /etc/paths.d && echo /Library/PostgreSQL/18/bin | sudo tee /etc/paths.d/postgresql
 ```
 
-> ⚠️ **A migração ainda não subiu neste servidor.** Falta o banco e o papel da
-> aplicação existirem — criá-los exige a senha do superusuário, que é de
-> Eduardo e não passa por aqui.
->
-> Até lá, o que existe de evidência: a migração sobe, desce e sobe de novo
-> contra SQLite, e `alembic check` não acusa deriva entre modelos e esquema. Os
-> modelos usam só tipos genéricos — sem `JSONB`, sem array, sem `ENUM` nativo —
-> para que o comportamento seja o mesmo nos dois bancos. **Isso é argumento, não
-> evidência.** O esquema precisa subir uma vez no PostgreSQL real antes de
-> qualquer dado entrar.
+**A migração está aplicada neste servidor desde 20/09/2026.** Sobe, desce e
+sobe de novo, e `alembic check` não acusa deriva entre modelos e esquema.
+
+| Tabela | Colunas | Índices |
+|---|---|---|
+| `grupo_economico` | 10 | 2 |
+| `empresa` | 13 | 2 |
+| `pessoa_contato` | 14 | 3 |
+| `lead` | 19 | 3 |
+| `oportunidade` | 26 | 6 |
+
+### Duas lições do primeiro contato com o PostgreSQL
+
+Gerar migração contra SQLite e aplicar no PostgreSQL **não funciona**, mesmo com
+tipos genéricos. A primeira tentativa morreu em:
+
+```
+column "nao_contatar" is of type boolean but default expression is of type integer
+```
+
+SQLite escreve `false` como `0`; o PostgreSQL exige `false`. A migração foi
+regerada contra o PostgreSQL e passou. **Regra:** migração se gera contra o
+banco de destino, sempre. SQLite serve para o teste rodar rápido, não para
+decidir DDL.
+
+O `alembic.ini` **não recebe a URL nem em memória**. O `configparser` trata `%`
+como interpolação, e a senha chega codificada para endereço, cheia de `%23` e
+`%40`. Passá-la por ali derrubava a migração com `invalid interpolation syntax`
+— erro que não menciona senha nem URL, e custa caro para diagnosticar.
 
 ## Ressalva de processo — resolvida
 

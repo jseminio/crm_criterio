@@ -1,8 +1,8 @@
 """estrutura inicial: cliente, contato, lead e oportunidade
 
-Revisão: dddbca46c445
+Revisão: 57a039d70ed5
 Revisão anterior: 
-Criada em: 2026-09-20 06:53:25.014591
+Criada em: 2026-09-20 08:05:21.431045
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'dddbca46c445'
+revision: str = '57a039d70ed5'
 down_revision: str | None = None
 branch_labels: str | None = None
 depends_on: str | None = None
@@ -136,7 +136,7 @@ def upgrade() -> None:
     sa.Column('telefone', sa.String(length=30), nullable=True),
     sa.Column('papel', sa.Enum('Decisor', 'Influenciador', 'Usuário', 'Ponto focal', name='papelcontato', native_enum=False, length=40), nullable=True),
     sa.Column('observacao', sa.Text(), nullable=True),
-    sa.Column('nao_contatar', sa.Boolean(), server_default=sa.text('0'), nullable=False),
+    sa.Column('nao_contatar', sa.Boolean(), server_default=sa.text('false'), nullable=False),
     sa.Column('nao_contatar_em', sa.DateTime(timezone=True), nullable=True),
     sa.Column('nao_contatar_motivo', sa.String(length=200), nullable=True),
     sa.Column('criado_em', sa.DateTime(timezone=True), nullable=False),

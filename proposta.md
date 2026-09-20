@@ -1,6 +1,10 @@
 # Critério CRM — Proposta da Etapa 1
 
-**PF-09.5 · 20/09/2026 · ⛔ Aguardando aprovação de Eduardo**
+**PF-09.5 · 20/09/2026 · ✅ APROVADA por Eduardo em 20/09/2026**
+
+> **Gate cumprido.** Eduardo aprovou a proposta **e a inversão E1 ↔ E2/E3** da
+> seção 2, em 20/09/2026. A construção está liberada. Quem aprovou não foi quem
+> escreveu — RN-10 respeitada.
 
 Última peça antes da construção. Fecha as quatro decisões pendentes e diz o
 que existe na sexta-feira, **25/09/2026**.
@@ -100,9 +104,12 @@ E5 que custa pouco depois que o dado existe. **Não é promessa.**
 | **Sua disponibilidade na semana** | O prazo é seu, o ritmo também | Os pontos de contato estão na tabela acima e são curtos |
 | **Escopo crescendo durante a semana** | A sexta não acontece | O que aparecer entra na lista do E4 em diante. Esta seção é a linha |
 
-## 7. O que peço
+## 7. A aprovação
 
-Uma frase: **aprovo a proposta**, ou o que quer diferente.
+**Aprovada por Eduardo em 20/09/2026**, com estas palavras: *"aprovo a proposta,
+inclusive a inversão"*.
 
-Especialmente sobre a **inversão E1 ↔ E2/E3** da seção 2, que é a única coisa
-aqui que contraria uma decisão sua de hoje.
+Isso libera a construção do E2 e do E3 fora da ordem originalmente aprovada, com
+o custo declarado na seção 2: durante a semana os dados ficam na máquina do
+Eduardo, sem backup automático, com um único usuário. **O fluxo volta ao padrão
+no E1**, logo depois da sexta.

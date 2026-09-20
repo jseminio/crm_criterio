@@ -10,11 +10,11 @@ listas para campanha.
 
 | Item | Situação |
 |---|---|
-| Fase do pipeline | 🟦 Definição **PF-09.5 Proposta** — `proposta.md` escrita, ⛔ **aguardando aprovação de Eduardo** |
+| Fase do pipeline | 🟩 Construção **PF-10 Implementação** — E2 e E3 em curso |
 | Gate cumprido | ✅ Suficiência — documento validado por Eduardo em 19/09/2026 |
 | Gate cumprido | ⛔ **Amostra aprovada** — aprovada por **Eduardo em 19/09/2026** |
 | Amostra | https://claude.ai/artifact/2EiCBrFhPdvbniQWZgtgTK — 6 telas, privada |
-| Gate à frente | ⛔ **Aprovação humana** da proposta — última trava antes da construção |
+| Gate cumprido | ⛔ **Aprovação humana** da proposta — **aprovada por Eduardo em 20/09/2026**, inclusive a inversão E1 ↔ E2/E3 |
 | Prazo | **Primeira versão até 25/09/2026**, decisão de Eduardo em 20/09/2026 |
 | Design | **PAD-002 aprovado por Eduardo em 19/09/2026.** A nota ainda vive na branch `docs/PAD-002-design-criterio-crm`, **não mesclada à main** — ver pendência 1 |
 | Classe | a definir na próxima fase |
@@ -26,7 +26,7 @@ listas para campanha.
 - `anexo-tecnico.md` — versão 2.7, uso interno: resumo estruturado, mapa de
   campos derivado do roteiro de entrevista e bloco JSON.
 - `proposta.md` — o que existe na sexta, o que não existe, o que depende de
-  você e a inversão E1 ↔ E2/E3. **PF-09.5, ⛔ aguardando aprovação.**
+  você e a inversão E1 ↔ E2/E3. **PF-09.5, ✅ aprovada em 20/09/2026.**
 - `planejamento.md` — a Etapa 1 em cinco incrementos, com sequência,
   dependências e riscos. **PF-09.**
 - `arquitetura.md` — modelo de dados, padrões transversais, decisões técnicas,
@@ -108,11 +108,9 @@ derivados da estrutura das notas, sem nenhum valor de cliente.
 
 ## Pendências que travam o avanço
 
-1. ⛔ **Aprovar a proposta** (`proposta.md`) — gate PF-09.5. Contém a inversão
-   E1 ↔ E2/E3 exigida pelo prazo de sexta, 25/09/2026.
-2. **Instalar o PostgreSQL** na máquina de Eduardo. Não há Postgres, Docker nem
+1. **Instalar o PostgreSQL** na máquina de Eduardo. Não há Postgres, Docker nem
    Homebrew — sem banco a semana não anda.
-3. **Confirmar as linhas 317 e 318 da planilha** com a Karine: idênticas em
+2. **Confirmar as linhas 317 e 318 da planilha** com a Karine: idênticas em
    todos os campos, inflam contagem e valor do funil.
 2. As perguntas da seção 19 do documento, em dois blocos: as que travam o
    código (bloco A) e as que travam a modelagem.

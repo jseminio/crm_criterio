@@ -105,11 +105,15 @@ Deixa de ser identidade.
 **O que falta implementar:** a chave e o aviso de duplicata. É a primeira coisa
 do E2, antes dos modelos do banco.
 
-## Ressalva de processo
+## Ressalva de processo — resolvida
 
-Escrito em 20/09/2026, depois de Eduardo dizer "pode codar agora". **A proposta
-do PF-09.5 não foi escrita** — o gate foi atravessado por instrução direta.
+Este código começou em 20/09/2026, depois de Eduardo dizer "pode codar agora",
+**antes da proposta do PF-09.5 existir**. O gate foi atravessado por instrução
+direta, e por isso o código se limitou ao que não dependia das decisões abertas.
 
-Das quatro decisões então abertas, três foram fechadas no mesmo dia: o de-para
-segue o caminho 2, a virada é em paralelo e a sequência dos cinco incrementos
-está aprovada. **Segue aberta prazo e orçamento.**
+**No mesmo dia a situação foi regularizada:** as seis decisões fecharam, a
+proposta foi escrita (`../proposta.md`) e **Eduardo a aprovou**, inclusive a
+inversão E1 ↔ E2/E3. A construção do E2 e do E3 está liberada com gate cumprido.
+
+Fica o registro porque a ordem importou: o código veio antes da proposta, e isso
+só não custou nada porque o escopo foi contido de propósito.

@@ -9,12 +9,21 @@ from __future__ import annotations
 
 import os
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Iterator
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
-__all__ = ["url_do_banco", "criar_engine", "criar_fabrica_de_sessao", "sessao", "VARIAVEL"]
+__all__ = [
+    "url_do_banco",
+    "criar_engine",
+    "criar_fabrica_de_sessao",
+    "sessao",
+    "VARIAVEL",
+    "ARQUIVO_ENV",
+    "BancoNaoConfigurado",
+]
 
 VARIAVEL = "CRM_DATABASE_URL"
 
@@ -31,18 +40,54 @@ class BancoNaoConfigurado(RuntimeError):
     """
 
 
+#: Onde procurar o arquivo de ambiente: a raiz do backend.
+ARQUIVO_ENV = Path(__file__).resolve().parents[3] / ".env"
+
+
+def _ler_do_arquivo(arquivo: Path | None = None) -> str | None:
+    """Lê `CRM_DATABASE_URL` do `.env`, quando ele existir.
+
+    Evita que cada comando precise exportar a variável à mão — e, principalmente,
+    evita que alguém a cole numa linha de comando, onde ela ficaria no histórico
+    do shell. O `.env` é ignorado pelo git.
+
+    **O valor lido nunca é registrado em log nem devolvido em mensagem de erro.**
+    Formato aceito: uma atribuição por linha, `#` comenta, aspas são opcionais.
+    """
+    arquivo = arquivo or ARQUIVO_ENV
+    if not arquivo.is_file():
+        return None
+    try:
+        conteudo = arquivo.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for linha in conteudo.splitlines():
+        limpa = linha.strip()
+        if not limpa or limpa.startswith("#") or "=" not in limpa:
+            continue
+        chave, _, valor = limpa.partition("=")
+        if chave.strip() != VARIAVEL:
+            continue
+        valor = valor.strip()
+        if len(valor) >= 2 and valor[0] == valor[-1] and valor[0] in "\"'":
+            valor = valor[1:-1]
+        return valor or None
+    return None
+
+
 def url_do_banco(padrao: str | None = None) -> str:
-    """Devolve a URL de conexão do ambiente.
+    """Devolve a URL de conexão: variável de ambiente, depois `.env`, depois `padrao`.
 
     `padrao` existe para o teste passar a URL em memória de propósito — nunca
     para produção adivinhar um destino.
     """
-    url = os.environ.get(VARIAVEL) or padrao
+    url = os.environ.get(VARIAVEL) or _ler_do_arquivo() or padrao
     if not url:
         raise BancoNaoConfigurado(
-            f"{VARIAVEL} não está definida. Aponte-a para o PostgreSQL, por "
-            f"exemplo postgresql+psycopg://usuario@localhost/criterio_crm, "
-            f"e mantenha o valor em .env — nunca no código."
+            f"{VARIAVEL} não está definida, e {ARQUIVO_ENV.name} não a traz. "
+            f"Aponte-a para o PostgreSQL, por exemplo "
+            f"postgresql+psycopg://usuario@localhost:5432/criterio_crm, e "
+            f"mantenha o valor em .env — nunca no código."
         )
     return url
 

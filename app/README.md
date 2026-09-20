@@ -142,21 +142,35 @@ fecharia um ciclo deixando os dois sem raiz.
 versionado. Ver `.env.example`. Sem a variável, o código **para com mensagem
 clara** em vez de gravar dado de cliente num SQLite improvisado.
 
+O código lê o `.env` sozinho: nenhum comando precisa exportar a variável, e a
+URL — que carrega senha — não passa pela linha de comando nem fica no histórico
+do shell. A ordem de precedência é ambiente, depois `.env`.
+
 ```bash
 cp backend/.env.example backend/.env   # e preencha
-createdb criterio_crm
 cd backend && ~/.venvs/criterio-crm/bin/alembic upgrade head
 ```
 
-> ⚠️ **A migração ainda não subiu num PostgreSQL de verdade.** Não há Postgres
-> nesta máquina — é a pendência de segunda-feira. Ela foi gerada e verificada
-> contra SQLite: sobe, desce e sobe de novo, e `alembic check` não acusa deriva
-> entre modelos e esquema.
+### O servidor desta máquina
+
+**PostgreSQL 18.6**, instalador EnterpriseDB, em `/Library/PostgreSQL/18`,
+escutando em `localhost:5432`. Instalado por Eduardo em 20/09/2026 e
+confirmado respondendo. Os binários não estão no `PATH` por padrão:
+
+```bash
+sudo mkdir -p /etc/paths.d && echo /Library/PostgreSQL/18/bin | sudo tee /etc/paths.d/postgresql
+```
+
+> ⚠️ **A migração ainda não subiu neste servidor.** Falta o banco e o papel da
+> aplicação existirem — criá-los exige a senha do superusuário, que é de
+> Eduardo e não passa por aqui.
 >
-> Os modelos usam só tipos genéricos — sem `JSONB`, sem array, sem `ENUM` nativo
-> — exatamente para que o comportamento seja o mesmo nos dois bancos. Mas isso é
-> argumento, não evidência. **O esquema precisa subir uma vez no Postgres real
-> antes de qualquer dado entrar.**
+> Até lá, o que existe de evidência: a migração sobe, desce e sobe de novo
+> contra SQLite, e `alembic check` não acusa deriva entre modelos e esquema. Os
+> modelos usam só tipos genéricos — sem `JSONB`, sem array, sem `ENUM` nativo —
+> para que o comportamento seja o mesmo nos dois bancos. **Isso é argumento, não
+> evidência.** O esquema precisa subir uma vez no PostgreSQL real antes de
+> qualquer dado entrar.
 
 ## Ressalva de processo — resolvida
 

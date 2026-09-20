@@ -178,10 +178,8 @@ canais novos, cálculo de preço.
 
 ## 8. O que falta para a proposta (PF-09.5)
 
-Três das quatro estão fechadas. Resta uma:
-
-1. **Prazo e orçamento** — ver seção 10, que explica o que a pergunta quer dizer
-   num projeto construído pelo próprio dono.
+**As quatro estão fechadas.** A proposta está escrita em `proposta.md` e
+aguarda a aprovação de Eduardo — o gate ⛔ **PF-09.5**.
 
 ## 9. O que a virada em paralelo exige do código
 
@@ -201,7 +199,20 @@ colocação e serviço, ou uma chave que a planilha passe a carregar.
 **É a primeira coisa a resolver no E2.** Está registrado como dívida do código
 em `app/README.md`.
 
-## 10. O que "prazo e orçamento" quer dizer aqui
+## 10. Prazo e orçamento — respondidos em 20/09/2026
+
+**Prazo: primeira versão pronta até sexta, 25/09/2026.** Cinco dias úteis. Isso
+**inverte a sequência aprovada**: E2 e E3 rodando local primeiro, E1 — nuvem,
+login Microsoft, backup — logo depois. O motivo, o custo e o alcance do desvio
+estão em `proposta.md`, seção 2, para sua aprovação.
+
+**Orçamento: sem teto declarado.** Palavras de Eduardo: o ganho de
+produtividade, transparência e eficiência supera o valor gasto. Operacionalmente
+significa escolher a opção mais barata que atenda região Brasil e backup
+automático, e **informar o valor antes de contratar**. Nenhuma conta é criada
+nem meio de pagamento usado pela IA.
+
+### O enunciado original da pergunta
 
 A pergunta estava mal formulada: num projeto contratado, prazo e orçamento são
 contrato. Aqui **quem constrói é o dono**, então as duas palavras significam

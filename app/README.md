@@ -18,7 +18,7 @@ as listas controladas do funil e a carga das propostas de 2026.
 cd backend
 python3 -m venv ~/.venvs/criterio-crm
 ~/.venvs/criterio-crm/bin/pip install -e ".[dev]" openpyxl
-~/.venvs/criterio-crm/bin/python -m pytest
+PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 ```
 
 > **Por que o ambiente virtual fica fora do repositório.** A verificação do

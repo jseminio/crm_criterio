@@ -10,13 +10,14 @@ código foi escrita.
 
 ## 1. Premissas a confirmar
 
-Duas foram fechadas; uma segue aberta.
+**As três foram fechadas.**
 
 | Premissa | Situação | Consequência |
 |---|---|---|
 | **Região do servidor** | ✅ **Brasil — decisão de Eduardo em 19/09/2026** | Banco, arquivos e backup ficam em região brasileira. Vale também para os serviços que tocam dado de cliente |
 | **A virada** | ✅ **Paralelo com a planilha — decisão de 20/09/2026** | A carga roda mais de uma vez: precisa ser **idempotente**, com identidade por conteúdo e não por número de linha |
-| **Prazo e orçamento** | Sem restrição declarada | Define quanto da Etapa 1 cabe na primeira entrega |
+| **Prazo** | ✅ **Primeira versão até sexta, 25/09/2026** — decisão de 20/09/2026 | Inverte E1 e E2/E3: o CRM roda local na semana, a nuvem vem depois. Ver `proposta.md`, seção 2 |
+| **Orçamento** | ✅ **Sem teto declarado** — decisão de 20/09/2026: o ganho supera o gasto | Escolho a opção mais barata que atenda região Brasil e backup, e informo o valor **antes** de qualquer contratação |
 
 Outras premissas menores estão marcadas ao longo do texto com *(a confirmar)*.
 
@@ -224,7 +225,6 @@ enxerga, nunca qual tabela se lê.
 
 ## 9. O que falta para o planejamento
 
-1. **As duas premissas restantes da seção 1** — virada e prazo/orçamento.
 2. **Alçada dos perfis** — o que cada um vê e edita.
 3. **Checklist de implantação** e **política de horas de conforto** — pendências
    do MP-SC-01, fora do controle deste projeto.

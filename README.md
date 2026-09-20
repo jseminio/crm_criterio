@@ -10,7 +10,7 @@ listas para campanha.
 
 | Item | Situação |
 |---|---|
-| Fase do pipeline | 🟦 Definição PF-08 Arquitetura |
+| Fase do pipeline | 🟦 Definição PF-09 Planejamento — `planejamento.md` escrito, para revisão |
 | Gate cumprido | ✅ Suficiência — documento validado por Eduardo em 19/09/2026 |
 | Gate cumprido | ⛔ **Amostra aprovada** — aprovada por **Eduardo em 19/09/2026** |
 | Amostra | https://claude.ai/artifact/2EiCBrFhPdvbniQWZgtgTK — 6 telas, privada |
@@ -24,6 +24,10 @@ listas para campanha.
 - `documento-de-negocio.md` — versão 2.7, **validado por Eduardo em 19/09/2026**.
 - `anexo-tecnico.md` — versão 2.7, uso interno: resumo estruturado, mapa de
   campos derivado do roteiro de entrevista e bloco JSON.
+- `planejamento.md` — a Etapa 1 em cinco incrementos, com sequência,
+  dependências e riscos. **PF-09, para revisão.**
+- `arquitetura.md` — modelo de dados, padrões transversais, decisões técnicas,
+  o motor de horas unificado e os riscos. **PF-08, para revisão.**
 - `proposta-secao-9-questionario.md` — texto pronto dos oito campos que entram
   no questionário (**decisão de 19/09/2026**), pedidos pela implantação.
   **O arquivo oficial no SharePoint não foi alterado.**
@@ -101,10 +105,8 @@ derivados da estrutura das notas, sem nenhum valor de cliente.
 
 ## Pendências que travam o avanço
 
-1. **Mesclar o PAD-002 à `main` e marcar a nota como `ativo`.** Ele foi
-   aprovado, mas a nota existe só na branch `docs/PAD-002-design-criterio-crm`
-   — enquanto não for mesclada, o padrão não está disponível para ninguém.
-   **Mesclar na `main` exige autorização explícita** (regra da casa).
+1. **As duas premissas restantes da arquitetura:** estratégia de virada e
+   prazo/orçamento. A região já está definida: **Brasil**.
 2. As perguntas da seção 19 do documento, em dois blocos: as que travam o
    código (bloco A) e as que travam a modelagem.
 3. **Decidir sobre as divergências das planilhas de precificação** (anexo

@@ -1,0 +1,84 @@
+/* Tokens do PAD-002 — Design do Critério CRM.
+ *
+ * As cores da marca são EXATAS do manual e nunca reajustadas. A nota do padrão
+ * é explícita: se esta folha e o artefato do design system divergirem, vale o
+ * artefato. Aqui ficam só os tokens que a tela do E3 consome.
+ */
+
+:root {
+  /* Marca — não alterar */
+  --azul-noturno: #1a2338;
+  --azul-neve: #a5c0d6;
+  --azul-gelo: #cae3f7;
+  --cinza-neutro: #b6b6b6;
+  --preto-cosmico: #0b0e17;
+  --branco: #ffffff;
+
+  /* Superfícies */
+  --surface-brand: var(--azul-noturno);
+  --surface-page: #f4f6f9;
+  --surface-card: var(--branco);
+  --surface-sunken: #eceff4;
+  --surface-ai-soft: #eef4fb;
+
+  /* Texto — contraste mínimo 4,5:1 */
+  --texto-forte: #16202f;
+  --texto-medio: #4a5568;
+  --texto-fraco: #6b7688;
+  --texto-sobre-marca: var(--branco);
+  --texto-sobre-marca-fraco: var(--azul-neve);
+
+  /* Bordas e foco — mínimo 3:1 */
+  --borda: #d5dbe3;
+  --borda-forte: #9aa5b5;
+  --foco: #2f6fb0;
+
+  /* Semântica de estado — sempre acompanhada de palavra, nunca só cor */
+  --ganho: #1d6f47;
+  --ganho-suave: #e4f3ea;
+  --perda: #9b2c2c;
+  --perda-suave: #fbeaea;
+  --espera: #8a5a12;
+  --espera-suave: #fdf3e2;
+  --andamento: #21528a;
+  --andamento-suave: #e6eff8;
+
+  /* Escala de 4 px */
+  --e1: 4px;  --e2: 8px;  --e3: 12px; --e4: 16px;
+  --e5: 20px; --e6: 24px; --e8: 32px; --e10: 40px;
+
+  /* Três raios */
+  --raio-sm: 6px;
+  --raio-md: 10px;
+  --raio-lg: 14px;
+
+  /* Sombra só em menu, modal e painel lateral */
+  --sombra-painel: 0 8px 28px rgba(11, 14, 23, 0.18);
+  --sombra-menu: 0 4px 14px rgba(11, 14, 23, 0.12);
+
+  --fonte-ui: "Poppins", system-ui, -apple-system, sans-serif;
+  --fonte-titulo: "Source Serif 4", Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  font-family: var(--fonte-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--texto-forte);
+  background: var(--surface-page);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--fonte-titulo); font-weight: 600; margin: 0; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+  border-radius: var(--raio-sm);
+}

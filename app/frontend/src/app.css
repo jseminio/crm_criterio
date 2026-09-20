@@ -1,0 +1,169 @@
+/* Componentes do CRM. Todo valor vem dos tokens do PAD-002 — nenhum número
+ * de cor ou espaçamento solto aqui. */
+
+/* ---------------------------------------------------------------- estrutura */
+.aplicacao { display: grid; grid-template-columns: 232px 1fr; height: 100%; }
+
+.lateral {
+  background: var(--surface-brand);
+  color: var(--texto-sobre-marca);
+  padding: var(--e6) var(--e4);
+  display: flex; flex-direction: column; gap: var(--e6);
+}
+/* Regra 8 do PAD-002: a logomarca aparece sozinha, nada ao lado dela.
+   Sem o arquivo oficial, o nome é composto em display. */
+.marca { font-family: var(--fonte-titulo); font-size: 20px; letter-spacing: .01em; }
+.marca-linha2 { display: block; font-family: var(--fonte-ui); font-size: 12px;
+  font-weight: 400; color: var(--texto-sobre-marca-fraco); letter-spacing: .08em;
+  text-transform: uppercase; margin-top: var(--e1); }
+
+.menu { display: flex; flex-direction: column; gap: var(--e1); }
+.menu-item {
+  appearance: none; border: 0; background: transparent; text-align: left;
+  color: var(--texto-sobre-marca-fraco); padding: var(--e2) var(--e3);
+  border-radius: var(--raio-sm); cursor: pointer; font-weight: 500;
+}
+.menu-item:hover { background: rgba(255,255,255,.08); color: var(--texto-sobre-marca); }
+.menu-item[aria-current="page"] { background: rgba(255,255,255,.14); color: var(--texto-sobre-marca); }
+.menu-contagem { float: right; color: var(--azul-neve); font-variant-numeric: tabular-nums; }
+
+.aviso-sem-login {
+  margin-top: auto; font-size: 12px; line-height: 1.45;
+  color: var(--texto-sobre-marca-fraco);
+  border-top: 1px solid rgba(255,255,255,.16); padding-top: var(--e3);
+}
+
+.conteudo { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+
+.topo {
+  background: var(--surface-brand); color: var(--texto-sobre-marca);
+  padding: var(--e4) var(--e6); display: flex; align-items: baseline;
+  gap: var(--e4); justify-content: space-between;
+}
+.topo h1 { font-size: 22px; }
+.topo-detalhe { color: var(--texto-sobre-marca-fraco); font-size: 13px; }
+
+.area { padding: var(--e5) var(--e6); overflow: auto; flex: 1; }
+
+/* ------------------------------------------------------------------ filtros */
+.filtros {
+  display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center;
+  margin-bottom: var(--e4);
+}
+.campo { display: flex; flex-direction: column; gap: var(--e1); }
+.campo-rotulo { font-size: 12px; font-weight: 500; color: var(--texto-medio); }
+.entrada, .selecao {
+  border: 1px solid var(--borda); background: var(--surface-card);
+  border-radius: var(--raio-sm); padding: var(--e2) var(--e3); min-height: 34px;
+}
+.entrada:hover, .selecao:hover { border-color: var(--borda-forte); }
+.entrada-busca { min-width: 260px; }
+
+.botao {
+  appearance: none; border-radius: var(--raio-sm); padding: var(--e2) var(--e4);
+  cursor: pointer; font-weight: 500; min-height: 34px; border: 1px solid transparent;
+}
+.botao-primario { background: var(--surface-brand); color: var(--branco); }
+.botao-primario:hover { background: #22304a; }
+.botao-secundario { background: var(--surface-card); border-color: var(--borda-forte); color: var(--texto-forte); }
+.botao-secundario:hover { background: var(--surface-sunken); }
+.botao:disabled { opacity: .55; cursor: not-allowed; }
+.botao-icone {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  font-size: 15px; padding: var(--e2); border-radius: var(--raio-sm); color: var(--texto-medio);
+}
+.botao-icone:hover { background: var(--surface-sunken); }
+
+/* ------------------------------------------------------------------- kanban */
+.kanban { display: flex; gap: var(--e3); align-items: flex-start; overflow-x: auto; padding-bottom: var(--e4); }
+.coluna {
+  background: var(--surface-sunken); border-radius: var(--raio-md);
+  min-width: 268px; max-width: 268px; display: flex; flex-direction: column;
+  max-height: calc(100vh - 220px);
+}
+.coluna-topo { padding: var(--e3); border-bottom: 1px solid var(--borda); }
+.coluna-nome { font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; gap: var(--e2); }
+.coluna-quantas { color: var(--texto-medio); font-variant-numeric: tabular-nums; }
+.coluna-valor { font-size: 12px; color: var(--texto-medio); margin-top: var(--e1); font-variant-numeric: tabular-nums; }
+.coluna-cartoes { padding: var(--e2); display: flex; flex-direction: column; gap: var(--e2); overflow-y: auto; }
+.coluna-vazia { padding: var(--e4) var(--e3); font-size: 12px; color: var(--texto-fraco); }
+
+.cartao {
+  background: var(--surface-card); border: 1px solid var(--borda);
+  border-radius: var(--raio-sm); padding: var(--e3); text-align: left;
+  cursor: pointer; width: 100%; display: flex; flex-direction: column; gap: var(--e1);
+}
+.cartao:hover { border-color: var(--borda-forte); }
+.cartao-grupo { font-weight: 600; font-size: 13px; }
+.cartao-nome { font-size: 12px; color: var(--texto-medio); }
+.cartao-linha { display: flex; flex-wrap: wrap; gap: var(--e1); align-items: center; margin-top: var(--e1); }
+.cartao-valor { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--texto-forte); }
+.cartao-prazo { font-size: 11px; color: var(--texto-medio); }
+.cartao-prazo-atrasado { color: var(--perda); font-weight: 500; }
+
+/* ------------------------------------------------------------------ tabelas */
+.tabela { width: 100%; border-collapse: collapse; background: var(--surface-card);
+  border: 1px solid var(--borda); border-radius: var(--raio-md); overflow: hidden; }
+.tabela th, .tabela td { padding: var(--e2) var(--e3); text-align: left; border-bottom: 1px solid var(--borda); }
+.tabela th { font-size: 12px; color: var(--texto-medio); font-weight: 500; background: var(--surface-sunken); }
+.tabela tbody tr:last-child td { border-bottom: 0; }
+.tabela tbody tr:hover { background: var(--surface-sunken); }
+.tabela-numero { text-align: right; font-variant-numeric: tabular-nums; }
+.tabela-clicavel { cursor: pointer; }
+
+/* ------------------------------------------------------------------ painéis */
+/* z-index explícito nos dois. Sem ele a ordem de pintura depende da ordem no
+   DOM, e um clique no menu lateral atravessava a cortina — o painel ficava
+   aberto e a tela trocava por baixo dele. Sobreposição não se apoia em ordem
+   de marcação. */
+.cortina { position: fixed; inset: 0; background: rgba(11,14,23,.36); z-index: 40; }
+.painel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw);
+  background: var(--surface-card); box-shadow: var(--sombra-painel);
+  display: flex; flex-direction: column; z-index: 41;
+}
+.painel-cabecalho { padding: var(--e5) var(--e5) var(--e3);
+  display: flex; justify-content: space-between; gap: var(--e3); border-bottom: 1px solid var(--borda); }
+.painel-titulo { font-size: 18px; }
+.painel-subtitulo { margin: var(--e1) 0 0; color: var(--texto-medio); font-size: 13px; }
+.painel-corpo { padding: var(--e5); overflow: auto; flex: 1; display: flex; flex-direction: column; gap: var(--e4); }
+.painel-rodape { padding: var(--e4) var(--e5); border-top: 1px solid var(--borda);
+  display: flex; gap: var(--e2); justify-content: flex-end; }
+
+.par { display: grid; grid-template-columns: 132px 1fr; gap: var(--e2); font-size: 13px; }
+.par-rotulo { color: var(--texto-medio); }
+.par-valor { font-variant-numeric: tabular-nums; }
+
+.formulario { display: flex; flex-direction: column; gap: var(--e3); }
+.formulario-duplo { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); }
+.campo-bloco { display: flex; flex-direction: column; gap: var(--e1); }
+
+/* -------------------------------------------------------------- etiquetas */
+.etiqueta { display: inline-block; padding: 2px var(--e2); border-radius: 999px;
+  font-size: 11px; font-weight: 500; border: 1px solid transparent; white-space: nowrap; }
+.etiqueta-ganho { background: var(--ganho-suave); color: var(--ganho); border-color: var(--ganho); }
+.etiqueta-perda { background: var(--perda-suave); color: var(--perda); border-color: var(--perda); }
+.etiqueta-espera { background: var(--espera-suave); color: var(--espera); border-color: var(--espera); }
+.etiqueta-andamento { background: var(--andamento-suave); color: var(--andamento); border-color: var(--andamento); }
+.etiqueta-neutra { background: var(--surface-sunken); color: var(--texto-medio); border-color: var(--borda-forte); }
+
+/* --------------------------------------------------------------- estados */
+.estado { padding: var(--e10) var(--e6); text-align: center; background: var(--surface-card);
+  border: 1px solid var(--borda); border-radius: var(--raio-md); display: flex;
+  flex-direction: column; align-items: center; gap: var(--e3); }
+.estado-titulo { font-size: 16px; }
+.estado-texto { color: var(--texto-medio); margin: 0; max-width: 46ch; }
+.estado-erro { border-color: var(--perda); }
+.esqueleto-linhas { display: flex; flex-direction: column; gap: var(--e2); width: 260px; }
+.esqueleto-linhas span { height: 12px; border-radius: var(--raio-sm);
+  background: linear-gradient(90deg, var(--surface-sunken), #e3e8ef, var(--surface-sunken));
+  background-size: 200% 100%; animation: brilho 1.4s ease-in-out infinite; }
+.esqueleto-linhas span:nth-child(2) { width: 82%; }
+.esqueleto-linhas span:nth-child(3) { width: 60%; }
+@keyframes brilho { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+@media (prefers-reduced-motion: reduce) { .esqueleto-linhas span { animation: none } }
+
+.recado { background: var(--surface-ai-soft); border: 1px solid var(--azul-neve);
+  border-radius: var(--raio-md); padding: var(--e3) var(--e4); font-size: 13px;
+  color: var(--texto-medio); margin-bottom: var(--e4); }
+.recado strong { color: var(--texto-forte); }

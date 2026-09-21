@@ -117,3 +117,42 @@ export interface Indicadores {
   ciclo_medio: Pendencia;
   taxa_de_conversao: Pendencia;
 }
+
+export interface Execucao {
+  id: number;
+  executada_em: string;
+  arquivo: string;
+  lidas: number;
+  de_outro_ano: number;
+  residuais: number;
+  importadas: number;
+  criadas: number;
+  atualizadas: number;
+  inalteradas: number;
+  gravadas: number;
+  ignoradas_incompletas: number;
+  ignoradas_duplicatas: number;
+  grupos_criados: number;
+  grupos_reaproveitados: number;
+  pendencias: number;
+  ajustes: number;
+  mudancas: number;
+}
+
+export interface ResumoPorCampo {
+  tipo: string;
+  campo: string | null;
+  quantas: number;
+}
+
+export interface ExecucaoDetalhe extends Execucao {
+  por_campo: ResumoPorCampo[];
+}
+
+export interface Ocorrencia {
+  id: number;
+  tipo: string;
+  linha: number | null;
+  campo: string | null;
+  texto: string;
+}

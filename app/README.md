@@ -10,10 +10,10 @@ autorizou por causa do prazo.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e quatro telas |
-| Testes | **211** no backend, todos passando. As telas foram verificadas no navegador contra os dados reais; **não têm teste automatizado** |
+| Testes | **236** no backend, todos passando. As telas foram verificadas no navegador contra os dados reais; **não têm teste automatizado** |
 | Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 153 oportunidades, 138 grupos |
-| API | 12 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
-| Telas | Funil em kanban, oportunidades em lista, leads e grupos econômicos. React com TypeScript, em `../frontend` |
+| API | 15 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
+| Telas | Funil em kanban, oportunidades em lista, leads, grupos econômicos (com detalhe) e conferência da carga. React com TypeScript, em `../frontend` |
 | Fora do ar | Nuvem, login, backup automático (E1); proposta e preço (E4); demais KPIs (E5) |
 
 ## Como rodar
@@ -31,11 +31,23 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > falsas** e enterra as reais. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
-Subir a API e as telas, cada uma no seu terminal:
+Subir tudo com um comando (a API e a tela, cada uma no seu processo; Ctrl+C
+derruba as duas):
+
+```bash
+./iniciar.sh        # abre em http://localhost:5173
+```
+
+Ele **falha antes de subir qualquer coisa**, dizendo o que fazer: ambiente Python
+ausente, dependências da tela por instalar, PostgreSQL fora do ar, `.env`
+ausente ou porta em uso. Os servidores caem quando a sessão que os iniciou
+fecha — por isso o comando existe.
+
+Ou à mão, cada um no seu terminal:
 
 ```bash
 cd backend && ~/.venvs/criterio-crm/bin/python scripts/servir.py
-cd frontend && npm install && npm run dev      # abre em http://localhost:5173
+cd frontend && npm install && npm run dev
 ```
 
 A API escuta **só em `127.0.0.1`**, de propósito: não tem login. Não a exponha na
@@ -275,6 +287,31 @@ Os 138 grupos são portanto um teto, não a carteira real. O reagrupamento é fe
 por Eduardo na tela de grupos, um par por vez, com o histórico intacto — e
 `scripts/conferir_grupos.py` lista os candidatos. Sua saída contém nome de cliente
 e valor: **não a grave dentro do repositório**.
+
+## Conferência da carga
+
+O relatório de conferência **é gravado no banco**, não só impresso: `ExecucaoDeCarga`
+guarda a rodada e `OcorrenciaDeCarga` cada linha dela. Sem isso ele aparecia no
+terminal e sumia — e confiar na base, condição para largar a planilha, dependia
+de alguém ter guardado a saída. A rodada é **imutável** de propósito: um
+relatório que muda depois de escrito deixa de ser evidência.
+
+Cada ocorrência pede algo diferente de quem lê, e são só três tipos:
+
+| Tipo | O que é |
+|---|---|
+| **Precisa de você** | O que só uma pessoa resolve: linha que ficou de fora, duplicata, proposta aceita **sem data do aceite** — que entra no CRM e mesmo assim exige alguém |
+| **Ajustado sozinho** | O que a carga corrigiu ou anotou sem perguntar: grafias unificadas, valores arredondados, campos vazios de propósito |
+| **Mudou na recarga** | O que a planilha alterou desde a rodada anterior, com antes e depois |
+
+A tela **Conferência** mostra, para a rodada escolhida: lidas → de 2026 → gravadas →
+de fora, e **verifica que a conta fecha** (gravadas + de fora = de 2026). Se não
+fechar, avisa em vermelho: há linha sumindo. Na carga real de 20/09/2026 fechou:
+153 + 4 = 157.
+
+Só grava rodada quem grava: a simulação (`importar_2026.py` sem `--gravar`) não
+deixa rastro, porque um histórico cheio de ensaios deixaria de provar o que está
+de fato no CRM. Guarda **só o nome do arquivo**, não o caminho.
 
 ## Indicadores do funil
 

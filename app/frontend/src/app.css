@@ -185,3 +185,28 @@
 .numero-estado { font-weight: 600; color: var(--espera) !important; font-size: 13px; margin: 0 !important; }
 
 .campo-ajuda { margin: var(--e1) 0 0; font-size: 12px; color: var(--texto-medio); }
+
+.link-de-tabela { appearance: none; border: 0; background: transparent; padding: 0;
+  text-align: left; cursor: pointer; color: var(--texto-forte); font-weight: 500;
+  text-decoration: underline; text-decoration-color: var(--borda-forte); text-underline-offset: 3px; }
+.link-de-tabela:hover { text-decoration-color: var(--foco); color: var(--foco); }
+.mini-tabela { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mini-tabela th { text-align: left; font-size: 12px; color: var(--texto-medio); font-weight: 500;
+  padding: var(--e1) var(--e2); border-bottom: 1px solid var(--borda); }
+.mini-tabela td { padding: var(--e2); border-bottom: 1px solid var(--borda); vertical-align: top; }
+.mini-tabela tr:last-child td { border-bottom: 0; }
+.mini-tabela .tabela-numero { text-align: right; font-variant-numeric: tabular-nums; }
+.secao-do-painel h3 { font-family: var(--fonte-ui); font-size: 13px; font-weight: 600; margin: 0 0 var(--e2); }
+
+/* ------------------------------------------------------------ conferência */
+.conta-fecha, .conta-nao-fecha { margin: 0 0 var(--e5); font-size: 13px; padding: var(--e2) var(--e3);
+  border-radius: var(--raio-sm); border: 1px solid transparent; }
+.conta-fecha { background: var(--ganho-suave); color: var(--ganho); border-color: var(--ganho); }
+.conta-nao-fecha { background: var(--perda-suave); color: var(--perda); border-color: var(--perda); font-weight: 600; }
+.abas { display: flex; gap: var(--e1); border-bottom: 1px solid var(--borda); }
+.aba { appearance: none; border: 0; background: transparent; cursor: pointer; font-weight: 500;
+  padding: var(--e2) var(--e4); color: var(--texto-medio); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.aba:hover { color: var(--texto-forte); }
+.aba[aria-selected="true"] { color: var(--texto-forte); border-bottom-color: var(--azul-noturno); }
+.aba-contagem { font-variant-numeric: tabular-nums; color: var(--texto-fraco); margin-left: var(--e1); }
+.botao[aria-pressed="true"] { background: var(--surface-brand); color: var(--branco); border-color: var(--surface-brand); }

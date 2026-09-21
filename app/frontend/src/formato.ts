@@ -40,3 +40,13 @@ export function prazo(iso: string | null | undefined): { texto: string; atrasado
   if (dias === 1) return { texto: "amanhã", atrasado: false };
   return { texto: `em ${dias} d`, atrasado: false };
 }
+
+/** Data e hora locais, em pt-BR: "21/09/2026 às 17:35". */
+export function dataHora(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const dia = d.toLocaleDateString("pt-BR");
+  const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return `${dia} às ${hora}`;
+}

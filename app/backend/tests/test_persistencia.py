@@ -239,3 +239,127 @@ class TestRelatorio:
 
         assert "Mudanças (2)" in resumo
         assert "situacao" in resumo
+
+
+class TestRelatorioDeConferencia:
+    """A rodada guardada é o que a tela mostra a quem vai confiar (ou não) na base."""
+
+    def _rodar(self, sessao, propostas, avisos=(), arquivo="planilha.xlsx", lidas=10):
+        from crm.carga.persistencia import registrar_execucao
+        from crm.carga.planilha_2026 import Relatorio
+
+        leitura = Relatorio(total_lidas=lidas, importadas=len(propostas))
+        leitura.avisos.extend(avisos)
+        resultado = importar(sessao, propostas)
+        return registrar_execucao(sessao, arquivo, leitura, resultado), resultado
+
+    def test_guarda_os_numeros_da_leitura_e_da_gravacao(self, sessao: Session):
+        execucao, _ = self._rodar(sessao, [proposta()], lidas=436)
+
+        assert execucao.lidas == 436
+        assert execucao.criadas == 1
+        assert execucao.grupos_criados == 1
+
+    def test_gravadas_soma_o_que_esta_no_crm_depois_da_rodada(self, sessao: Session):
+        """Numa recarga sem mudança, 'criadas' é zero — e o que a pessoa quer saber
+        é quantas estão lá, não quantas foram novas."""
+        entrada = [proposta()]
+        importar(sessao, entrada)
+
+        execucao, _ = self._rodar(sessao, entrada)
+
+        assert (execucao.criadas, execucao.inalteradas) == (0, 1)
+        assert execucao.gravadas == 1
+
+    def test_aviso_que_bloqueia_pede_uma_pessoa(self, sessao: Session):
+        from crm.carga.planilha_2026 import Aviso
+
+        execucao, _ = self._rodar(
+            sessao, [proposta()], [Aviso(9, "situação", "fora da lista", bloqueia=True)]
+        )
+
+        assert [o.tipo.value for o in execucao.ocorrencias] == ["Precisa de você"]
+
+    def test_registro_que_entrou_mas_so_uma_pessoa_completa_tambem_pede_uma_pessoa(
+        self, sessao: Session
+    ):
+        """A aceita sem data entra no CRM — e mesmo assim alguém precisa preenchê-la."""
+        from crm.carga.planilha_2026 import Aviso
+
+        execucao, _ = self._rodar(
+            sessao,
+            [proposta()],
+            [Aviso(9, "data de aceite", "aceita sem data", acao_humana=True)],
+        )
+
+        assert execucao.ocorrencias[0].tipo.value == "Precisa de você"
+
+    def test_conversao_automatica_e_um_ajuste(self, sessao: Session):
+        from crm.carga.planilha_2026 import Aviso
+
+        execucao, _ = self._rodar(
+            sessao, [proposta()], [Aviso(9, "tipo de canal", "'Socio' convertido para 'Sócios'")]
+        )
+
+        assert execucao.ocorrencias[0].tipo.value == "Ajustado sozinho"
+
+    def test_mudanca_na_recarga_aparece_legivel(self, sessao: Session):
+        """'Enviar proposta → Aceita', não '<Situacao.ACEITA: ...>'."""
+        importar(sessao, [proposta()])
+
+        execucao, _ = self._rodar(
+            sessao, [proposta(situacao=Situacao.ACEITA, data_aceite=date(2026, 4, 1))]
+        )
+
+        mudancas = [o for o in execucao.ocorrencias if o.tipo.value == "Mudou na recarga"]
+        situacao = next(o for o in mudancas if o.campo == "situacao")
+        assert situacao.texto == "Sogamax: Enviar proposta → Aceita"
+        assert "<" not in situacao.texto
+
+    def test_linha_incompleta_ja_explicada_pela_leitura_nao_e_contada_duas_vezes(
+        self, sessao: Session
+    ):
+        from crm.carga.planilha_2026 import Aviso
+
+        execucao, _ = self._rodar(
+            sessao,
+            [proposta(linha=5, nome_oportunidade=None)],
+            [Aviso(5, "nome", "linha sem nome de oportunidade", bloqueia=True)],
+        )
+
+        da_linha_5 = [o for o in execucao.ocorrencias if o.linha == 5]
+        assert len(da_linha_5) == 1
+
+    def test_linha_incompleta_sem_aviso_da_leitura_ainda_e_registrada(self, sessao: Session):
+        execucao, _ = self._rodar(sessao, [proposta(linha=5, nome_oportunidade=None)])
+
+        assert any(o.campo == "linha incompleta" for o in execucao.ocorrencias)
+
+    def test_duplicata_vira_pendencia_com_a_primeira_linha(self, sessao: Session):
+        execucao, _ = self._rodar(sessao, [proposta(linha=317), proposta(linha=318)])
+
+        duplicata = next(o for o in execucao.ocorrencias if o.campo == "linha duplicada")
+        assert duplicata.tipo.value == "Precisa de você"
+        assert duplicata.linha == 317
+
+    def test_guarda_so_o_nome_do_arquivo(self, sessao: Session):
+        """O caminho revela a estrutura de pastas de quem rodou e não ajuda a conferir."""
+        unix, _ = self._rodar(sessao, [proposta()], arquivo="/Users/alguem/Downloads/planilha.xlsx")
+        win, _ = self._rodar(sessao, [proposta()], arquivo="C:\\pasta\\planilha.xlsx")
+
+        assert unix.arquivo == "planilha.xlsx"
+        assert win.arquivo == "planilha.xlsx"
+
+    def test_cada_rodada_e_um_registro_novo_e_o_historico_fica(self, sessao: Session):
+        entrada = [proposta()]
+        self._rodar(sessao, entrada)
+        self._rodar(sessao, entrada)
+
+        from crm.db.modelos import ExecucaoDeCarga
+
+        assert sessao.scalar(sa.select(sa.func.count()).select_from(ExecucaoDeCarga)) == 2
+
+    def test_a_data_da_rodada_tem_fuso(self, sessao: Session):
+        execucao, _ = self._rodar(sessao, [proposta()])
+
+        assert execucao.executada_em.tzinfo is not None

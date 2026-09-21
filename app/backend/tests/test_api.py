@@ -384,3 +384,89 @@ class TestIndicadores:
 
         assert dados["em_aberto"]["quantas"] == 0
         assert dados["ciclo_medio"]["calculavel"] is False
+
+
+@pytest.fixture
+def rodada(sessao: Session) -> int:
+    """Uma rodada da carga com um de cada tipo, já gravada."""
+    from crm.db.base import agora
+    from crm.db.modelos import ExecucaoDeCarga, OcorrenciaDeCarga
+    from crm.domain.listas import TipoDeOcorrencia as T
+
+    execucao = ExecucaoDeCarga(
+        executada_em=agora(), arquivo="planilha.xlsx", lidas=436, de_outro_ano=279,
+        residuais=0, importadas=157, criadas=0, atualizadas=1, inalteradas=152,
+        ignoradas_incompletas=3, ignoradas_duplicatas=1, grupos_criados=0,
+        grupos_reaproveitados=0,
+        ocorrencias=[
+            OcorrenciaDeCarga(tipo=T.PENDENCIA, linha=317, campo="linha duplicada", texto="idênticas"),
+            OcorrenciaDeCarga(tipo=T.PENDENCIA, linha=12, campo="data de aceite", texto="aceita sem data"),
+            OcorrenciaDeCarga(tipo=T.PENDENCIA, linha=30, campo="data de aceite", texto="aceita sem data"),
+            OcorrenciaDeCarga(tipo=T.AJUSTE, linha=8, campo="tipo de canal", texto="'Socio' → 'Sócios'"),
+            OcorrenciaDeCarga(tipo=T.MUDANCA, linha=5, campo="situacao", texto="Alfa: Enviar proposta → Aceita"),
+        ],
+    )
+    sessao.add(execucao)
+    sessao.commit()
+    return execucao.id
+
+
+class TestConferencia:
+    def test_lista_as_rodadas_com_a_contagem_por_tipo(self, cliente: TestClient, rodada):
+        cargas = cliente.get("/api/cargas").json()
+
+        assert len(cargas) == 1
+        assert (cargas[0]["pendencias"], cargas[0]["ajustes"], cargas[0]["mudancas"]) == (3, 1, 1)
+
+    def test_gravadas_e_o_que_esta_no_crm_depois_da_rodada(self, cliente: TestClient, rodada):
+        """Numa recarga, 'criadas' é pequeno; o que importa é quantas estão lá."""
+        assert cliente.get("/api/cargas").json()[0]["gravadas"] == 153
+
+    def test_a_mais_recente_vem_primeiro(self, cliente: TestClient, rodada, sessao: Session):
+        from crm.db.base import agora
+        from crm.db.modelos import ExecucaoDeCarga
+
+        sessao.add(ExecucaoDeCarga(
+            executada_em=agora(), arquivo="depois.xlsx", lidas=1, de_outro_ano=0,
+            residuais=0, importadas=1, criadas=1, atualizadas=0, inalteradas=0,
+            ignoradas_incompletas=0, ignoradas_duplicatas=0, grupos_criados=1,
+            grupos_reaproveitados=0))
+        sessao.commit()
+
+        assert cliente.get("/api/cargas").json()[0]["arquivo"] == "depois.xlsx"
+
+    def test_detalhe_agrupa_por_campo(self, cliente: TestClient, rodada):
+        """É o que responde 'onde está o grosso do trabalho' sem ler 140 linhas."""
+        detalhe = cliente.get(f"/api/cargas/{rodada}").json()
+
+        aceite = next(g for g in detalhe["por_campo"] if g["campo"] == "data de aceite")
+        assert (aceite["tipo"], aceite["quantas"]) == ("Precisa de você", 2)
+
+    def test_ocorrencias_na_ordem_da_planilha(self, cliente: TestClient, rodada):
+        """Quem confere lê a planilha de cima para baixo."""
+        itens = cliente.get(f"/api/cargas/{rodada}/ocorrencias").json()["itens"]
+
+        linhas = [i["linha"] for i in itens]
+        assert linhas == sorted(linhas)
+
+    def test_filtra_por_tipo(self, cliente: TestClient, rodada):
+        pagina = cliente.get(
+            f"/api/cargas/{rodada}/ocorrencias", params={"tipo": "Precisa de você"}
+        ).json()
+
+        assert pagina["total"] == 3
+
+    def test_filtra_por_campo(self, cliente: TestClient, rodada):
+        pagina = cliente.get(
+            f"/api/cargas/{rodada}/ocorrencias", params={"campo": "data de aceite"}
+        ).json()
+
+        assert pagina["total"] == 2
+
+    def test_carga_inexistente_da_404(self, cliente: TestClient):
+        assert cliente.get("/api/cargas/999").status_code == 404
+        assert cliente.get("/api/cargas/999/ocorrencias").status_code == 404
+
+    def test_sem_nenhuma_rodada_devolve_lista_vazia(self, cliente: TestClient):
+        """A tela precisa distinguir 'nenhuma carga registrada' de erro."""
+        assert cliente.get("/api/cargas").json() == []

@@ -23,7 +23,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ / "src"))
 
 from crm.carga.arquivo import ler_aba_propostas  # noqa: E402
-from crm.carga.persistencia import importar  # noqa: E402
+from crm.carga.persistencia import importar, registrar_execucao  # noqa: E402
 from crm.carga.planilha_2026 import carregar  # noqa: E402
 from crm.db.modelos import GrupoEconomico, Oportunidade  # noqa: E402
 from crm.db.sessao import criar_engine, url_do_banco  # noqa: E402
@@ -51,6 +51,11 @@ def principal(argumentos: list[str]) -> int:
         print("=" * 66)
         resultado = importar(sessao, propostas)
         print(resultado.resumo())
+
+        # Só uma carga que vale entra para o histórico. A simulação não deixa
+        # rastro: um relatório de conferência cheio de ensaios deixaria de ser
+        # prova do que realmente está no CRM.
+        execucao = registrar_execucao(sessao, caminho, relatorio_leitura, resultado) if gravar else None
 
         print()
         print("=" * 66)
@@ -89,7 +94,8 @@ def principal(argumentos: list[str]) -> int:
 
         if gravar:
             sessao.commit()
-            print("\n✓ GRAVADO.")
+            print(f"\n✓ GRAVADO. Relatório de conferência registrado como carga nº {execucao.id}:")
+            print("  abra a tela Conferência para ver o que ficou pendente e o que foi ajustado.")
         else:
             sessao.rollback()
             print("\n↩ Desfeito. Rode de novo com --gravar para valer.")

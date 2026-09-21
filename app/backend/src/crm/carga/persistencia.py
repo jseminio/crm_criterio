@@ -26,11 +26,24 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from crm.carga.identidade import chave_de_origem, detectar_duplicatas
-from crm.carga.planilha_2026 import Proposta
-from crm.db.modelos import GrupoEconomico, Oportunidade
-from crm.domain.listas import Origem, SituacaoGrupo
+from crm.carga.planilha_2026 import Proposta, Relatorio
+from crm.db.base import agora
+from crm.db.modelos import (
+    ExecucaoDeCarga,
+    GrupoEconomico,
+    OcorrenciaDeCarga,
+    Oportunidade,
+)
+from crm.domain.listas import Origem, SituacaoGrupo, TipoDeOcorrencia
 
-__all__ = ["importar", "ResultadoImportacao", "Mudanca", "CENTAVO"]
+__all__ = [
+    "importar",
+    "registrar_execucao",
+    "ResultadoImportacao",
+    "Mudanca",
+    "Ocorrencia",
+    "CENTAVO",
+]
 
 CENTAVO = Decimal("0.01")
 
@@ -61,6 +74,23 @@ CAMPOS = {
 CAMPOS_DE_DINHEIRO = {"preco_mensal", "preco_anual", "valor_mensalizado"}
 
 
+def _legivel(valor: object) -> str:
+    """Como um valor aparece para quem confere: 'Aceita', não '<Situacao.ACEITA>'."""
+    if valor is None:
+        return "vazio"
+    return str(getattr(valor, "value", valor))
+
+
+@dataclass(frozen=True)
+class Ocorrencia:
+    """Uma linha do relatório, já classificada pelo que pede de quem lê."""
+
+    tipo: TipoDeOcorrencia
+    linha: int | None
+    campo: str | None
+    texto: str
+
+
 @dataclass(frozen=True)
 class Mudanca:
     """Um valor que a recarga alterou."""
@@ -73,7 +103,10 @@ class Mudanca:
 
     @property
     def texto(self) -> str:
-        return f"linha {self.linha} · {self.nome} · {self.campo}: {self.de!r} → {self.para!r}"
+        return (
+            f"linha {self.linha} · {self.nome} · {self.campo}: "
+            f"{_legivel(self.de)} → {_legivel(self.para)}"
+        )
 
 
 @dataclass
@@ -88,7 +121,12 @@ class ResultadoImportacao:
     grupos_criados: int = 0
     grupos_reaproveitados: int = 0
     mudancas: list[Mudanca] = field(default_factory=list)
-    avisos: list[str] = field(default_factory=list)
+    ocorrencias: list[Ocorrencia] = field(default_factory=list)
+
+    @property
+    def avisos(self) -> list[str]:
+        """Os textos das ocorrências, para quem só quer ler a lista."""
+        return [o.texto for o in self.ocorrencias]
 
     @property
     def total_gravado(self) -> int:
@@ -181,15 +219,27 @@ def importar(sessao: Session, propostas: Iterable[Proposta]) -> ResultadoImporta
     linhas_duplicadas: set[int] = set()
     for duplicata in detectar_duplicatas(propostas):
         linhas_duplicadas.update(duplicata.linhas[1:])
-        resultado.avisos.append(duplicata.texto)
+        resultado.ocorrencias.append(
+            Ocorrencia(
+                TipoDeOcorrencia.PENDENCIA,
+                duplicata.linhas[0],
+                "linha duplicada",
+                duplicata.texto,
+            )
+        )
 
     cache_de_grupos: dict[str, GrupoEconomico] = {}
 
     for proposta in propostas:
         if not proposta.completa:
             resultado.ignoradas_incompletas += 1
-            resultado.avisos.append(
-                f"linha {proposta.linha} · sem nome ou sem situação — não vira oportunidade"
+            resultado.ocorrencias.append(
+                Ocorrencia(
+                    TipoDeOcorrencia.PENDENCIA,
+                    proposta.linha,
+                    "linha incompleta",
+                    "sem nome ou sem situação — não vira oportunidade",
+                )
             )
             continue
 
@@ -200,9 +250,14 @@ def importar(sessao: Session, propostas: Iterable[Proposta]) -> ResultadoImporta
         for campo in CAMPOS_DE_DINHEIRO:
             bruto = getattr(proposta, campo)
             if bruto is not None and _em_centavos(bruto) != bruto:
-                resultado.avisos.append(
-                    f"linha {proposta.linha} · {campo}: {bruto} arredondado para "
-                    f"{_em_centavos(bruto)} — planilha traz resíduo de fórmula"
+                resultado.ocorrencias.append(
+                    Ocorrencia(
+                        TipoDeOcorrencia.AJUSTE,
+                        proposta.linha,
+                        campo,
+                        f"{bruto} arredondado para {_em_centavos(bruto)} — "
+                        f"planilha traz resíduo de fórmula",
+                    )
                 )
 
         chave = chave_de_origem(proposta)
@@ -252,3 +307,73 @@ def importar(sessao: Session, propostas: Iterable[Proposta]) -> ResultadoImporta
 
     sessao.flush()
     return resultado
+
+
+def registrar_execucao(
+    sessao: Session,
+    arquivo: str,
+    leitura: Relatorio,
+    resultado: ResultadoImportacao,
+) -> ExecucaoDeCarga:
+    """Guarda a rodada como o relatório de conferência que a tela mostra.
+
+    Junta duas fontes com olhares diferentes sobre a mesma planilha: a **leitura**
+    (o que havia nas células e como foi normalizado) e a **gravação** (o que
+    entrou no CRM e o que mudou). Cada linha vira uma ocorrência classificada
+    pelo que pede de quem lê — pendência, ajuste ou mudança.
+    """
+    ocorrencias: list[Ocorrencia] = []
+
+    for aviso in leitura.avisos:
+        # Pede uma pessoa quando não converteu (bloqueia) ou quando entrou
+        # incompleto e só alguém completa (acao_humana). O resto foi ajustado
+        # sozinho — e é justamente o que a pessoa quer poder conferir.
+        tipo = (
+            TipoDeOcorrencia.PENDENCIA
+            if aviso.bloqueia or aviso.acao_humana
+            else TipoDeOcorrencia.AJUSTE
+        )
+        ocorrencias.append(Ocorrencia(tipo, aviso.linha, aviso.campo, aviso.texto))
+
+    # A leitura já diz por que uma linha ficou de fora. Repetir a consequência
+    # ("não vira oportunidade") contaria a mesma linha duas vezes.
+    ja_pendentes = {
+        o.linha for o in ocorrencias if o.tipo is TipoDeOcorrencia.PENDENCIA
+    }
+    for ocorrencia in resultado.ocorrencias:
+        if ocorrencia.campo == "linha incompleta" and ocorrencia.linha in ja_pendentes:
+            continue
+        ocorrencias.append(ocorrencia)
+
+    for mudanca in resultado.mudancas:
+        ocorrencias.append(
+            Ocorrencia(
+                TipoDeOcorrencia.MUDANCA,
+                mudanca.linha,
+                mudanca.campo,
+                f"{mudanca.nome}: {_legivel(mudanca.de)} → {_legivel(mudanca.para)}",
+            )
+        )
+
+    execucao = ExecucaoDeCarga(
+        executada_em=agora(),
+        arquivo=arquivo.replace("\\", "/").rsplit("/", 1)[-1],
+        lidas=leitura.total_lidas,
+        de_outro_ano=leitura.descartadas_outro_ano,
+        residuais=leitura.descartadas_residuais,
+        importadas=leitura.importadas,
+        criadas=resultado.criadas,
+        atualizadas=resultado.atualizadas,
+        inalteradas=resultado.inalteradas,
+        ignoradas_incompletas=resultado.ignoradas_incompletas,
+        ignoradas_duplicatas=resultado.ignoradas_duplicatas,
+        grupos_criados=resultado.grupos_criados,
+        grupos_reaproveitados=resultado.grupos_reaproveitados,
+        ocorrencias=[
+            OcorrenciaDeCarga(tipo=o.tipo, linha=o.linha, campo=o.campo, texto=o.texto)
+            for o in ocorrencias
+        ],
+    )
+    sessao.add(execucao)
+    sessao.flush()
+    return execucao

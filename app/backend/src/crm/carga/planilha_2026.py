@@ -48,6 +48,13 @@ class Aviso:
     texto: str
     bloqueia: bool = False
     """``True`` quando o dado não pôde ser convertido e ficou pendente."""
+    acao_humana: bool = False
+    """``True`` quando o registro entrou, mas só uma pessoa completa o dado.
+
+    Distinto de `bloqueia`: a proposta aceita sem data **entra** no CRM, e
+    mesmo assim alguém precisa preencher a data. Sem esta marca, o relatório de
+    conferência trataria como "ajuste automático" algo que só uma pessoa resolve.
+    """
 
 
 @dataclass(frozen=True)
@@ -221,6 +228,7 @@ def carregar(linhas: Iterable[dict[str, Any]]) -> tuple[list[Proposta], Relatori
                     "data de aceite",
                     "aceita sem data — Eduardo preencherá no CRM",
                     bloqueia=False,
+                    acao_humana=True,
                 )
             )
 

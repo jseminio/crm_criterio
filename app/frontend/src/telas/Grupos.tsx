@@ -7,11 +7,12 @@
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { GrupoResumo, Pagina } from "../api/tipos";
+import type { GrupoResumo, Listas, Pagina } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { usarDados } from "../usarDados";
+import { DetalheDoGrupo } from "./DetalheDoGrupo";
 
 function Fusao({
   principal,
@@ -124,8 +125,9 @@ function Fusao({
   );
 }
 
-export function Grupos() {
+export function Grupos({ listas }: { listas: Listas | null }) {
   const [busca, definirBusca] = useState("");
+  const [aberto, definirAberto] = useState<GrupoResumo | null>(null);
   const [fundindo, definirFundindo] = useState<GrupoResumo | null>(null);
 
   const { dados, carregando, erro, recarregar } = usarDados<Pagina<GrupoResumo>>(
@@ -190,7 +192,16 @@ export function Grupos() {
           <tbody>
             {dados!.itens.map((grupo) => (
               <tr key={grupo.id}>
-                <td>{grupo.nome}</td>
+                <td>
+                  {/* O nome é o caminho natural para o detalhe. */}
+                  <button
+                    type="button"
+                    className="link-de-tabela"
+                    onClick={() => definirAberto(grupo)}
+                  >
+                    {grupo.nome}
+                  </button>
+                </td>
                 <td>
                   <Etiqueta texto={grupo.situacao} />
                 </td>
@@ -211,6 +222,14 @@ export function Grupos() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {aberto && (
+        <DetalheDoGrupo
+          grupo={aberto}
+          listas={listas}
+          aoFechar={() => definirAberto(null)}
+        />
       )}
 
       {fundindo && dados && (

@@ -25,7 +25,13 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from crm.api import esquemas as e
 from crm.db.grupos import FusaoInvalida, fundir_grupos
-from crm.db.modelos import GrupoEconomico, Lead, Oportunidade
+from crm.db.modelos import (
+    ExecucaoDeCarga,
+    GrupoEconomico,
+    Lead,
+    OcorrenciaDeCarga,
+    Oportunidade,
+)
 from crm.db.sessao import criar_engine, criar_fabrica_de_sessao, url_do_banco
 from crm.domain import indicadores as regras_de_indicadores
 from crm.domain.listas import (
@@ -37,6 +43,7 @@ from crm.domain.listas import (
     SituacaoLead,
     Temperatura,
     TipoCanal,
+    TipoDeOcorrencia,
 )
 from crm.domain.listas import _CAPTADORES  # noqa: PLC2701 — única fonte da lista
 
@@ -354,6 +361,106 @@ def _registrar(api: FastAPI) -> None:
         detalhe = e.OportunidadeDetalhe.model_validate(oportunidade)
         detalhe.grupo_nome = oportunidade.grupo.nome
         return detalhe
+
+    # ------------------------------------------------------------- conferência
+    def _contagens(sessao: Session, ids: list[int]) -> dict[int, dict[TipoDeOcorrencia, int]]:
+        """Quantas ocorrências de cada tipo, por rodada, numa consulta só."""
+        contagem: dict[int, dict[TipoDeOcorrencia, int]] = {i: {} for i in ids}
+        if not ids:
+            return contagem
+        linhas = sessao.execute(
+            sa.select(
+                OcorrenciaDeCarga.execucao_id, OcorrenciaDeCarga.tipo, sa.func.count()
+            )
+            .where(OcorrenciaDeCarga.execucao_id.in_(ids))
+            .group_by(OcorrenciaDeCarga.execucao_id, OcorrenciaDeCarga.tipo)
+        ).all()
+        for execucao_id, tipo, quantas in linhas:
+            contagem[execucao_id][tipo] = quantas
+        return contagem
+
+    def _resumo_da_execucao(
+        execucao: ExecucaoDeCarga, contagem: dict[TipoDeOcorrencia, int]
+    ) -> dict:
+        dados = e.ExecucaoResumo.model_validate(execucao).model_dump()
+        dados["pendencias"] = contagem.get(TipoDeOcorrencia.PENDENCIA, 0)
+        dados["ajustes"] = contagem.get(TipoDeOcorrencia.AJUSTE, 0)
+        dados["mudancas"] = contagem.get(TipoDeOcorrencia.MUDANCA, 0)
+        return dados
+
+    @api.get("/api/cargas", response_model=list[e.ExecucaoResumo], tags=["conferência"])
+    def listar_cargas(
+        sessao: Session = Depends(obter_sessao),
+        limite: int = Query(default=50, le=200),
+    ) -> list[e.ExecucaoResumo]:
+        """As rodadas da carga, da mais recente para a mais antiga."""
+        execucoes = sessao.scalars(
+            sa.select(ExecucaoDeCarga)
+            .order_by(ExecucaoDeCarga.executada_em.desc(), ExecucaoDeCarga.id.desc())
+            .limit(limite)
+        ).all()
+        contagens = _contagens(sessao, [x.id for x in execucoes])
+        return [
+            e.ExecucaoResumo(**_resumo_da_execucao(x, contagens[x.id])) for x in execucoes
+        ]
+
+    @api.get("/api/cargas/{carga_id}", response_model=e.ExecucaoDetalhe, tags=["conferência"])
+    def ver_carga(carga_id: int, sessao: Session = Depends(obter_sessao)) -> e.ExecucaoDetalhe:
+        execucao = sessao.get(ExecucaoDeCarga, carga_id)
+        if execucao is None:
+            raise HTTPException(404, "carga não encontrada")
+        contagem = _contagens(sessao, [carga_id])[carga_id]
+        por_campo = sessao.execute(
+            sa.select(
+                OcorrenciaDeCarga.tipo, OcorrenciaDeCarga.campo, sa.func.count().label("q")
+            )
+            .where(OcorrenciaDeCarga.execucao_id == carga_id)
+            .group_by(OcorrenciaDeCarga.tipo, OcorrenciaDeCarga.campo)
+            .order_by(sa.desc("q"))
+        ).all()
+        return e.ExecucaoDetalhe(
+            **_resumo_da_execucao(execucao, contagem),
+            por_campo=[
+                e.ResumoPorCampo(tipo=tipo, campo=campo, quantas=quantas)
+                for tipo, campo, quantas in por_campo
+            ],
+        )
+
+    @api.get(
+        "/api/cargas/{carga_id}/ocorrencias",
+        response_model=e.Pagina[e.OcorrenciaResposta],
+        tags=["conferência"],
+    )
+    def listar_ocorrencias(
+        carga_id: int,
+        sessao: Session = Depends(obter_sessao),
+        tipo: TipoDeOcorrencia | None = None,
+        campo: str | None = None,
+        limite: int = Query(default=200, le=1000),
+        salto: int = 0,
+    ) -> e.Pagina[e.OcorrenciaResposta]:
+        """As linhas do relatório, na ordem da planilha, para ir direto ao lugar."""
+        if sessao.get(ExecucaoDeCarga, carga_id) is None:
+            raise HTTPException(404, "carga não encontrada")
+        consulta = sa.select(OcorrenciaDeCarga).where(
+            OcorrenciaDeCarga.execucao_id == carga_id
+        )
+        if tipo is not None:
+            consulta = consulta.where(OcorrenciaDeCarga.tipo == tipo)
+        if campo is not None:
+            consulta = consulta.where(OcorrenciaDeCarga.campo == campo)
+        total = sessao.scalar(sa.select(sa.func.count()).select_from(consulta.subquery()))
+        itens = sessao.scalars(
+            consulta.order_by(
+                OcorrenciaDeCarga.linha.asc().nulls_last(), OcorrenciaDeCarga.id
+            )
+            .offset(salto)
+            .limit(limite)
+        ).all()
+        return e.Pagina(
+            total=total or 0,
+            itens=[e.OcorrenciaResposta.model_validate(i) for i in itens],
+        )
 
     # ------------------------------------------------------------------- leads
     @api.get("/api/leads", response_model=e.Pagina[e.LeadResumo], tags=["leads"])

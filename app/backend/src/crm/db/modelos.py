@@ -33,9 +33,18 @@ from crm.domain.listas import (
     SituacaoLead,
     Temperatura,
     TipoCanal,
+    TipoDeOcorrencia,
 )
 
-__all__ = ["GrupoEconomico", "Empresa", "PessoaContato", "Lead", "Oportunidade"]
+__all__ = [
+    "GrupoEconomico",
+    "Empresa",
+    "PessoaContato",
+    "Lead",
+    "Oportunidade",
+    "ExecucaoDeCarga",
+    "OcorrenciaDeCarga",
+]
 
 #: Dinheiro é guardado em centavos exatos.
 #:
@@ -290,3 +299,69 @@ class Oportunidade(CarimboMixin, Base):
 
     def __repr__(self) -> str:
         return f"<Oportunidade {self.id} {self.nome!r} {self.situacao.value}>"
+
+
+class ExecucaoDeCarga(Base):
+    """Uma rodada da carga da planilha, guardada como foi.
+
+    Existe para o relatório de conferência sobreviver ao script. Sem isto ele
+    aparecia na tela do terminal e sumia — e confiar na base, que é a condição
+    para abandonar a planilha, dependia de alguém ter guardado a saída.
+
+    **Imutável de propósito**: não herda o carimbo de alteração. Um relatório
+    que muda depois de escrito deixa de ser evidência do que aconteceu.
+    """
+
+    __tablename__ = "execucao_de_carga"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    executada_em: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, index=True
+    )
+    arquivo: Mapped[str] = mapped_column(sa.String(300), nullable=False)
+    """Só o nome do arquivo, sem o caminho: o caminho revela a estrutura de
+    pastas de quem rodou e não ajuda a conferir nada."""
+
+    # O que a leitura da planilha viu
+    lidas: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    de_outro_ano: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    residuais: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    importadas: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+
+    # O que a gravação fez
+    criadas: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    atualizadas: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    inalteradas: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    ignoradas_incompletas: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    ignoradas_duplicatas: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    grupos_criados: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    grupos_reaproveitados: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+
+    ocorrencias: Mapped[list["OcorrenciaDeCarga"]] = relationship(
+        back_populates="execucao", cascade="all, delete-orphan"
+    )
+
+    @property
+    def gravadas(self) -> int:
+        """Quantas oportunidades desta planilha estão no CRM depois da rodada."""
+        return self.criadas + self.atualizadas + self.inalteradas
+
+
+class OcorrenciaDeCarga(Base):
+    """Uma linha do relatório: algo que a carga viu, ajustou ou alterou."""
+
+    __tablename__ = "ocorrencia_de_carga"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    execucao_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("execucao_de_carga.id"), nullable=False, index=True
+    )
+    tipo: Mapped[TipoDeOcorrencia] = mapped_column(
+        coluna_lista(TipoDeOcorrencia), nullable=False, index=True
+    )
+    linha: Mapped[int | None] = mapped_column(sa.Integer)
+    """A linha da aba da planilha, para quem confere ir direto ao lugar."""
+    campo: Mapped[str | None] = mapped_column(sa.String(60))
+    texto: Mapped[str] = mapped_column(sa.Text, nullable=False)
+
+    execucao: Mapped[ExecucaoDeCarga] = relationship(back_populates="ocorrencias")

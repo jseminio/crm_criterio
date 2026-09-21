@@ -22,6 +22,7 @@ __all__ = [
     "SituacaoEmpresa",
     "PapelContato",
     "Origem",
+    "TipoDeOcorrencia",
     "TipoCanal",
     "Temperatura",
     "LinhaServico",
@@ -132,6 +133,19 @@ class Origem(Enum):
 
     CARGA_2026 = "Carga 2026"
     CRM = "CRM"
+
+
+class TipoDeOcorrencia(Enum):
+    """O que uma linha do relatório de conferência pede de quem lê.
+
+    Três tipos, pensados para a pergunta de quem confere a carga: *o que ficou
+    pendente, o que foi corrigido, o que mudou?* Mais categorias que isso
+    obrigariam a pessoa a decorar a taxonomia antes de conseguir conferir.
+    """
+
+    PENDENCIA = "Precisa de você"
+    AJUSTE = "Ajustado sozinho"
+    MUDANCA = "Mudou na recarga"
 
 
 class TipoCanal(Enum):

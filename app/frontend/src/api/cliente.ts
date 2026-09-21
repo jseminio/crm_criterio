@@ -2,10 +2,13 @@
 
 import type {
   ColunaDoFunil,
+  Execucao,
+  ExecucaoDetalhe,
   GrupoResumo,
   Indicadores,
   LeadResumo,
   Listas,
+  Ocorrencia,
   OportunidadeDetalhe,
   OportunidadeResumo,
   Pagina,
@@ -71,6 +74,15 @@ export const api = {
   funil: (filtros: FiltrosDoFunil = {}) =>
     pedir<ColunaDoFunil[]>(comParametros("/api/funil", { ...filtros })),
 
+  cargas: () => pedir<Execucao[]>("/api/cargas"),
+
+  carga: (id: number) => pedir<ExecucaoDetalhe>(`/api/cargas/${id}`),
+
+  ocorrencias: (id: number, filtros: { tipo?: string; campo?: string } = {}) =>
+    pedir<Pagina<Ocorrencia>>(
+      comParametros(`/api/cargas/${id}/ocorrencias`, { ...filtros, limite: 200 }),
+    ),
+
   indicadores: (filtros: FiltrosDoFunil = {}) =>
     pedir<Indicadores>(comParametros("/api/indicadores", { ...filtros })),
 
@@ -105,7 +117,7 @@ export const api = {
       body: JSON.stringify(dados),
     }),
 
-  grupos: (filtros: { busca?: string; limite?: number } = {}) =>
+  grupos: (filtros: { busca?: string; limite?: number; incluir_fundidos?: boolean } = {}) =>
     pedir<Pagina<GrupoResumo>>(comParametros("/api/grupos", { limite: 500, ...filtros })),
 
   fundirGrupos: (principalId: number, absorvidoId: number) =>

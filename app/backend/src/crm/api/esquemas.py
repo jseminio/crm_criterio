@@ -7,7 +7,7 @@ os dois faz com que um campo novo no banco vaze para a tela sem ninguém decidir
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,6 +21,7 @@ from crm.domain.listas import (
     SituacaoLead,
     Temperatura,
     TipoCanal,
+    TipoDeOcorrencia,
 )
 
 __all__ = [
@@ -39,6 +40,10 @@ __all__ = [
     "RecorteResposta",
     "PendenciaResposta",
     "IndicadoresResposta",
+    "ExecucaoResumo",
+    "ExecucaoDetalhe",
+    "OcorrenciaResposta",
+    "ResumoPorCampo",
 ]
 
 
@@ -209,6 +214,48 @@ class IndicadoresResposta(Base):
     aceitas_com_data_de_aceite: int
     ciclo_medio: PendenciaResposta
     taxa_de_conversao: PendenciaResposta
+
+
+class ExecucaoResumo(Base):
+    """Uma rodada da carga, com os números que respondem: o que entrou, o que
+    pede uma pessoa, o que foi ajustado, o que mudou."""
+
+    id: int
+    executada_em: datetime
+    arquivo: str
+    lidas: int
+    de_outro_ano: int
+    residuais: int
+    importadas: int
+    criadas: int
+    atualizadas: int
+    inalteradas: int
+    gravadas: int
+    ignoradas_incompletas: int
+    ignoradas_duplicatas: int
+    grupos_criados: int
+    grupos_reaproveitados: int
+    pendencias: int = 0
+    ajustes: int = 0
+    mudancas: int = 0
+
+
+class ResumoPorCampo(Base):
+    tipo: TipoDeOcorrencia
+    campo: str | None
+    quantas: int
+
+
+class ExecucaoDetalhe(ExecucaoResumo):
+    por_campo: list[ResumoPorCampo]
+
+
+class OcorrenciaResposta(Base):
+    id: int
+    tipo: TipoDeOcorrencia
+    linha: int | None
+    campo: str | None
+    texto: str
 
 
 class Pagina[T](BaseModel):

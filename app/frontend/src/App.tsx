@@ -5,13 +5,14 @@ import "./tokens.css";
 import "./app.css";
 import { api } from "./api/cliente";
 import type { Listas } from "./api/tipos";
+import { Conferencia } from "./telas/Conferencia";
 import { Funil } from "./telas/Funil";
 import { Grupos } from "./telas/Grupos";
 import { Leads } from "./telas/Leads";
 import { Lista } from "./telas/Lista";
 import { usarDados } from "./usarDados";
 
-type Tela = "funil" | "lista" | "leads" | "grupos";
+type Tela = "funil" | "lista" | "leads" | "grupos" | "conferencia";
 
 const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[] = [
   {
@@ -37,6 +38,12 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     rotulo: "Grupos",
     titulo: "Grupos econômicos",
     descricao: "O cliente é o grupo. Junte os que a planilha separou.",
+  },
+  {
+    chave: "conferencia",
+    rotulo: "Conferência",
+    titulo: "Conferência da carga",
+    descricao: "O que entrou da planilha, o que ficou pendente e o que foi ajustado.",
   },
 ];
 
@@ -85,7 +92,8 @@ export default function App() {
           {tela === "funil" && <Funil listas={listas} />}
           {tela === "lista" && <Lista listas={listas} />}
           {tela === "leads" && <Leads listas={listas} />}
-          {tela === "grupos" && <Grupos />}
+          {tela === "grupos" && <Grupos listas={listas} />}
+          {tela === "conferencia" && <Conferencia />}
         </main>
       </div>
     </div>

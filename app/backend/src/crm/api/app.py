@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, sessionmaker
 
 from crm.api import esquemas as e
+from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
 from crm.db.grupos import FusaoInvalida, fundir_grupos
 from crm.db.modelos import (
     ExecucaoDeCarga,
@@ -344,8 +345,23 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(404, "oportunidade não encontrada")
 
         mudancas = corpo.model_dump(exclude_unset=True)
+
+        # Lembra o que foi mudado AQUI e a planilha também controla, para a
+        # recarga não desfazer. Só conta o que de fato mudou de valor: abrir o
+        # painel e salvar sem alterar nada não deve travar o campo.
+        editados = {
+            campo
+            for campo, valor in mudancas.items()
+            if campo in CAMPOS_DA_CARGA and getattr(oportunidade, campo) != valor
+        }
         for campo, valor in mudancas.items():
             setattr(oportunidade, campo, valor)
+        if editados:
+            # Nova lista, não mutação: o SQLAlchemy não enxerga alteração no
+            # lugar de um valor JSON.
+            oportunidade.campos_do_crm = sorted(
+                set(oportunidade.campos_do_crm or []) | editados
+            )
 
         # Aceita sem data de aceite é o defeito mais comum da planilha de 2026.
         # Aqui não se repete: a API recusa, em vez de deixar passar e virar

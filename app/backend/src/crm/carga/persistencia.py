@@ -284,17 +284,37 @@ def importar(sessao: Session, propostas: Iterable[Proposta]) -> ResultadoImporta
         # conferência mandaria quem confere para a linha errada.
         existente.linha_planilha = proposta.linha
 
-        mudancas = [
-            Mudanca(
-                linha=proposta.linha,
-                nome=proposta.nome_oportunidade,
-                campo=campo,
-                de=getattr(existente, campo),
-                para=novo,
+        editados_no_crm = set(existente.campos_do_crm or [])
+        mudancas = []
+        for campo in CAMPOS:
+            novo = _valor_da_proposta(proposta, campo)
+            atual = getattr(existente, campo)
+            if novo == atual:
+                continue
+            if campo in editados_no_crm:
+                # Uma pessoa mudou este campo aqui. A planilha discorda, e a
+                # decisão de qual vale é dela — não da carga. Mantém o do CRM e
+                # deixa a divergência à vista, em vez de sobrescrever calada.
+                resultado.ocorrencias.append(
+                    Ocorrencia(
+                        TipoDeOcorrencia.PENDENCIA,
+                        proposta.linha,
+                        campo,
+                        f"{proposta.nome_oportunidade}: a planilha diz "
+                        f"{_legivel(novo)}, mas o CRM tem {_legivel(atual)} "
+                        f"(editado aqui) — mantido o do CRM",
+                    )
+                )
+                continue
+            mudancas.append(
+                Mudanca(
+                    linha=proposta.linha,
+                    nome=proposta.nome_oportunidade,
+                    campo=campo,
+                    de=atual,
+                    para=novo,
+                )
             )
-            for campo in CAMPOS
-            if (novo := _valor_da_proposta(proposta, campo)) != getattr(existente, campo)
-        ]
 
         if not mudancas:
             resultado.inalteradas += 1

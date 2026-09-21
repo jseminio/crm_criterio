@@ -470,3 +470,99 @@ class TestConferencia:
     def test_sem_nenhuma_rodada_devolve_lista_vazia(self, cliente: TestClient):
         """A tela precisa distinguir 'nenhuma carga registrada' de erro."""
         assert cliente.get("/api/cargas").json() == []
+
+
+class TestEdicaoMarcaOCampo:
+    """A API lembra o que foi mudado na tela, para a recarga não desfazer."""
+
+    def _oportunidade(self, sessao: Session, id_: int) -> Oportunidade:
+        sessao.expire_all()
+        return sessao.get(Oportunidade, id_)
+
+    def test_editar_um_campo_que_a_planilha_controla_o_marca(
+        self, cliente: TestClient, carteira, sessao: Session
+    ):
+        cliente.patch(
+            f"/api/oportunidades/{carteira['primeira']}", json={"temperatura": "Frio"}
+        )
+
+        assert self._oportunidade(sessao, carteira["primeira"]).campos_do_crm == ["temperatura"]
+
+    def test_salvar_sem_mudar_o_valor_nao_marca(
+        self, cliente: TestClient, carteira, sessao: Session
+    ):
+        """Abrir o painel e salvar não deve congelar campo nenhum."""
+        atual = cliente.get(f"/api/oportunidades/{carteira['primeira']}").json()
+        cliente.patch(
+            f"/api/oportunidades/{carteira['primeira']}",
+            json={"temperatura": atual["temperatura"]},
+        )
+
+        assert self._oportunidade(sessao, carteira["primeira"]).campos_do_crm == []
+
+    def test_campo_que_so_existe_no_crm_nao_e_marcado(
+        self, cliente: TestClient, carteira, sessao: Session
+    ):
+        """Próxima ação e observação a planilha nem tem: não há o que proteger."""
+        cliente.patch(
+            f"/api/oportunidades/{carteira['primeira']}",
+            json={"proxima_acao": "Ligar", "observacao": "nota"},
+        )
+
+        assert self._oportunidade(sessao, carteira["primeira"]).campos_do_crm == []
+
+    def test_edicoes_sucessivas_acumulam(
+        self, cliente: TestClient, carteira, sessao: Session
+    ):
+        cliente.patch(f"/api/oportunidades/{carteira['primeira']}", json={"temperatura": "Frio"})
+        cliente.patch(
+            f"/api/oportunidades/{carteira['primeira']}",
+            json={"situacao": "Aceita", "data_aceite": "2026-05-01"},
+        )
+
+        assert self._oportunidade(sessao, carteira["primeira"]).campos_do_crm == [
+            "data_aceite", "situacao", "temperatura",
+        ]
+
+
+class TestEdicaoNaTelaSobreviveARecargaDaPlanilha:
+    """De ponta a ponta: a pessoa edita pela tela e a planilha é recarregada.
+
+    Cada lado tem os seus testes. O defeito real nasceu na junção — a carga não
+    sabia o que a API havia mudado — e só um teste que atravessa os dois pega isso.
+    """
+
+    def test_data_de_aceite_preenchida_pela_api_resiste_a_recarga(
+        self, cliente: TestClient, sessao: Session
+    ):
+        from datetime import date as Data
+
+        from crm.carga.persistencia import importar
+        from crm.domain.listas import LinhaServico
+        from crm.carga.planilha_2026 import Proposta
+
+        planilha = [Proposta(
+            linha=1, nome_oportunidade="Sogamax", data_colocacao=Data(2026, 1, 1),
+            servico="BPO Contábil", tipo_servico="Recorrente", linha_servico=LinhaServico.C1,
+            captador="MO", canal=None, tipo_canal=None, situacao=Situacao.ACEITA,
+            temperatura=None, data_aceite=None,          # a planilha NÃO tem a data
+            motivo_recusa=None, motivo_recusa_original=None,
+            preco_mensal=Decimal("5000.00"), preco_anual=Decimal("65000.00"),
+            valor_mensalizado=None,
+        )]
+        importar(sessao, planilha)
+        sessao.commit()
+        id_ = sessao.scalar(sa.select(Oportunidade.id))
+
+        # A pessoa preenche a data na tela...
+        resposta = cliente.patch(f"/api/oportunidades/{id_}", json={"data_aceite": "2026-04-15"})
+        assert resposta.status_code == 200
+
+        # ...e a carga roda de novo, com a planilha ainda sem a data.
+        sessao.expire_all()
+        resultado = importar(sessao, planilha)
+        sessao.commit()
+
+        sessao.expire_all()
+        assert sessao.get(Oportunidade, id_).data_aceite == Data(2026, 4, 15)
+        assert any("mantido o do CRM" in o.texto for o in resultado.ocorrencias)

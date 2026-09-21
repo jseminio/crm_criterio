@@ -363,3 +363,91 @@ class TestRelatorioDeConferencia:
         execucao, _ = self._rodar(sessao, [proposta()])
 
         assert execucao.executada_em.tzinfo is not None
+
+
+class TestEdicaoNoCrmSobreviveARecarga:
+    """A planilha e o CRM editam a mesma oportunidade, em paralelo.
+
+    Sem estas travas, preencher a data do aceite na tela e rodar a carga de novo
+    a apagava — a planilha não tem nenhuma. Foi provado antes da correção.
+    """
+
+    def _editar_no_crm(self, sessao, **campos):
+        op = sessao.scalar(sa.select(Oportunidade))
+        for campo, valor in campos.items():
+            setattr(op, campo, valor)
+        op.campos_do_crm = sorted(set(op.campos_do_crm or []) | set(campos))
+        sessao.flush()
+        return op
+
+    def test_a_data_de_aceite_preenchida_na_tela_nao_e_apagada(self, sessao: Session):
+        """O caso que falhava: a planilha não tem a data, o CRM tem."""
+        entrada = [proposta(situacao=Situacao.ACEITA, data_aceite=None)]
+        importar(sessao, entrada)
+        op = self._editar_no_crm(sessao, data_aceite=date(2026, 4, 15))
+
+        importar(sessao, entrada)
+
+        assert op.data_aceite == date(2026, 4, 15)
+
+    def test_a_divergencia_vira_pendencia_e_nao_mudanca(self, sessao: Session):
+        """Mantém o do CRM e deixa à vista — quem decide qual vale é uma pessoa."""
+        entrada = [proposta(situacao=Situacao.ACEITA, data_aceite=None)]
+        importar(sessao, entrada)
+        self._editar_no_crm(sessao, data_aceite=date(2026, 4, 15))
+
+        resultado = importar(sessao, entrada)
+
+        assert resultado.mudancas == []
+        conflito = next(o for o in resultado.ocorrencias if o.campo == "data_aceite")
+        assert conflito.tipo.value == "Precisa de você"
+        assert "mantido o do CRM" in conflito.texto
+        assert "15" in conflito.texto or "2026-04-15" in conflito.texto
+
+    def test_campo_editado_no_crm_que_a_planilha_concorda_nao_gera_conflito(
+        self, sessao: Session
+    ):
+        """Divergência é o que importa. Se os dois dizem o mesmo, não há o que decidir."""
+        importar(sessao, [proposta(situacao=Situacao.ENVIAR_PROPOSTA)])
+        self._editar_no_crm(sessao, situacao=Situacao.ACEITA, data_aceite=date(2026, 4, 1))
+
+        resultado = importar(
+            sessao, [proposta(situacao=Situacao.ACEITA, data_aceite=date(2026, 4, 1))]
+        )
+
+        assert resultado.ocorrencias == []
+        assert resultado.mudancas == []
+
+    def test_o_que_nao_foi_editado_no_crm_continua_seguindo_a_planilha(self, sessao: Session):
+        """A trava é por campo, não por oportunidade: senão editar uma observação
+        congelaria a linha inteira e a planilha deixaria de valer para o resto."""
+        importar(sessao, [proposta(temperatura=Temperatura.MORNO)])
+        self._editar_no_crm(sessao, data_aceite=date(2026, 4, 1))
+
+        resultado = importar(sessao, [proposta(temperatura=Temperatura.QUENTE)])
+
+        assert {m.campo for m in resultado.mudancas} == {"temperatura"}
+        assert sessao.scalar(sa.select(Oportunidade)).temperatura is Temperatura.QUENTE
+
+    def test_a_recarga_sem_edicao_no_crm_segue_igual_ao_de_antes(self, sessao: Session):
+        """A trava nova não pode alterar o comportamento de quem nunca editou."""
+        importar(sessao, [proposta()])
+
+        resultado = importar(sessao, [proposta(situacao=Situacao.ACEITA, data_aceite=date(2026, 4, 1))])
+
+        assert {m.campo for m in resultado.mudancas} == {"situacao", "data_aceite"}
+
+    def test_a_pendencia_de_conflito_entra_no_relatorio_de_conferencia(self, sessao: Session):
+        from crm.carga.persistencia import registrar_execucao
+        from crm.carga.planilha_2026 import Relatorio
+
+        entrada = [proposta(situacao=Situacao.ACEITA, data_aceite=None)]
+        importar(sessao, entrada)
+        self._editar_no_crm(sessao, data_aceite=date(2026, 4, 15))
+
+        resultado = importar(sessao, entrada)
+        execucao = registrar_execucao(sessao, "p.xlsx", Relatorio(total_lidas=1, importadas=1), resultado)
+
+        conflitos = [o for o in execucao.ocorrencias if "mantido o do CRM" in o.texto]
+        assert len(conflitos) == 1
+        assert conflitos[0].tipo.value == "Precisa de você"

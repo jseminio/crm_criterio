@@ -227,6 +227,12 @@ export function DetalheDaOportunidade({
               </div>
             </div>
 
+            <p className="campo-ajuda" style={{ margin: 0 }}>
+              O que você mudar em situação, temperatura, motivo e data do aceite{" "}
+              <strong>a recarga da planilha não sobrescreve</strong>. Se a planilha
+              discordar, a divergência aparece na tela Conferência para você decidir.
+            </p>
+
             <div className="campo-bloco">
               <label className="campo-rotulo" htmlFor="d-obs">
                 Observação

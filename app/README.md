@@ -10,7 +10,7 @@ autorizou por causa do prazo.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e quatro telas |
-| Testes | **236** no backend, todos passando. As telas foram verificadas no navegador contra os dados reais; **não têm teste automatizado** |
+| Testes | **247** no backend, todos passando. As telas foram verificadas no navegador contra os dados reais; **não têm teste automatizado** |
 | Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 153 oportunidades, 138 grupos |
 | API | 15 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Funil em kanban, oportunidades em lista, leads, grupos econômicos (com detalhe) e conferência da carga. React com TypeScript, em `../frontend` |
@@ -277,6 +277,26 @@ a recarga não acusar mudança de preço que não houve.
 
 **Sem `--gravar` nada é mantido**: faz tudo e desfaz no fim, mostrando o que
 aconteceria. É o padrão de propósito.
+
+### Quando o CRM e a planilha discordam
+
+Com os dois rodando em paralelo, situação, temperatura, motivo de recusa e data
+do aceite são editáveis **nos dois lados**. A regra: **quem editou no CRM tem a
+última palavra sobre aquele campo.** Cada oportunidade lembra quais campos foram
+mudados na tela (`campos_do_crm`), e a recarga não os sobrescreve. Se a planilha
+discordar, a divergência vira uma pendência em **Conferência**, com os dois
+valores lado a lado, para uma pessoa decidir.
+
+A trava é **por campo, não por oportunidade**: editar a data do aceite não
+congela a linha inteira, e o resto continua seguindo a planilha. Só conta o que
+de fato mudou de valor — abrir o painel e salvar sem alterar nada não trava
+nada.
+
+> **Isto foi um defeito real, provado antes da correção.** A planilha não tem
+> nenhuma data de aceite; preencher a data na tela e rodar a carga de novo a
+> apagava (`2026-04-15 → vazio`). O relatório registrava a mudança, mas o dado já
+> estava perdido. Teria acontecido na primeira vez que alguém preenchesse as 40
+> datas.
 
 ### O grupo econômico que a carga não enxerga
 

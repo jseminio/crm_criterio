@@ -19,6 +19,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from crm.db.base import Base, CarimboMixin, coluna_lista
@@ -280,6 +281,23 @@ class Oportunidade(CarimboMixin, Base):
     confirmação de quem digitou.
 
     Nula no que nasce no CRM: aí a identidade é a chave primária.
+    """
+
+    campos_do_crm: Mapped[list[str]] = mapped_column(
+        # JSONB no PostgreSQL: o tipo json não tem operador de igualdade, então o
+        # Alembic não consegue comparar o valor padrão e o `alembic check` quebra.
+        # JSON genérico nos demais bancos, para o teste rodar em SQLite.
+        sa.JSON().with_variant(JSONB(), "postgresql"),
+        nullable=False,
+        default=list,
+        server_default=sa.text("'[]'"),
+    )
+    """Campos que uma pessoa mudou **aqui**, e que a carga não pode sobrescrever.
+
+    Enquanto o CRM roda em paralelo com a planilha, os dois editam a mesma
+    oportunidade. Sem esta memória, a recarga apagava o que se preenchia na tela:
+    a planilha não tem nenhuma data de aceite, então preencher a data e rodar a
+    carga de novo a desfazia. Tipo JSON genérico, para valer igual nos dois bancos.
     """
 
     linha_planilha: Mapped[int | None] = mapped_column(sa.Integer)

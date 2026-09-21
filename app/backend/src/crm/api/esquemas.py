@@ -36,6 +36,9 @@ __all__ = [
     "Pagina",
     "ColunaDoFunil",
     "Listas",
+    "RecorteResposta",
+    "PendenciaResposta",
+    "IndicadoresResposta",
 ]
 
 
@@ -178,6 +181,34 @@ class ColunaDoFunil(BaseModel):
     valor_mensal: Decimal
     valor_anual: Decimal
     oportunidades: list[OportunidadeResumo]
+
+
+class RecorteResposta(Base):
+    quantas: int
+    valor_mensal: Decimal
+    valor_anual: Decimal
+    sem_preco_mensal: int
+    com_preco_mensal: int
+
+
+class PendenciaResposta(Base):
+    """Um indicador que existe no desenho mas ainda não pode ser calculado.
+
+    A tela mostra o motivo e o que falta, em vez de um traço ou de um zero: o
+    zero pareceria medição, e o traço esconderia que há trabalho a fazer.
+    """
+
+    calculavel: bool
+    motivo: str
+    o_que_falta: str
+
+
+class IndicadoresResposta(Base):
+    em_aberto: RecorteResposta
+    aceitas: RecorteResposta
+    aceitas_com_data_de_aceite: int
+    ciclo_medio: PendenciaResposta
+    taxa_de_conversao: PendenciaResposta
 
 
 class Pagina[T](BaseModel):

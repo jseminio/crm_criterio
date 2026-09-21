@@ -1,16 +1,20 @@
 # Critério CRM — aplicação
 
-Primeiro código da **Etapa 1**, o incremento E2 (*a carteira existe*):
-as listas controladas do funil e a carga das propostas de 2026.
+Código da **Etapa 1** do Critério CRM: o banco, a carga das propostas de 2026,
+a API do funil e as telas. Cobre os incrementos E2 (*a carteira existe*) e E3
+(*o funil funciona*), na ordem invertida que a proposta aprovada em 20/09/2026
+autorizou por causa do prazo.
 
 ## Estado
 
 | | |
 |---|---|
-| O que roda | Normalização das listas e carga da planilha, com relatório de conferência |
-| Testes | 86, todos passando |
-| Banco | **ainda não** — o domínio é testável sem ele |
-| API e telas | **ainda não** |
+| O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e quatro telas |
+| Testes | **211** no backend, todos passando. As telas foram verificadas no navegador contra os dados reais; **não têm teste automatizado** |
+| Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 153 oportunidades, 138 grupos |
+| API | 12 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
+| Telas | Funil em kanban, oportunidades em lista, leads e grupos econômicos. React com TypeScript, em `../frontend` |
+| Fora do ar | Nuvem, login, backup automático (E1); proposta e preço (E4); demais KPIs (E5) |
 
 ## Como rodar
 
@@ -26,6 +30,16 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > consegue ler binário. Um `.venv` dentro do workspace gera **1887 pendências
 > falsas** e enterra as reais. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
+
+Subir a API e as telas, cada uma no seu terminal:
+
+```bash
+cd backend && ~/.venvs/criterio-crm/bin/python scripts/servir.py
+cd frontend && npm install && npm run dev      # abre em http://localhost:5173
+```
+
+A API escuta **só em `127.0.0.1`**, de propósito: não tem login. Não a exponha na
+rede antes do E1.
 
 Conferir a carga contra uma planilha real — **lê e mostra, não grava nada**:
 
@@ -171,15 +185,20 @@ cp backend/.env.example backend/.env   # e preencha CRM_DB_PASSWORD
 cd backend && ~/.venvs/criterio-crm/bin/alembic upgrade head
 ```
 
-`scripts/configurar_env.py` faz o mesmo perguntando a senha sem mostrá-la na
-tela, mas **exige um terminal de verdade** — por botão ou por pipe ele para com
-aviso em vez de morrer com erro de leitura.
+Dois scripts ajudam quem prefere não abrir o arquivo. `scripts/definir_senha.py`
+troca só a linha da senha e testa a conexão; `scripts/configurar_env.py` monta o
+`.env` inteiro. Os dois pedem a senha sem mostrá-la e **exigem um terminal de
+verdade** — por botão ou por pipe param com aviso em vez de morrer com erro de
+leitura, que foi exatamente o que aconteceu na primeira vez.
 
 ### O servidor desta máquina
 
 **PostgreSQL 18.6**, instalador EnterpriseDB, em `/Library/PostgreSQL/18`,
 escutando em `localhost:5432`. Instalado por Eduardo em 20/09/2026 e
-confirmado respondendo. Os binários não estão no `PATH` por padrão:
+confirmado respondendo. **O pgAdmin que vem no instalador é compilado só para
+Apple Silicon e não abre neste Mac Intel** (erro `-10661`); para uma interface
+gráfica será preciso outra ferramenta. Os binários não estão no `PATH` por
+padrão:
 
 ```bash
 sudo mkdir -p /etc/paths.d && echo /Library/PostgreSQL/18/bin | sudo tee /etc/paths.d/postgresql
@@ -214,6 +233,91 @@ O `alembic.ini` **não recebe a URL nem em memória**. O `configparser` trata `%
 como interpolação, e a senha chega codificada para endereço, cheia de `%23` e
 `%40`. Passá-la por ali derrubava a migração com `invalid interpolation syntax`
 — erro que não menciona senha nem URL, e custa caro para diagnosticar.
+
+## A carga de 2026
+
+`crm/carga/persistencia.py` grava as propostas e **sabe rodar de novo** — que é o
+que a decisão de rodar em paralelo com a planilha exige. Resultado contra a
+planilha real, no PostgreSQL, em 20/09/2026:
+
+```
+1ª carga: criadas 153 · grupos criados 138 · reaproveitados 15
+2ª carga: criadas   0 · atualizadas 0 · sem mudança 153
+```
+
+**153 + 3 incompletas + 1 duplicata = as 157 propostas de 2026.**
+
+Três princípios. **Identidade pelo conteúdo** — nome, data de colocação, serviço
+e tipo de serviço; a posição na aba não é identidade, então inserir uma linha
+acima não cria registro novo. **Nada muda em silêncio** — toda alteração entra no
+relatório campo a campo, com antes e depois. **Nada é apagado** — registro que
+sumiu da planilha permanece, porque sumir de uma planilha não é decisão de
+negócio.
+
+Dinheiro é arredondado para centavos **com aviso**: a planilha traz até dez casas
+decimais, resíduo de fórmula. O arredondamento acontece antes da comparação, para
+a recarga não acusar mudança de preço que não houve.
+
+```bash
+~/.venvs/criterio-crm/bin/python scripts/importar_2026.py <planilha>            # simula e desfaz
+~/.venvs/criterio-crm/bin/python scripts/importar_2026.py <planilha> --gravar   # grava
+```
+
+**Sem `--gravar` nada é mantido**: faz tudo e desfaz no fim, mostrando o que
+aconteceria. É o padrão de propósito.
+
+### O grupo econômico que a carga não enxerga
+
+A carga agrupa pelo **nome exato** do cliente, e a coluna de origem mistura
+cliente com serviço (*"Sete Brasil (Leo Fraga) - Regularização do Bacen"* é uma
+coisa só). Por isso o mesmo cliente aparece repartido: um deles em **nove** grupos.
+Os 138 grupos são portanto um teto, não a carteira real. O reagrupamento é feito
+por Eduardo na tela de grupos, um par por vez, com o histórico intacto — e
+`scripts/conferir_grupos.py` lista os candidatos. Sua saída contém nome de cliente
+e valor: **não a grave dentro do repositório**.
+
+## Indicadores do funil
+
+`crm/domain/indicadores.py` calcula **pouco, de propósito**. Só entra o que os
+dados de 2026 sustentam sem que alguém tenha de escolher uma definição. O que
+não dá para calcular volta com o **motivo** e **o que falta** — nunca zero, nunca
+traço: zero pareceria medição, traço esconderia que há trabalho a fazer.
+
+| Indicador | Situação | Motivo |
+|---|---|---|
+| Propostas em aberto | Calculado | Inverso de `Situacao.decidida`: se as situações mudarem, a conta muda junto |
+| Aceitas em 2026 | Calculado | Com quantas têm preço mensal — 20 das 40 são de valor único |
+| Taxa de conversão | **Pendente** | Denominador: 38% ou 26%. O anexo técnico diz "não implementar sem a definição" |
+| Ticket médio | **Pendente** | Venda nova ou receita média por grupo? |
+| Ciclo médio | **Pendente** | 0 de 40 datas de aceite; a base do cálculo não está registrada |
+| MRR | **Fora** | O oficial é da carteira inteira; aqui só há o preço mensal das propostas |
+
+`GET /api/indicadores` aceita os mesmos filtros do funil.
+
+## Lacunas da verificação automática da plataforma
+
+A varredura de vazamento lê **o disco, não o índice do git**, e só abre arquivos
+de uma lista fechada de extensões. Consequências concretas para este workspace:
+
+| Arquivo | Efeito |
+|---|---|
+| `__pycache__/*.pyc` | Ignorado pelo git, mas varrido. Contornado com `PYTHONDONTWRITEBYTECODE=1` |
+| `.env.example`, modelo de migração `.mako` | Extensão fora da lista: ficam em amarelo, **sem verificação** |
+| `node_modules/` | Ignorado pelo git, mas varrido: cerca de 130 pendências falsas |
+| `.tsx` | **Fora da lista: o código das telas inteiro não tem cobertura de segurança** |
+
+O último não é ruído — é uma parte do sistema que ninguém verifica. **A varredura
+é Zona Núcleo e não foi alterada.** Duas emendas resolveriam, ambas decisão de
+Eduardo: respeitar o `.gitignore`, e aceitar `.tsx` como texto.
+
+## Lições de teste
+
+O banco de teste é SQLite em memória, com uma conexão compartilhada entre threads
+— sem isso o `TestClient` roda a API noutra thread e ela lê um banco vazio,
+diferente do que o teste gravou. Toda a suíte roda com o ambiente isolado: nenhum
+teste enxerga o `.env` nem as variáveis de quem roda. Três testes de configuração
+passavam só enquanto não existia `.env` e quebraram no instante em que ele foi
+criado.
 
 ## Ressalva de processo — resolvida
 

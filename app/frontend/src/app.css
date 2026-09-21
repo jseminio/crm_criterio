@@ -167,3 +167,19 @@
   border-radius: var(--raio-md); padding: var(--e3) var(--e4); font-size: 13px;
   color: var(--texto-medio); margin-bottom: var(--e4); }
 .recado strong { color: var(--texto-forte); }
+
+/* --------------------------------------------------------- faixa de números */
+.numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--e3); margin-bottom: var(--e5); }
+@media (max-width: 1100px) { .numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.numero { background: var(--surface-card); border: 1px solid var(--borda);
+  border-radius: var(--raio-md); padding: var(--e4); display: flex; flex-direction: column; gap: var(--e1); }
+.numero-rotulo { font-family: var(--fonte-ui); font-size: 12px; font-weight: 500; color: var(--texto-medio); }
+.numero-valor { margin: 0; font-family: var(--fonte-titulo); font-size: 24px; font-weight: 600; line-height: 1.2; }
+.numero-detalhe { font-size: 12px; color: var(--texto-medio); font-variant-numeric: tabular-nums; }
+.numero-detalhe p { margin: var(--e1) 0 0; }
+.numero-nota { color: var(--texto-fraco); }
+.numero-nota strong { color: var(--texto-forte); }
+/* Pendência tem borda tracejada e palavra: nunca só cor (regra 4 do PAD-002). */
+.numero-pendente { background: var(--surface-sunken); border-style: dashed; border-color: var(--borda-forte); }
+.numero-estado { font-weight: 600; color: var(--espera) !important; font-size: 13px; margin: 0 !important; }

@@ -27,6 +27,7 @@ from crm.api import esquemas as e
 from crm.db.grupos import FusaoInvalida, fundir_grupos
 from crm.db.modelos import GrupoEconomico, Lead, Oportunidade
 from crm.db.sessao import criar_engine, criar_fabrica_de_sessao, url_do_banco
+from crm.domain import indicadores as regras_de_indicadores
 from crm.domain.listas import (
     LinhaServico,
     MotivoRecusa,
@@ -265,6 +266,45 @@ def _registrar(api: FastAPI) -> None:
                 )
             )
         return colunas
+
+    @api.get("/api/indicadores", response_model=e.IndicadoresResposta, tags=["funil"])
+    def indicadores(
+        sessao: Session = Depends(obter_sessao),
+        captador: list[str] | None = Query(default=None),
+        tipo_canal: list[TipoCanal] | None = Query(default=None),
+        temperatura: list[Temperatura] | None = Query(default=None),
+        busca: str | None = None,
+    ) -> e.IndicadoresResposta:
+        """Os números do funil, com os mesmos filtros do kanban.
+
+        Só entra o que os dados sustentam sem definição pendente. O que não dá
+        para calcular volta com o motivo e o que falta — ver
+        `crm.domain.indicadores`.
+        """
+        consulta = _consulta_de_oportunidades(
+            None, captador, tipo_canal, temperatura, None, busca
+        )
+        oportunidades = [linha[0] for linha in sessao.execute(consulta).all()]
+        resultado = regras_de_indicadores.calcular(oportunidades)
+
+        def recorte(r: regras_de_indicadores.Recorte) -> e.RecorteResposta:
+            return e.RecorteResposta(
+                quantas=r.quantas,
+                valor_mensal=r.valor_mensal,
+                valor_anual=r.valor_anual,
+                sem_preco_mensal=r.sem_preco_mensal,
+                com_preco_mensal=r.com_preco_mensal,
+            )
+
+        return e.IndicadoresResposta(
+            em_aberto=recorte(resultado.em_aberto),
+            aceitas=recorte(resultado.aceitas),
+            aceitas_com_data_de_aceite=resultado.aceitas_com_data_de_aceite,
+            ciclo_medio=e.PendenciaResposta.model_validate(resultado.ciclo_medio),
+            taxa_de_conversao=e.PendenciaResposta.model_validate(
+                resultado.taxa_de_conversao
+            ),
+        )
 
     @api.get(
         "/api/oportunidades/{oportunidade_id}",

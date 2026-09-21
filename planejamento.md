@@ -92,6 +92,23 @@ indicadores de cobertura do processo.
 > precisam do encerramento de contrato, forecast precisa da previsão, NPS
 > precisa da pesquisa, CAC precisa de dado externo.
 
+**Situação em 21/09/2026 — parcial, e diferente da meta esticada da proposta.**
+A proposta (seção 3) citava quatro números no topo: MRR, propostas no funil,
+conversão e ticket médio. Entregue no funil: **propostas em aberto** e
+**aceitas em 2026**, com valores. Ficaram de fora, cada um por um motivo
+concreto, e a tela mostra o motivo em vez de um zero:
+
+| Indicador | Por que não sai | Quem destrava |
+|---|---|---|
+| **Taxa de conversão** | Denominador indefinido: 38% (só decididas) ou 26% (todas) | Eduardo |
+| **Ticket médio** | Venda nova ou receita média por grupo? | Eduardo |
+| **Ciclo médio de vendas** | 0 das 40 aceitas têm data de aceite; a base do cálculo (contar a partir de quando) não está registrada | Eduardo preenche as datas; confirmar a base na planilha oficial de KPIs |
+| **MRR** | O oficial é a receita contratada da **carteira inteira** (R$ 226.341 em 19/09/2026). O que existe aqui é o preço mensal das propostas de 2026 — outra grandeza. Chamá-lo de MRR seria valor certo com rótulo errado | Etapa 3, com a carteira |
+
+**Um dado que a faixa expõe:** 20 das 40 aceitas não têm preço mensal
+(consultoria de valor único). O "mensal aceito" cobre só metade delas, e a tela
+diz isso junto do número.
+
 ## 3. Sequência e dependências
 
 ```

@@ -301,3 +301,46 @@ class TestGrupos:
 
         assert resposta.status_code == 409
         assert "si mesmo" in resposta.json()["detail"]
+
+
+class TestIndicadores:
+    def test_soma_o_que_esta_em_aberto(self, cliente: TestClient, carteira):
+        dados = cliente.get("/api/indicadores").json()
+
+        # Só "Enviar proposta" da fixture está em aberto: R$ 5.000/mês, R$ 65.000/ano.
+        assert dados["em_aberto"]["quantas"] == 1
+        assert Decimal(dados["em_aberto"]["valor_mensal"]) == Decimal("5000.00")
+
+    def test_soma_as_aceitas(self, cliente: TestClient, carteira):
+        dados = cliente.get("/api/indicadores").json()
+
+        assert dados["aceitas"]["quantas"] == 1
+        assert Decimal(dados["aceitas"]["valor_mensal"]) == Decimal("8000.00")
+
+    def test_diz_quantas_aceitas_tem_data_de_aceite(self, cliente: TestClient, carteira):
+        """A fixture aceita tem data: é o número que destrava o ciclo médio."""
+        assert cliente.get("/api/indicadores").json()["aceitas_com_data_de_aceite"] == 1
+
+    def test_acompanha_o_filtro_de_captador(self, cliente: TestClient, carteira):
+        """Os números seguem o que a pessoa está olhando no funil."""
+        so_bo = cliente.get("/api/indicadores", params={"captador": "BO"}).json()
+
+        assert so_bo["aceitas"]["quantas"] == 0
+        assert so_bo["em_aberto"]["quantas"] == 0
+
+    def test_conversao_volta_como_pendente_e_explica_por_que(
+        self, cliente: TestClient, carteira
+    ):
+        """Não existe número de conversão na resposta — nem zero, nem estimativa."""
+        dados = cliente.get("/api/indicadores").json()
+
+        assert dados["taxa_de_conversao"]["calculavel"] is False
+        assert "denominador" in dados["taxa_de_conversao"]["motivo"]
+        assert "valor" not in dados["taxa_de_conversao"]
+        assert "taxa" not in dados["taxa_de_conversao"]
+
+    def test_a_base_vazia_nao_quebra(self, cliente: TestClient):
+        dados = cliente.get("/api/indicadores").json()
+
+        assert dados["em_aberto"]["quantas"] == 0
+        assert dados["ciclo_medio"]["calculavel"] is False

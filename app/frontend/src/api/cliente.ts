@@ -3,6 +3,7 @@
 import type {
   ColunaDoFunil,
   GrupoResumo,
+  Indicadores,
   LeadResumo,
   Listas,
   OportunidadeDetalhe,
@@ -69,6 +70,9 @@ export const api = {
 
   funil: (filtros: FiltrosDoFunil = {}) =>
     pedir<ColunaDoFunil[]>(comParametros("/api/funil", { ...filtros })),
+
+  indicadores: (filtros: FiltrosDoFunil = {}) =>
+    pedir<Indicadores>(comParametros("/api/indicadores", { ...filtros })),
 
   oportunidades: (filtros: FiltrosDoFunil & { situacao?: string[]; grupo_id?: number } = {}) =>
     pedir<Pagina<OportunidadeResumo>>(

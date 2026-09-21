@@ -11,6 +11,7 @@ import {
   temFiltro,
   type EstadoDosFiltros,
 } from "../componentes/Filtros";
+import { Numeros } from "../componentes/Numeros";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { dinheiroCurto, prazo } from "../formato";
 import { usarDados } from "../usarDados";
@@ -62,6 +63,7 @@ export function Funil({ listas }: { listas: Listas | null }) {
 
   return (
     <>
+      <Numeros filtros={filtros} />
       <Filtros filtros={filtros} aoMudar={definirFiltros} listas={listas} />
 
       {carregando && <Carregando rotulo="Carregando o funil" />}

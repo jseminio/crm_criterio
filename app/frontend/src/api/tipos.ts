@@ -94,3 +94,26 @@ export interface Listas {
   situacoes_de_grupo: string[];
   captadores: string[];
 }
+
+export interface Recorte {
+  quantas: number;
+  valor_mensal: string;
+  valor_anual: string;
+  sem_preco_mensal: number;
+  com_preco_mensal: number;
+}
+
+/** Um indicador que existe no desenho mas ainda não pode ser calculado. */
+export interface Pendencia {
+  calculavel: boolean;
+  motivo: string;
+  o_que_falta: string;
+}
+
+export interface Indicadores {
+  em_aberto: Recorte;
+  aceitas: Recorte;
+  aceitas_com_data_de_aceite: number;
+  ciclo_medio: Pendencia;
+  taxa_de_conversao: Pendencia;
+}

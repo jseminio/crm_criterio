@@ -245,11 +245,191 @@ function Conversao({
   );
 }
 
+function EdicaoDeLead({
+  lead,
+  listas,
+  aoFechar,
+  aoSalvar,
+}: {
+  lead: LeadResumo;
+  listas: Listas | null;
+  aoFechar: () => void;
+  aoSalvar: () => void;
+}) {
+  const convertido = lead.convertido_em_id !== null;
+  const [rascunho, definirRascunho] = useState({
+    situacao: lead.situacao,
+    temperatura: lead.temperatura ?? "",
+    interesse: lead.interesse ?? "",
+    proxima_acao: lead.proxima_acao ?? "",
+    proxima_acao_em: lead.proxima_acao_em ?? "",
+    observacao: lead.observacao ?? "",
+  });
+  const [erro, definirErro] = useState<string | null>(null);
+  const [salvando, definirSalvando] = useState(false);
+
+  const mudar = (campo: string, valor: string) =>
+    definirRascunho((atual) => ({ ...atual, [campo]: valor }));
+
+  const salvar = async () => {
+    definirSalvando(true);
+    definirErro(null);
+    try {
+      const mudancas: Record<string, unknown> = Object.fromEntries(
+        Object.entries(rascunho).map(([k, v]) => [k, v === "" ? null : v]),
+      );
+      // Lead convertido tem a situação decidida pela oportunidade: não a enviamos.
+      if (convertido) delete mudancas.situacao;
+      await api.editarLead(lead.id, mudancas);
+      aoSalvar();
+      aoFechar();
+    } catch (falha) {
+      definirErro(falha instanceof ErroDaApi ? falha.message : "Falha ao salvar.");
+    } finally {
+      definirSalvando(false);
+    }
+  };
+
+  // "Convertido" fica de fora: só a conversão leva a esse estado, porque ele
+  // pressupõe a oportunidade que o sustenta.
+  const situacoes = listas?.situacoes_de_lead.filter((s) => s !== "Convertido") ?? [];
+
+  return (
+    <PainelLateral
+      titulo={lead.nome}
+      subtitulo={lead.empresa_texto ?? undefined}
+      aoFechar={aoFechar}
+      rodape={
+        <>
+          <button type="button" className="botao botao-secundario" onClick={aoFechar}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="botao botao-primario"
+            onClick={salvar}
+            disabled={salvando}
+          >
+            {salvando ? "Salvando…" : "Salvar alterações"}
+          </button>
+        </>
+      }
+    >
+      {erro && (
+        <div className="estado estado-erro" role="alert">
+          <p className="estado-texto">{erro}</p>
+        </div>
+      )}
+
+      <div className="formulario">
+        <div className="campo-bloco">
+          <label className="campo-rotulo" htmlFor="e-situacao">
+            Situação
+          </label>
+          {convertido ? (
+            <div>
+              <Etiqueta texto={lead.situacao} />
+              <p className="campo-ajuda">
+                Este lead já virou oportunidade — a situação passou a ser a dela.
+              </p>
+            </div>
+          ) : (
+            <select
+              id="e-situacao"
+              className="selecao"
+              value={rascunho.situacao}
+              onChange={(e) => mudar("situacao", e.target.value)}
+            >
+              {situacoes.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        <div className="formulario-duplo">
+          <div className="campo-bloco">
+            <label className="campo-rotulo" htmlFor="e-temperatura">
+              Temperatura
+            </label>
+            <select
+              id="e-temperatura"
+              className="selecao"
+              value={rascunho.temperatura}
+              onChange={(e) => mudar("temperatura", e.target.value)}
+            >
+              <option value="">Não informada</option>
+              {listas?.temperaturas.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="campo-bloco">
+            <label className="campo-rotulo" htmlFor="e-interesse">
+              Interesse
+            </label>
+            <input
+              id="e-interesse"
+              className="entrada"
+              value={rascunho.interesse}
+              onChange={(e) => mudar("interesse", e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="formulario-duplo">
+          <div className="campo-bloco">
+            <label className="campo-rotulo" htmlFor="e-acao">
+              Próxima ação
+            </label>
+            <input
+              id="e-acao"
+              className="entrada"
+              value={rascunho.proxima_acao}
+              onChange={(e) => mudar("proxima_acao", e.target.value)}
+            />
+          </div>
+          <div className="campo-bloco">
+            <label className="campo-rotulo" htmlFor="e-acao-em">
+              Quando
+            </label>
+            <input
+              id="e-acao-em"
+              type="date"
+              className="entrada"
+              value={rascunho.proxima_acao_em}
+              onChange={(e) => mudar("proxima_acao_em", e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="campo-bloco">
+          <label className="campo-rotulo" htmlFor="e-obs">
+            Observação
+          </label>
+          <textarea
+            id="e-obs"
+            className="entrada"
+            rows={3}
+            value={rascunho.observacao}
+            onChange={(e) => mudar("observacao", e.target.value)}
+          />
+        </div>
+      </div>
+    </PainelLateral>
+  );
+}
+
 export function Leads({ listas }: { listas: Listas | null }) {
   const [apenasAbertos, definirApenasAbertos] = useState(true);
   const [busca, definirBusca] = useState("");
   const [cadastrando, definirCadastrando] = useState(false);
   const [convertendo, definirConvertendo] = useState<LeadResumo | null>(null);
+  const [editando, definirEditando] = useState<LeadResumo | null>(null);
 
   const { dados, carregando, erro, recarregar } = usarDados<Pagina<LeadResumo>>(
     () => api.leads({ apenas_abertos: apenasAbertos, busca: busca || undefined }),
@@ -368,7 +548,14 @@ export function Leads({ listas }: { listas: Listas | null }) {
                       </span>
                     )}
                   </td>
-                  <td>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <button
+                      type="button"
+                      className="botao botao-secundario"
+                      onClick={() => definirEditando(lead)}
+                    >
+                      Abrir
+                    </button>{" "}
                     {lead.convertido_em_id === null ? (
                       <button
                         type="button"
@@ -395,6 +582,14 @@ export function Leads({ listas }: { listas: Listas | null }) {
           listas={listas}
           aoFechar={() => definirCadastrando(false)}
           aoCriar={recarregar}
+        />
+      )}
+      {editando && (
+        <EdicaoDeLead
+          lead={editando}
+          listas={listas}
+          aoFechar={() => definirEditando(null)}
+          aoSalvar={recarregar}
         />
       )}
       {convertendo && (

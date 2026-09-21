@@ -405,7 +405,21 @@ def _registrar(api: FastAPI) -> None:
         lead = sessao.get(Lead, lead_id)
         if lead is None:
             raise HTTPException(404, "lead não encontrado")
-        for campo, valor in corpo.model_dump(exclude_unset=True).items():
+
+        mudancas = corpo.model_dump(exclude_unset=True)
+
+        # "Convertido" significa que existe uma oportunidade apontada por este
+        # lead. Marcá-lo à mão deixaria o estado sem a oportunidade que o
+        # sustenta — e a origem, que viaja na conversão, nunca chegaria ao funil.
+        if mudancas.get("situacao") is SituacaoLead.CONVERTIDO:
+            raise HTTPException(
+                422, "para converter um lead, use a conversão em oportunidade"
+            )
+        # E um lead já convertido tem a situação decidida pela oportunidade.
+        if lead.convertido_em_id is not None and "situacao" in mudancas:
+            raise HTTPException(409, "este lead já virou oportunidade")
+
+        for campo, valor in mudancas.items():
             setattr(lead, campo, valor)
         sessao.flush()
         return e.LeadResumo.model_validate(lead)

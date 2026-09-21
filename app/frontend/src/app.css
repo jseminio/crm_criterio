@@ -183,3 +183,5 @@
 /* Pendência tem borda tracejada e palavra: nunca só cor (regra 4 do PAD-002). */
 .numero-pendente { background: var(--surface-sunken); border-style: dashed; border-color: var(--borda-forte); }
 .numero-estado { font-weight: 600; color: var(--espera) !important; font-size: 13px; margin: 0 !important; }
+
+.campo-ajuda { margin: var(--e1) 0 0; font-size: 12px; color: var(--texto-medio); }

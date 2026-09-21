@@ -219,6 +219,46 @@ class TestLeads:
         assert cliente.get("/api/leads", params={"apenas_abertos": True}).json()["total"] == 0
 
 
+class TestEdicaoDeLead:
+    def test_muda_a_situacao(self, cliente: TestClient, carteira):
+        resposta = cliente.patch(
+            f"/api/leads/{carteira['lead']}", json={"situacao": "Em contato"}
+        )
+
+        assert resposta.status_code == 200
+        assert resposta.json()["situacao"] == "Em contato"
+
+    def test_nao_deixa_marcar_como_convertido_a_mao(self, cliente: TestClient, carteira):
+        """Convertido pressupõe uma oportunidade; sem ela a origem nunca chega ao funil."""
+        resposta = cliente.patch(
+            f"/api/leads/{carteira['lead']}", json={"situacao": "Convertido"}
+        )
+
+        assert resposta.status_code == 422
+        assert "conversão" in resposta.json()["detail"]
+
+    def test_lead_convertido_nao_muda_de_situacao(self, cliente: TestClient, carteira):
+        cliente.post(f"/api/leads/{carteira['lead']}/converter", json={})
+
+        resposta = cliente.patch(
+            f"/api/leads/{carteira['lead']}", json={"situacao": "Descartado"}
+        )
+
+        assert resposta.status_code == 409
+
+    def test_lead_convertido_ainda_aceita_editar_observacao(
+        self, cliente: TestClient, carteira
+    ):
+        """A trava é sobre a situação, não sobre o lead inteiro."""
+        cliente.post(f"/api/leads/{carteira['lead']}/converter", json={})
+
+        resposta = cliente.patch(
+            f"/api/leads/{carteira['lead']}", json={"observacao": "Fechou por indicação"}
+        )
+
+        assert resposta.status_code == 200
+
+
 class TestConversao:
     def test_vira_oportunidade_num_grupo_existente(self, cliente: TestClient, carteira):
         resposta = cliente.post(

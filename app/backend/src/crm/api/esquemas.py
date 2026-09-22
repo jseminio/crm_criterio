@@ -39,6 +39,7 @@ __all__ = [
     "Listas",
     "RecorteResposta",
     "PendenciaResposta",
+    "TaxaDeConversaoResposta",
     "IndicadoresResposta",
     "ExecucaoResumo",
     "ExecucaoDetalhe",
@@ -208,12 +209,28 @@ class PendenciaResposta(Base):
     o_que_falta: str
 
 
+class TaxaDeConversaoResposta(Base):
+    """Aceitas ÷ decididas — decisão de Eduardo em 22/09/2026.
+
+    Em aberto não entra no denominador: ainda pode fechar. `abaixo_do_alerta`
+    e `atingiu_a_meta` vêm em `None` só quando não há decidida nenhuma — não
+    calculável é diferente de "abaixo do alerta".
+    """
+
+    aceitas: int
+    decididas: int
+    percentual: Decimal | None
+    calculavel: bool
+    abaixo_do_alerta: bool | None
+    atingiu_a_meta: bool | None
+
+
 class IndicadoresResposta(Base):
     em_aberto: RecorteResposta
     aceitas: RecorteResposta
     aceitas_com_data_de_aceite: int
     ciclo_medio: PendenciaResposta
-    taxa_de_conversao: PendenciaResposta
+    taxa_de_conversao: TaxaDeConversaoResposta
 
 
 class ExecucaoResumo(Base):

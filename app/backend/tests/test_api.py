@@ -368,16 +368,14 @@ class TestIndicadores:
         assert so_bo["aceitas"]["quantas"] == 0
         assert so_bo["em_aberto"]["quantas"] == 0
 
-    def test_conversao_volta_como_pendente_e_explica_por_que(
-        self, cliente: TestClient, carteira
-    ):
-        """Não existe número de conversão na resposta — nem zero, nem estimativa."""
+    def test_conversao_divide_aceitas_por_decididas(self, cliente: TestClient, carteira):
+        """A fixture tem 1 aceita e 1 recusada decididas, e 1 em aberto de fora."""
         dados = cliente.get("/api/indicadores").json()
 
-        assert dados["taxa_de_conversao"]["calculavel"] is False
-        assert "denominador" in dados["taxa_de_conversao"]["motivo"]
-        assert "valor" not in dados["taxa_de_conversao"]
-        assert "taxa" not in dados["taxa_de_conversao"]
+        conversao = dados["taxa_de_conversao"]
+        assert (conversao["aceitas"], conversao["decididas"]) == (1, 2)
+        assert conversao["percentual"] == "50.0"
+        assert conversao["calculavel"] is True
 
     def test_a_base_vazia_nao_quebra(self, cliente: TestClient):
         dados = cliente.get("/api/indicadores").json()

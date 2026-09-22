@@ -58,11 +58,12 @@ class Situacao(Enum):
 
     @property
     def decidida(self) -> bool:
-        """Situação terminal — entra no denominador da taxa de conversão.
+        """Situação terminal — o denominador da taxa de conversão.
 
-        ⚠️ Qual denominador usar é **decisão pendente** de Eduardo: só as
-        decididas (38% em 2026) ou todas as trabalhadas (26%). Esta propriedade
-        marca o conceito; o indicador não é calculado aqui.
+        Decisão de Eduardo em 22/09/2026: a conversão conta só o que já tem
+        desfecho. Oportunidade em aberto não entra — ela ainda pode fechar, e
+        contá-la penalizaria o time por um resultado que não aconteceu. Ver
+        `crm.domain.indicadores.TaxaDeConversao` para o cálculo.
         """
         return self in {Situacao.ACEITA, Situacao.RECUSADA, Situacao.PERDIDO}
 

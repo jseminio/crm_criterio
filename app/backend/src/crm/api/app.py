@@ -309,7 +309,7 @@ def _registrar(api: FastAPI) -> None:
             aceitas=recorte(resultado.aceitas),
             aceitas_com_data_de_aceite=resultado.aceitas_com_data_de_aceite,
             ciclo_medio=e.PendenciaResposta.model_validate(resultado.ciclo_medio),
-            taxa_de_conversao=e.PendenciaResposta.model_validate(
+            taxa_de_conversao=e.TaxaDeConversaoResposta.model_validate(
                 resultado.taxa_de_conversao
             ),
         )

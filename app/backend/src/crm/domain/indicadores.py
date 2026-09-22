@@ -2,11 +2,8 @@
 
 **Este módulo calcula pouco de propósito.** Dos doze KPIs oficiais, só entram
 aqui os que os dados de 2026 sustentam sem que ninguém tenha de escolher uma
-definição. Cada um dos outros tem um motivo registrado para ficar de fora:
+definição. Cada um dos que ficam de fora tem um motivo registrado:
 
-- **Taxa de conversão** — o anexo técnico diz *"não implementar sem a definição
-  fixada"*. Sobre os mesmos dados, denominador de propostas decididas dá 38% e
-  denominador de todas dá 26%: diagnósticos opostos. A escolha é de Eduardo.
 - **Ticket médio** — não se sabe se é venda nova ou receita média por grupo.
 - **Ciclo médio de vendas** — depende da data de aceite, que a planilha não
   registra, e a base do cálculo (a partir de quando?) não está documentada.
@@ -27,9 +24,19 @@ from typing import Iterable, Protocol
 
 from crm.domain.listas import Situacao
 
-__all__ = ["Indicadores", "Recorte", "PendenciaDoIndicador", "calcular"]
+__all__ = [
+    "Indicadores",
+    "Recorte",
+    "PendenciaDoIndicador",
+    "TaxaDeConversao",
+    "calcular",
+]
 
 ZERO = Decimal("0.00")
+
+#: Do KPI oficial "KPI de Head de Novos Negócios": meta 50%, alerta abaixo de 30%.
+META_DE_CONVERSAO = Decimal("50")
+ALERTA_DE_CONVERSAO = Decimal("30")
 
 
 class _Oportunidade(Protocol):
@@ -69,12 +76,55 @@ class PendenciaDoIndicador:
 
 
 @dataclass(frozen=True)
+class TaxaDeConversao:
+    """Aceitas ÷ decididas — decisão de Eduardo em 22/09/2026.
+
+    O denominador conta só o que já tem desfecho: Aceita, Recusada ou Perdido
+    (`Situacao.decidida`). Oportunidade em aberto não entra — ela ainda pode
+    fechar, e contá-la já penalizaria o time por um resultado que não
+    aconteceu ainda. É a leitura padrão de funil de vendas: não se julga a
+    conversão do período por proposta que ainda não venceu.
+
+    Sobre o mesmo dado, a outra definição possível — todas as trabalhadas,
+    incluindo o que está em aberto — dava um número bem diferente: 26% contra
+    38%, diagnósticos opostos do mesmo trimestre. Só uma pessoa podia decidir
+    qual conta, e a decisão está registrada no anexo técnico.
+    """
+
+    aceitas: int
+    decididas: int
+    percentual: Decimal | None
+    """``None`` só quando não há nenhuma decidida ainda.
+
+    Sem este caso à parte, dividir por zero viraria 0% — que parece "nada
+    fechou" quando na verdade é "não dá para medir ainda".
+    """
+
+    @property
+    def calculavel(self) -> bool:
+        return self.percentual is not None
+
+    @property
+    def abaixo_do_alerta(self) -> bool | None:
+        """``None`` quando não calculável — não há o que alertar sobre o vazio."""
+        if self.percentual is None:
+            return None
+        return self.percentual < ALERTA_DE_CONVERSAO
+
+    @property
+    def atingiu_a_meta(self) -> bool | None:
+        if self.percentual is None:
+            return None
+        return self.percentual >= META_DE_CONVERSAO
+
+
+@dataclass(frozen=True)
 class Indicadores:
     em_aberto: Recorte
     aceitas: Recorte
     aceitas_com_data_de_aceite: int
     ciclo_medio: PendenciaDoIndicador
-    taxa_de_conversao: PendenciaDoIndicador
+    taxa_de_conversao: TaxaDeConversao
 
 
 def _somar(oportunidades: list[_Oportunidade]) -> Recorte:
@@ -95,6 +145,7 @@ def calcular(oportunidades: Iterable[_Oportunidade]) -> Indicadores:
     """
     todas = list(oportunidades)
     em_aberto = [o for o in todas if not o.situacao.decidida]
+    decididas = [o for o in todas if o.situacao.decidida]
     aceitas = [o for o in todas if o.situacao.ganha]
     com_data = sum(1 for o in aceitas if o.data_aceite is not None)
 
@@ -124,13 +175,14 @@ def calcular(oportunidades: Iterable[_Oportunidade]) -> Indicadores:
             ),
         )
 
-    conversao = PendenciaDoIndicador(
-        calculavel=False,
-        motivo=(
-            "O denominador da taxa de conversão não está definido: só as propostas "
-            "decididas, ou todas as trabalhadas. Os dois dão diagnósticos opostos."
-        ),
-        o_que_falta="A definição do denominador, por Eduardo.",
+    if decididas:
+        percentual = (Decimal(len(aceitas)) / Decimal(len(decididas)) * 100).quantize(
+            Decimal("0.1")
+        )
+    else:
+        percentual = None
+    conversao = TaxaDeConversao(
+        aceitas=len(aceitas), decididas=len(decididas), percentual=percentual
     )
 
     return Indicadores(

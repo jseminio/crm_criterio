@@ -267,7 +267,7 @@ export function DetalheDaOportunidade({
             <Par rotulo="Tipo de serviço">{detalhe.tipo_servico ?? "—"}</Par>
             <Par rotulo="Preço mensal">{dinheiro(detalhe.preco_mensal)}</Par>
             <Par rotulo="Preço anual">{dinheiro(detalhe.preco_anual)}</Par>
-            <Par rotulo="Data da colocação">{data(detalhe.data_colocacao)}</Par>
+            <Par rotulo="Data da originação">{data(detalhe.data_colocacao)}</Par>
             <Par rotulo="Captador">{detalhe.captador ?? "—"}</Par>
             <Par rotulo="Origem">
               <Etiqueta texto={detalhe.tipo_canal} tipo="neutra" />{" "}

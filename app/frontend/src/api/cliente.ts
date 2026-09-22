@@ -66,6 +66,9 @@ export interface FiltrosDoFunil {
   tipo_canal?: string[];
   temperatura?: string[];
   busca?: string;
+  data_tipo?: "colocacao" | "aceite";
+  data_de?: string;
+  data_ate?: string;
 }
 
 export const api = {

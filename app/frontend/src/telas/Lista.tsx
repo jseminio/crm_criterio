@@ -27,7 +27,17 @@ export function Lista({ listas }: { listas: Listas | null }) {
         ...paraConsulta(filtros),
         situacao: situacao ? [situacao] : undefined,
       }),
-    [filtros.busca, filtros.captador, filtros.tipo_canal, filtros.temperatura, situacao],
+    [
+      filtros.busca,
+      filtros.captador,
+      filtros.tipo_canal,
+      filtros.temperatura,
+      filtros.dataTipo,
+      filtros.periodo,
+      filtros.dataDe,
+      filtros.dataAte,
+      situacao,
+    ],
   );
 
   const filtrando = temFiltro(filtros) || situacao !== "";
@@ -90,7 +100,7 @@ export function Lista({ listas }: { listas: Listas | null }) {
                 <th scope="col">Situação</th>
                 <th scope="col">Temperatura</th>
                 <th scope="col">Captador</th>
-                <th scope="col">Colocação</th>
+                <th scope="col">Originação</th>
                 <th scope="col" className="tabela-numero">
                   Mensal
                 </th>

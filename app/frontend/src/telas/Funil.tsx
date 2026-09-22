@@ -80,7 +80,16 @@ export function Funil({ listas }: { listas: Listas | null }) {
 
   const { dados, carregando, erro, recarregar } = usarDados<ColunaDoFunil[]>(
     () => api.funil(paraConsulta(filtros)),
-    [filtros.busca, filtros.captador, filtros.tipo_canal, filtros.temperatura],
+    [
+      filtros.busca,
+      filtros.captador,
+      filtros.tipo_canal,
+      filtros.temperatura,
+      filtros.dataTipo,
+      filtros.periodo,
+      filtros.dataDe,
+      filtros.dataAte,
+    ],
   );
 
   const total = dados?.reduce((soma, coluna) => soma + coluna.quantas, 0) ?? 0;

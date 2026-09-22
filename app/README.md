@@ -10,7 +10,7 @@ autorizou por causa do prazo.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e quatro telas |
-| Testes | **252** no backend, **82** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Testes | **256** no backend, **96** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
 | Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
 | API | 15 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe) e conferência da carga. React com TypeScript, em `../frontend` |
@@ -409,6 +409,26 @@ PAD-002.
 | MRR | **Fora** | O oficial é da carteira inteira; aqui só há o preço mensal das propostas |
 
 `GET /api/indicadores` aceita os mesmos filtros do funil.
+
+### Corte por período (22/09/2026)
+
+Pedido de Eduardo: comparar um recorte de tempo contra o resto da carteira —
+ex. o efeito de um teste de prospecção rodado só em julho. `data_de`/`data_ate`
+entram em `_consulta_de_oportunidades` (`crm/api/app.py`), a função que as três
+rotas de funil compartilham — o corte vale no kanban, na lista e nos
+indicadores de uma vez, sem repetir a regra em três lugares.
+
+`data_tipo` escolhe o campo: `colocacao` — rotulado **"Originação"** na tela,
+por pedido de Eduardo em 22/09/2026 — (quando a proposta foi enviada, o
+padrão, e o que mede o efeito de um teste de prospecção) ou `aceite` (quando
+foi decidida). Os dois existem em `Oportunidade`; medem perguntas diferentes.
+O nome interno do campo continua `data_colocacao`: só o rótulo visível mudou.
+
+Na tela, `frontend/src/periodo.ts` resolve os atalhos (Este mês, Mês anterior,
+Este trimestre, Trimestre anterior, Este ano, Ano anterior) em datas
+concretas **no navegador** — a API só recebe `data_de`/`data_ate` prontos,
+nunca o nome do atalho. "Personalizado" libera os dois campos de data para
+digitar à mão.
 
 ## Lacunas da verificação automática da plataforma
 

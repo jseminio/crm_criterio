@@ -16,7 +16,8 @@ existir.**
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Iterator
+from datetime import date
+from typing import Iterator, Literal
 
 import sqlalchemy as sa
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -182,6 +183,9 @@ def _registrar(api: FastAPI) -> None:
         temperatura: list[Temperatura] | None,
         grupo_id: int | None,
         busca: str | None,
+        data_tipo: Literal["colocacao", "aceite"] | None = None,
+        data_de: date | None = None,
+        data_ate: date | None = None,
     ):
         consulta = sa.select(Oportunidade, GrupoEconomico.nome).join(
             GrupoEconomico, Oportunidade.grupo_id == GrupoEconomico.id
@@ -203,6 +207,18 @@ def _registrar(api: FastAPI) -> None:
                     GrupoEconomico.nome.ilike(f"%{busca}%"),
                 )
             )
+        if data_de or data_ate:
+            # Corte de período, pedido por Eduardo em 22/09/2026 para medir o
+            # efeito de um teste de prospecção num recorte de tempo. O campo é
+            # escolhido por quem filtra: colocação (quando a proposta foi
+            # enviada) é o padrão, aceite (quando foi decidida) é a opção —
+            # os dois existem em `Oportunidade`, e cada um mede uma pergunta
+            # diferente.
+            campo = Oportunidade.data_aceite if data_tipo == "aceite" else Oportunidade.data_colocacao
+            if data_de:
+                consulta = consulta.where(campo >= data_de)
+            if data_ate:
+                consulta = consulta.where(campo <= data_ate)
         return consulta
 
     @api.get(
@@ -218,12 +234,16 @@ def _registrar(api: FastAPI) -> None:
         temperatura: list[Temperatura] | None = Query(default=None),
         grupo_id: int | None = None,
         busca: str | None = None,
+        data_tipo: Literal["colocacao", "aceite"] | None = None,
+        data_de: date | None = None,
+        data_ate: date | None = None,
         limite: int = Query(default=100, le=1000),
         salto: int = 0,
     ) -> e.Pagina[e.OportunidadeResumo]:
         """A visão em lista, com os filtros que o funil precisa."""
         consulta = _consulta_de_oportunidades(
-            situacao, captador, tipo_canal, temperatura, grupo_id, busca
+            situacao, captador, tipo_canal, temperatura, grupo_id, busca,
+            data_tipo, data_de, data_ate,
         )
         total = sessao.scalar(sa.select(sa.func.count()).select_from(consulta.subquery()))
         linhas = sessao.execute(
@@ -245,6 +265,9 @@ def _registrar(api: FastAPI) -> None:
         tipo_canal: list[TipoCanal] | None = Query(default=None),
         temperatura: list[Temperatura] | None = Query(default=None),
         busca: str | None = None,
+        data_tipo: Literal["colocacao", "aceite"] | None = None,
+        data_de: date | None = None,
+        data_ate: date | None = None,
     ) -> list[e.ColunaDoFunil]:
         """O kanban: uma coluna por situação, na ordem do funil.
 
@@ -252,7 +275,8 @@ def _registrar(api: FastAPI) -> None:
         quando zera faz a tela dançar e esconde que o estado existe.
         """
         consulta = _consulta_de_oportunidades(
-            None, captador, tipo_canal, temperatura, None, busca
+            None, captador, tipo_canal, temperatura, None, busca,
+            data_tipo, data_de, data_ate,
         )
         linhas = sessao.execute(
             consulta.order_by(Oportunidade.data_colocacao.desc().nulls_last())
@@ -282,6 +306,9 @@ def _registrar(api: FastAPI) -> None:
         tipo_canal: list[TipoCanal] | None = Query(default=None),
         temperatura: list[Temperatura] | None = Query(default=None),
         busca: str | None = None,
+        data_tipo: Literal["colocacao", "aceite"] | None = None,
+        data_de: date | None = None,
+        data_ate: date | None = None,
     ) -> e.IndicadoresResposta:
         """Os números do funil, com os mesmos filtros do kanban.
 
@@ -290,7 +317,8 @@ def _registrar(api: FastAPI) -> None:
         `crm.domain.indicadores`.
         """
         consulta = _consulta_de_oportunidades(
-            None, captador, tipo_canal, temperatura, None, busca
+            None, captador, tipo_canal, temperatura, None, busca,
+            data_tipo, data_de, data_ate,
         )
         oportunidades = [linha[0] for linha in sessao.execute(consulta).all()]
         resultado = regras_de_indicadores.calcular(oportunidades)

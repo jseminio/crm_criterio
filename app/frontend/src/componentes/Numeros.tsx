@@ -54,7 +54,16 @@ function Cartao({
 export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
   const { dados, carregando, erro, recarregar } = usarDados<Indicadores>(
     () => api.indicadores(paraConsulta(filtros)),
-    [filtros.busca, filtros.captador, filtros.tipo_canal, filtros.temperatura],
+    [
+      filtros.busca,
+      filtros.captador,
+      filtros.tipo_canal,
+      filtros.temperatura,
+      filtros.dataTipo,
+      filtros.periodo,
+      filtros.dataDe,
+      filtros.dataAte,
+    ],
   );
 
   if (carregando && !dados) return <Carregando rotulo="Calculando os números" />;

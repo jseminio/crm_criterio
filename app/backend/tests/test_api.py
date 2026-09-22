@@ -141,6 +141,53 @@ class TestLista:
         assert pagina["total"] == 2
 
 
+class TestCorteDePeriodo:
+    """Pedido de Eduardo em 22/09/2026: comparar um recorte de tempo (ex.: um
+    teste de prospecção) contra o resto da carteira. O corte vale nas três
+    telas porque as três chamam `_consulta_de_oportunidades`."""
+
+    def test_corta_por_data_de_colocacao_por_padrao(self, cliente: TestClient, carteira):
+        """Alfa BPO (03-01) fica de fora; Beta BPO (04-01) e Alfa Consultoria
+        (05-01) entram."""
+        pagina = cliente.get(
+            "/api/oportunidades",
+            params={"data_de": "2026-04-01", "data_ate": "2026-05-01"},
+        ).json()
+
+        assert pagina["total"] == 2
+        nomes = {item["nome"] for item in pagina["itens"]}
+        assert nomes == {"Beta BPO", "Alfa Consultoria"}
+
+    def test_so_data_de_ja_corta_sem_precisar_do_ate(self, cliente: TestClient, carteira):
+        pagina = cliente.get("/api/oportunidades", params={"data_de": "2026-05-01"}).json()
+
+        assert pagina["total"] == 1
+        assert pagina["itens"][0]["nome"] == "Alfa Consultoria"
+
+    def test_corta_por_data_de_aceite_quando_pedido(self, cliente: TestClient, carteira):
+        """Só a Beta BPO tem data de aceite — as outras duas, mesmo dentro do
+        intervalo por colocação, ficam de fora quando o corte é por aceite."""
+        pagina = cliente.get(
+            "/api/oportunidades",
+            params={"data_tipo": "aceite", "data_de": "2026-06-01", "data_ate": "2026-06-30"},
+        ).json()
+
+        assert pagina["total"] == 1
+        assert pagina["itens"][0]["nome"] == "Beta BPO"
+
+    def test_vale_no_funil_e_nos_indicadores(self, cliente: TestClient, carteira):
+        parametros = {"data_de": "2026-04-01", "data_ate": "2026-05-01"}
+
+        colunas = cliente.get("/api/funil", params=parametros).json()
+        assert sum(c["quantas"] for c in colunas) == 2
+
+        indicadores = cliente.get("/api/indicadores", params=parametros).json()
+        # As duas do intervalo já têm desfecho: Alfa Consultoria (Recusada) e
+        # Beta BPO (Aceita). Alfa BPO fica de fora do corte — ainda que
+        # decidida, sua colocação (03-01) está antes do intervalo.
+        assert indicadores["taxa_de_conversao"]["decididas"] == 2
+
+
 class TestEdicao:
     def test_move_a_oportunidade_de_situacao(self, cliente: TestClient, carteira):
         resposta = cliente.patch(

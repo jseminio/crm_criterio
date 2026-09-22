@@ -18,10 +18,14 @@ export default defineConfig({
     maxWorkers: 1,
     minWorkers: 1,
     testTimeout: 15000,
-    // Reaproveita o processo entre arquivos em vez de abrir um por arquivo —
-    // metade do tempo numa máquina sob carga. Seguro aqui porque cada teste já
-    // limpa o que monta (afterEach com cleanup) e zera os mocks da API
-    // (beforeEach com vi.clearAllMocks); testado que não vaza estado.
-    isolate: false,
+    // NÃO usar `isolate: false`. Pareceu seguro em 21/09/2026 (rodou limpo
+    // várias vezes) e virou instabilidade real em 22/09/2026, assim que um
+    // quarto arquivo passou a mockar `../api/cliente` com um formato
+    // diferente dos outros três: `isolate: false` reaproveita o registro de
+    // módulos entre arquivos do mesmo processo, e o `vi.mock` de um arquivo
+    // às vezes vazava para o teste seguinte — em ~1 de cada 3 rodadas, sem
+    // padrão fixo. Teste instável é pior que teste lento: ensina a ignorar
+    // falha. `maxWorkers: 1` sozinho já resolve o problema de inicialização
+    // sob carga; isolamento entre arquivos continua ligado (o padrão).
   },
 });

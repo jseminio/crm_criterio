@@ -10,11 +10,26 @@
  */
 
 import { api } from "../api/cliente";
-import type { Indicadores } from "../api/tipos";
+import type { Indicadores, TaxaDeConversao } from "../api/tipos";
 import { Carregando, Erro } from "./estados";
 import { paraConsulta, type EstadoDosFiltros } from "./Filtros";
-import { dinheiro, dinheiroCurto } from "../formato";
+import { dinheiro, dinheiroCurto, percentual } from "../formato";
 import { usarDados } from "../usarDados";
+
+/** O tom da conversão contra os limiares oficiais (meta 50%, alerta <30%).
+ *
+ * Mesma regra do PAD-002 que `Etiqueta` aplica às situações: a palavra vem
+ * sempre junto da cor, nunca só a cor sozinha.
+ */
+function EtiquetaDeConversao({ tx }: { tx: TaxaDeConversao }) {
+  if (!tx.calculavel) return null;
+  const [texto, tom] = tx.atingiu_a_meta
+    ? ["Na meta", "ganho"]
+    : tx.abaixo_do_alerta
+      ? ["Abaixo do alerta", "perda"]
+      : ["Entre o alerta e a meta", "espera"];
+  return <span className={`etiqueta etiqueta-${tom}`}>{texto}</span>;
+}
 
 function Cartao({
   rotulo,
@@ -91,9 +106,31 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
         )}
       </Cartao>
 
-      <Cartao rotulo="Taxa de conversão" pendente>
-        <p className="numero-estado">Aguardando definição</p>
-        <p>{dados.taxa_de_conversao.motivo}</p>
+      <Cartao
+        rotulo="Taxa de conversão"
+        destaque={
+          dados.taxa_de_conversao.calculavel
+            ? percentual(dados.taxa_de_conversao.percentual)
+            : undefined
+        }
+        pendente={!dados.taxa_de_conversao.calculavel}
+      >
+        {dados.taxa_de_conversao.calculavel ? (
+          <>
+            <p>
+              {dados.taxa_de_conversao.aceitas} de {dados.taxa_de_conversao.decididas}{" "}
+              decididas · <EtiquetaDeConversao tx={dados.taxa_de_conversao} />
+            </p>
+            <p className="numero-nota">
+              Só o que já tem desfecho entra na conta — aceita, recusada ou
+              perdida. Em aberto fica de fora: ainda pode fechar.
+            </p>
+          </>
+        ) : (
+          <p className="numero-estado">
+            Não calculável — nenhuma proposta decidida ainda neste recorte.
+          </p>
+        )}
       </Cartao>
     </div>
   );

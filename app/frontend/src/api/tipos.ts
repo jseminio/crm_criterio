@@ -110,12 +110,27 @@ export interface Pendencia {
   o_que_falta: string;
 }
 
+/** Aceitas ÷ decididas — decisão de Eduardo em 22/09/2026.
+ *
+ * Em aberto não entra no denominador: ainda pode fechar. `abaixo_do_alerta` e
+ * `atingiu_a_meta` vêm `null` só quando não há decidida nenhuma — não
+ * calculável é diferente de "abaixo do alerta".
+ */
+export interface TaxaDeConversao {
+  aceitas: number;
+  decididas: number;
+  percentual: string | null;
+  calculavel: boolean;
+  abaixo_do_alerta: boolean | null;
+  atingiu_a_meta: boolean | null;
+}
+
 export interface Indicadores {
   em_aberto: Recorte;
   aceitas: Recorte;
   aceitas_com_data_de_aceite: number;
   ciclo_medio: Pendencia;
-  taxa_de_conversao: Pendencia;
+  taxa_de_conversao: TaxaDeConversao;
 }
 
 export interface Execucao {

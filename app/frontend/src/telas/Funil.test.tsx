@@ -38,7 +38,14 @@ const INDICADORES_VAZIOS: Indicadores = {
   aceitas: { quantas: 0, valor_mensal: "0", valor_anual: "0", sem_preco_mensal: 0, com_preco_mensal: 0 },
   aceitas_com_data_de_aceite: 0,
   ciclo_medio: { calculavel: false, motivo: "—", o_que_falta: "—" },
-  taxa_de_conversao: { calculavel: false, motivo: "—", o_que_falta: "—" },
+  taxa_de_conversao: {
+    aceitas: 0,
+    decididas: 0,
+    percentual: null,
+    calculavel: false,
+    abaixo_do_alerta: null,
+    atingiu_a_meta: null,
+  },
 };
 
 function coluna(situacao: string, oportunidades: ColunaDoFunil["oportunidades"]): ColunaDoFunil {

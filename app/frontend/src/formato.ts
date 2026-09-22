@@ -41,6 +41,12 @@ export function prazo(iso: string | null | undefined): { texto: string; atrasado
   return { texto: `em ${dias} d`, atrasado: false };
 }
 
+/** "38.1" (a API devolve ponto decimal) vira "38,1%". */
+export function percentual(valor: string | null | undefined): string {
+  if (valor === null || valor === undefined || valor === "") return "—";
+  return `${valor.replace(".", ",")}%`;
+}
+
 /** Data e hora locais, em pt-BR: "21/09/2026 às 17:35". */
 export function dataHora(iso: string | null | undefined): string {
   if (!iso) return "—";

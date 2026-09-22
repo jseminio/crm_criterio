@@ -10,7 +10,7 @@ autorizou por causa do prazo.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e quatro telas |
-| Testes | **247** no backend, **72** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Testes | **252** no backend, **82** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
 | Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 153 oportunidades, 138 grupos |
 | API | 15 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe) e conferência da carga. React com TypeScript, em `../frontend` |
@@ -344,9 +344,22 @@ traço: zero pareceria medição, traço esconderia que há trabalho a fazer.
 |---|---|---|
 | Propostas em aberto | Calculado | Inverso de `Situacao.decidida`: se as situações mudarem, a conta muda junto |
 | Aceitas em 2026 | Calculado | Com quantas têm preço mensal — 20 das 40 são de valor único |
-| Taxa de conversão | **Pendente** | Denominador: 38% ou 26%. O anexo técnico diz "não implementar sem a definição" |
+| Taxa de conversão | **Calculado** desde 22/09/2026 | Denominador = decididas (Aceita+Recusada+Perdido), decisão de Eduardo. 38,1% sobre os dados reais, contra 26,1% se todas as trabalhadas contassem |
 | Ticket médio | **Pendente** | Venda nova ou receita média por grupo? |
 | Ciclo médio | **Pendente** | 0 de 40 datas de aceite; a base do cálculo não está registrada |
+
+### A taxa de conversão
+
+`TaxaDeConversao` (`crm/domain/indicadores.py`) divide aceitas por decididas —
+em aberto não entra em nenhum dos dois lados, porque ainda pode fechar. Contra
+os limiares oficiais da planilha de KPIs (meta 50%, alerta abaixo de 30%), o
+resultado carrega `abaixo_do_alerta` e `atingiu_a_meta`, os dois `None` só
+quando não há nenhuma decidida ainda — divisão por zero não pode virar 0%,
+que pareceria "nada fechou" quando na verdade é "não dá para medir".
+
+Na tela, o cartão mostra a etiqueta em palavra (**Abaixo do alerta** /
+**Entre o alerta e a meta** / **Na meta**), nunca só a cor — regra 4 do
+PAD-002.
 | MRR | **Fora** | O oficial é da carteira inteira; aqui só há o preço mensal das propostas |
 
 `GET /api/indicadores` aceita os mesmos filtros do funil.
@@ -408,9 +421,24 @@ dispensável, e o cartão não se move.
 > real — mas **não pude confirmar com um mouse de verdade** nesta máquina.
 > **Peço para Eduardo confirmar amanhã** arrastando um cartão de verdade.
 
+## Checar os tipos de verdade
+
+```bash
+cd frontend && npx tsc -b
+```
+
+**Não use `tsc --noEmit` sozinho.** `tsconfig.json` na raiz do frontend é só um
+arquivo de projeto (`"files": []`, delega tudo via `references` para
+`tsconfig.app.json` e `tsconfig.node.json`) — sem `-b`, o `tsc --noEmit`
+verifica **nada** e sai limpo mesmo com erro real no código. Descoberto em
+22/09/2026: o comando errado tinha sido usado a sessão inteira, e só quando
+`tsc -b` rodou de verdade apareceram dois erros que estavam invisíveis —
+um deles anterior a essa sessão, sem relação com o trabalho do dia. `npm run
+build` já usa `tsc -b` corretamente; o risco era só nas checagens manuais.
+
 ## Testes das telas
 
-76 testes com **Vitest** e **Testing Library**, em `frontend/src/**/*.test.{ts,tsx}`:
+82 testes com **Vitest** e **Testing Library**, em `frontend/src/**/*.test.{ts,tsx}`:
 
 ```bash
 cd frontend && npx vitest run
@@ -424,7 +452,9 @@ de toda lista, o tratamento de erro da API (`ErroDaApi`, "fora do ar" vs.
 "recusou"), e as travas com defeito real por trás: **aceita sem data de
 aceite** trava o botão de salvar (o mesmo defeito corrigido no backend em
 21/09/2026), **"Convertido" nunca é uma opção do seletor** de situação do
-lead — só a conversão leva lá —, e as três regras do arrasto no kanban acima.
+lead — só a conversão leva lá —, as três regras do arrasto no kanban acima, e
+os três estados da taxa de conversão contra os limiares oficiais (abaixo do
+alerta, entre alerta e meta, na meta), decidida em 22/09/2026.
 
 Cada teste crítico foi verificado quebrando a regra de propósito e confirmando
 que o teste pega — não basta o teste passar, ele precisa falhar quando o
@@ -433,9 +463,17 @@ comportamento muda.
 **Numa máquina sob carga, `vitest run` pode não subir.** Aconteceu aqui: dois
 núcleos, vários aplicativos abertos, `load average` acima de 300. Um worker por
 arquivo de teste estoura o tempo de inicialização e o Vitest falha antes de
-rodar um teste sequer — não é defeito do teste. `vitest.config.ts` já roda com
-um processo só (`maxWorkers: 1`) e sem isolar entre arquivos (`isolate: false`),
-o que também deixou a suíte inteira em 5–6 segundos em vez de mais de um minuto.
+rodar um teste sequer — não é defeito do teste. `vitest.config.ts` roda com um
+processo só (`maxWorkers: 1`), que sozinho já resolve isso.
+
+**`isolate: false` foi tentado e revertido.** Parecia seguro em 21/09/2026 —
+rodou limpo várias vezes — e virou instabilidade real em 22/09/2026, assim que
+um quarto arquivo passou a mockar `../api/cliente` com um formato diferente
+dos outros três: `isolate: false` reaproveita o registro de módulos entre
+arquivos do mesmo processo, e o `vi.mock` de um arquivo às vezes vazava para
+o teste seguinte — falha em cerca de 1 a cada 3 rodadas, sem padrão fixo.
+Teste instável é pior que teste lento: ensina a ignorar falha. `maxWorkers: 1`
+sozinho é suficiente; isolamento entre arquivos volta a ser o padrão.
 
 ## Ressalva de processo — resolvida
 

@@ -15,11 +15,11 @@ import type {
 } from "./tipos";
 
 export class ErroDaApi extends Error {
-  constructor(
-    readonly status: number,
-    mensagem: string,
-  ) {
+  readonly status: number;
+
+  constructor(status: number, mensagem: string) {
     super(mensagem);
+    this.status = status;
   }
 }
 

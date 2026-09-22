@@ -29,6 +29,7 @@ __all__ = [
     "OportunidadeResumo",
     "OportunidadeDetalhe",
     "OportunidadeEdicao",
+    "OportunidadeNova",
     "LeadResumo",
     "LeadNovo",
     "LeadEdicao",
@@ -98,10 +99,11 @@ class OportunidadeDetalhe(OportunidadeResumo):
 class OportunidadeEdicao(BaseModel):
     """O que a tela pode mudar. Tudo opcional: só o que vier é alterado.
 
-    Preço, serviço e datas de origem **não estão aqui**. Enquanto a planilha
-    roda em paralelo, ela é a fonte desses campos — editá-los nos dois lugares
-    criaria divergência que ninguém saberia resolver. Entram no E4, quando a
-    proposta passar a nascer no CRM.
+    Preço, serviço e data de originação entraram em 22/09/2026 (E4): a
+    proposta já pode nascer e ser ajustada direto no CRM, não só na planilha.
+    O campo mudado aqui entra em `campos_do_crm` (mesmo mecanismo que já
+    protegia situação/temperatura) — a recarga da planilha não sobrescreve de
+    volta.
     """
 
     situacao: Situacao | None = None
@@ -111,6 +113,32 @@ class OportunidadeEdicao(BaseModel):
     proxima_acao: str | None = Field(default=None, max_length=200)
     proxima_acao_em: date | None = None
     observacao: str | None = None
+    servico: str | None = Field(default=None, max_length=120)
+    tipo_servico: str | None = Field(default=None, max_length=120)
+    data_colocacao: date | None = None
+    preco_mensal: Decimal | None = None
+    preco_anual: Decimal | None = None
+
+
+class OportunidadeNova(BaseModel):
+    """Uma proposta nascida no CRM — sem passar pela planilha nem por um lead.
+
+    O grupo existente é reaproveitado pelo nome; se não houver, nasce um novo
+    — mesmo padrão de `ConversaoDeLead`.
+    """
+
+    nome: str = Field(min_length=1, max_length=200)
+    grupo_id: int | None = None
+    nome_do_grupo: str | None = Field(default=None, max_length=200)
+    servico: str | None = Field(default=None, max_length=120)
+    tipo_servico: str | None = Field(default=None, max_length=120)
+    data_colocacao: date | None = None
+    preco_mensal: Decimal | None = None
+    preco_anual: Decimal | None = None
+    captador: str | None = Field(default=None, max_length=10)
+    temperatura: Temperatura | None = None
+    tipo_canal: TipoCanal | None = None
+    canal: str | None = Field(default=None, max_length=120)
 
 
 class LeadResumo(Base):

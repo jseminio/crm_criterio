@@ -11,6 +11,7 @@ import {
   temFiltro,
   type EstadoDosFiltros,
 } from "../componentes/Filtros";
+import { NovaOportunidade } from "../componentes/NovaOportunidade";
 import { Numeros } from "../componentes/Numeros";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { dinheiroCurto, prazo } from "../formato";
@@ -77,6 +78,7 @@ export function Funil({ listas }: { listas: Listas | null }) {
   const [colunaAlvo, definirColunaAlvo] = useState<string | null>(null);
   const [movendo, definirMovendo] = useState<number | null>(null);
   const [erroDeMovimento, definirErroDeMovimento] = useState<string | null>(null);
+  const [criando, definirCriando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = usarDados<ColunaDoFunil[]>(
     () => api.funil(paraConsulta(filtros)),
@@ -133,7 +135,20 @@ export function Funil({ listas }: { listas: Listas | null }) {
   return (
     <>
       <Numeros filtros={filtros} />
-      <Filtros filtros={filtros} aoMudar={definirFiltros} listas={listas} />
+      <Filtros
+        filtros={filtros}
+        aoMudar={definirFiltros}
+        listas={listas}
+        acao={
+          <button
+            type="button"
+            className="botao botao-primario"
+            onClick={() => definirCriando(true)}
+          >
+            Nova oportunidade
+          </button>
+        }
+      />
 
       {erroDeMovimento && (
         <div className="aviso-de-movimento" role="alert">
@@ -231,6 +246,14 @@ export function Funil({ listas }: { listas: Listas | null }) {
           situacaoInicial={situacaoDeAbertura}
           aoFechar={fechar}
           aoSalvar={recarregar}
+        />
+      )}
+
+      {criando && (
+        <NovaOportunidade
+          listas={listas}
+          aoFechar={() => definirCriando(false)}
+          aoCriar={recarregar}
         />
       )}
     </>

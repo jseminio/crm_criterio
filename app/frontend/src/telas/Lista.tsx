@@ -12,6 +12,7 @@ import {
   type EstadoDosFiltros,
 } from "../componentes/Filtros";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
+import { NovaOportunidade } from "../componentes/NovaOportunidade";
 import { data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
@@ -20,6 +21,7 @@ export function Lista({ listas }: { listas: Listas | null }) {
   const [filtros, definirFiltros] = useState<EstadoDosFiltros>(FILTROS_VAZIOS);
   const [situacao, definirSituacao] = useState("");
   const [aberta, definirAberta] = useState<number | null>(null);
+  const [criando, definirCriando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = usarDados<Pagina<OportunidadeResumo>>(
     () =>
@@ -53,24 +55,33 @@ export function Lista({ listas }: { listas: Listas | null }) {
         aoMudar={definirFiltros}
         listas={listas}
         acao={
-          <div className="campo">
-            <label className="campo-rotulo" htmlFor="filtro-situacao">
-              Situação
-            </label>
-            <select
-              id="filtro-situacao"
-              className="selecao"
-              value={situacao}
-              onChange={(e) => definirSituacao(e.target.value)}
+          <>
+            <div className="campo">
+              <label className="campo-rotulo" htmlFor="filtro-situacao">
+                Situação
+              </label>
+              <select
+                id="filtro-situacao"
+                className="selecao"
+                value={situacao}
+                onChange={(e) => definirSituacao(e.target.value)}
+              >
+                <option value="">Todas</option>
+                {listas?.situacoes.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              className="botao botao-primario"
+              onClick={() => definirCriando(true)}
             >
-              <option value="">Todas</option>
-              {listas?.situacoes.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
+              Nova oportunidade
+            </button>
+          </>
         }
       />
 
@@ -143,6 +154,14 @@ export function Lista({ listas }: { listas: Listas | null }) {
           listas={listas}
           aoFechar={() => definirAberta(null)}
           aoSalvar={recarregar}
+        />
+      )}
+
+      {criando && (
+        <NovaOportunidade
+          listas={listas}
+          aoFechar={() => definirCriando(false)}
+          aoCriar={recarregar}
         />
       )}
     </>

@@ -145,17 +145,27 @@ describe("DetalheDaOportunidade", () => {
     expect(screen.getByRole("button", { name: /salvar alterações/i })).toBeEnabled();
   });
 
-  it("não deixa editar preço, serviço ou datas de origem — só mostra", async () => {
-    // A regra de contrato: enquanto a planilha roda em paralelo, ela é a
-    // fonte desses campos. Não pode existir campo editável para eles aqui.
+  it("preço, serviço e data de originação vêm preenchidos e editáveis — desde o E4", async () => {
     await abrir(oportunidade());
 
-    expect(screen.queryByLabelText(/preço/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/serviço/i)).not.toBeInTheDocument();
-    // O texto real tem um espaço fino sem quebra (\u00a0) depois de "R$", mas
-    // o normalizador do Testing Library o reduz a espaço comum antes de
-    // comparar — por isso a consulta usa o espaço comum, não o caractere real.
-    expect(screen.getByText("R$ 5.000,00")).toBeInTheDocument();
+    expect(screen.getByLabelText("Serviço")).toHaveValue("BPO Contábil");
+    expect(screen.getByLabelText("Tipo de serviço")).toHaveValue("Recorrente");
+    expect(screen.getByLabelText("Preço mensal")).toHaveValue(5000);
+    expect(screen.getByLabelText("Preço anual")).toHaveValue(65000);
+    expect(screen.getByLabelText("Data de originação")).toHaveValue("2026-03-01");
+  });
+
+  it("envia preço e serviço editados junto do resto", async () => {
+    vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
+    await abrir(oportunidade());
+
+    await userEvent.clear(screen.getByLabelText("Preço mensal"));
+    await userEvent.type(screen.getByLabelText("Preço mensal"), "5500");
+    await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+
+    await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledOnce());
+    const [, mudancas] = vi.mocked(api.editarOportunidade).mock.calls[0];
+    expect(mudancas.preco_mensal).toBe("5500");
   });
 
   it("mostra o motivo só quando a situação é Recusada ou Perdido", async () => {

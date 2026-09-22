@@ -6,7 +6,6 @@ import type { Listas, OportunidadeDetalhe } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro } from "../componentes/estados";
-import { data, dinheiro } from "../formato";
 
 function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
@@ -56,6 +55,11 @@ export function DetalheDaOportunidade({
           proxima_acao: d.proxima_acao ?? "",
           proxima_acao_em: d.proxima_acao_em ?? "",
           observacao: d.observacao ?? "",
+          servico: d.servico ?? "",
+          tipo_servico: d.tipo_servico ?? "",
+          data_colocacao: d.data_colocacao ?? "",
+          preco_mensal: d.preco_mensal ?? "",
+          preco_anual: d.preco_anual ?? "",
         });
       })
       .catch((f) => definirErro(f instanceof ErroDaApi ? f.message : "Falha inesperada."));
@@ -142,6 +146,83 @@ export function DetalheDaOportunidade({
                 ))}
               </select>
             </div>
+
+            <div className="formulario-duplo">
+              <div className="campo-bloco">
+                <label className="campo-rotulo" htmlFor="d-servico">
+                  Serviço
+                </label>
+                <input
+                  id="d-servico"
+                  className="entrada"
+                  value={rascunho.servico}
+                  onChange={(e) => mudar("servico", e.target.value)}
+                  placeholder="BPO Contábil"
+                />
+              </div>
+              <div className="campo-bloco">
+                <label className="campo-rotulo" htmlFor="d-tipo-servico">
+                  Tipo de serviço
+                </label>
+                <input
+                  id="d-tipo-servico"
+                  className="entrada"
+                  value={rascunho.tipo_servico}
+                  onChange={(e) => mudar("tipo_servico", e.target.value)}
+                  placeholder="Contabilidade"
+                />
+              </div>
+            </div>
+
+            <div className="formulario-duplo">
+              <div className="campo-bloco">
+                <label className="campo-rotulo" htmlFor="d-preco-mensal">
+                  Preço mensal
+                </label>
+                <input
+                  id="d-preco-mensal"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="entrada"
+                  value={rascunho.preco_mensal}
+                  onChange={(e) => mudar("preco_mensal", e.target.value)}
+                />
+              </div>
+              <div className="campo-bloco">
+                <label className="campo-rotulo" htmlFor="d-preco-anual">
+                  Preço anual
+                </label>
+                <input
+                  id="d-preco-anual"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="entrada"
+                  value={rascunho.preco_anual}
+                  onChange={(e) => mudar("preco_anual", e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="campo-bloco">
+              <label className="campo-rotulo" htmlFor="d-originacao">
+                Data de originação
+              </label>
+              <input
+                id="d-originacao"
+                type="date"
+                className="entrada"
+                value={rascunho.data_colocacao}
+                onChange={(e) => mudar("data_colocacao", e.target.value)}
+              />
+            </div>
+
+            <p className="campo-ajuda" style={{ margin: 0 }}>
+              Serviço, preço e data de originação agora são editáveis aqui — desde
+              22/09/2026 (E4), a proposta pode nascer e ser ajustada direto no CRM.{" "}
+              <strong>A mesma trava contra a recarga da planilha vale para eles.</strong>
+            </p>
 
             <div className="formulario-duplo">
               <div className="campo-bloco">
@@ -260,14 +341,8 @@ export function DetalheDaOportunidade({
             <h3 style={{ fontSize: 14, marginBottom: "var(--e2)" }}>Vem da planilha</h3>
             <div className="recado">
               Enquanto a planilha roda em paralelo, <strong>ela é a fonte destes campos</strong>.
-              Editá-los nos dois lugares criaria divergência. Eles passam a ser editáveis aqui
-              quando a proposta nascer no CRM.
+              Editá-los nos dois lugares criaria divergência.
             </div>
-            <Par rotulo="Serviço">{detalhe.servico ?? "—"}</Par>
-            <Par rotulo="Tipo de serviço">{detalhe.tipo_servico ?? "—"}</Par>
-            <Par rotulo="Preço mensal">{dinheiro(detalhe.preco_mensal)}</Par>
-            <Par rotulo="Preço anual">{dinheiro(detalhe.preco_anual)}</Par>
-            <Par rotulo="Data da originação">{data(detalhe.data_colocacao)}</Par>
             <Par rotulo="Captador">{detalhe.captador ?? "—"}</Par>
             <Par rotulo="Origem">
               <Etiqueta texto={detalhe.tipo_canal} tipo="neutra" />{" "}

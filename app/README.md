@@ -3,18 +3,20 @@
 Código da **Etapa 1** do Critério CRM: o banco, a carga das propostas de 2026,
 a API do funil e as telas. Cobre os incrementos E2 (*a carteira existe*) e E3
 (*o funil funciona*), na ordem invertida que a proposta aprovada em 20/09/2026
-autorizou por causa do prazo.
+autorizou por causa do prazo — e, desde 22/09/2026, o começo do E4 (*a
+proposta nasce no CRM*): preço, serviço e criação de oportunidade direto na
+tela, sem depender da planilha ou de um lead.
 
 ## Estado
 
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e quatro telas |
-| Testes | **256** no backend, **96** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Testes | **262** no backend, **101** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
 | Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
-| API | 15 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
+| API | 16 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe) e conferência da carga. React com TypeScript, em `../frontend` |
-| Fora do ar | Nuvem, login, backup automático (E1); proposta e preço (E4); demais KPIs (E5) |
+| Fora do ar | Nuvem, login, backup automático (E1); documento da proposta e demais KPIs (E5) |
 
 ## Como rodar
 
@@ -353,6 +355,33 @@ Duas propostas do kit ficaram de fora por decisão de Eduardo: "Empresa XPTO"
 ~/.venvs/criterio-crm/bin/python scripts/conciliar_kit_bruno.py <kit.csv>            # simula e desfaz
 ~/.venvs/criterio-crm/bin/python scripts/conciliar_kit_bruno.py <kit.csv> --gravar   # grava
 ```
+
+## O começo do E4 — a proposta nasce no CRM (22/09/2026)
+
+Eduardo aprovou o escopo (gate PF-07, amostra aprovada em chat) para dois
+pedaços do E4, deixando de fora a geração do documento da proposta:
+
+1. **Preço, serviço e data de originação viram editáveis** no painel de
+   detalhe (`OportunidadeEdicao`, em `crm/api/esquemas.py`). Não foi preciso
+   inventar mecanismo novo: os três campos já estavam em `CAMPOS` (a lista que
+   `crm/carga/persistencia.py` usa para decidir o que a recarga da planilha
+   pode sobrescrever) — só abrir o campo na tela já ativa a mesma trava que
+   protege situação e temperatura desde 21/09/2026.
+2. **`POST /api/oportunidades` cria a proposta do zero**, sem passar por lead
+   nem por planilha. Mesmo padrão de `POST /api/leads/{id}/converter`: o
+   grupo existente é reaproveitado pelo nome, ou nasce um novo. Nasce com
+   `Situacao.ENVIAR_PROPOSTA` e `Origem.CRM`; `data_colocacao` sem valor vira
+   a data de hoje no servidor, não na tela — dois clientes abrindo o
+   formulário no mesmo minuto não podem divergir por relógio local.
+
+Na tela, o botão "Nova oportunidade" mora no filtro (`Filtros`/`acao`), igual
+ao seletor de Situação da tela Lista — mesmo lugar, mesmo padrão, em vez de
+inventar uma barra de ações nova.
+
+**Fora desta rodada, por decisão explícita:** gerar o documento da proposta
+(PDF/Word) para enviar ao cliente. Precisaria de modelo aprovado e
+provavelmente envolve o Bruno na definição do template — escopo maior,
+adiado para quando entrar em pauta.
 
 ## Conferência da carga
 

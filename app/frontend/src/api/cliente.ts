@@ -96,6 +96,12 @@ export const api = {
 
   oportunidade: (id: number) => pedir<OportunidadeDetalhe>(`/api/oportunidades/${id}`),
 
+  criarOportunidade: (oportunidade: Record<string, unknown>) =>
+    pedir<OportunidadeDetalhe>("/api/oportunidades", {
+      method: "POST",
+      body: JSON.stringify(oportunidade),
+    }),
+
   editarOportunidade: (id: number, mudancas: Record<string, unknown>) =>
     pedir<OportunidadeDetalhe>(`/api/oportunidades/${id}`, {
       method: "PATCH",

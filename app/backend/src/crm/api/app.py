@@ -258,6 +258,62 @@ def _registrar(api: FastAPI) -> None:
             itens=[_resumo_de(o, nome) for o, nome in linhas],
         )
 
+    @api.post(
+        "/api/oportunidades",
+        response_model=e.OportunidadeDetalhe,
+        status_code=201,
+        tags=["funil"],
+    )
+    def criar_oportunidade(
+        corpo: e.OportunidadeNova, sessao: Session = Depends(obter_sessao)
+    ) -> e.OportunidadeDetalhe:
+        """A proposta nasce direto no CRM — sem passar pela planilha nem por
+        um lead. Decisão de Eduardo em 22/09/2026 (E4).
+
+        O grupo existente é reaproveitado pelo nome; se não houver, nasce um
+        novo — mesmo padrão de `converter_lead`.
+        """
+        if corpo.grupo_id is not None:
+            grupo = sessao.get(GrupoEconomico, corpo.grupo_id)
+            if grupo is None:
+                raise HTTPException(404, "grupo não encontrado")
+        else:
+            nome_do_grupo = corpo.nome_do_grupo or corpo.nome
+            grupo = sessao.scalar(
+                sa.select(GrupoEconomico).where(
+                    sa.func.lower(GrupoEconomico.nome) == nome_do_grupo.casefold(),
+                    GrupoEconomico.fundido_em_id.is_(None),
+                )
+            )
+            if grupo is None:
+                grupo = GrupoEconomico(
+                    nome=nome_do_grupo, situacao=SituacaoGrupo.PROSPECT, origem=Origem.CRM
+                )
+                sessao.add(grupo)
+                sessao.flush()
+
+        oportunidade = Oportunidade(
+            grupo_id=grupo.id,
+            nome=corpo.nome,
+            servico=corpo.servico,
+            tipo_servico=corpo.tipo_servico,
+            situacao=Situacao.ENVIAR_PROPOSTA,
+            temperatura=corpo.temperatura,
+            tipo_canal=corpo.tipo_canal,
+            canal=corpo.canal,
+            captador=corpo.captador,
+            data_colocacao=corpo.data_colocacao or date.today(),
+            preco_mensal=corpo.preco_mensal,
+            preco_anual=corpo.preco_anual,
+            origem=Origem.CRM,
+        )
+        sessao.add(oportunidade)
+        sessao.flush()
+
+        detalhe = e.OportunidadeDetalhe.model_validate(oportunidade)
+        detalhe.grupo_nome = grupo.nome
+        return detalhe
+
     @api.get("/api/funil", response_model=list[e.ColunaDoFunil], tags=["funil"])
     def funil(
         sessao: Session = Depends(obter_sessao),

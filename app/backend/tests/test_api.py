@@ -228,17 +228,77 @@ class TestEdicao:
 
         assert resposta.status_code == 200
 
-    def test_a_edicao_nao_alcanca_preco(self, cliente: TestClient, carteira):
-        """Enquanto a planilha roda em paralelo, ela é a fonte do preço."""
-        cliente.patch(
-            f"/api/oportunidades/{carteira['primeira']}", json={"preco_mensal": "999.00"}
+    def test_edita_preco_e_servico(self, cliente: TestClient, carteira, sessao: Session):
+        """Desde 22/09/2026 (E4) a proposta pode ser ajustada direto no CRM."""
+        resposta = cliente.patch(
+            f"/api/oportunidades/{carteira['primeira']}",
+            json={"preco_mensal": "999.00", "servico": "Consultoria"},
         )
 
+        assert resposta.status_code == 200
         detalhe = cliente.get(f"/api/oportunidades/{carteira['primeira']}").json()
-        assert Decimal(detalhe["preco_mensal"]) == Decimal("5000.00")
+        assert Decimal(detalhe["preco_mensal"]) == Decimal("999.00")
+        assert detalhe["servico"] == "Consultoria"
+
+        # E entra em campos_do_crm — mesma trava que já protegia situação e
+        # temperatura contra a recarga da planilha sobrescrever de volta.
+        oportunidade = sessao.get(Oportunidade, carteira["primeira"])
+        assert {"preco_mensal", "servico"} <= set(oportunidade.campos_do_crm)
 
     def test_oportunidade_inexistente_da_404(self, cliente: TestClient, carteira):
         assert cliente.patch("/api/oportunidades/9999", json={}).status_code == 404
+
+
+class TestCriacaoDeOportunidade:
+    """A proposta nascendo direto no CRM — o E4, aprovado por Eduardo em
+    22/09/2026."""
+
+    def test_cria_com_grupo_novo(self, cliente: TestClient):
+        resposta = cliente.post(
+            "/api/oportunidades",
+            json={
+                "nome": "Delta Engenharia",
+                "servico": "BPO Contábil",
+                "preco_mensal": "3000.00",
+            },
+        )
+
+        assert resposta.status_code == 201
+        corpo = resposta.json()
+        assert corpo["nome"] == "Delta Engenharia"
+        assert corpo["grupo_nome"] == "Delta Engenharia"
+        assert corpo["situacao"] == "Enviar proposta"
+        assert corpo["origem"] == "CRM"
+        assert Decimal(corpo["preco_mensal"]) == Decimal("3000.00")
+
+    def test_data_de_colocacao_default_e_hoje(self, cliente: TestClient):
+        corpo = cliente.post("/api/oportunidades", json={"nome": "Épsilon"}).json()
+
+        assert corpo["data_colocacao"] == date.today().isoformat()
+
+    def test_reaproveita_grupo_existente_pelo_nome(self, cliente: TestClient, carteira):
+        resposta = cliente.post(
+            "/api/oportunidades", json={"nome": "Alfa BPO Fase 2", "nome_do_grupo": "Grupo Alfa"}
+        )
+
+        assert resposta.json()["grupo_id"] == carteira["alfa"]
+
+    def test_grupo_id_explicito_tem_prioridade(self, cliente: TestClient, carteira):
+        resposta = cliente.post(
+            "/api/oportunidades", json={"nome": "Beta Fase 2", "grupo_id": carteira["beta"]}
+        )
+
+        assert resposta.json()["grupo_id"] == carteira["beta"]
+
+    def test_grupo_id_inexistente_da_404(self, cliente: TestClient):
+        resposta = cliente.post(
+            "/api/oportunidades", json={"nome": "X", "grupo_id": 9999}
+        )
+
+        assert resposta.status_code == 404
+
+    def test_so_o_nome_e_obrigatorio(self, cliente: TestClient):
+        assert cliente.post("/api/oportunidades", json={}).status_code == 422
 
 
 class TestLeads:

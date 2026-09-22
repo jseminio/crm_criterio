@@ -20,11 +20,20 @@ function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }
 export function DetalheDaOportunidade({
   id,
   listas,
+  situacaoInicial,
   aoFechar,
   aoSalvar,
 }: {
   id: number;
   listas: Listas | null;
+  /** Pré-seleciona a situação ao abrir — usado pelo arrasto no kanban.
+   *
+   * O cartão do kanban não carrega `data_aceite` (só o detalhe traz); soltar
+   * em "Aceita" não tem como decidir sozinho se falta a data. Em vez de
+   * adivinhar, abre aqui com a situação já marcada, e a trava existente —
+   * salvar desabilitado sem a data — cuida do resto sem duplicar a regra.
+   */
+  situacaoInicial?: string;
   aoFechar: () => void;
   aoSalvar: () => void;
 }) {
@@ -40,7 +49,7 @@ export function DetalheDaOportunidade({
       .then((d) => {
         definirDetalhe(d);
         definirRascunho({
-          situacao: d.situacao,
+          situacao: situacaoInicial ?? d.situacao,
           temperatura: d.temperatura ?? "",
           motivo_recusa: d.motivo_recusa ?? "",
           data_aceite: d.data_aceite ?? "",

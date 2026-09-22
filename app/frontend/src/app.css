@@ -80,7 +80,12 @@
   background: var(--surface-sunken); border-radius: var(--raio-md);
   min-width: 268px; max-width: 268px; display: flex; flex-direction: column;
   max-height: calc(100vh - 220px);
+  border: 2px solid transparent; transition: border-color .1s, background .1s;
 }
+/* O destaque some assim que o cartão sai da coluna — é feedback do gesto em
+   curso, não um estado do dado, então não precisa de palavra (regra 4 do
+   PAD-002 fala de estado da oportunidade, não de affordance de arrastar). */
+.coluna-alvo { border-color: var(--foco); background: var(--andamento-suave); }
 .coluna-topo { padding: var(--e3); border-bottom: 1px solid var(--borda); }
 .coluna-nome { font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; gap: var(--e2); }
 .coluna-quantas { color: var(--texto-medio); font-variant-numeric: tabular-nums; }
@@ -91,9 +96,13 @@
 .cartao {
   background: var(--surface-card); border: 1px solid var(--borda);
   border-radius: var(--raio-sm); padding: var(--e3); text-align: left;
-  cursor: pointer; width: 100%; display: flex; flex-direction: column; gap: var(--e1);
+  cursor: grab; width: 100%; display: flex; flex-direction: column; gap: var(--e1);
 }
 .cartao:hover { border-color: var(--borda-forte); }
+.cartao:active { cursor: grabbing; }
+/* Enquanto o PATCH está em voo: opacidade reduzida e o arrasto desativado
+   por trás (o navegador já soltou o cartão, isto é só o retorno visual). */
+.cartao-movendo { opacity: .5; pointer-events: none; }
 .cartao-grupo { font-weight: 600; font-size: 13px; }
 .cartao-nome { font-size: 12px; color: var(--texto-medio); }
 .cartao-linha { display: flex; flex-wrap: wrap; gap: var(--e1); align-items: center; margin-top: var(--e1); }
@@ -167,6 +176,15 @@
   border-radius: var(--raio-md); padding: var(--e3) var(--e4); font-size: 13px;
   color: var(--texto-medio); margin-bottom: var(--e4); }
 .recado strong { color: var(--texto-forte); }
+
+/* Erro transitório de uma ação (ex.: mover cartão no kanban) — some ao
+   dispensar, diferente do Erro de tela cheia que substitui a lista inteira. */
+.aviso-de-movimento {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e3);
+  background: var(--perda-suave); border: 1px solid var(--perda); color: var(--perda);
+  border-radius: var(--raio-md); padding: var(--e2) var(--e3); font-size: 13px;
+  margin-bottom: var(--e4);
+}
 
 /* --------------------------------------------------------- faixa de números */
 .numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));

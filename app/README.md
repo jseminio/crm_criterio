@@ -13,7 +13,7 @@ autorizou por causa do prazo.
 | Testes | **247** no backend, **72** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
 | Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 153 oportunidades, 138 grupos |
 | API | 15 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
-| Telas | Funil em kanban, oportunidades em lista, leads, grupos econômicos (com detalhe) e conferência da carga. React com TypeScript, em `../frontend` |
+| Telas | Funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe) e conferência da carga. React com TypeScript, em `../frontend` |
 | Fora do ar | Nuvem, login, backup automático (E1); proposta e preço (E4); demais KPIs (E5) |
 
 ## Como rodar
@@ -376,9 +376,41 @@ teste enxerga o `.env` nem as variáveis de quem roda. Três testes de configura
 passavam só enquanto não existia `.env` e quebraram no instante em que ele foi
 criado.
 
+## Arrastar cartões no kanban
+
+Cada cartão do `Funil` é `draggable`; soltar numa coluna diferente muda a
+situação. Três regras, nenhuma delas óbvia de fora:
+
+- **Soltar em "Aceita" não grava direto.** O cartão do kanban (`OportunidadeResumo`)
+  não carrega `data_aceite` — só o detalhe traz. Adivinhar do lado do cliente
+  arriscaria um PATCH que a API recusa (a mesma trava de 21/09/2026: aceita sem
+  data). Em vez disso, o drop **abre o painel de detalhe com "Aceita" já
+  selecionada** (`situacaoInicial` em `DetalheDaOportunidade`), e a validação
+  que já existe — salvar desabilitado sem a data — cuida do resto sem duplicar
+  a regra.
+- **Soltar na própria coluna não faz nada.** Comparado antes de qualquer
+  chamada à API.
+- **Uma falha ao gravar mostra um aviso dispensável** (`.aviso-de-movimento`) e
+  **não recarrega** — o cartão continua onde a última leitura confirmada o
+  colocou, em vez de a tela mentir que a mudança aconteceu.
+
+Verificado no navegador contra a API e o PostgreSQL reais (21/09/2026): mover
+grava e recarrega; soltar em "Aceita" abre o painel sem PATCH; soltar na mesma
+coluna não dispara nada; uma falha simulada de rede mostra o aviso, é
+dispensável, e o cartão não se move.
+
+> ⚠️ **O arrasto com mouse simulado pela ferramenta de automação não iniciou o
+> gesto nativo do Chromium** — nenhuma chamada disparou, o cartão não se moveu.
+> Testado via `DragEvent` despachado diretamente (que exercita exatamente o
+> mesmo código que o navegador chama para um arrasto de verdade) e confirmado
+> correto nos três casos acima. É a mesma API (`draggable`, `dragstart`,
+> `dragover`, `drop`) que Trello e board de kanban qualquer usam com mouse
+> real — mas **não pude confirmar com um mouse de verdade** nesta máquina.
+> **Peço para Eduardo confirmar amanhã** arrastando um cartão de verdade.
+
 ## Testes das telas
 
-72 testes com **Vitest** e **Testing Library**, em `frontend/src/**/*.test.{ts,tsx}`:
+76 testes com **Vitest** e **Testing Library**, em `frontend/src/**/*.test.{ts,tsx}`:
 
 ```bash
 cd frontend && npx vitest run
@@ -389,10 +421,10 @@ pt-BR (`formato.ts`, com o espaço fino sem quebra que o `Intl.NumberFormat`
 insere — visualmente idêntico a um espaço comum, byte diferente), a regra 4 do
 PAD-002 ("estado nunca só por cor") em `Etiqueta`, os quatro estados obrigatórios
 de toda lista, o tratamento de erro da API (`ErroDaApi`, "fora do ar" vs.
-"recusou"), e as duas travas com defeito real por trás: **aceita sem data de
+"recusou"), e as travas com defeito real por trás: **aceita sem data de
 aceite** trava o botão de salvar (o mesmo defeito corrigido no backend em
-21/09/2026), e **"Convertido" nunca é uma opção do seletor** de situação do
-lead — só a conversão leva lá.
+21/09/2026), **"Convertido" nunca é uma opção do seletor** de situação do
+lead — só a conversão leva lá —, e as três regras do arrasto no kanban acima.
 
 Cada teste crítico foi verificado quebrando a regra de propósito e confirmando
 que o teste pega — não basta o teste passar, ele precisa falhar quando o

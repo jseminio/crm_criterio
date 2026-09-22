@@ -11,7 +11,7 @@ autorizou por causa do prazo.
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e quatro telas |
 | Testes | **252** no backend, **82** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
-| Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 153 oportunidades, 138 grupos |
+| Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
 | API | 15 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe) e conferência da carga. React com TypeScript, em `../frontend` |
 | Fora do ar | Nuvem, login, backup automático (E1); proposta e preço (E4); demais KPIs (E5) |
@@ -307,6 +307,52 @@ Os 138 grupos são portanto um teto, não a carteira real. O reagrupamento é fe
 por Eduardo na tela de grupos, um par por vez, com o histórico intacto — e
 `scripts/conferir_grupos.py` lista os candidatos. Sua saída contém nome de cliente
 e valor: **não a grave dentro do repositório**.
+
+## A conciliação com o kit do Bruno (22/09/2026)
+
+O Bruno passou um kit de 100 arquivos reconstruindo, a partir do próprio
+e-mail e WhatsApp, um CRM paralelo (Twenty, numa VPS) enquanto foi o
+comercial exclusivo da Critério. Eduardo pediu para complementar **só os
+dados de 2026** com o que ele já conciliou — não para adotar o CRM dele.
+O kit em si **não entrou no repositório** (dado de cliente, LGPD amarelo);
+fica fora, no Downloads de quem processa.
+
+`scripts/conciliar_kit_bruno.py` casa as 124 propostas de 2026 do kit contra
+a carteira pela mesma chave da carga (nome + data + serviço + tipo). Resultado
+real, contra o banco, em 22/09/2026:
+
+```
+Batem pela chave completa: 105
+Reclassificação (servico/tipo_servico corrigido, chave_origem preservada): 9
+Novas, aprovadas por Eduardo, inseridas com Origem.KIT_BRUNO_2026: 2 (CIH, BPO Contábil Andréa Curcio)
+Fora do escopo, aguardando confirmação: 8
+```
+
+Duas lições que custaram uma rodada de correção cada:
+
+- **Reclassificação não é dado novo.** Nome+data+serviço+tipo de 9 propostas
+  batem por nome+data mas não pela chave inteira — o kit corrige o
+  `tipo_servico` (às vezes o `servico`) que a planilha tinha errado. A chave
+  de origem **não muda** — ela precisa continuar batendo com a recarga
+  semanal da planilha — só o campo corrigido entra em `campos_do_crm`, pela
+  mesma trava que protege edição manual na tela.
+- **Nome parecido não é casamento automático.** Da primeira comparação por
+  nome aproximado sobraram 19 "sem match"; pela chave real sobraram 10, das
+  quais 6 acabaram sendo as mesmas propostas de novo, só com o nome escrito
+  diferente entre kit e CRM (ex.: kit "Proposta Tupi" = CRM "Rádio Tupi",
+  mesma data e serviço). O script **não** casa por nome aproximado — quando
+  há mais de uma oportunidade candidata na mesma data (caso "Thiago Becker",
+  duas propostas no mesmo dia), ele desiste e deixa para conferência manual,
+  em vez de arriscar corrigir o campo errado.
+
+Duas propostas do kit ficaram de fora por decisão de Eduardo: "Empresa XPTO"
+(sem CNPJ, suspeita de nome-placeholder) e "CFO AaS - Restaurante Igor Dutra"
+(o próprio arquivo do Bruno marca `tipo: pesquisar` — nem ele tinha fechado).
+
+```bash
+~/.venvs/criterio-crm/bin/python scripts/conciliar_kit_bruno.py <kit.csv>            # simula e desfaz
+~/.venvs/criterio-crm/bin/python scripts/conciliar_kit_bruno.py <kit.csv> --gravar   # grava
+```
 
 ## Conferência da carga
 

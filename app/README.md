@@ -10,7 +10,7 @@ autorizou por causa do prazo.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e quatro telas |
-| Testes | **247** no backend, todos passando. As telas foram verificadas no navegador contra os dados reais; **não têm teste automatizado** |
+| Testes | **247** no backend, **72** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
 | Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 153 oportunidades, 138 grupos |
 | API | 15 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Funil em kanban, oportunidades em lista, leads, grupos econômicos (com detalhe) e conferência da carga. React com TypeScript, em `../frontend` |
@@ -375,6 +375,35 @@ diferente do que o teste gravou. Toda a suíte roda com o ambiente isolado: nenh
 teste enxerga o `.env` nem as variáveis de quem roda. Três testes de configuração
 passavam só enquanto não existia `.env` e quebraram no instante em que ele foi
 criado.
+
+## Testes das telas
+
+72 testes com **Vitest** e **Testing Library**, em `frontend/src/**/*.test.{ts,tsx}`:
+
+```bash
+cd frontend && npx vitest run
+```
+
+Cobrem o que já quebrou de verdade ou pode quebrar em silêncio: formatação em
+pt-BR (`formato.ts`, com o espaço fino sem quebra que o `Intl.NumberFormat`
+insere — visualmente idêntico a um espaço comum, byte diferente), a regra 4 do
+PAD-002 ("estado nunca só por cor") em `Etiqueta`, os quatro estados obrigatórios
+de toda lista, o tratamento de erro da API (`ErroDaApi`, "fora do ar" vs.
+"recusou"), e as duas travas com defeito real por trás: **aceita sem data de
+aceite** trava o botão de salvar (o mesmo defeito corrigido no backend em
+21/09/2026), e **"Convertido" nunca é uma opção do seletor** de situação do
+lead — só a conversão leva lá.
+
+Cada teste crítico foi verificado quebrando a regra de propósito e confirmando
+que o teste pega — não basta o teste passar, ele precisa falhar quando o
+comportamento muda.
+
+**Numa máquina sob carga, `vitest run` pode não subir.** Aconteceu aqui: dois
+núcleos, vários aplicativos abertos, `load average` acima de 300. Um worker por
+arquivo de teste estoura o tempo de inicialização e o Vitest falha antes de
+rodar um teste sequer — não é defeito do teste. `vitest.config.ts` já roda com
+um processo só (`maxWorkers: 1`) e sem isolar entre arquivos (`isolate: false`),
+o que também deixou a suíte inteira em 5–6 segundos em vez de mais de um minuto.
 
 ## Ressalva de processo — resolvida
 

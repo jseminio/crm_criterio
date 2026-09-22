@@ -48,11 +48,15 @@ from crm.domain.listas import Origem, Situacao, SituacaoGrupo  # noqa: E402
 CENTAVO = Decimal("0.01")
 
 #: Nomes do kit ("cliente") explicitamente aprovados para virar oportunidade
-#: nova. Os outros dois candidatos ficam de fora por decisão de Eduardo em
-#: 22/09/2026: "Empresa XPTO" (nome-placeholder suspeito, sem CNPJ) e
-#: "CFO AaS - Restaurante Igor Dutra" (o próprio arquivo do Bruno marca
-#: "pesquisar" — nem ele tinha fechado essa).
-NOVAS_CONFIRMADAS = {"CIH", "BPO Contábil Andréa Curcio"}
+#: nova. "CFO AaS - Restaurante Igor Dutra" fica de fora por decisão de
+#: Eduardo em 22/09/2026: o próprio arquivo do Bruno marca "pesquisar" — nem
+#: ele tinha fechado essa.
+NOVAS_CONFIRMADAS = {"CIH", "BPO Contábil Andréa Curcio", "Empresa XPTO"}
+
+#: "Empresa XPTO" não era placeholder: Eduardo confirmou em 22/09/2026 que é
+#: codinome para "Tailor Made (Roger)". Vira o nome real ao inserir — o kit
+#: nunca guarda "Empresa XPTO" além deste ponto.
+RENOMEAR_AO_INSERIR = {"Empresa XPTO": "Tailor Made (Roger)"}
 
 #: status do kit → Situacao do CRM. Só para o relatório saber comparar; a
 #: reclassificação nunca toca a situação de um registro que já existe.
@@ -162,8 +166,15 @@ def principal(argumentos: list[str]) -> int:
                 exatas.append(linha)
                 continue
 
+            # Nomes que o kit usa como codinome (ex. "Empresa XPTO") são
+            # buscados pelo nome real já gravado, não pelo codinome — senão
+            # uma segunda rodada do script nunca mais encontraria o registro
+            # que a primeira já inseriu, e duplicaria.
+            nome_para_casar = RENOMEAR_AO_INSERIR.get(
+                linha.nome_oportunidade, linha.nome_oportunidade
+            )
             grupo_solto = por_chave_solta.get(
-                _chave_solta(linha.nome_oportunidade, linha.data_colocacao), []
+                _chave_solta(nome_para_casar, linha.data_colocacao), []
             )
             if len(grupo_solto) == 1:
                 existente = grupo_solto[0]
@@ -172,6 +183,10 @@ def principal(argumentos: list[str]) -> int:
                 if mudou_servico or mudou_tipo:
                     reclassificar.append((linha, existente, mudou_servico, mudou_tipo))
                     continue
+                # Já bate por nome real + data + serviço + tipo — só falta a
+                # chave completa por causa do codinome. Nada a fazer.
+                exatas.append(linha)
+                continue
 
             candidatas_novas.append(linha)
 
@@ -219,22 +234,26 @@ def principal(argumentos: list[str]) -> int:
         for linha in candidatas_novas:
             if linha.cliente not in NOVAS_CONFIRMADAS:
                 continue
+            nome_real = RENOMEAR_AO_INSERIR.get(linha.cliente, linha.cliente)
             grupo = sessao.scalar(
                 sa.select(GrupoEconomico).where(
-                    sa.func.lower(GrupoEconomico.nome) == linha.cliente.casefold(),
+                    sa.func.lower(GrupoEconomico.nome) == nome_real.casefold(),
                     GrupoEconomico.fundido_em_id.is_(None),
                 )
             )
             if grupo is None:
-                grupo = GrupoEconomico(nome=linha.cliente, situacao=SituacaoGrupo.PROSPECT, origem=Origem.KIT_BRUNO_2026)
+                grupo = GrupoEconomico(nome=nome_real, situacao=SituacaoGrupo.PROSPECT, origem=Origem.KIT_BRUNO_2026)
                 sessao.add(grupo)
                 sessao.flush()
 
             situacao = MAPA_SITUACAO.get(linha.status, Situacao.ENVIAR_PROPOSTA)
+            codinome = (
+                f" Codinome no kit: {linha.cliente!r}." if nome_real != linha.cliente else ""
+            )
             sessao.add(
                 Oportunidade(
                     grupo_id=grupo.id,
-                    nome=linha.cliente,
+                    nome=nome_real,
                     servico=linha.servico,
                     tipo_servico=linha.tipo_servico,
                     situacao=situacao,
@@ -244,7 +263,7 @@ def principal(argumentos: list[str]) -> int:
                     valor_mensalizado=linha.valor_mensalizado,
                     origem=Origem.KIT_BRUNO_2026,
                     observacao=(
-                        f"Importado do kit de transferência do Bruno (22/09/2026). "
+                        f"Importado do kit de transferência do Bruno (22/09/2026).{codinome} "
                         f"Confiança dele: {linha.confianca}. Método: {linha.metodo_conciliacao}."
                     ),
                 )

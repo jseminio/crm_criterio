@@ -7,7 +7,7 @@ from datetime import date
 from decimal import Decimal
 
 from crm.domain.indicadores import calcular
-from crm.domain.listas import Situacao
+from crm.domain.listas import Situacao, TipoCanal
 
 
 @dataclass
@@ -15,7 +15,27 @@ class Op:
     situacao: Situacao
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
+    data_colocacao: date | None = None
     data_aceite: date | None = None
+    proxima_acao: str | None = None
+    tipo_canal: TipoCanal | None = None
+    documentos_fiscais_mes: int | None = None
+    lancamentos_contabeis_mes: int | None = None
+    pagamentos_mes: int | None = None
+    contas_bancarias: int | None = None
+    conciliacoes_cartao_mes: int | None = None
+    empregados_clt: int | None = None
+    admissoes_desligamentos_mes: int | None = None
+    cnpjs_no_escopo: int | None = None
+    tomadores_de_servico: int | None = None
+
+
+#: Os nove direcionadores preenchidos — para os testes de "ficha completa".
+VOLUMETRIA_COMPLETA = dict(
+    documentos_fiscais_mes=100, lancamentos_contabeis_mes=200, pagamentos_mes=50,
+    contas_bancarias=2, conciliacoes_cartao_mes=100, empregados_clt=10,
+    admissoes_desligamentos_mes=2, cnpjs_no_escopo=1, tomadores_de_servico=10,
+)
 
 
 D = Decimal
@@ -125,31 +145,90 @@ class TestTaxaDeConversao:
         assert ind.taxa_de_conversao.atingiu_a_meta is False
 
 
-class TestOQueNaoSeCalcula:
-    """Um indicador sem definição devolve o motivo, não um número que parece certo."""
+class TestCicloMedioDeVendas:
+    """Decisão de Eduardo em 23/09/2026: originação → aceite."""
 
-    def test_ciclo_explica_quantas_datas_faltam(self):
-        ind = calcular([Op(Situacao.ACEITA)] * 40)
-
-        assert ind.ciclo_medio.calculavel is False
-        assert "0 de 40" in ind.ciclo_medio.motivo
-
-    def test_ciclo_com_parte_das_datas_ainda_nao_e_calculavel(self):
-        """Uma média sobre parte das aceitas seria enviesada pelas que foram
-        preenchidas primeiro."""
-        ind = calcular([Op(Situacao.ACEITA, data_aceite=date(2026, 4, 1)), Op(Situacao.ACEITA)])
-
-        assert ind.ciclo_medio.calculavel is False
-        assert "1 de 2" in ind.ciclo_medio.motivo
-
-    def test_ciclo_com_todas_as_datas_ainda_pede_a_base_do_calculo(self):
-        """Mesmo completo, a base — contar a partir de quando — não está registrada."""
-        ind = calcular([Op(Situacao.ACEITA, data_aceite=date(2026, 4, 1))])
-
-        assert ind.ciclo_medio.calculavel is False
-        assert "a partir de quando" in ind.ciclo_medio.motivo
-
-    def test_sem_aceitas_o_ciclo_diz_isso(self):
+    def test_sem_aceitas_nao_e_calculavel(self):
         ind = calcular([Op(Situacao.RECUSADA)])
 
-        assert "Ainda não há proposta aceita" in ind.ciclo_medio.motivo
+        assert ind.ciclo_medio.calculavel is False
+        assert ind.ciclo_medio.dias is None
+        assert ind.ciclo_medio.amostra == 0
+
+    def test_aceita_sem_as_duas_datas_fica_fora_nao_vira_zero(self):
+        """Sem isto, uma aceita sem data pareceria "fechou na hora" em vez de
+        "não dá para medir esta"."""
+        ind = calcular([
+            Op(Situacao.ACEITA, data_colocacao=date(2026, 3, 1), data_aceite=date(2026, 3, 11)),
+            Op(Situacao.ACEITA, data_colocacao=date(2026, 3, 1)),  # sem data de aceite
+        ])
+
+        assert ind.ciclo_medio.calculavel is True
+        assert ind.ciclo_medio.amostra == 1
+        assert ind.ciclo_medio.aceitas_sem_as_duas_datas == 1
+        assert ind.ciclo_medio.dias == D("10.0")
+
+    def test_media_de_varias_aceitas(self):
+        ind = calcular([
+            Op(Situacao.ACEITA, data_colocacao=date(2026, 1, 1), data_aceite=date(2026, 1, 11)),  # 10
+            Op(Situacao.ACEITA, data_colocacao=date(2026, 1, 1), data_aceite=date(2026, 1, 21)),  # 20
+        ])
+
+        assert ind.ciclo_medio.dias == D("15.0")
+        assert ind.ciclo_medio.amostra == 2
+
+
+class TestCobertura:
+    """"Aumentar os pontos de contato" virando número — documento-de-negocio.md, seção 12.5."""
+
+    def test_percentual_com_proxima_acao_considera_so_em_aberto(self):
+        ind = calcular([
+            Op(Situacao.ENVIAR_PROPOSTA, proxima_acao="Ligar"),
+            Op(Situacao.ON_HOLD),  # em aberto, sem próxima ação
+            Op(Situacao.ACEITA),  # decidida — fora da conta de "em aberto"
+        ])
+
+        assert ind.cobertura.em_aberto_total == 2
+        assert ind.cobertura.em_aberto_com_proxima_acao == 1
+        assert ind.cobertura.percentual_com_proxima_acao == D("50.0")
+
+    def test_string_vazia_nao_conta_como_proxima_acao(self):
+        ind = calcular([Op(Situacao.ENVIAR_PROPOSTA, proxima_acao="  ")])
+
+        assert ind.cobertura.em_aberto_com_proxima_acao == 0
+
+    def test_sem_nenhuma_em_aberto_nao_calcula(self):
+        ind = calcular([Op(Situacao.ACEITA)])
+
+        assert ind.cobertura.percentual_com_proxima_acao is None
+
+    def test_ficha_completa_exige_os_nove_direcionadores(self):
+        completa = Op(Situacao.ENVIAR_PROPOSTA, **VOLUMETRIA_COMPLETA)
+        incompleta = Op(Situacao.ENVIAR_PROPOSTA, **{**VOLUMETRIA_COMPLETA, "cnpjs_no_escopo": None})
+
+        ind = calcular([completa, incompleta])
+
+        assert ind.cobertura.com_volumetria_completa == 1
+        assert ind.cobertura.total == 2
+        assert ind.cobertura.percentual_com_volumetria_completa == D("50.0")
+
+
+class TestDependenciaDeCanal:
+    """Insight já identificado em documento-de-negocio.md: 56% da rede dos sócios em 19/09/2026."""
+
+    def test_conta_so_o_canal_socios(self):
+        ind = calcular([
+            Op(Situacao.ENVIAR_PROPOSTA, tipo_canal=TipoCanal.SOCIOS),
+            Op(Situacao.ENVIAR_PROPOSTA, tipo_canal=TipoCanal.SOCIOS),
+            Op(Situacao.ENVIAR_PROPOSTA, tipo_canal=TipoCanal.PARCEIROS),
+            Op(Situacao.ENVIAR_PROPOSTA, tipo_canal=None),
+        ])
+
+        assert ind.dependencia_de_canal.da_rede_de_socios == 2
+        assert ind.dependencia_de_canal.total == 4
+        assert ind.dependencia_de_canal.percentual == D("50.0")
+
+    def test_funil_vazio_nao_calcula(self):
+        ind = calcular([])
+
+        assert ind.dependencia_de_canal.percentual is None

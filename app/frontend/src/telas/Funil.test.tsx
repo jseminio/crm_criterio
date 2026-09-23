@@ -32,13 +32,14 @@ const LISTAS: Listas = {
   situacoes_de_grupo: [],
   captadores: [],
   portes: [],
+  servicos: [],
 };
 
 const INDICADORES_VAZIOS: Indicadores = {
   em_aberto: { quantas: 0, valor_mensal: "0", valor_anual: "0", sem_preco_mensal: 0, com_preco_mensal: 0 },
   aceitas: { quantas: 0, valor_mensal: "0", valor_anual: "0", sem_preco_mensal: 0, com_preco_mensal: 0 },
   aceitas_com_data_de_aceite: 0,
-  ciclo_medio: { calculavel: false, motivo: "—", o_que_falta: "—" },
+  ciclo_medio: { calculavel: false, dias: null, amostra: 0, aceitas_sem_as_duas_datas: 0 },
   taxa_de_conversao: {
     aceitas: 0,
     decididas: 0,
@@ -47,6 +48,15 @@ const INDICADORES_VAZIOS: Indicadores = {
     abaixo_do_alerta: null,
     atingiu_a_meta: null,
   },
+  cobertura: {
+    em_aberto_com_proxima_acao: 0,
+    em_aberto_total: 0,
+    com_volumetria_completa: 0,
+    total: 0,
+    percentual_com_proxima_acao: null,
+    percentual_com_volumetria_completa: null,
+  },
+  dependencia_de_canal: { da_rede_de_socios: 0, total: 0, percentual: null },
 };
 
 function coluna(situacao: string, oportunidades: ColunaDoFunil["oportunidades"]): ColunaDoFunil {

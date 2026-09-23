@@ -24,6 +24,7 @@ const LISTAS: Listas = {
   situacoes_de_grupo: [],
   captadores: ["EL", "BO"],
   portes: [],
+  servicos: [],
 };
 
 describe("NovaOportunidade", () => {

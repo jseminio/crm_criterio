@@ -31,6 +31,7 @@ const LISTAS: Listas = {
   situacoes_de_grupo: [],
   captadores: ["EL", "BO"],
   portes: [],
+  servicos: [],
 };
 
 function lead(extra: Partial<LeadResumo> = {}): LeadResumo {

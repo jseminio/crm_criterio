@@ -34,6 +34,7 @@ export function Lista({ listas }: { listas: Listas | null }) {
       filtros.captador,
       filtros.tipo_canal,
       filtros.temperatura,
+      filtros.servico,
       filtros.dataTipo,
       filtros.periodo,
       filtros.dataDe,

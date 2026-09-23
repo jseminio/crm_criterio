@@ -13,7 +13,7 @@ import { api } from "../api/cliente";
 import type { Indicadores, TaxaDeConversao } from "../api/tipos";
 import { Carregando, Erro } from "./estados";
 import { paraConsulta, type EstadoDosFiltros } from "./Filtros";
-import { dinheiro, dinheiroCurto, percentual } from "../formato";
+import { dias, dinheiro, dinheiroCurto, percentual } from "../formato";
 import { usarDados } from "../usarDados";
 
 /** O tom da conversão contra os limiares oficiais (meta 50%, alerta <30%).
@@ -59,6 +59,7 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
       filtros.captador,
       filtros.tipo_canal,
       filtros.temperatura,
+      filtros.servico,
       filtros.dataTipo,
       filtros.periodo,
       filtros.dataDe,
@@ -70,8 +71,7 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
   if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
   if (!dados) return null;
 
-  const { em_aberto: aberto, aceitas } = dados;
-  const semData = aceitas.quantas - dados.aceitas_com_data_de_aceite;
+  const { em_aberto: aberto, aceitas, ciclo_medio: ciclo, cobertura, dependencia_de_canal: dependencia } = dados;
 
   return (
     <div className="numeros" aria-label="Números do funil">
@@ -105,12 +105,25 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
         )}
       </Cartao>
 
-      <Cartao rotulo="Ciclo médio de vendas" pendente>
-        <p className="numero-estado">Não calculável</p>
-        <p>{dados.ciclo_medio.motivo}</p>
-        {semData > 0 && (
-          <p className="numero-nota">
-            Preencher a data do aceite libera este indicador.
+      <Cartao
+        rotulo="Ciclo médio de vendas"
+        destaque={ciclo.calculavel ? `${dias(ciclo.dias)} dias` : undefined}
+        pendente={!ciclo.calculavel}
+      >
+        {ciclo.calculavel ? (
+          <>
+            <p>Originação até aceite · {ciclo.amostra} proposta{ciclo.amostra === 1 ? "" : "s"}</p>
+            {ciclo.aceitas_sem_as_duas_datas > 0 && (
+              <p className="numero-nota">
+                {ciclo.aceitas_sem_as_duas_datas} aceita
+                {ciclo.aceitas_sem_as_duas_datas === 1 ? "" : "s"} sem as duas datas ficaram
+                de fora — não contam como zero dias.
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="numero-estado">
+            Não calculável — nenhuma aceita com data de originação e de aceite ainda.
           </p>
         )}
       </Cartao>
@@ -139,6 +152,50 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
           <p className="numero-estado">
             Não calculável — nenhuma proposta decidida ainda neste recorte.
           </p>
+        )}
+      </Cartao>
+
+      <Cartao
+        rotulo="Cobertura do processo"
+        destaque={
+          cobertura.percentual_com_proxima_acao !== null
+            ? `${percentual(cobertura.percentual_com_proxima_acao)} com próxima ação`
+            : undefined
+        }
+        pendente={cobertura.percentual_com_proxima_acao === null}
+      >
+        {cobertura.percentual_com_proxima_acao !== null ? (
+          <p>
+            {cobertura.em_aberto_com_proxima_acao} de {cobertura.em_aberto_total} em aberto
+            têm próxima ação definida
+          </p>
+        ) : (
+          <p className="numero-estado">Nenhuma oportunidade em aberto neste recorte.</p>
+        )}
+        <p>
+          {percentual(cobertura.percentual_com_volumetria_completa)} com ficha de
+          volumetria completa ({cobertura.com_volumetria_completa} de {cobertura.total})
+        </p>
+        <p className="numero-nota">
+          É "aumentar os pontos de contato" virando número — os dois indicadores de
+          cobertura que a base de 2026 já sustenta.
+        </p>
+      </Cartao>
+
+      <Cartao
+        rotulo="Dependência de canal"
+        destaque={
+          dependencia.percentual !== null ? percentual(dependencia.percentual) : undefined
+        }
+        pendente={dependencia.percentual === null}
+      >
+        {dependencia.percentual !== null ? (
+          <p>
+            {dependencia.da_rede_de_socios} de {dependencia.total} propostas nasceram da
+            rede dos sócios
+          </p>
+        ) : (
+          <p className="numero-estado">Nenhuma oportunidade neste recorte.</p>
         )}
       </Cartao>
     </div>

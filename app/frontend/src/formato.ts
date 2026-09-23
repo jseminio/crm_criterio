@@ -47,6 +47,12 @@ export function percentual(valor: string | null | undefined): string {
   return `${valor.replace(".", ",")}%`;
 }
 
+/** "61.0" vira "61,0" — sem a unidade, que cada tela decide como encaixar. */
+export function dias(valor: string | null | undefined): string {
+  if (valor === null || valor === undefined || valor === "") return "—";
+  return valor.replace(".", ",");
+}
+
 /** Data e hora locais, em pt-BR: "21/09/2026 às 17:35". */
 export function dataHora(iso: string | null | undefined): string {
   if (!iso) return "—";

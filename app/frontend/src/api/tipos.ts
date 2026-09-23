@@ -123,6 +123,7 @@ export interface Listas {
   situacoes_de_grupo: string[];
   captadores: string[];
   portes: string[];
+  servicos: string[];
 }
 
 export interface Recorte {
@@ -133,11 +134,32 @@ export interface Recorte {
   com_preco_mensal: number;
 }
 
-/** Um indicador que existe no desenho mas ainda não pode ser calculado. */
-export interface Pendencia {
+/** Originação → aceite — decisão de Eduardo em 23/09/2026.
+ *
+ * Só entra aceita com as duas datas; `aceitas_sem_as_duas_datas` diz quantas
+ * ficaram de fora, para a tela não fingir que a amostra é o total.
+ */
+export interface CicloMedioDeVendas {
+  dias: string | null;
+  amostra: number;
+  aceitas_sem_as_duas_datas: number;
   calculavel: boolean;
-  motivo: string;
-  o_que_falta: string;
+}
+
+/** "Aumentar os pontos de contato" virando número — documento-de-negocio.md, seção 12.5. */
+export interface Cobertura {
+  em_aberto_com_proxima_acao: number;
+  em_aberto_total: number;
+  com_volumetria_completa: number;
+  total: number;
+  percentual_com_proxima_acao: string | null;
+  percentual_com_volumetria_completa: string | null;
+}
+
+export interface DependenciaDeCanal {
+  da_rede_de_socios: number;
+  total: number;
+  percentual: string | null;
 }
 
 /** Aceitas ÷ decididas — decisão de Eduardo em 22/09/2026.
@@ -159,8 +181,10 @@ export interface Indicadores {
   em_aberto: Recorte;
   aceitas: Recorte;
   aceitas_com_data_de_aceite: number;
-  ciclo_medio: Pendencia;
+  ciclo_medio: CicloMedioDeVendas;
   taxa_de_conversao: TaxaDeConversao;
+  cobertura: Cobertura;
+  dependencia_de_canal: DependenciaDeCanal;
 }
 
 export interface Execucao {

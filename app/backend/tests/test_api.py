@@ -580,6 +580,46 @@ class TestIndicadores:
         assert dados["em_aberto"]["quantas"] == 0
         assert dados["ciclo_medio"]["calculavel"] is False
 
+    def test_ciclo_medio_originacao_ate_aceite(self, cliente: TestClient, carteira):
+        """Beta BPO: colocação 04-01, aceite 06-01 — 61 dias. Decisão de
+        Eduardo em 23/09/2026 sobre a base do cálculo."""
+        dados = cliente.get("/api/indicadores").json()
+
+        ciclo = dados["ciclo_medio"]
+        assert ciclo["calculavel"] is True
+        assert ciclo["dias"] == "61.0"
+        assert ciclo["amostra"] == 1
+
+    def test_cobertura_de_proxima_acao_e_volumetria(self, cliente: TestClient, carteira):
+        """Nenhuma das três tem próxima ação nem volumetria preenchida."""
+        dados = cliente.get("/api/indicadores").json()
+
+        cobertura = dados["cobertura"]
+        assert cobertura["em_aberto_total"] == 1  # só Alfa BPO está em aberto
+        assert cobertura["em_aberto_com_proxima_acao"] == 0
+        assert cobertura["com_volumetria_completa"] == 0
+        assert cobertura["total"] == 3
+
+    def test_dependencia_da_rede_de_socios(self, cliente: TestClient, carteira):
+        """Alfa BPO e Beta BPO vieram de Sócios; Alfa Consultoria, de Parceiros."""
+        dados = cliente.get("/api/indicadores").json()
+
+        dependencia = dados["dependencia_de_canal"]
+        assert dependencia["da_rede_de_socios"] == 2
+        assert dependencia["total"] == 3
+        assert dependencia["percentual"] == "66.7"
+
+    def test_filtra_por_servico(self, cliente: TestClient, carteira):
+        pagina = cliente.get("/api/oportunidades", params={"servico": "Consultoria"}).json()
+
+        assert pagina["total"] == 1
+        assert pagina["itens"][0]["nome"] == "Alfa Consultoria"
+
+    def test_lista_de_servicos_vem_do_banco(self, cliente: TestClient, carteira):
+        servicos = cliente.get("/api/listas").json()["servicos"]
+
+        assert servicos == ["BPO Contábil", "BPO Financeiro", "Consultoria"]
+
 
 @pytest.fixture
 def rodada(sessao: Session) -> int:

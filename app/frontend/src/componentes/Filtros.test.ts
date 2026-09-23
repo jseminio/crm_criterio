@@ -53,6 +53,12 @@ describe("paraConsulta", () => {
     expect(consulta.busca).toBe("Aeskins");
   });
 
+  it("empacota o serviço escolhido numa lista de um item", () => {
+    const consulta = paraConsulta({ ...FILTROS_VAZIOS, servico: "BPO Contábil" });
+
+    expect(consulta.servico).toEqual(["BPO Contábil"]);
+  });
+
   it("resolve um atalho de período em datas concretas", () => {
     const consulta = paraConsulta({ ...FILTROS_VAZIOS, periodo: "ano" });
 

@@ -142,8 +142,19 @@ def _detalhe_de(oportunidade: Oportunidade, nome_do_grupo: str | None) -> e.Opor
 def _registrar(api: FastAPI) -> None:
     # ------------------------------------------------------------------ listas
     @api.get("/api/listas", response_model=e.Listas, tags=["referência"])
-    def listas() -> e.Listas:
-        """As listas controladas, para a tela montar os seletores."""
+    def listas(sessao: Session = Depends(obter_sessao)) -> e.Listas:
+        """As listas controladas, para a tela montar os seletores.
+
+        `servicos` não é enum do domínio — é texto livre da planilha, então
+        vem do banco, não de código. `crm.carga.planilha_2026` já registra os
+        oito valores reais nas 155 propostas de 2026.
+        """
+        servicos = sessao.scalars(
+            sa.select(Oportunidade.servico)
+            .where(Oportunidade.servico.is_not(None))
+            .distinct()
+            .order_by(Oportunidade.servico)
+        ).all()
         return e.Listas(
             situacoes=_valores(Situacao),
             situacoes_de_lead=_valores(SituacaoLead),
@@ -155,6 +166,7 @@ def _registrar(api: FastAPI) -> None:
             situacoes_de_grupo=_valores(SituacaoGrupo),
             captadores=sorted(_CAPTADORES),
             portes=[p.value for p in regras_de_porte.Porte],
+            servicos=list(servicos),
         )
 
     # ------------------------------------------------------------------ grupos
@@ -219,6 +231,7 @@ def _registrar(api: FastAPI) -> None:
         data_tipo: Literal["colocacao", "aceite"] | None = None,
         data_de: date | None = None,
         data_ate: date | None = None,
+        servico: list[str] | None = None,
     ):
         consulta = sa.select(Oportunidade, GrupoEconomico.nome).join(
             GrupoEconomico, Oportunidade.grupo_id == GrupoEconomico.id
@@ -231,6 +244,8 @@ def _registrar(api: FastAPI) -> None:
             consulta = consulta.where(Oportunidade.tipo_canal.in_(tipo_canal))
         if temperatura:
             consulta = consulta.where(Oportunidade.temperatura.in_(temperatura))
+        if servico:
+            consulta = consulta.where(Oportunidade.servico.in_(servico))
         if grupo_id is not None:
             consulta = consulta.where(Oportunidade.grupo_id == grupo_id)
         if busca:
@@ -270,13 +285,14 @@ def _registrar(api: FastAPI) -> None:
         data_tipo: Literal["colocacao", "aceite"] | None = None,
         data_de: date | None = None,
         data_ate: date | None = None,
+        servico: list[str] | None = Query(default=None),
         limite: int = Query(default=100, le=1000),
         salto: int = 0,
     ) -> e.Pagina[e.OportunidadeResumo]:
         """A visão em lista, com os filtros que o funil precisa."""
         consulta = _consulta_de_oportunidades(
             situacao, captador, tipo_canal, temperatura, grupo_id, busca,
-            data_tipo, data_de, data_ate,
+            data_tipo, data_de, data_ate, servico,
         )
         total = sessao.scalar(sa.select(sa.func.count()).select_from(consulta.subquery()))
         linhas = sessao.execute(
@@ -355,6 +371,7 @@ def _registrar(api: FastAPI) -> None:
         data_tipo: Literal["colocacao", "aceite"] | None = None,
         data_de: date | None = None,
         data_ate: date | None = None,
+        servico: list[str] | None = Query(default=None),
     ) -> list[e.ColunaDoFunil]:
         """O kanban: uma coluna por situação, na ordem do funil.
 
@@ -363,7 +380,7 @@ def _registrar(api: FastAPI) -> None:
         """
         consulta = _consulta_de_oportunidades(
             None, captador, tipo_canal, temperatura, None, busca,
-            data_tipo, data_de, data_ate,
+            data_tipo, data_de, data_ate, servico,
         )
         linhas = sessao.execute(
             consulta.order_by(Oportunidade.data_colocacao.desc().nulls_last())
@@ -396,6 +413,7 @@ def _registrar(api: FastAPI) -> None:
         data_tipo: Literal["colocacao", "aceite"] | None = None,
         data_de: date | None = None,
         data_ate: date | None = None,
+        servico: list[str] | None = Query(default=None),
     ) -> e.IndicadoresResposta:
         """Os números do funil, com os mesmos filtros do kanban.
 
@@ -405,7 +423,7 @@ def _registrar(api: FastAPI) -> None:
         """
         consulta = _consulta_de_oportunidades(
             None, captador, tipo_canal, temperatura, None, busca,
-            data_tipo, data_de, data_ate,
+            data_tipo, data_de, data_ate, servico,
         )
         oportunidades = [linha[0] for linha in sessao.execute(consulta).all()]
         resultado = regras_de_indicadores.calcular(oportunidades)
@@ -423,9 +441,13 @@ def _registrar(api: FastAPI) -> None:
             em_aberto=recorte(resultado.em_aberto),
             aceitas=recorte(resultado.aceitas),
             aceitas_com_data_de_aceite=resultado.aceitas_com_data_de_aceite,
-            ciclo_medio=e.PendenciaResposta.model_validate(resultado.ciclo_medio),
+            ciclo_medio=e.CicloMedioDeVendasResposta.model_validate(resultado.ciclo_medio),
             taxa_de_conversao=e.TaxaDeConversaoResposta.model_validate(
                 resultado.taxa_de_conversao
+            ),
+            cobertura=e.CoberturaResposta.model_validate(resultado.cobertura),
+            dependencia_de_canal=e.DependenciaDeCanalResposta.model_validate(
+                resultado.dependencia_de_canal
             ),
         )
 

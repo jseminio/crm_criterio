@@ -30,6 +30,7 @@ const LISTAS: Listas = {
   situacoes_de_grupo: [],
   captadores: [],
   portes: ["Micro", "Pequeno", "Médio", "Grande", "Extra Grande"],
+  servicos: [],
 };
 
 function oportunidade(extra: Partial<OportunidadeDetalhe> = {}): OportunidadeDetalhe {

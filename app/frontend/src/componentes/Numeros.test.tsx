@@ -15,12 +15,12 @@ vi.mock("../api/cliente", async () => {
   return { ...real, api: { indicadores: vi.fn() } };
 });
 
-function indicadores(taxa: Partial<Indicadores["taxa_de_conversao"]>): Indicadores {
+function indicadores(taxa: Partial<Indicadores["taxa_de_conversao"]> = {}, extra: Partial<Indicadores> = {}): Indicadores {
   return {
     em_aberto: { quantas: 0, valor_mensal: "0", valor_anual: "0", sem_preco_mensal: 0, com_preco_mensal: 0 },
     aceitas: { quantas: 0, valor_mensal: "0", valor_anual: "0", sem_preco_mensal: 0, com_preco_mensal: 0 },
     aceitas_com_data_de_aceite: 0,
-    ciclo_medio: { calculavel: false, motivo: "—", o_que_falta: "—" },
+    ciclo_medio: { calculavel: false, dias: null, amostra: 0, aceitas_sem_as_duas_datas: 0 },
     taxa_de_conversao: {
       aceitas: 0,
       decididas: 0,
@@ -30,6 +30,16 @@ function indicadores(taxa: Partial<Indicadores["taxa_de_conversao"]>): Indicador
       atingiu_a_meta: null,
       ...taxa,
     },
+    cobertura: {
+      em_aberto_com_proxima_acao: 0,
+      em_aberto_total: 0,
+      com_volumetria_completa: 0,
+      total: 0,
+      percentual_com_proxima_acao: null,
+      percentual_com_volumetria_completa: null,
+    },
+    dependencia_de_canal: { da_rede_de_socios: 0, total: 0, percentual: null },
+    ...extra,
   };
 }
 
@@ -110,5 +120,64 @@ describe("Numeros — taxa de conversão", () => {
 
     const cartao = screen.getByText("Taxa de conversão").closest(".numero");
     expect(cartao).not.toHaveClass("numero-pendente");
+  });
+});
+
+describe("Numeros — ciclo médio, cobertura e dependência de canal (23/09/2026)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("ciclo médio não calculável não mostra 0 dias", async () => {
+    await abrir(indicadores());
+
+    expect(
+      screen.getByText(/não calculável — nenhuma aceita com data de originação/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("0 dias")).not.toBeInTheDocument();
+  });
+
+  it("ciclo médio calculável mostra os dias com vírgula", async () => {
+    await abrir(
+      indicadores({}, {
+        ciclo_medio: { calculavel: true, dias: "61.0", amostra: 1, aceitas_sem_as_duas_datas: 0 },
+      }),
+    );
+
+    expect(screen.getByText("61,0 dias")).toBeInTheDocument();
+  });
+
+  it("avisa quantas aceitas ficaram de fora por falta de data", async () => {
+    await abrir(
+      indicadores({}, {
+        ciclo_medio: { calculavel: true, dias: "10.0", amostra: 1, aceitas_sem_as_duas_datas: 2 },
+      }),
+    );
+
+    expect(screen.getByText(/2 aceitas sem as duas datas/i)).toBeInTheDocument();
+  });
+
+  it("cobertura mostra os dois percentuais", async () => {
+    await abrir(
+      indicadores({}, {
+        cobertura: {
+          em_aberto_com_proxima_acao: 3, em_aberto_total: 4,
+          com_volumetria_completa: 1, total: 10,
+          percentual_com_proxima_acao: "75.0", percentual_com_volumetria_completa: "10.0",
+        },
+      }),
+    );
+
+    expect(screen.getByText(/75,0% com próxima ação/)).toBeInTheDocument();
+    expect(screen.getByText(/10,0% com ficha de/)).toBeInTheDocument();
+  });
+
+  it("dependência de canal mostra o percentual da rede dos sócios", async () => {
+    await abrir(
+      indicadores({}, {
+        dependencia_de_canal: { da_rede_de_socios: 86, total: 154, percentual: "55.8" },
+      }),
+    );
+
+    expect(screen.getByText("55,8%")).toBeInTheDocument();
+    expect(screen.getByText(/86 de 154 propostas/i)).toBeInTheDocument();
   });
 });

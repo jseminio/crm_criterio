@@ -12,6 +12,7 @@ export interface EstadoDosFiltros {
   captador: string;
   tipo_canal: string;
   temperatura: string;
+  servico: string;
   dataTipo: "colocacao" | "aceite";
   periodo: Preset | "";
   dataDe: string;
@@ -23,6 +24,7 @@ export const FILTROS_VAZIOS: EstadoDosFiltros = {
   captador: "",
   tipo_canal: "",
   temperatura: "",
+  servico: "",
   dataTipo: "colocacao",
   periodo: "",
   dataDe: "",
@@ -37,6 +39,7 @@ export function temFiltro(filtros: EstadoDosFiltros): boolean {
     filtros.captador !== "" ||
     filtros.tipo_canal !== "" ||
     filtros.temperatura !== "" ||
+    filtros.servico !== "" ||
     filtros.periodo !== ""
   );
 }
@@ -59,6 +62,7 @@ export function paraConsulta(filtros: EstadoDosFiltros) {
     captador: filtros.captador ? [filtros.captador] : undefined,
     tipo_canal: filtros.tipo_canal ? [filtros.tipo_canal] : undefined,
     temperatura: filtros.temperatura ? [filtros.temperatura] : undefined,
+    servico: filtros.servico ? [filtros.servico] : undefined,
     data_tipo: intervalo ? filtros.dataTipo : undefined,
     data_de: intervalo?.de,
     data_ate: intervalo?.ate,
@@ -127,6 +131,25 @@ export function Filtros({
           {listas?.tipos_de_canal.map((c) => (
             <option key={c} value={c}>
               {c}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="campo">
+        <label className="campo-rotulo" htmlFor="filtro-servico">
+          Serviço
+        </label>
+        <select
+          id="filtro-servico"
+          className="selecao"
+          value={filtros.servico}
+          onChange={mudar("servico")}
+        >
+          <option value="">Todos</option>
+          {listas?.servicos.map((s) => (
+            <option key={s} value={s}>
+              {s}
             </option>
           ))}
         </select>

@@ -40,7 +40,9 @@ __all__ = [
     "ColunaDoFunil",
     "Listas",
     "RecorteResposta",
-    "PendenciaResposta",
+    "CicloMedioDeVendasResposta",
+    "CoberturaResposta",
+    "DependenciaDeCanalResposta",
     "TaxaDeConversaoResposta",
     "IndicadoresResposta",
     "ExecucaoResumo",
@@ -281,16 +283,37 @@ class RecorteResposta(Base):
     com_preco_mensal: int
 
 
-class PendenciaResposta(Base):
-    """Um indicador que existe no desenho mas ainda não pode ser calculado.
+class CicloMedioDeVendasResposta(Base):
+    """Originação → aceite — decisão de Eduardo em 23/09/2026.
 
-    A tela mostra o motivo e o que falta, em vez de um traço ou de um zero: o
-    zero pareceria medição, e o traço esconderia que há trabalho a fazer.
+    Só entra aceita com as duas datas. `aceitas_sem_as_duas_datas` diz quantas
+    ficaram de fora, para a tela não fingir que a amostra é o total.
     """
 
+    dias: Decimal | None
+    amostra: int
+    aceitas_sem_as_duas_datas: int
     calculavel: bool
-    motivo: str
-    o_que_falta: str
+
+
+class CoberturaResposta(Base):
+    """"Aumentar os pontos de contato" virando número — documento-de-negocio.md,
+    seção 12.5."""
+
+    em_aberto_com_proxima_acao: int
+    em_aberto_total: int
+    com_volumetria_completa: int
+    total: int
+    percentual_com_proxima_acao: Decimal | None
+    percentual_com_volumetria_completa: Decimal | None
+
+
+class DependenciaDeCanalResposta(Base):
+    """Quanto do funil nasce da rede dos sócios."""
+
+    da_rede_de_socios: int
+    total: int
+    percentual: Decimal | None
 
 
 class TaxaDeConversaoResposta(Base):
@@ -313,8 +336,10 @@ class IndicadoresResposta(Base):
     em_aberto: RecorteResposta
     aceitas: RecorteResposta
     aceitas_com_data_de_aceite: int
-    ciclo_medio: PendenciaResposta
+    ciclo_medio: CicloMedioDeVendasResposta
     taxa_de_conversao: TaxaDeConversaoResposta
+    cobertura: CoberturaResposta
+    dependencia_de_canal: DependenciaDeCanalResposta
 
 
 class ExecucaoResumo(Base):
@@ -381,3 +406,4 @@ class Listas(BaseModel):
     situacoes_de_grupo: list[str]
     captadores: list[str]
     portes: list[str]
+    servicos: list[str]

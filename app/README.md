@@ -6,19 +6,20 @@ a API do funil e as telas. Cobre os incrementos E2 (*a carteira existe*) e E3
 autorizou por causa do prazo — e, desde 22/09/2026, o começo do E4 (*a
 proposta nasce no CRM*): preço, serviço e criação de oportunidade direto na
 tela, sem depender da planilha ou de um lead; desde 23/09/2026, a régua de
-porte por volume (sugestão, nunca decisão) e a captura de complexidade e
-risco técnico.
+porte por volume (sugestão, nunca decisão), a captura de complexidade e
+risco técnico, e o começo do E5 (*os números aparecem*): ciclo médio de
+vendas, cobertura do processo e dependência de canal.
 
 ## Estado
 
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e quatro telas |
-| Testes | **279** no backend, **107** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Testes | **289** no backend, **113** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
 | Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
 | API | 16 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe) e conferência da carga. React com TypeScript, em `../frontend` |
-| Fora do ar | Nuvem, login, backup automático (E1); documento da proposta, ficha de volumetria completa e demais KPIs (E5) |
+| Fora do ar | Nuvem, login, backup automático (E1); documento da proposta, ficha de volumetria completa (E4); ticket médio, MRR e os seis indicadores de cobertura que exigem contrato/implantação/entrevista/classificação (E5) |
 
 ## Como rodar
 
@@ -424,10 +425,37 @@ navegador. É esse par que vira material para recalibrar a régua depois.
 > antes de carimbar; `tests/test_api.py::test_salvar_outro_campo_com_porte_null_no_corpo_nao_carimba_data`
 > é a regressão.
 
-**O que decidir antes da próxima rodada** (seção 6 do documento, ainda em
-aberto): se a régua deve só sugerir ou decidir (hoje: só sugere); quem atribui
-complexidade/risco na fase comercial, já que não pode ser quem precifica; e
-se roda o teste da seção 4 contra uma amostra real, para calibrar de verdade.
+### Decisões da seção 6 — registradas em 23/09/2026
+
+O documento listava cinco pontos em aberto antes de ir além do código. Eduardo
+decidiu:
+
+| Ponto | Decisão | Status |
+|---|---|---|
+| Régua sugere ou decide | **Só sugere** — confirma o que já estava construído | ✅ Decisão tomada |
+| Quem atribui complexidade/risco na fase comercial | **Em aberto** — qualquer pessoa preenche, sem regra formal, por enquanto | ⏳ Pendência, decisão adiada por escolha |
+| Validação do Bruno no texto da seção 9 do questionário | **Fica para depois** — não bloqueia o CRM (campos já funcionam, independente do questionário formal existir) | ⏳ Pendência, decisão adiada por escolha |
+| Teste da seção 4 (calibrar contra amostra real) | **Começou** — amostra fechada e ferramenta de comparação entregue | 🟡 Parcial, ver abaixo |
+| Rodar o teste completo | Falta o levantamento dos 9 direcionadores reais | ⛔ Sem responsável definido |
+
+**O teste da seção 4, até onde deu para ir sem sair do código:**
+
+- **Fonte da amostra**: `Categorizado de clientes Curva ABC.xlsx` (não a
+  planilha simples de rentabilidade — Eduardo pediu para trocar, por ser o
+  modelo mais completo e mais atual).
+- **Amostra**: 7 grupos de pior classificação + 3 de melhor — **Cargo,
+  Aeskins, INBEL, Ritz, 3AW, Ihus, MR** (piores) e **Blac, JGAA, Queimado**
+  (melhores). Excluídos da lista de piores: três holdings pessoais da equipe
+  (não são clientes) e um grupo sem porte atribuído na planilha de origem.
+- **"Porte hoje"** reduzido a um valor por grupo pela empresa de maior
+  honorário dentro dele — regra necessária porque a planilha atribui porte
+  por CNPJ, e um grupo pode ter CNPJs de portes diferentes.
+- **Ferramenta entregue**: `Teste_Regua_Porte_Amostra.xlsx`, em
+  `~/Downloads` — **fora do repositório**, dado de cliente (LGPD amarelo).
+  Fórmulas conferidas contra `crm/domain/porte.py` (mesmo cálculo, mesmo
+  resultado num caso de teste). Só falta preencher os nove direcionadores de
+  cada grupo — os números reais viriam dos sistemas de cada cliente (Omie
+  etc.), e **quem faz esse levantamento continua sem definição**.
 
 ## Conferência da carga
 
@@ -466,8 +494,11 @@ traço: zero pareceria medição, traço esconderia que há trabalho a fazer.
 | Propostas em aberto | Calculado | Inverso de `Situacao.decidida`: se as situações mudarem, a conta muda junto |
 | Aceitas em 2026 | Calculado | Com quantas têm preço mensal — 20 das 40 são de valor único |
 | Taxa de conversão | **Calculado** desde 22/09/2026 | Denominador = decididas (Aceita+Recusada+Perdido), decisão de Eduardo. 38,1% sobre os dados reais, contra 26,1% se todas as trabalhadas contassem |
-| Ticket médio | **Pendente** | Venda nova ou receita média por grupo? |
-| Ciclo médio | **Pendente** | 0 de 40 datas de aceite; a base do cálculo não está registrada |
+| Ciclo médio de vendas | **Calculado** desde 23/09/2026 | Originação → aceite, decisão de Eduardo. Só entra aceita com as duas datas — hoje 1 de 40 |
+| Cobertura do processo | **Calculado** desde 23/09/2026 | % com próxima ação definida (em aberto) e % com ficha de volumetria completa — os dois únicos, dos oito do documento de negócio, que não exigem entidade fora da Etapa 1 |
+| Dependência de canal | **Calculado** desde 23/09/2026 | % das propostas vindas da rede dos sócios — insight já identificado em `documento-de-negocio.md` |
+| Ticket médio | **Fora do CRM** | Decisão de Eduardo em 23/09/2026: receita média por grupo na carteira inteira — dado que não está aqui, só nas 2026. Cálculo pontual fora do CRM, ver abaixo |
+| MRR | **Fora** | O oficial é da carteira inteira; aqui só há o preço mensal das propostas |
 
 ### A taxa de conversão
 
@@ -481,9 +512,48 @@ que pareceria "nada fechou" quando na verdade é "não dá para medir".
 Na tela, o cartão mostra a etiqueta em palavra (**Abaixo do alerta** /
 **Entre o alerta e a meta** / **Na meta**), nunca só a cor — regra 4 do
 PAD-002.
-| MRR | **Fora** | O oficial é da carteira inteira; aqui só há o preço mensal das propostas |
 
-`GET /api/indicadores` aceita os mesmos filtros do funil.
+### O ciclo médio, a cobertura e a dependência de canal (23/09/2026)
+
+Três indicadores do E5, com as mesmas duas regras que já valiam para a
+conversão: **nunca zero quando é "não calculável"**, e **sempre a palavra
+junto do número**, nunca só o valor pelado.
+
+- **`CicloMedioDeVendas`** — dias entre `data_colocacao` e `data_aceite`, só
+  para aceitas com as duas datas. Decisão de Eduardo sobre a base (era a
+  pendência registrada desde 21/09/2026). Aceita sem as duas datas fica de
+  fora da média — não vira zero dias, que pareceria "fechou na hora".
+- **`Cobertura`** — dos oito indicadores de cobertura do processo listados em
+  `documento-de-negocio.md` (seção 12.5), só dois não exigem entidade que a
+  Etapa 1 não modela (reunião, classe da carteira, entrevista, implantação,
+  contrato): % de oportunidades em aberto com próxima ação definida, e % com
+  ficha de volumetria completa (os nove direcionadores de `crm.domain.porte`,
+  todos preenchidos).
+- **`DependenciaDeCanal`** — % das propostas que nasceram da rede dos sócios
+  (`TipoCanal.SOCIOS`). Insight que o documento de negócio já tinha calculado
+  à mão (56% em 19/09/2026); agora atualiza sozinho a cada filtro.
+
+### Ticket médio — por que não está na tela (23/09/2026)
+
+Eduardo decidiu: receita média por grupo, **na carteira inteira** — não venda
+nova. Mas a carteira inteira não está no CRM (só as 155 propostas de 2026),
+pela mesma razão que já tira o MRR de escopo. Calculei pontualmente, fora do
+CRM, a partir de `Rentabilidade_Grupo_COMPLETO.xlsx` (fica em `~/Downloads`,
+**fora do repositório** — dado de cliente, LGPD amarelo):
+
+| Fonte na planilha | Grupos | Ticket médio |
+|---|---|---|
+| Aba "Margem por Grupo" (valor já consolidado) | 15 | R$ 12.069,36 |
+| Aba "4. Clientes" (soma por CNPJ dentro do grupo) | 16 | R$ 8.385,65 |
+
+As duas fontes da mesma planilha divergem — não escolhi uma como "a certa"
+porque é dado real de faturamento, não algo para arbitrar. Ambas ficam acima
+da meta oficial de R$ 3.000, o que o próprio documento já suspeitava ("a meta
+se refere a outra coisa").
+
+`GET /api/indicadores` aceita os mesmos filtros do funil, mais `servico`
+(novo em 23/09/2026 — os oito valores reais das 155 propostas, vindos do
+banco, não de enum: `Oportunidade.servico` é texto livre da planilha).
 
 ### Corte por período (22/09/2026)
 

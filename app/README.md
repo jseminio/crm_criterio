@@ -31,10 +31,9 @@ python3 -m venv ~/.venvs/criterio-crm
 PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 ```
 
-> **Por que o ambiente virtual fica fora do repositório.** A verificação do
-> vortexOS varre `workspaces/` inteiro à procura de vazamento da engine, e não
-> consegue ler binário. Um `.venv` dentro do workspace gera **1887 pendências
-> falsas** e enterra as reais. Pelo mesmo motivo o pytest roda sem cache em
+> **Por que o ambiente virtual fica fora do repositório.** Mantém o
+> repositório só com código e documentos: nada de binário, cache ou artefato de
+> build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
 Subir tudo com um comando (a API e a tela, cada uma no seu processo; Ctrl+C

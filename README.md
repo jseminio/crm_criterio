@@ -10,15 +10,20 @@ listas para campanha.
 
 | Item | Situação |
 |---|---|
-| Fase do pipeline | 🟩 Construção **PF-10 Implementação** — E2 e E3 em curso |
-| Gate cumprido | ✅ Suficiência — documento validado por Eduardo em 19/09/2026 |
-| Gate cumprido | ⛔ **Amostra aprovada** — aprovada por **Eduardo em 19/09/2026** |
-| Amostra | https://claude.ai/artifact/2EiCBrFhPdvbniQWZgtgTK — 6 telas, privada |
-| Gate cumprido | ⛔ **Aprovação humana** da proposta — **aprovada por Eduardo em 20/09/2026**, inclusive a inversão E1 ↔ E2/E3 |
+| Fase | Construção — E2 e E3 entregues; E4, E5 e Etapa 2 (contratos) começados |
+| Documento de negócio | Validado por Eduardo em 19/09/2026 |
+| Amostra das telas | Aprovada por Eduardo em 19/09/2026 — https://claude.ai/artifact/2EiCBrFhPdvbniQWZgtgTK (6 telas, privada) |
+| Proposta | Aprovada por Eduardo em 20/09/2026, inclusive a inversão E1 ↔ E2/E3 |
 | Prazo | **Primeira versão até 25/09/2026**, decisão de Eduardo em 20/09/2026 |
-| Design | **PAD-002 aprovado por Eduardo em 19/09/2026.** A nota ainda vive na branch `docs/PAD-002-design-criterio-crm`, **não mesclada à main** — ver pendência 1 |
-| Classe | a definir na próxima fase |
-| Branch | `feat/crm-descoberta-negocio` |
+| Design | **PAD-002, aprovado por Eduardo em 19/09/2026.** A fonte da verdade é o código: `app/frontend/src/tokens.css`. A nota original ficou no repositório do vortexOS e não é mais consultada |
+| Regras de trabalho | [`CLAUDE.md`](CLAUDE.md) |
+
+> **Projeto independente desde 23/09/2026.** O CRM nasceu dentro do vortexOS
+> (`workspaces/criterio-crm`) e foi separado por decisão de Eduardo. Os
+> documentos anteriores a essa data — documento de negócio, anexo técnico,
+> proposta, planejamento, arquitetura — usam o vocabulário de lá (PF-xx, gates,
+> RN-xx, "workspace"). São **registro histórico** das decisões e ficam como
+> estão. As regras que valem daqui em diante estão no `CLAUDE.md`.
 
 ## Conteúdo
 
@@ -55,7 +60,7 @@ listas para campanha.
 **Itens compartilhados entre checklists** — preencher uma vez, referenciar nos dois:
 rateio de folha por centro de custo (Contábil E4 ↔ DP G8) · posição inicial
 conciliada com o Balanço de Abertura (Contábil D ↔ Financeiro G6).
-- `tests/` — estrutura de testes criada no dia zero (seção 16.1 do Documento Fundador).
+- `tests/` — plano original de organização dos testes. Os testes que rodam estão em `app/`.
 
 ## Fonte dos dados
 
@@ -91,16 +96,14 @@ copiados para cá — só o método de classificação.
 disponível no plano atual: 21/08 a 18/09/2026, 39 reuniões, das quais 6 com o
 roteiro de diagnóstico comercial.
 
-Nem a planilha nem as notas do Granola estão copiadas para este workspace:
+Nem a planilha nem as notas do Granola estão copiadas para este projeto:
 contêm dados de clientes. O `anexo-tecnico.md` guarda **apenas nomes de campo**
 derivados da estrutura das notas, sem nenhum valor de cliente.
 
-## Travas deste workspace
+## Travas deste projeto
 
-- Contexto isolado: nada daqui alimenta outro workspace, e nada de
-  `workspaces/comercial-omie` entra aqui.
-- Nada de `framework/` é copiado para cá.
-- Dados de cliente nunca vão para `vault/09-Conhecimento/`.
+- Dados de cliente não entram no repositório: nem planilha, nem nota de
+  entrevista, nem saída de script de conferência.
 - Nota de entrevista e contrato assinado exigem controle de acesso quando o
   sistema existir.
 - Segredos (banco, provedor de e-mail, API de WhatsApp, API de assinatura,

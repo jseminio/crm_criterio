@@ -11,7 +11,7 @@ Uso:
     ~/.venvs/criterio-crm/bin/python scripts/conferir_grupos.py [arquivo de saída]
 
 ⚠️ A saída contém **nome de cliente e valor de proposta**. Não a grave dentro
-do repositório: `workspaces/` é versionado e dado de cliente não entra em git.
+do repositório: o repositório é versionado e dado de cliente não entra em git.
 """
 
 from __future__ import annotations

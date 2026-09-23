@@ -1,0 +1,15 @@
+# Segredos — nunca versionar
+.env
+.env.*
+!.env.example
+
+# Dependências e artefatos
+node_modules/
+dist/
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+
+# Sistema
+.DS_Store

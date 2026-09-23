@@ -21,8 +21,7 @@ dev = ["pytest>=8.0"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q -p no:cacheprovider"
-# Sem cache e sem .pyc dentro do workspace: a verificação do vortexOS varre
-# workspaces/ inteiro e artefato de build vira ruído. Ver README.
+# Sem cache em disco: nada de artefato de teste dentro do repositório.
 
 [tool.setuptools.packages.find]
 where = ["src"]

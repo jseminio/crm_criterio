@@ -1,6 +1,6 @@
 """Conexão com o banco, lida do ambiente.
 
-**Nenhuma credencial mora no código.** A regra do vortexOS é explícita: segredo
+**Nenhuma credencial mora no código.** A regra do projeto é explícita: segredo
 só em `.env` ou cofre, nunca em código, JSON, nota ou log. Este módulo lê a
 variável e não guarda nem imprime o que leu.
 """
@@ -52,7 +52,7 @@ URL_DE_MEMORIA = "sqlite+pysqlite:///:memory:"
 class BancoNaoConfigurado(RuntimeError):
     """Levantada quando ninguém disse onde está o banco.
 
-    Falha visível, como manda a RN-16: cair aqui com uma mensagem clara é melhor
+    Falha visível, como mandam as regras do projeto: cair aqui com uma mensagem clara é melhor
     do que escrever dados de cliente num SQLite improvisado que ninguém sabe que
     existe.
     """

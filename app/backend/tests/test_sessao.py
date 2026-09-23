@@ -14,7 +14,7 @@ class TestUrlDoBanco:
         assert url_do_banco() == "postgresql+psycopg://alguem@localhost/crm"
 
     def test_sem_variavel_falha_de_forma_visivel(self):
-        """RN-16: melhor parar com mensagem clara do que gravar dado de cliente
+        """Falha visível: melhor parar com mensagem clara do que gravar dado de cliente
         num SQLite improvisado que ninguém sabe que existe."""
         with pytest.raises(BancoNaoConfigurado, match=VARIAVEL):
             url_do_banco()

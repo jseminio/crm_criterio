@@ -1,8 +1,8 @@
 # tests/ — criterio-crm
 
-Estrutura criada no nascimento do workspace, como exige a seção 16.1 do
-Documento Fundador. **Ainda não há teste aqui**: o projeto está em PF-01
-Discovery e nenhuma linha de código foi escrita.
+Estrutura criada no nascimento do projeto. **Os testes de verdade moram em
+`app/backend/tests/` (pytest) e em `app/frontend/src/` (Vitest)** — é lá que
+rodam hoje. Esta pasta ficou como o plano original de organização.
 
 ## O que entra aqui quando a construção começar
 

@@ -497,7 +497,7 @@ traço: zero pareceria medição, traço esconderia que há trabalho a fazer.
 | Ciclo médio de vendas | **Calculado** desde 23/09/2026 | Originação → aceite, decisão de Eduardo. Só entra aceita com as duas datas — hoje 1 de 40 |
 | Cobertura do processo | **Calculado** desde 23/09/2026 | % com próxima ação definida (em aberto) e % com ficha de volumetria completa — os dois únicos, dos oito do documento de negócio, que não exigem entidade fora da Etapa 1 |
 | Dependência de canal | **Calculado** desde 23/09/2026 | % das propostas vindas da rede dos sócios — insight já identificado em `documento-de-negocio.md` |
-| Ticket médio | **Fora do CRM** | Decisão de Eduardo em 23/09/2026: receita média por grupo na carteira inteira — dado que não está aqui, só nas 2026. Cálculo pontual fora do CRM, ver abaixo |
+| Ticket médio | **Fora do CRM** | R$ 7.407,78 — receita média por grupo/empresa na carteira inteira, decisão de Eduardo em 23/09/2026. Dado não está aqui (só as 2026). Cálculo pontual fora do CRM, ver abaixo |
 | MRR | **Fora** | O oficial é da carteira inteira; aqui só há o preço mensal das propostas |
 
 ### A taxa de conversão
@@ -539,17 +539,25 @@ Eduardo decidiu: receita média por grupo, **na carteira inteira** — não vend
 nova. Mas a carteira inteira não está no CRM (só as 155 propostas de 2026),
 pela mesma razão que já tira o MRR de escopo. Calculei pontualmente, fora do
 CRM, a partir de `Rentabilidade_Grupo_COMPLETO.xlsx` (fica em `~/Downloads`,
-**fora do repositório** — dado de cliente, LGPD amarelo):
+**fora do repositório** — dado de cliente, LGPD amarelo).
 
-| Fonte na planilha | Grupos | Ticket médio |
-|---|---|---|
-| Aba "Margem por Grupo" (valor já consolidado) | 15 | R$ 12.069,36 |
-| Aba "4. Clientes" (soma por CNPJ dentro do grupo) | 16 | R$ 8.385,65 |
+Duas idas e voltas até fechar:
 
-As duas fontes da mesma planilha divergem — não escolhi uma como "a certa"
-porque é dado real de faturamento, não algo para arbitrar. Ambas ficam acima
-da meta oficial de R$ 3.000, o que o próprio documento já suspeitava ("a meta
-se refere a outra coisa").
+1. **Aba "Margem por Grupo" × aba "4. Clientes" pareciam divergir** (R$
+   12.069,36 vs R$ 8.385,65) — era erro meu de agregação, não dado
+   inconsistente. Reconciliando grupo a grupo, 14 dos 15 batem exatamente
+   quando "4. Clientes" é **somado** por CNPJ (não "um valor só quando os
+   CNPJs empatam"). O único que não batia — Grupo Blac, R$ 2.600,01 de
+   diferença real entre as abas — Eduardo confirmou em 23/09/2026: vale o
+   valor da aba "Margem por Grupo" (R$ 27.930,00).
+2. **16 empresas sem grupo econômico ficaram de fora da primeira conta.**
+   Eduardo confirmou: são 16 clientes individuais de verdade, cada um sua
+   própria unidade — entram um a um, não como grupo.
+
+**Ticket médio final: R$ 7.407,78** (31 unidades — 15 grupos + 16 empresas
+individuais; total mensal R$ 229.641,20). Mediana R$ 3.762,83, bem mais perto
+da meta oficial de R$ 3.000 que a média — a média é puxada para cima por
+poucos grupos grandes (INBEL R$ 44.725, MR R$ 40.589).
 
 `GET /api/indicadores` aceita os mesmos filtros do funil, mais `servico`
 (novo em 23/09/2026 — os oito valores reais das 155 propostas, vindos do

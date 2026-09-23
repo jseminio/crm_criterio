@@ -30,6 +30,7 @@ __all__ = [
     "OportunidadeDetalhe",
     "OportunidadeEdicao",
     "OportunidadeNova",
+    "SugestaoDePorteResposta",
     "LeadResumo",
     "LeadNovo",
     "LeadEdicao",
@@ -84,6 +85,16 @@ class OportunidadeResumo(Base):
     proxima_acao_em: date | None = None
 
 
+class SugestaoDePorteResposta(Base):
+    """O que a régua sugere — nunca o que decide. Ver `crm.domain.porte`."""
+
+    calculavel: bool
+    pontuacao: Decimal | None = None
+    porte: str | None = None
+    horas_base: int | None = None
+    direcionadores_aplicados: int
+
+
 class OportunidadeDetalhe(OportunidadeResumo):
     canal: str | None = None
     linha_servico: LinhaServico | None = None
@@ -94,6 +105,28 @@ class OportunidadeDetalhe(OportunidadeResumo):
     observacao: str | None = None
     origem: Origem
     linha_planilha: int | None = None
+
+    complexidade: int | None = None
+    risco_tecnico: int | None = None
+
+    documentos_fiscais_mes: int | None = None
+    lancamentos_contabeis_mes: int | None = None
+    pagamentos_mes: int | None = None
+    contas_bancarias: int | None = None
+    conciliacoes_cartao_mes: int | None = None
+    empregados_clt: int | None = None
+    admissoes_desligamentos_mes: int | None = None
+    cnpjs_no_escopo: int | None = None
+    tomadores_de_servico: int | None = None
+    servicos_contratados_alem_do_primeiro: int = 0
+    tem_consolidacao_de_grupo: bool = False
+    e_auditada: bool = False
+
+    porte: str | None = None
+    porte_definido_por: str | None = None
+    porte_definido_em: datetime | None = None
+    sugestao_de_porte: SugestaoDePorteResposta | None = None
+    """Calculada a cada leitura, nunca gravada — muda se a régua mudar."""
 
 
 class OportunidadeEdicao(BaseModel):
@@ -118,6 +151,29 @@ class OportunidadeEdicao(BaseModel):
     data_colocacao: date | None = None
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
+
+    complexidade: int | None = Field(default=None, ge=1, le=5)
+    risco_tecnico: int | None = Field(default=None, ge=1, le=5)
+
+    documentos_fiscais_mes: int | None = Field(default=None, ge=0)
+    lancamentos_contabeis_mes: int | None = Field(default=None, ge=0)
+    pagamentos_mes: int | None = Field(default=None, ge=0)
+    contas_bancarias: int | None = Field(default=None, ge=0)
+    conciliacoes_cartao_mes: int | None = Field(default=None, ge=0)
+    empregados_clt: int | None = Field(default=None, ge=0)
+    admissoes_desligamentos_mes: int | None = Field(default=None, ge=0)
+    cnpjs_no_escopo: int | None = Field(default=None, ge=0)
+    tomadores_de_servico: int | None = Field(default=None, ge=0)
+    servicos_contratados_alem_do_primeiro: int | None = Field(default=None, ge=0)
+    tem_consolidacao_de_grupo: bool | None = None
+    e_auditada: bool | None = None
+
+    porte: str | None = Field(default=None, max_length=20)
+    porte_definido_por: str | None = Field(default=None, max_length=10)
+    """Confirma ou sobrepõe a sugestão da régua. Quando `porte` vier
+    preenchido, o servidor grava `porte_definido_em` com o instante da
+    gravação — não dá pra confiar em relógio de navegador para o registro que
+    vai recalibrar a régua depois."""
 
 
 class OportunidadeNova(BaseModel):
@@ -324,3 +380,4 @@ class Listas(BaseModel):
     linhas_de_servico: list[str]
     situacoes_de_grupo: list[str]
     captadores: list[str]
+    portes: list[str]

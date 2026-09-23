@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -299,6 +299,96 @@ class TestCriacaoDeOportunidade:
 
     def test_so_o_nome_e_obrigatorio(self, cliente: TestClient):
         assert cliente.post("/api/oportunidades", json={}).status_code == 422
+
+
+class TestVolumetriaEPorte:
+    """A régua de porte (E4, 23/09/2026) — sempre sugestão, nunca decisão.
+    Ver `crm.domain.porte` e `regua-de-porte-e-plano-de-teste.md`."""
+
+    def test_sem_volumetria_nenhuma_a_sugestao_nao_e_calculavel(
+        self, cliente: TestClient, carteira
+    ):
+        detalhe = cliente.get(f"/api/oportunidades/{carteira['primeira']}").json()
+
+        assert detalhe["sugestao_de_porte"]["calculavel"] is False
+        assert detalhe["sugestao_de_porte"]["porte"] is None
+
+    def test_preenche_volumetria_e_a_sugestao_aparece_na_leitura(
+        self, cliente: TestClient, carteira
+    ):
+        cliente.patch(
+            f"/api/oportunidades/{carteira['primeira']}",
+            json={"empregados_clt": 200},  # nota 4 sozinho -> Extra Grande
+        )
+
+        detalhe = cliente.get(f"/api/oportunidades/{carteira['primeira']}").json()
+
+        assert detalhe["empregados_clt"] == 200
+        assert detalhe["sugestao_de_porte"]["calculavel"] is True
+        assert detalhe["sugestao_de_porte"]["porte"] == "Extra Grande"
+
+    def test_direcionador_fora_do_intervalo_e_recusado(self, cliente: TestClient, carteira):
+        resposta = cliente.patch(
+            f"/api/oportunidades/{carteira['primeira']}", json={"empregados_clt": -1}
+        )
+
+        assert resposta.status_code == 422
+
+    def test_complexidade_fora_de_1_a_5_e_recusada(self, cliente: TestClient, carteira):
+        resposta = cliente.patch(
+            f"/api/oportunidades/{carteira['primeira']}", json={"complexidade": 6}
+        )
+
+        assert resposta.status_code == 422
+
+    def test_confirmar_porte_grava_quem_e_quando_no_servidor(
+        self, cliente: TestClient, carteira, sessao: Session
+    ):
+        antes = datetime.now(UTC)
+
+        resposta = cliente.patch(
+            f"/api/oportunidades/{carteira['primeira']}",
+            json={"porte": "Extra Grande", "porte_definido_por": "EL"},
+        )
+
+        assert resposta.status_code == 200
+        detalhe = resposta.json()
+        assert detalhe["porte"] == "Extra Grande"
+        assert detalhe["porte_definido_por"] == "EL"
+        # O instante vem do servidor, não do que o corpo da requisição manda
+        # (o schema nem aceita `porte_definido_em` do cliente). SQLite (banco
+        # de teste) devolve o datetime sem fuso — comparo sem fuso dos dois
+        # lados, só para provar que o servidor gravou "agora", não um valor
+        # arbitrário.
+        gravado = sessao.get(Oportunidade, carteira["primeira"]).porte_definido_em
+        assert gravado is not None and gravado.replace(tzinfo=UTC) >= antes
+
+    def test_a_sugestao_nunca_grava_porte_sozinha(self, cliente: TestClient, carteira):
+        """Calcular a sugestão numa leitura não pode, de tabela, confirmar
+        porte nenhum — só a pessoa confirma, via PATCH explícito."""
+        cliente.patch(f"/api/oportunidades/{carteira['primeira']}", json={"empregados_clt": 200})
+        cliente.get(f"/api/oportunidades/{carteira['primeira']}")
+
+        detalhe = cliente.get(f"/api/oportunidades/{carteira['primeira']}").json()
+        assert detalhe["porte"] is None
+        assert detalhe["porte_definido_por"] is None
+
+    def test_salvar_outro_campo_com_porte_null_no_corpo_nao_carimba_data(
+        self, cliente: TestClient, carteira, sessao: Session
+    ):
+        """A tela manda o rascunho inteiro a cada salvar — `porte: null`
+        sempre vai junto, mesmo quando ninguém tocou nele. Regressão: isso
+        chegou a carimbar `porte_definido_em` em toda gravação, só por
+        `"porte"` estar presente no corpo, sem checar se o valor mudou."""
+        resposta = cliente.patch(
+            f"/api/oportunidades/{carteira['primeira']}",
+            json={"empregados_clt": 200, "porte": None},
+        )
+
+        assert resposta.status_code == 200
+        assert resposta.json()["porte_definido_em"] is None
+        oportunidade = sessao.get(Oportunidade, carteira["primeira"])
+        assert oportunidade.porte_definido_em is None
 
 
 class TestLeads:

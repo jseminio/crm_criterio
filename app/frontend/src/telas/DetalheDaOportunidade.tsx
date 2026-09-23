@@ -6,12 +6,210 @@ import type { Listas, OportunidadeDetalhe } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro } from "../componentes/estados";
+import { dataHora } from "../formato";
 
 function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
     <div className="par">
       <span className="par-rotulo">{rotulo}</span>
       <span className="par-valor">{children}</span>
+    </div>
+  );
+}
+
+/** Os nove direcionadores da régua de porte, na ordem de
+ * `regua-de-porte-e-plano-de-teste.md`, seção 2. Em branco = "não se aplica
+ * ao escopo contratado" — fica fora da média, nunca vira zero. */
+const DIRECIONADORES: { id: string; rotulo: string; placeholder: string }[] = [
+  { id: "documentos_fiscais_mes", rotulo: "Documentos fiscais/mês", placeholder: "emitidas + recebidas" },
+  { id: "lancamentos_contabeis_mes", rotulo: "Lançamentos contábeis/mês", placeholder: "" },
+  { id: "pagamentos_mes", rotulo: "Pagamentos/mês", placeholder: "" },
+  { id: "contas_bancarias", rotulo: "Contas bancárias", placeholder: "" },
+  { id: "conciliacoes_cartao_mes", rotulo: "Conciliações de cartão/mês", placeholder: "0 = nenhuma" },
+  { id: "empregados_clt", rotulo: "Empregados CLT", placeholder: "" },
+  { id: "admissoes_desligamentos_mes", rotulo: "Admissões + desligamentos/mês", placeholder: "" },
+  { id: "cnpjs_no_escopo", rotulo: "CNPJs no escopo", placeholder: "" },
+  { id: "tomadores_de_servico", rotulo: "Tomadores de serviço", placeholder: "" },
+];
+
+function paresDe<T>(itens: T[]): T[][] {
+  const pares: T[][] = [];
+  for (let i = 0; i < itens.length; i += 2) pares.push(itens.slice(i, i + 2));
+  return pares;
+}
+
+function VolumetriaEPorte({
+  detalhe,
+  rascunho,
+  mudar,
+  alternar,
+  listas,
+}: {
+  detalhe: OportunidadeDetalhe;
+  rascunho: Record<string, string>;
+  mudar: (campo: string, valor: string) => void;
+  alternar: (campo: string) => (evento: { target: { checked: boolean } }) => void;
+  listas: Listas | null;
+}) {
+  const sugestao = detalhe.sugestao_de_porte;
+
+  const numero = (id: string, rotulo: string, placeholder?: string) => (
+    <div className="campo-bloco" key={id}>
+      <label className="campo-rotulo" htmlFor={`d-${id}`}>
+        {rotulo}
+      </label>
+      <input
+        id={`d-${id}`}
+        type="number"
+        min="0"
+        step="1"
+        className="entrada"
+        value={rascunho[id] ?? ""}
+        onChange={(e) => mudar(id, e.target.value)}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+
+  const nota1a5 = (id: string, rotulo: string) => (
+    <div className="campo-bloco">
+      <label className="campo-rotulo" htmlFor={`d-${id}`}>
+        {rotulo}
+      </label>
+      <select
+        id={`d-${id}`}
+        className="selecao"
+        value={rascunho[id] ?? ""}
+        onChange={(e) => mudar(id, e.target.value)}
+      >
+        <option value="">Não avaliada</option>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
+  return (
+    <div className="formulario">
+      <h3 style={{ fontSize: 14, marginBottom: "var(--e2)" }}>Volumetria e porte</h3>
+      <p className="campo-ajuda" style={{ marginTop: 0 }}>
+        A régua sugere o porte a partir do volume — <strong>nunca decide sozinha</strong>.
+        Preencha só o que já for conhecido; direcionador em branco não entra na média.
+      </p>
+
+      <div className="formulario-duplo">
+        {nota1a5("complexidade", "Complexidade")}
+        {nota1a5("risco_tecnico", "Risco técnico")}
+      </div>
+
+      {paresDe(DIRECIONADORES).map((par, i) => (
+        <div className="formulario-duplo" key={i}>
+          {par.map((d) => numero(d.id, d.rotulo, d.placeholder))}
+        </div>
+      ))}
+
+      <div className="formulario-duplo">
+        {numero(
+          "servicos_contratados_alem_do_primeiro",
+          "Serviços contratados além do primeiro",
+          "0",
+        )}
+        <div className="campo-bloco">
+          <label className="campo-rotulo">Ajustes</label>
+          <label style={{ display: "flex", alignItems: "center", gap: "var(--e1)", fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={rascunho.tem_consolidacao_de_grupo === "sim"}
+              onChange={alternar("tem_consolidacao_de_grupo")}
+            />
+            Há consolidação de grupo
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "var(--e1)", fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={rascunho.e_auditada === "sim"}
+              onChange={alternar("e_auditada")}
+            />
+            Empresa auditada
+          </label>
+        </div>
+      </div>
+
+      <div className="recado">
+        {sugestao?.calculavel ? (
+          <>
+            Sugestão da régua: <strong>{sugestao.porte}</strong> — pontuação{" "}
+            {sugestao.pontuacao?.replace(".", ",")}, {sugestao.horas_base}h base/mês,{" "}
+            {sugestao.direcionadores_aplicados} de 9 direcionadores preenchidos.
+          </>
+        ) : (
+          "Sugestão da régua: não calculável — nenhum direcionador preenchido ainda."
+        )}
+        <br />
+        <span style={{ fontSize: 12 }}>
+          Reflete o que está salvo; salve as mudanças acima para atualizar.
+        </span>
+      </div>
+
+      <div className="formulario-duplo">
+        <div className="campo-bloco">
+          <label className="campo-rotulo" htmlFor="d-porte">
+            Porte confirmado
+          </label>
+          <select
+            id="d-porte"
+            className="selecao"
+            value={rascunho.porte ?? ""}
+            onChange={(e) => mudar("porte", e.target.value)}
+          >
+            <option value="">Não confirmado</option>
+            {listas?.portes.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          {sugestao?.calculavel && rascunho.porte !== sugestao.porte && (
+            <button
+              type="button"
+              className="botao botao-secundario"
+              style={{ marginTop: "var(--e1)" }}
+              onClick={() => mudar("porte", sugestao.porte ?? "")}
+            >
+              Usar sugestão ({sugestao.porte})
+            </button>
+          )}
+        </div>
+        <div className="campo-bloco">
+          <label className="campo-rotulo" htmlFor="d-porte-por">
+            Definido por
+          </label>
+          <select
+            id="d-porte-por"
+            className="selecao"
+            value={rascunho.porte_definido_por ?? ""}
+            onChange={(e) => mudar("porte_definido_por", e.target.value)}
+          >
+            <option value="">Não informado</option>
+            {listas?.captadores.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {detalhe.porte_definido_em && (
+        <p className="campo-ajuda" style={{ margin: 0 }}>
+          Confirmado por {detalhe.porte_definido_por ?? "alguém não identificado"} em{" "}
+          {dataHora(detalhe.porte_definido_em)}. O instante é gravado pelo servidor — é o que
+          vira material para recalibrar a régua depois.
+        </p>
+      )}
     </div>
   );
 }
@@ -60,6 +258,22 @@ export function DetalheDaOportunidade({
           data_colocacao: d.data_colocacao ?? "",
           preco_mensal: d.preco_mensal ?? "",
           preco_anual: d.preco_anual ?? "",
+          complexidade: d.complexidade?.toString() ?? "",
+          risco_tecnico: d.risco_tecnico?.toString() ?? "",
+          documentos_fiscais_mes: d.documentos_fiscais_mes?.toString() ?? "",
+          lancamentos_contabeis_mes: d.lancamentos_contabeis_mes?.toString() ?? "",
+          pagamentos_mes: d.pagamentos_mes?.toString() ?? "",
+          contas_bancarias: d.contas_bancarias?.toString() ?? "",
+          conciliacoes_cartao_mes: d.conciliacoes_cartao_mes?.toString() ?? "",
+          empregados_clt: d.empregados_clt?.toString() ?? "",
+          admissoes_desligamentos_mes: d.admissoes_desligamentos_mes?.toString() ?? "",
+          cnpjs_no_escopo: d.cnpjs_no_escopo?.toString() ?? "",
+          tomadores_de_servico: d.tomadores_de_servico?.toString() ?? "",
+          servicos_contratados_alem_do_primeiro: d.servicos_contratados_alem_do_primeiro.toString(),
+          tem_consolidacao_de_grupo: d.tem_consolidacao_de_grupo ? "sim" : "",
+          e_auditada: d.e_auditada ? "sim" : "",
+          porte: d.porte ?? "",
+          porte_definido_por: d.porte_definido_por ?? "",
         });
       })
       .catch((f) => definirErro(f instanceof ErroDaApi ? f.message : "Falha inesperada."));
@@ -70,13 +284,23 @@ export function DetalheDaOportunidade({
   const mudar = (campo: string, valor: string) =>
     definirRascunho((atual) => ({ ...atual, [campo]: valor }));
 
+  const alternar = (campo: string) => (evento: { target: { checked: boolean } }) =>
+    definirRascunho((atual) => ({ ...atual, [campo]: evento.target.checked ? "sim" : "" }));
+
+  //  Os dois únicos campos booleanos: "" não é "sem resposta" aqui, é "não" —
+  // um checkbox desmarcado precisa virar `false` explícito, não sumir do
+  // corpo da requisição como os outros campos vazios fazem.
+  const CAMPOS_BOOLEANOS = new Set(["tem_consolidacao_de_grupo", "e_auditada"]);
+
   const salvar = async () => {
     definirSalvando(true);
     definirErro(null);
     try {
       // Campo vazio vira null, não string vazia: no banco a ausência é null.
       const mudancas = Object.fromEntries(
-        Object.entries(rascunho).map(([k, v]) => [k, v === "" ? null : v]),
+        Object.entries(rascunho).map(([k, v]) =>
+          CAMPOS_BOOLEANOS.has(k) ? [k, v === "sim"] : [k, v === "" ? null : v],
+        ),
       );
       await api.editarOportunidade(id, mudancas);
       aoSalvar();
@@ -223,6 +447,14 @@ export function DetalheDaOportunidade({
               22/09/2026 (E4), a proposta pode nascer e ser ajustada direto no CRM.{" "}
               <strong>A mesma trava contra a recarga da planilha vale para eles.</strong>
             </p>
+
+            <VolumetriaEPorte
+              detalhe={detalhe}
+              rascunho={rascunho}
+              mudar={mudar}
+              alternar={alternar}
+              listas={listas}
+            />
 
             <div className="formulario-duplo">
               <div className="campo-bloco">

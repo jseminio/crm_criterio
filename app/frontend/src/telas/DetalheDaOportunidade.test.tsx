@@ -29,6 +29,7 @@ const LISTAS: Listas = {
   linhas_de_servico: [],
   situacoes_de_grupo: [],
   captadores: [],
+  portes: ["Micro", "Pequeno", "Médio", "Grande", "Extra Grande"],
 };
 
 function oportunidade(extra: Partial<OportunidadeDetalhe> = {}): OportunidadeDetalhe {
@@ -57,6 +58,24 @@ function oportunidade(extra: Partial<OportunidadeDetalhe> = {}): OportunidadeDet
     observacao: null,
     origem: "Carga 2026",
     linha_planilha: 42,
+    complexidade: null,
+    risco_tecnico: null,
+    documentos_fiscais_mes: null,
+    lancamentos_contabeis_mes: null,
+    pagamentos_mes: null,
+    contas_bancarias: null,
+    conciliacoes_cartao_mes: null,
+    empregados_clt: null,
+    admissoes_desligamentos_mes: null,
+    cnpjs_no_escopo: null,
+    tomadores_de_servico: null,
+    servicos_contratados_alem_do_primeiro: 0,
+    tem_consolidacao_de_grupo: false,
+    e_auditada: false,
+    porte: null,
+    porte_definido_por: null,
+    porte_definido_em: null,
+    sugestao_de_porte: { calculavel: false, pontuacao: null, porte: null, horas_base: null, direcionadores_aplicados: 0 },
     ...extra,
   };
 }
@@ -183,5 +202,91 @@ describe("DetalheDaOportunidade", () => {
     );
 
     expect(screen.getByText(/cliente internalizou/i)).toBeInTheDocument();
+  });
+});
+
+describe("Volumetria e porte — a régua sugere, nunca decide (E4, 23/09/2026)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("sem direcionador nenhum preenchido, mostra que não dá para calcular", async () => {
+    await abrir(oportunidade());
+
+    expect(screen.getByText(/não calculável — nenhum direcionador preenchido/i)).toBeInTheDocument();
+  });
+
+  it("com sugestão calculável, mostra o porte e a pontuação — sem confirmar nada sozinha", async () => {
+    await abrir(
+      oportunidade({
+        sugestao_de_porte: {
+          calculavel: true,
+          pontuacao: "4.00",
+          porte: "Extra Grande",
+          horas_base: 80,
+          direcionadores_aplicados: 1,
+        },
+      }),
+    );
+
+    expect(screen.getByText(/sugestão da régua/i)).toHaveTextContent("Extra Grande");
+    expect(screen.getByText(/sugestão da régua/i)).toHaveTextContent("4,00");
+    // A sugestão não é o porte confirmado — o campo de confirmação continua
+    // vazio até uma pessoa decidir.
+    expect(screen.getByLabelText("Porte confirmado")).toHaveValue("");
+  });
+
+  it("o botão 'usar sugestão' copia o porte sugerido para o campo de confirmação", async () => {
+    await abrir(
+      oportunidade({
+        sugestao_de_porte: {
+          calculavel: true,
+          pontuacao: "4.00",
+          porte: "Extra Grande",
+          horas_base: 80,
+          direcionadores_aplicados: 1,
+        },
+      }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /usar sugestão/i }));
+
+    expect(screen.getByLabelText("Porte confirmado")).toHaveValue("Extra Grande");
+  });
+
+  it("digitar um direcionador e salvar manda o número, e vazio manda null", async () => {
+    vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
+    await abrir(oportunidade());
+
+    await userEvent.type(screen.getByLabelText("Empregados CLT"), "180");
+    await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+
+    await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledOnce());
+    const [, mudancas] = vi.mocked(api.editarOportunidade).mock.calls[0];
+    expect(mudancas.empregados_clt).toBe("180");
+    expect(mudancas.contas_bancarias).toBeNull(); // não preenchido — fica de fora, não vira 0
+  });
+
+  it("desmarcar 'auditada' manda false explícito, não null", async () => {
+    vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
+    await abrir(oportunidade({ e_auditada: true }));
+
+    // Já vem marcado; desmarca e salva sem mudar mais nada.
+    await userEvent.click(screen.getByRole("checkbox", { name: /empresa auditada/i }));
+    await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+
+    await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledOnce());
+    const [, mudancas] = vi.mocked(api.editarOportunidade).mock.calls[0];
+    expect(mudancas.e_auditada).toBe(false);
+  });
+
+  it("porte confirmado mostra quem e quando, vindo do servidor", async () => {
+    await abrir(
+      oportunidade({
+        porte: "Grande",
+        porte_definido_por: "EL",
+        porte_definido_em: "2026-09-23T14:30:00Z",
+      }),
+    );
+
+    expect(screen.getByText(/confirmado por EL em/i)).toBeInTheDocument();
   });
 });

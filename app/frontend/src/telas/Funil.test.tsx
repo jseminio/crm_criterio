@@ -31,6 +31,7 @@ const LISTAS: Listas = {
   linhas_de_servico: [],
   situacoes_de_grupo: [],
   captadores: [],
+  portes: [],
 };
 
 const INDICADORES_VAZIOS: Indicadores = {
@@ -139,6 +140,24 @@ describe("arrasto no kanban", () => {
       observacao: null,
       origem: "Carga 2026",
       linha_planilha: null,
+      complexidade: null,
+      risco_tecnico: null,
+      documentos_fiscais_mes: null,
+      lancamentos_contabeis_mes: null,
+      pagamentos_mes: null,
+      contas_bancarias: null,
+      conciliacoes_cartao_mes: null,
+      empregados_clt: null,
+      admissoes_desligamentos_mes: null,
+      cnpjs_no_escopo: null,
+      tomadores_de_servico: null,
+      servicos_contratados_alem_do_primeiro: 0,
+      tem_consolidacao_de_grupo: false,
+      e_auditada: false,
+      porte: null,
+      porte_definido_por: null,
+      porte_definido_em: null,
+      sugestao_de_porte: { calculavel: false, pontuacao: null, porte: null, horas_base: null, direcionadores_aplicados: 0 },
     });
     await abrir([
       coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")]),

@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from crm.api import esquemas as e
 from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
+from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, fundir_grupos
 from crm.db.modelos import (
     ExecucaoDeCarga,
@@ -36,6 +37,7 @@ from crm.db.modelos import (
 )
 from crm.db.sessao import criar_engine, criar_fabrica_de_sessao, url_do_banco
 from crm.domain import indicadores as regras_de_indicadores
+from crm.domain import porte as regras_de_porte
 from crm.domain.listas import (
     LinhaServico,
     MotivoRecusa,
@@ -107,6 +109,36 @@ def _resumo_de(oportunidade: Oportunidade, nome_do_grupo: str | None) -> e.Oport
     return resumo
 
 
+def _detalhe_de(oportunidade: Oportunidade, nome_do_grupo: str | None) -> e.OportunidadeDetalhe:
+    """O detalhe, com a sugestão da régua de porte calculada na hora — ela
+    nunca é gravada, então recalcula a cada leitura (ver `crm.domain.porte`)."""
+    detalhe = e.OportunidadeDetalhe.model_validate(oportunidade)
+    detalhe.grupo_nome = nome_do_grupo
+    volumetria = regras_de_porte.Volumetria(
+        documentos_fiscais_mes=oportunidade.documentos_fiscais_mes,
+        lancamentos_contabeis_mes=oportunidade.lancamentos_contabeis_mes,
+        pagamentos_mes=oportunidade.pagamentos_mes,
+        contas_bancarias=oportunidade.contas_bancarias,
+        conciliacoes_cartao_mes=oportunidade.conciliacoes_cartao_mes,
+        empregados_clt=oportunidade.empregados_clt,
+        admissoes_desligamentos_mes=oportunidade.admissoes_desligamentos_mes,
+        cnpjs_no_escopo=oportunidade.cnpjs_no_escopo,
+        tomadores_de_servico=oportunidade.tomadores_de_servico,
+        servicos_contratados_alem_do_primeiro=oportunidade.servicos_contratados_alem_do_primeiro,
+        tem_consolidacao_de_grupo=oportunidade.tem_consolidacao_de_grupo,
+        e_auditada=oportunidade.e_auditada,
+    )
+    sugestao = regras_de_porte.sugerir_porte(volumetria)
+    detalhe.sugestao_de_porte = e.SugestaoDePorteResposta(
+        calculavel=sugestao.calculavel,
+        pontuacao=sugestao.pontuacao,
+        porte=sugestao.porte.value if sugestao.porte else None,
+        horas_base=sugestao.horas_base,
+        direcionadores_aplicados=sugestao.direcionadores_aplicados,
+    )
+    return detalhe
+
+
 def _registrar(api: FastAPI) -> None:
     # ------------------------------------------------------------------ listas
     @api.get("/api/listas", response_model=e.Listas, tags=["referência"])
@@ -122,6 +154,7 @@ def _registrar(api: FastAPI) -> None:
             linhas_de_servico=_valores(LinhaServico),
             situacoes_de_grupo=_valores(SituacaoGrupo),
             captadores=sorted(_CAPTADORES),
+            portes=[p.value for p in regras_de_porte.Porte],
         )
 
     # ------------------------------------------------------------------ grupos
@@ -310,9 +343,7 @@ def _registrar(api: FastAPI) -> None:
         sessao.add(oportunidade)
         sessao.flush()
 
-        detalhe = e.OportunidadeDetalhe.model_validate(oportunidade)
-        detalhe.grupo_nome = grupo.nome
-        return detalhe
+        return _detalhe_de(oportunidade, grupo.nome)
 
     @api.get("/api/funil", response_model=list[e.ColunaDoFunil], tags=["funil"])
     def funil(
@@ -409,9 +440,7 @@ def _registrar(api: FastAPI) -> None:
         oportunidade = sessao.get(Oportunidade, oportunidade_id)
         if oportunidade is None:
             raise HTTPException(404, "oportunidade não encontrada")
-        detalhe = e.OportunidadeDetalhe.model_validate(oportunidade)
-        detalhe.grupo_nome = oportunidade.grupo.nome
-        return detalhe
+        return _detalhe_de(oportunidade, oportunidade.grupo.nome)
 
     @api.patch(
         "/api/oportunidades/{oportunidade_id}",
@@ -438,6 +467,11 @@ def _registrar(api: FastAPI) -> None:
             for campo, valor in mudancas.items()
             if campo in CAMPOS_DA_CARGA and getattr(oportunidade, campo) != valor
         }
+        # Mesma disciplina para o porte: a tela manda o rascunho inteiro a
+        # cada salvar, `porte` incluso mesmo sem ninguém ter mexido nele — só
+        # carimba o servidor quando o valor realmente mudou.
+        porte_mudou = "porte" in mudancas and oportunidade.porte != mudancas["porte"]
+
         for campo, valor in mudancas.items():
             setattr(oportunidade, campo, valor)
         if editados:
@@ -446,6 +480,12 @@ def _registrar(api: FastAPI) -> None:
             oportunidade.campos_do_crm = sorted(
                 set(oportunidade.campos_do_crm or []) | editados
             )
+
+        # O instante da confirmação/sobreposição de porte é do servidor, não
+        # do navegador de quem preenche — é este par (quem + quando) que vira
+        # material para recalibrar a régua depois.
+        if porte_mudou:
+            oportunidade.porte_definido_em = agora()
 
         # Aceita sem data de aceite é o defeito mais comum da planilha de 2026.
         # Aqui não se repete: a API recusa, em vez de deixar passar e virar
@@ -458,9 +498,7 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(422, "para marcar como aceita, informe a data do aceite")
 
         sessao.flush()
-        detalhe = e.OportunidadeDetalhe.model_validate(oportunidade)
-        detalhe.grupo_nome = oportunidade.grupo.nome
-        return detalhe
+        return _detalhe_de(oportunidade, oportunidade.grupo.nome)
 
     # ------------------------------------------------------------- conferência
     def _contagens(sessao: Session, ids: list[int]) -> dict[int, dict[TipoDeOcorrencia, int]]:
@@ -683,9 +721,7 @@ def _registrar(api: FastAPI) -> None:
         lead.situacao = SituacaoLead.CONVERTIDO
         sessao.flush()
 
-        detalhe = e.OportunidadeDetalhe.model_validate(oportunidade)
-        detalhe.grupo_nome = grupo.nome
-        return detalhe
+        return _detalhe_de(oportunidade, grupo.nome)
 
 
 app = criar_app()

@@ -43,6 +43,14 @@ export interface OportunidadeResumo {
   proxima_acao_em: string | null;
 }
 
+export interface SugestaoDePorte {
+  calculavel: boolean;
+  pontuacao: string | null;
+  porte: string | null;
+  horas_base: number | null;
+  direcionadores_aplicados: number;
+}
+
 export interface OportunidadeDetalhe extends OportunidadeResumo {
   canal: string | null;
   linha_servico: string | null;
@@ -53,6 +61,27 @@ export interface OportunidadeDetalhe extends OportunidadeResumo {
   observacao: string | null;
   origem: string;
   linha_planilha: number | null;
+
+  complexidade: number | null;
+  risco_tecnico: number | null;
+
+  documentos_fiscais_mes: number | null;
+  lancamentos_contabeis_mes: number | null;
+  pagamentos_mes: number | null;
+  contas_bancarias: number | null;
+  conciliacoes_cartao_mes: number | null;
+  empregados_clt: number | null;
+  admissoes_desligamentos_mes: number | null;
+  cnpjs_no_escopo: number | null;
+  tomadores_de_servico: number | null;
+  servicos_contratados_alem_do_primeiro: number;
+  tem_consolidacao_de_grupo: boolean;
+  e_auditada: boolean;
+
+  porte: string | null;
+  porte_definido_por: string | null;
+  porte_definido_em: string | null;
+  sugestao_de_porte: SugestaoDePorte | null;
 }
 
 export interface ColunaDoFunil {
@@ -93,6 +122,7 @@ export interface Listas {
   linhas_de_servico: string[];
   situacoes_de_grupo: string[];
   captadores: string[];
+  portes: string[];
 }
 
 export interface Recorte {

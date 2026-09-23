@@ -269,6 +269,50 @@ class Oportunidade(CarimboMixin, Base):
     proxima_acao_em: Mapped[date | None] = mapped_column(sa.Date, index=True)
     observacao: Mapped[str | None] = mapped_column(sa.Text)
 
+    complexidade: Mapped[int | None] = mapped_column(sa.SmallInteger)
+    risco_tecnico: Mapped[int | None] = mapped_column(sa.SmallInteger)
+    """Nota 1 a 5, mesma escala do `modelo-classificacao-carteira.md` — para
+    servir sem conversão quando a classificação viva (Etapa 3) chegar.
+
+    Decisão de 22/09/2026 (`regua-de-porte-e-plano-de-teste.md`, seção 7):
+    preenchidos **na oportunidade, antes da proposta**, não só na carteira —
+    senão, quando a precificação automática entrar, não há histórico para
+    calibrar nada.
+    """
+
+    documentos_fiscais_mes: Mapped[int | None] = mapped_column(sa.Integer)
+    lancamentos_contabeis_mes: Mapped[int | None] = mapped_column(sa.Integer)
+    pagamentos_mes: Mapped[int | None] = mapped_column(sa.Integer)
+    contas_bancarias: Mapped[int | None] = mapped_column(sa.Integer)
+    conciliacoes_cartao_mes: Mapped[int | None] = mapped_column(sa.Integer)
+    empregados_clt: Mapped[int | None] = mapped_column(sa.Integer)
+    admissoes_desligamentos_mes: Mapped[int | None] = mapped_column(sa.Integer)
+    cnpjs_no_escopo: Mapped[int | None] = mapped_column(sa.Integer)
+    tomadores_de_servico: Mapped[int | None] = mapped_column(sa.Integer)
+    """Os nove direcionadores da régua de porte (`crm.domain.porte`). `None`
+    é "não se aplica ao escopo contratado" — fica fora da média, nunca vira
+    zero. Ver a régua para as faixas de cada um."""
+
+    servicos_contratados_alem_do_primeiro: Mapped[int] = mapped_column(
+        sa.SmallInteger, nullable=False, default=0, server_default=sa.text("0")
+    )
+    tem_consolidacao_de_grupo: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default=sa.false()
+    )
+    e_auditada: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default=sa.false()
+    )
+
+    porte: Mapped[str | None] = mapped_column(sa.String(20))
+    """O porte **confirmado** — não o calculado. A régua só sugere (ver
+    `crm.domain.porte`); este campo é o que a pessoa aceitou ou sobrepôs."""
+
+    porte_definido_por: Mapped[str | None] = mapped_column(sa.String(10))
+    porte_definido_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    """Quem confirmou ou sobrepôs o porte, e quando — é este par que vira
+    material para recalibrar a régua depois. Sem autor, uma sobreposição é
+    só um número diferente, sem ninguém para explicar por quê."""
+
     origem: Mapped[Origem] = mapped_column(
         coluna_lista(Origem), nullable=False, default=Origem.CRM
     )
@@ -312,6 +356,14 @@ class Oportunidade(CarimboMixin, Base):
         sa.CheckConstraint(
             "origem <> 'Carga 2026' OR chave_origem IS NOT NULL",
             name="carga_exige_chave_de_origem",
+        ),
+        sa.CheckConstraint(
+            "complexidade IS NULL OR complexidade BETWEEN 1 AND 5",
+            name="complexidade_de_1_a_5",
+        ),
+        sa.CheckConstraint(
+            "risco_tecnico IS NULL OR risco_tecnico BETWEEN 1 AND 5",
+            name="risco_tecnico_de_1_a_5",
         ),
     )
 

@@ -5,18 +5,20 @@ a API do funil e as telas. Cobre os incrementos E2 (*a carteira existe*) e E3
 (*o funil funciona*), na ordem invertida que a proposta aprovada em 20/09/2026
 autorizou por causa do prazo — e, desde 22/09/2026, o começo do E4 (*a
 proposta nasce no CRM*): preço, serviço e criação de oportunidade direto na
-tela, sem depender da planilha ou de um lead.
+tela, sem depender da planilha ou de um lead; desde 23/09/2026, a régua de
+porte por volume (sugestão, nunca decisão) e a captura de complexidade e
+risco técnico.
 
 ## Estado
 
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e quatro telas |
-| Testes | **262** no backend, **101** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Testes | **279** no backend, **107** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
 | Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
 | API | 16 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe) e conferência da carga. React com TypeScript, em `../frontend` |
-| Fora do ar | Nuvem, login, backup automático (E1); documento da proposta e demais KPIs (E5) |
+| Fora do ar | Nuvem, login, backup automático (E1); documento da proposta, ficha de volumetria completa e demais KPIs (E5) |
 
 ## Como rodar
 
@@ -382,6 +384,50 @@ inventar uma barra de ações nova.
 (PDF/Word) para enviar ao cliente. Precisaria de modelo aprovado e
 provavelmente envolve o Bruno na definição do template — escopo maior,
 adiado para quando entrar em pauta.
+
+## A régua de porte — sugestão, nunca decisão (23/09/2026)
+
+Especificada em `../regua-de-porte-e-plano-de-teste.md`. O próprio documento
+avisa: aferida contra **um caso só**, "confirma que a escala não está
+grosseiramente errada, não que está calibrada". Por isso o código nunca
+decide — só sugere, sempre (`crm/domain/porte.py`).
+
+```
+base    = média dos direcionadores aplicáveis          (0 a 4, os que faltam ficam fora — nunca viram zero)
+escopo  = +0,25 por serviço contratado além do primeiro (máx. +0,75)
+grupo   = +0,50 se houver consolidação de grupo
+audit   = +0,25 se a empresa for auditada
+pontuação = base + escopo + grupo + audit → corte em Micro / Pequeno / Médio / Grande / Extra Grande
+```
+
+Os nove direcionadores (documentos fiscais, lançamentos contábeis, pagamentos,
+contas bancárias, conciliações de cartão, empregados CLT, admissões e
+desligamentos, CNPJs no escopo, tomadores de serviço) e complexidade/risco
+técnico (nota 1 a 5, mesma escala do `modelo-classificacao-carteira.md`)
+entram **na oportunidade, antes da proposta** — decisão da seção 7 do
+documento: "nada no cálculo [automático] — mas complexidade e risco técnico
+passam a ser preenchidos aqui, senão não há histórico para calibrar nada
+quando a precificação automática entrar".
+
+`GET /api/oportunidades/{id}` devolve `sugestao_de_porte` calculada na hora
+(nunca gravada — muda se a régua mudar). O campo `porte` só grava quando uma
+pessoa confirma ou sobrepõe, via `PATCH` — com `porte_definido_por` e
+`porte_definido_em`, este último carimbado pelo **servidor**, não pelo
+navegador. É esse par que vira material para recalibrar a régua depois.
+
+> **Defeito real, corrigido antes de ir ao ar:** a tela manda o rascunho
+> inteiro a cada "Salvar alterações", `porte` incluso mesmo quando ninguém
+> mexeu nele. A primeira versão carimbava `porte_definido_em` só por `"porte"`
+> estar presente no corpo do PATCH — não por ter mudado de valor —, então
+> **qualquer** salvamento (editar preço, mudar temperatura) registrava uma
+> "confirmação" fantasma. Corrigido comparando o valor novo contra o atual
+> antes de carimbar; `tests/test_api.py::test_salvar_outro_campo_com_porte_null_no_corpo_nao_carimba_data`
+> é a regressão.
+
+**O que decidir antes da próxima rodada** (seção 6 do documento, ainda em
+aberto): se a régua deve só sugerir ou decidir (hoje: só sugere); quem atribui
+complexidade/risco na fase comercial, já que não pode ser quem precifica; e
+se roda o teste da seção 4 contra uma amostra real, para calibrar de verdade.
 
 ## Conferência da carga
 

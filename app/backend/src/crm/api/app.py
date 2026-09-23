@@ -26,6 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, sessionmaker
 
 from crm.api import esquemas as e
+from crm.api.backup import roteador as roteador_de_backup
 from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
 from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, fundir_grupos
@@ -99,6 +100,7 @@ def criar_app(fabrica: sessionmaker[Session] | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     _registrar(api)
+    api.include_router(roteador_de_backup(lambda: _fabrica.kw["bind"]))
     return api
 
 

@@ -13,3 +13,7 @@ __pycache__/
 
 # Sistema
 .DS_Store
+
+# Backups lógicos: têm dado de cliente, nunca versionar
+Backups-CRM/
+crm-*.zip

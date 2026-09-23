@@ -36,6 +36,32 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Backup lógico (exportar e importar os dados)
+
+Leva **os dados**, não o banco: um `.zip` com um arquivo `.jsonl` por tabela e um
+manifesto com a contagem e a impressão digital (SHA-256) de cada uma. O mesmo
+arquivo importa em outro PostgreSQL ou em SQLite, sem depender de versão de banco.
+
+```bash
+cd backend
+~/.venvs/criterio-crm/bin/python scripts/backup.py exportar            # ~/Backups-CRM/crm-AAAAMMDD-HHMMSS.zip
+~/.venvs/criterio-crm/bin/python scripts/backup.py verificar <arquivo> # confere sem tocar no banco
+~/.venvs/criterio-crm/bin/python scripts/backup.py importar <arquivo>  # só em banco vazio
+~/.venvs/criterio-crm/bin/python scripts/backup.py importar <arquivo> --substituir  # apaga o atual
+```
+
+Na tela, **Configurações** faz o mesmo: baixar o backup, conferir o arquivo e importar.
+
+- **Tudo ou nada:** a importação roda numa transação; qualquer erro desfaz por inteiro.
+- **Recusa destino com dados** e esquema de outra revisão (rode `alembic upgrade head` antes).
+- **Só na máquina do CRM:** as rotas `/api/backup/*` recusam pedido que chegue por
+  túnel (ngrok) ou host que não seja `localhost`, porque o arquivo tem todos os dados
+  de cliente e a API não tem login.
+- **Sem criptografia.** Guarde fora do repositório e de pastas compartilhadas.
+- **Limite de conferência:** a importação em PostgreSQL (acerto das sequências) não foi
+  testada num banco descartável — a máquina não permitiu criar um. Teste num destino
+  vazio antes de depender dela.
+
 Subir tudo com um comando (a API e a tela, cada uma no seu processo; Ctrl+C
 derruba as duas):
 

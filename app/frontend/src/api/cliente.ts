@@ -73,7 +73,44 @@ export interface FiltrosDoFunil {
   data_ate?: string;
 }
 
+export interface ResumoDeBackup {
+  criado_em: string;
+  revisao_do_esquema: string | null;
+  tabelas: Record<string, number>;
+  total: number;
+}
+
+/** O arquivo de backup vai cru no corpo, não em JSON. */
+async function enviarArquivo(caminho: string, arquivo: File, cabecalhos: Record<string, string> = {}) {
+  let resposta: Response;
+  try {
+    resposta = await fetch(caminho, { method: "POST", body: arquivo, headers: cabecalhos });
+  } catch {
+    throw new ErroDaApi(0, "Não consegui falar com o servidor. Ele está no ar?");
+  }
+  if (!resposta.ok) {
+    let detalhe = `Erro ${resposta.status}`;
+    try {
+      const corpo = await resposta.json();
+      if (typeof corpo?.detail === "string") detalhe = corpo.detail;
+    } catch {
+      /* sem JSON */
+    }
+    throw new ErroDaApi(resposta.status, detalhe);
+  }
+  return (await resposta.json()) as ResumoDeBackup;
+}
+
 export const api = {
+  verificarBackup: (arquivo: File) => enviarArquivo("/api/backup/verificar", arquivo),
+
+  importarBackup: (arquivo: File, substituir: boolean) =>
+    enviarArquivo(
+      `/api/backup/importar${substituir ? "?substituir=true" : ""}`,
+      arquivo,
+      substituir ? { "X-Confirmacao": "SUBSTITUIR" } : {},
+    ),
+
   listas: () => pedir<Listas>("/api/listas"),
 
   funil: (filtros: FiltrosDoFunil = {}) =>

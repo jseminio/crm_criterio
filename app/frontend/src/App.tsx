@@ -6,6 +6,7 @@ import "./app.css";
 import { api } from "./api/cliente";
 import type { Listas } from "./api/tipos";
 import { Conferencia } from "./telas/Conferencia";
+import { Configuracoes } from "./telas/Configuracoes";
 import { Contratos } from "./telas/Contratos";
 import { Funil } from "./telas/Funil";
 import { Grupos } from "./telas/Grupos";
@@ -13,7 +14,7 @@ import { Leads } from "./telas/Leads";
 import { Lista } from "./telas/Lista";
 import { usarDados } from "./usarDados";
 
-type Tela = "funil" | "lista" | "leads" | "grupos" | "contratos" | "conferencia";
+type Tela = "funil" | "lista" | "leads" | "grupos" | "contratos" | "conferencia" | "configuracoes";
 
 const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[] = [
   {
@@ -51,6 +52,12 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     rotulo: "Conferência",
     titulo: "Conferência da carga",
     descricao: "O que entrou da planilha, o que ficou pendente e o que foi ajustado.",
+  },
+  {
+    chave: "configuracoes",
+    rotulo: "Configurações",
+    titulo: "Configurações",
+    descricao: "Backup lógico: leve os dados para outra máquina ou guarde uma cópia.",
   },
 ];
 
@@ -102,6 +109,7 @@ export default function App() {
           {tela === "grupos" && <Grupos listas={listas} />}
           {tela === "contratos" && <Contratos listas={listas} />}
           {tela === "conferencia" && <Conferencia />}
+          {tela === "configuracoes" && <Configuracoes />}
         </main>
       </div>
     </div>

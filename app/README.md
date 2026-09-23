@@ -7,19 +7,20 @@ autorizou por causa do prazo — e, desde 22/09/2026, o começo do E4 (*a
 proposta nasce no CRM*): preço, serviço e criação de oportunidade direto na
 tela, sem depender da planilha ou de um lead; desde 23/09/2026, a régua de
 porte por volume (sugestão, nunca decisão), a captura de complexidade e
-risco técnico, e o começo do E5 (*os números aparecem*): ciclo médio de
-vendas, cobertura do processo e dependência de canal.
+risco técnico, o começo do E5 (*os números aparecem*): ciclo médio de
+vendas, cobertura do processo e dependência de canal — e o começo da
+**Etapa 2** (*fechar o ciclo*): a oportunidade aceita vira contrato.
 
 ## Estado
 
 | | |
 |---|---|
-| O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e quatro telas |
-| Testes | **289** no backend, **113** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
-| Banco | PostgreSQL 18.6 local, cinco tabelas, migração aplicada. Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
-| API | 16 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
-| Telas | Funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe) e conferência da carga. React com TypeScript, em `../frontend` |
-| Fora do ar | Nuvem, login, backup automático (E1); documento da proposta, ficha de volumetria completa (E4); ticket médio, MRR e os seis indicadores de cobertura que exigem contrato/implantação/entrevista/classificação (E5) |
+| O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e seis telas |
+| Testes | **296** no backend, **113** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Banco | PostgreSQL 18.6 local, seis tabelas (`contrato` desde 23/09/2026), migração aplicada. Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
+| API | 20 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
+| Telas | Funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe), contratos (novo, 23/09/2026) e conferência da carga. React com TypeScript, em `../frontend` |
+| Fora do ar | Nuvem, login, backup automático (E1); documento da proposta, ficha de volumetria completa (E4); ticket médio, MRR e os seis indicadores de cobertura que exigem implantação/entrevista/classificação (E5); Clicksign, evento de contrato, renovação, saldo de horas de conforto, Implantação (Etapa 2) |
 
 ## Como rodar
 
@@ -582,6 +583,28 @@ Este trimestre, Trimestre anterior, Este ano, Ano anterior) em datas
 concretas **no navegador** — a API só recebe `data_de`/`data_ate` prontos,
 nunca o nome do atalho. "Personalizado" libera os dois campos de data para
 digitar à mão.
+
+## O começo da Etapa 2 — contrato (23/09/2026)
+
+Eduardo pediu para avançar além da Etapa 1 ("Vamos deixar essas pendências
+para depois. Avance para implementar a Etapa 2") e confirmou o escopo desta
+rodada (gate PF-07, amostra aprovada em chat): **só o registro do contrato**,
+sem Clicksign — a assinatura eletrônica fica para depois, por decisão dele.
+
+`Contrato` (`crm/db/modelos.py`) nasce de uma oportunidade aceita, nunca do
+zero: `POST /api/oportunidades/{id}/converter-em-contrato` recusa quem não
+está em `Situacao.ACEITA` (422) e quem já tem contrato (409 — `oportunidade_id`
+é única). Escopo e preço partem da proposta aceita mas podem ser ajustados no
+corpo da conversão; `data_inicio` parte de `data_aceite` quando não vier.
+Nasce sempre `Aguardando assinatura` — o documento existir não significa que
+foi assinado. `GET/PATCH /api/contratos` e a tela "Contratos" (lista +
+painel de edição, mesmo padrão de `Leads`) cobrem o resto do ciclo de vida.
+
+**Fora desta rodada, por decisão explícita ou por `anexo-tecnico.md`
+marcar "a confirmar":** Clicksign, evento de contrato (aditivo, reajuste,
+expansão), renovação automática, saldo de horas de conforto, e Implantação —
+esta última porque os documentos recomendam esperar a aprovação de
+`MP-SC-01`, uma dependência externa ao projeto.
 
 ## Lacunas da verificação automática da plataforma
 

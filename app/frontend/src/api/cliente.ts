@@ -2,6 +2,8 @@
 
 import type {
   ColunaDoFunil,
+  ContratoDetalhe,
+  ContratoResumo,
   Execucao,
   ExecucaoDetalhe,
   GrupoResumo,
@@ -133,5 +135,22 @@ export const api = {
     pedir<GrupoResumo>(`/api/grupos/${principalId}/fundir`, {
       method: "POST",
       body: JSON.stringify({ absorvido_id: absorvidoId }),
+    }),
+
+  contratos: (filtros: { situacao?: string[]; grupo_id?: number } = {}) =>
+    pedir<Pagina<ContratoResumo>>(comParametros("/api/contratos", { ...filtros, limite: 500 })),
+
+  contrato: (id: number) => pedir<ContratoDetalhe>(`/api/contratos/${id}`),
+
+  editarContrato: (id: number, mudancas: Record<string, unknown>) =>
+    pedir<ContratoDetalhe>(`/api/contratos/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(mudancas),
+    }),
+
+  converterEmContrato: (oportunidadeId: number, dados: Record<string, unknown> = {}) =>
+    pedir<ContratoDetalhe>(`/api/oportunidades/${oportunidadeId}/converter-em-contrato`, {
+      method: "POST",
+      body: JSON.stringify(dados),
     }),
 };

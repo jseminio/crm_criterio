@@ -17,6 +17,7 @@ from crm.domain.listas import (
     MotivoRecusa,
     Origem,
     Situacao,
+    SituacaoContrato,
     SituacaoGrupo,
     SituacaoLead,
     Temperatura,
@@ -35,6 +36,10 @@ __all__ = [
     "LeadNovo",
     "LeadEdicao",
     "ConversaoDeLead",
+    "ContratoResumo",
+    "ContratoDetalhe",
+    "ContratoEdicao",
+    "ConversaoEmContrato",
     "Fusao",
     "Pagina",
     "ColunaDoFunil",
@@ -259,6 +264,53 @@ class ConversaoDeLead(BaseModel):
     nome: str | None = Field(default=None, max_length=200)
     servico: str | None = Field(default=None, max_length=120)
     tipo_servico: str | None = Field(default=None, max_length=120)
+
+
+class ContratoResumo(Base):
+    """O que cabe numa linha da lista de contratos."""
+
+    id: int
+    grupo_id: int
+    grupo_nome: str | None = None
+    oportunidade_id: int | None = None
+    escopo: str | None = None
+    preco_mensal: Decimal | None = None
+    preco_anual: Decimal | None = None
+    data_inicio: date | None = None
+    data_fim: date | None = None
+    situacao: SituacaoContrato
+    signatario: str | None = None
+
+
+class ContratoDetalhe(ContratoResumo):
+    documento_assinado: str | None = None
+    observacao: str | None = None
+
+
+class ContratoEdicao(BaseModel):
+    """O que a tela pode mudar. Tudo opcional: só o que vier é alterado."""
+
+    escopo: str | None = Field(default=None, max_length=200)
+    preco_mensal: Decimal | None = None
+    preco_anual: Decimal | None = None
+    data_inicio: date | None = None
+    data_fim: date | None = None
+    situacao: SituacaoContrato | None = None
+    documento_assinado: str | None = Field(default=None, max_length=400)
+    signatario: str | None = Field(default=None, max_length=200)
+    observacao: str | None = None
+
+
+class ConversaoEmContrato(BaseModel):
+    """Vira contrato. Escopo e preço partem da oportunidade aceita, mas podem
+    ser ajustados aqui — o que foi aceito na proposta nem sempre é exatamente
+    o que vai assinado no papel."""
+
+    escopo: str | None = Field(default=None, max_length=200)
+    preco_mensal: Decimal | None = None
+    preco_anual: Decimal | None = None
+    data_inicio: date | None = None
+    signatario: str | None = Field(default=None, max_length=200)
 
 
 class Fusao(BaseModel):

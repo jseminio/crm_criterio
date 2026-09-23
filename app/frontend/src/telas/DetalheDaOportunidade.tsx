@@ -238,6 +238,8 @@ export function DetalheDaOportunidade({
   const [erro, definirErro] = useState<string | null>(null);
   const [salvando, definirSalvando] = useState(false);
   const [rascunho, definirRascunho] = useState<Record<string, string>>({});
+  const [convertendoEmContrato, definirConvertendoEmContrato] = useState(false);
+  const [avisoDeContrato, definirAvisoDeContrato] = useState<string | null>(null);
 
   const carregar = () => {
     definirErro(null);
@@ -314,6 +316,21 @@ export function DetalheDaOportunidade({
 
   const exigeDataDeAceite = rascunho.situacao === "Aceita" && !rascunho.data_aceite;
 
+  const converterEmContrato = async () => {
+    definirConvertendoEmContrato(true);
+    definirErro(null);
+    definirAvisoDeContrato(null);
+    try {
+      await api.converterEmContrato(id);
+      definirAvisoDeContrato("Contrato criado — confira na tela Contratos.");
+      aoSalvar();
+    } catch (falha) {
+      definirErro(falha instanceof ErroDaApi ? falha.message : "Falha ao converter em contrato.");
+    } finally {
+      definirConvertendoEmContrato(false);
+    }
+  };
+
   return (
     <PainelLateral
       titulo={detalhe?.grupo_nome ?? "Oportunidade"}
@@ -328,6 +345,16 @@ export function DetalheDaOportunidade({
             <button type="button" className="botao botao-secundario" onClick={aoFechar}>
               Cancelar
             </button>
+            {detalhe.situacao === "Aceita" && (
+              <button
+                type="button"
+                className="botao botao-secundario"
+                onClick={converterEmContrato}
+                disabled={convertendoEmContrato}
+              >
+                {convertendoEmContrato ? "Convertendo…" : "Converter em contrato"}
+              </button>
+            )}
             {/* Uma ação primária por painel — regra 2 do PAD-002. */}
             <button
               type="button"
@@ -349,6 +376,11 @@ export function DetalheDaOportunidade({
           {erro && (
             <div className="estado estado-erro" role="alert">
               <p className="estado-texto">{erro}</p>
+            </div>
+          )}
+          {avisoDeContrato && (
+            <div className="recado" role="status">
+              {avisoDeContrato}
             </div>
           )}
 

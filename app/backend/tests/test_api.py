@@ -495,6 +495,81 @@ class TestConversao:
         assert segunda.status_code == 409
 
 
+class TestContratos:
+    """Começo da Etapa 2 (23/09/2026): oportunidade aceita vira contrato."""
+
+    def test_converte_a_aceita_em_contrato(self, cliente: TestClient, carteira):
+        resposta = cliente.post(
+            f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={}
+        )
+
+        assert resposta.status_code == 201
+        corpo = resposta.json()
+        assert corpo["grupo_nome"] == "Beta Participações"
+        assert corpo["situacao"] == "Aguardando assinatura"
+        assert corpo["escopo"] == "BPO Financeiro"
+        assert corpo["preco_mensal"] == "8000.00"
+        assert corpo["data_inicio"] == "2026-06-01"
+
+    def test_ajustes_no_corpo_sobrepoem_o_que_vem_da_oportunidade(
+        self, cliente: TestClient, carteira
+    ):
+        resposta = cliente.post(
+            f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato",
+            json={"escopo": "BPO Financeiro + Fiscal", "signatario": "Fulano de Tal"},
+        )
+
+        corpo = resposta.json()
+        assert corpo["escopo"] == "BPO Financeiro + Fiscal"
+        assert corpo["signatario"] == "Fulano de Tal"
+
+    def test_nao_converte_oportunidade_nao_aceita(self, cliente: TestClient, carteira):
+        resposta = cliente.post(
+            f"/api/oportunidades/{carteira['primeira']}/converter-em-contrato", json={}
+        )
+
+        assert resposta.status_code == 422
+
+    def test_nao_converte_duas_vezes(self, cliente: TestClient, carteira):
+        cliente.post(f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={})
+
+        segunda = cliente.post(
+            f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={}
+        )
+
+        assert segunda.status_code == 409
+
+    def test_lista_e_filtra_por_situacao(self, cliente: TestClient, carteira):
+        cliente.post(f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={})
+
+        pagina = cliente.get("/api/contratos").json()
+        assert pagina["total"] == 1
+
+        vazia = cliente.get(
+            "/api/contratos", params={"situacao": "Ativo"}
+        ).json()
+        assert vazia["total"] == 0
+
+    def test_le_o_detalhe(self, cliente: TestClient, carteira):
+        criado = cliente.post(
+            f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={}
+        ).json()
+
+        detalhe = cliente.get(f"/api/contratos/{criado['id']}").json()
+        assert detalhe["oportunidade_id"] == carteira["aceita"]
+
+    def test_edita_a_situacao(self, cliente: TestClient, carteira):
+        criado = cliente.post(
+            f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={}
+        ).json()
+
+        editado = cliente.patch(
+            f"/api/contratos/{criado['id']}", json={"situacao": "Ativo"}
+        ).json()
+
+        assert editado["situacao"] == "Ativo"
+
+
 class TestGrupos:
     def test_lista_com_a_contagem_de_oportunidades(self, cliente: TestClient, carteira):
         """É o número que diz onde olhar primeiro no reagrupamento."""

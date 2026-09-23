@@ -6,13 +6,14 @@ import "./app.css";
 import { api } from "./api/cliente";
 import type { Listas } from "./api/tipos";
 import { Conferencia } from "./telas/Conferencia";
+import { Contratos } from "./telas/Contratos";
 import { Funil } from "./telas/Funil";
 import { Grupos } from "./telas/Grupos";
 import { Leads } from "./telas/Leads";
 import { Lista } from "./telas/Lista";
 import { usarDados } from "./usarDados";
 
-type Tela = "funil" | "lista" | "leads" | "grupos" | "conferencia";
+type Tela = "funil" | "lista" | "leads" | "grupos" | "contratos" | "conferencia";
 
 const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[] = [
   {
@@ -38,6 +39,12 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     rotulo: "Grupos",
     titulo: "Grupos econômicos",
     descricao: "O cliente é o grupo. Junte os que a planilha separou.",
+  },
+  {
+    chave: "contratos",
+    rotulo: "Contratos",
+    titulo: "Contratos",
+    descricao: "O que a oportunidade aceita virou — começo da Etapa 2.",
   },
   {
     chave: "conferencia",
@@ -93,6 +100,7 @@ export default function App() {
           {tela === "lista" && <Lista listas={listas} />}
           {tela === "leads" && <Leads listas={listas} />}
           {tela === "grupos" && <Grupos listas={listas} />}
+          {tela === "contratos" && <Contratos listas={listas} />}
           {tela === "conferencia" && <Conferencia />}
         </main>
       </div>

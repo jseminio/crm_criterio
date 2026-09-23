@@ -20,6 +20,7 @@ __all__ = [
     "SituacaoLead",
     "SituacaoGrupo",
     "SituacaoEmpresa",
+    "SituacaoContrato",
     "PapelContato",
     "Origem",
     "TipoDeOcorrencia",
@@ -113,6 +114,25 @@ class SituacaoEmpresa(Enum):
     ATIVA = "Ativa"
     INATIVA = "Inativa"
     BAIXADA = "Baixada"
+
+
+class SituacaoContrato(Enum):
+    """Onde o contrato está — início do E2 (Etapa 2), 23/09/2026.
+
+    Nasce de uma oportunidade aceita, sem assinatura automática ainda (o
+    Clicksign não entrou nesta rodada — decisão de Eduardo). Por isso começa
+    aguardando assinatura, não ativo: o documento existir não significa que
+    foi assinado.
+    """
+
+    AGUARDANDO_ASSINATURA = "Aguardando assinatura"
+    ATIVO = "Ativo"
+    SUSPENSO = "Suspenso"
+    ENCERRADO = "Encerrado"
+
+    @property
+    def em_vigor(self) -> bool:
+        return self is SituacaoContrato.ATIVO
 
 
 class PapelContato(Enum):

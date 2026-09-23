@@ -1,9 +1,12 @@
-"""As entidades do E2 e do E3: cliente, contato, lead e oportunidade.
+"""As entidades do E2, E3 e do começo da Etapa 2: cliente, contato, lead,
+oportunidade e contrato.
 
-Cobre o que a proposta aprovada em 20/09/2026 promete para sexta — a carteira
-existindo e o funil funcionando. As entidades de contrato, implantação e
-carteira classificada estão na arquitetura, mas **não** aqui: entram quando as
-etapas seguintes chegarem, e cada uma depende de decisão humana ainda pendente.
+E2/E3 cobrem o que a proposta aprovada em 20/09/2026 prometeu para sexta — a
+carteira existindo e o funil funcionando. `Contrato` entrou em 23/09/2026,
+começo da Etapa 2 ("fechar o ciclo") — decisão de Eduardo, com o Bruno já
+alinhado. Implantação e carteira classificada continuam **fora**: a primeira
+depende da aprovação do `MP-SC-01`, que não é deste projeto; a segunda é
+Etapa 3.
 
 Três princípios da arquitetura aparecem no código:
 
@@ -29,6 +32,7 @@ from crm.domain.listas import (
     Origem,
     PapelContato,
     Situacao,
+    SituacaoContrato,
     SituacaoEmpresa,
     SituacaoGrupo,
     SituacaoLead,
@@ -43,6 +47,7 @@ __all__ = [
     "PessoaContato",
     "Lead",
     "Oportunidade",
+    "Contrato",
     "ExecucaoDeCarga",
     "OcorrenciaDeCarga",
 ]
@@ -91,6 +96,9 @@ class GrupoEconomico(CarimboMixin, Base):
         back_populates="grupo", cascade="save-update"
     )
     oportunidades: Mapped[list["Oportunidade"]] = relationship(
+        back_populates="grupo", cascade="save-update"
+    )
+    contratos: Mapped[list["Contrato"]] = relationship(
         back_populates="grupo", cascade="save-update"
     )
 
@@ -369,6 +377,55 @@ class Oportunidade(CarimboMixin, Base):
 
     def __repr__(self) -> str:
         return f"<Oportunidade {self.id} {self.nome!r} {self.situacao.value}>"
+
+
+class Contrato(CarimboMixin, Base):
+    """Nasce de uma oportunidade aceita — começo da Etapa 2 (E2 "fechar o
+    ciclo"), 23/09/2026.
+
+    **Só o registro, ainda.** Sem Clicksign (decisão de Eduardo: a assinatura
+    eletrônica fica para depois), sem evento de contrato (aditivo, reajuste,
+    expansão — é a camada seguinte, ainda não construída), sem renovação
+    automática (`anexo-tecnico.md` marca vigência/renovação como "a
+    confirmar" — não é para inventar aqui).
+    """
+
+    __tablename__ = "contrato"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    grupo_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("grupo_economico.id"), nullable=False, index=True
+    )
+    oportunidade_id: Mapped[int | None] = mapped_column(
+        sa.ForeignKey("oportunidade.id"), unique=True, index=True
+    )
+    """A oportunidade aceita que originou o contrato. Nula se o contrato
+    nascer direto na tela, sem passar pelo funil."""
+
+    escopo: Mapped[str | None] = mapped_column(sa.String(200))
+    preco_mensal: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_anual: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+
+    data_inicio: Mapped[date | None] = mapped_column(sa.Date)
+    data_fim: Mapped[date | None] = mapped_column(sa.Date)
+
+    situacao: Mapped[SituacaoContrato] = mapped_column(
+        coluna_lista(SituacaoContrato),
+        nullable=False,
+        default=SituacaoContrato.AGUARDANDO_ASSINATURA,
+    )
+    documento_assinado: Mapped[str | None] = mapped_column(sa.String(400))
+    """Link ou referência do documento — sem upload no CRM ainda. Texto
+    livre (ex.: caminho no SharePoint), não um arquivo guardado aqui."""
+
+    signatario: Mapped[str | None] = mapped_column(sa.String(200))
+    observacao: Mapped[str | None] = mapped_column(sa.Text)
+
+    grupo: Mapped[GrupoEconomico] = relationship(back_populates="contratos")
+    oportunidade: Mapped["Oportunidade | None"] = relationship()
+
+    def __repr__(self) -> str:
+        return f"<Contrato {self.id} grupo={self.grupo_id} {self.situacao.value}>"
 
 
 class ExecucaoDeCarga(Base):

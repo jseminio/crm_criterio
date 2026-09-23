@@ -1,7 +1,8 @@
 """A API do Critério CRM.
 
-Serve o funil: grupos, oportunidades e leads. É o que o E3 precisa e nada além
-— contrato, implantação e carteira classificada não passam por aqui.
+Serve o funil: grupos, oportunidades, leads e, a partir do início da Etapa 2
+(23/09/2026), o contrato que nasce de uma oportunidade aceita. Implantação e
+carteira classificada continuam de fora — ainda não passam por aqui.
 
 ⚠️ **Esta API não tem autenticação.** O E1, que traz o login pela conta
 corporativa Microsoft, foi adiado por decisão de Eduardo em 20/09/2026 para que
@@ -29,6 +30,7 @@ from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
 from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, fundir_grupos
 from crm.db.modelos import (
+    Contrato,
     ExecucaoDeCarga,
     GrupoEconomico,
     Lead,
@@ -43,6 +45,7 @@ from crm.domain.listas import (
     MotivoRecusa,
     Origem,
     Situacao,
+    SituacaoContrato,
     SituacaoGrupo,
     SituacaoLead,
     Temperatura,
@@ -136,6 +139,18 @@ def _detalhe_de(oportunidade: Oportunidade, nome_do_grupo: str | None) -> e.Opor
         horas_base=sugestao.horas_base,
         direcionadores_aplicados=sugestao.direcionadores_aplicados,
     )
+    return detalhe
+
+
+def _resumo_de_contrato(contrato: Contrato, nome_do_grupo: str | None) -> e.ContratoResumo:
+    resumo = e.ContratoResumo.model_validate(contrato)
+    resumo.grupo_nome = nome_do_grupo
+    return resumo
+
+
+def _detalhe_de_contrato(contrato: Contrato, nome_do_grupo: str | None) -> e.ContratoDetalhe:
+    detalhe = e.ContratoDetalhe.model_validate(contrato)
+    detalhe.grupo_nome = nome_do_grupo
     return detalhe
 
 
@@ -521,6 +536,104 @@ def _registrar(api: FastAPI) -> None:
 
         sessao.flush()
         return _detalhe_de(oportunidade, oportunidade.grupo.nome)
+
+    @api.post(
+        "/api/oportunidades/{oportunidade_id}/converter-em-contrato",
+        response_model=e.ContratoDetalhe,
+        status_code=201,
+        tags=["contratos"],
+    )
+    def converter_em_contrato(
+        oportunidade_id: int,
+        corpo: e.ConversaoEmContrato,
+        sessao: Session = Depends(obter_sessao),
+    ) -> e.ContratoDetalhe:
+        """Fecha o ciclo: a oportunidade aceita vira contrato — começo da
+        Etapa 2 (23/09/2026). Só o registro; sem Clicksign, sem renovação
+        automática (decisão de Eduardo — ver `crm.db.modelos.Contrato`).
+        """
+        oportunidade = sessao.get(Oportunidade, oportunidade_id)
+        if oportunidade is None:
+            raise HTTPException(404, "oportunidade não encontrada")
+        if oportunidade.situacao is not Situacao.ACEITA:
+            raise HTTPException(422, "só uma oportunidade aceita vira contrato")
+
+        contrato_existente = sessao.scalar(
+            sa.select(Contrato).where(Contrato.oportunidade_id == oportunidade_id)
+        )
+        if contrato_existente is not None:
+            raise HTTPException(409, "esta oportunidade já tem contrato")
+
+        contrato = Contrato(
+            grupo_id=oportunidade.grupo_id,
+            oportunidade_id=oportunidade.id,
+            escopo=corpo.escopo or oportunidade.servico,
+            preco_mensal=corpo.preco_mensal or oportunidade.preco_mensal,
+            preco_anual=corpo.preco_anual or oportunidade.preco_anual,
+            data_inicio=corpo.data_inicio or oportunidade.data_aceite,
+            signatario=corpo.signatario,
+            situacao=SituacaoContrato.AGUARDANDO_ASSINATURA,
+        )
+        sessao.add(contrato)
+        sessao.flush()
+
+        return _detalhe_de_contrato(contrato, oportunidade.grupo.nome)
+
+    @api.get("/api/contratos", response_model=e.Pagina[e.ContratoResumo], tags=["contratos"])
+    def listar_contratos(
+        sessao: Session = Depends(obter_sessao),
+        situacao: list[SituacaoContrato] | None = Query(default=None),
+        grupo_id: int | None = None,
+        limite: int = Query(default=100, le=1000),
+        salto: int = 0,
+    ) -> e.Pagina[e.ContratoResumo]:
+        consulta = sa.select(Contrato, GrupoEconomico.nome).join(
+            GrupoEconomico, Contrato.grupo_id == GrupoEconomico.id
+        )
+        if situacao:
+            consulta = consulta.where(Contrato.situacao.in_(situacao))
+        if grupo_id is not None:
+            consulta = consulta.where(Contrato.grupo_id == grupo_id)
+
+        total = sessao.scalar(sa.select(sa.func.count()).select_from(consulta.subquery()))
+        linhas = sessao.execute(
+            consulta.order_by(Contrato.data_inicio.desc().nulls_last(), Contrato.id.desc())
+            .offset(salto)
+            .limit(limite)
+        ).all()
+        return e.Pagina(
+            total=total or 0,
+            itens=[_resumo_de_contrato(c, nome) for c, nome in linhas],
+        )
+
+    @api.get(
+        "/api/contratos/{contrato_id}", response_model=e.ContratoDetalhe, tags=["contratos"]
+    )
+    def ver_contrato(
+        contrato_id: int, sessao: Session = Depends(obter_sessao)
+    ) -> e.ContratoDetalhe:
+        contrato = sessao.get(Contrato, contrato_id)
+        if contrato is None:
+            raise HTTPException(404, "contrato não encontrado")
+        return _detalhe_de_contrato(contrato, contrato.grupo.nome)
+
+    @api.patch(
+        "/api/contratos/{contrato_id}", response_model=e.ContratoDetalhe, tags=["contratos"]
+    )
+    def editar_contrato(
+        contrato_id: int,
+        corpo: e.ContratoEdicao,
+        sessao: Session = Depends(obter_sessao),
+    ) -> e.ContratoDetalhe:
+        contrato = sessao.get(Contrato, contrato_id)
+        if contrato is None:
+            raise HTTPException(404, "contrato não encontrado")
+
+        mudancas = corpo.model_dump(exclude_unset=True)
+        for campo, valor in mudancas.items():
+            setattr(contrato, campo, valor)
+        sessao.flush()
+        return _detalhe_de_contrato(contrato, contrato.grupo.nome)
 
     # ------------------------------------------------------------- conferência
     def _contagens(sessao: Session, ids: list[int]) -> dict[int, dict[TipoDeOcorrencia, int]]:

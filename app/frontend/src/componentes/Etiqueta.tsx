@@ -20,6 +20,9 @@ const TOM_POR_SITUACAO: Record<string, string> = {
   Prospect: "andamento",
   Encerrado: "perda",
   Fundido: "espera",
+  "Aguardando assinatura": "espera",
+  Ativo: "ganho",
+  Suspenso: "espera",
 };
 
 const TOM_POR_TEMPERATURA: Record<string, string> = {

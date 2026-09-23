@@ -218,6 +218,25 @@ export interface ExecucaoDetalhe extends Execucao {
   por_campo: ResumoPorCampo[];
 }
 
+export interface ContratoResumo {
+  id: number;
+  grupo_id: number;
+  grupo_nome: string | null;
+  oportunidade_id: number | null;
+  escopo: string | null;
+  preco_mensal: string | null;
+  preco_anual: string | null;
+  data_inicio: string | null;
+  data_fim: string | null;
+  situacao: string;
+  signatario: string | null;
+}
+
+export interface ContratoDetalhe extends ContratoResumo {
+  documento_assinado: string | null;
+  observacao: string | null;
+}
+
 export interface Ocorrencia {
   id: number;
   tipo: string;

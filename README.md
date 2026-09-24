@@ -31,9 +31,9 @@ listas para campanha.
   dependências e riscos. **PF-09.**
 - `arquitetura.md` — modelo de dados, padrões transversais, decisões técnicas,
   o motor de horas unificado e os riscos. **PF-08, para revisão.**
-- `proposta-secao-9-questionario.md` — texto pronto dos oito campos que entram
-  no questionário (**decisão de 19/09/2026**), pedidos pela implantação.
-  **O arquivo oficial no SharePoint não foi alterado.**
+- `onboarding-anexos/proposta-secao-9-questionario.md` — texto pronto dos oito
+  campos que entram no questionário (**decisão de 19/09/2026**), pedidos pela
+  implantação. **O arquivo oficial no SharePoint não foi alterado.**
 - `regua-de-porte-e-plano-de-teste.md` — **hipótese**: régua de porte por
   volume, fator de atrito na proposta, plano de teste em 3 passos e o mapa do
   questionário servindo preço, atrito e implantação (pedido de Bruno Soares).
@@ -41,16 +41,17 @@ listas para campanha.
 - `modelo-classificacao-carteira.md` — especificação do modelo de saúde da
   carteira, extraída das planilhas auditáveis: fórmulas, cortes, réguas,
   agregação por grupo e **dois defeitos encontrados**. É o que o CRM implementa.
-- `rascunho-checklist-implantacao-contabil.md`
-- `rascunho-checklist-implantacao-fiscal.md`
-- `rascunho-checklist-implantacao-dp.md`
-- `rascunho-checklist-implantacao-financeiro.md`
+- `onboarding-anexos/rascunho-checklist-implantacao-contabil.md`
+- `onboarding-anexos/rascunho-checklist-implantacao-fiscal.md`
+- `onboarding-anexos/rascunho-checklist-implantacao-dp.md`
+- `onboarding-anexos/rascunho-checklist-implantacao-financeiro.md`
   — os quatro checklists de setor do `MP-SC-01`, para **Bruno Soares** validar.
   **Rascunhos, não aprovados.** Preenchem uma pendência do fluxo, não do CRM.
   Fiscal e DP trazem notas regulatórias com data de consulta (19/09/2026) e
   fonte — **não são calendário fiscal nem parecer**; o catálogo de obrigações é
   da equipe da Critério. O Financeiro deixa em aberto duas fronteiras de
-  produto: movimentação bancária e cobrança.
+  produto: movimentação bancária e cobrança. Movidos para `onboarding-anexos/`
+  em 24/09/2026 para não ficarem misturados com a documentação do CRM.
 
 **Itens compartilhados entre checklists** — preencher uma vez, referenciar nos dois:
 rateio de folha por centro de custo (Contábil E4 ↔ DP G8) · posição inicial

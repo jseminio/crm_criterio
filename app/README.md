@@ -43,6 +43,22 @@ A tabela `empresa` ganhou, em 25/09/2026, `logradouro`, `numero`, `complemento`,
 existiam. Todos opcionais. Nenhuma tela edita esses campos ainda: eles existem
 para receber os dados preenchidos na planilha de lacunas de contato.
 
+### Devolver a planilha de lacunas de contato
+
+```bash
+cd backend
+~/.venvs/criterio-crm/bin/python scripts/importar_lacunas_contato.py <planilha.xlsx>            # ensaio: não grava
+~/.venvs/criterio-crm/bin/python scripts/importar_lacunas_contato.py <planilha.xlsx> --aplicar  # grava, com backup antes
+```
+
+Decisão de 25/09/2026: **o mesmo cliente pode ter várias empresas, em linhas separadas**
+com o mesmo `ID_GRUPO`. Cada linha vira uma **empresa** (razão social, CNPJ, endereço) e
+um **contato** (nome, cargo, e-mail, telefone) ligado a ela. Rodar duas vezes não
+duplica. Valor já preenchido no CRM e diferente do da planilha vira **conflito** no
+relatório e não é alterado, a menos que se use `--sobrescrever`. Erro (CNPJ inválido,
+UF ou CEP fora do padrão, CNPJ repetido em dois clientes) bloqueia a gravação inteira.
+Sem razão social na linha, a empresa usa o nome do grupo (aparece como aviso).
+
 ## Backup lógico (exportar e importar os dados)
 
 Leva **os dados**, não o banco: um `.zip` com um arquivo `.jsonl` por tabela e um

@@ -466,6 +466,9 @@ def _registrar(api: FastAPI) -> None:
             dependencia_de_canal=e.DependenciaDeCanalResposta.model_validate(
                 resultado.dependencia_de_canal
             ),
+            ticket_recorrente=e.TicketRecorrenteResposta.model_validate(
+                resultado.ticket_recorrente
+            ),
         )
 
     @api.get(

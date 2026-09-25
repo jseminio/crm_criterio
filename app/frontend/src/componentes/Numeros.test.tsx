@@ -39,6 +39,7 @@ function indicadores(taxa: Partial<Indicadores["taxa_de_conversao"]> = {}, extra
       percentual_com_volumetria_completa: null,
     },
     dependencia_de_canal: { da_rede_de_socios: 0, total: 0, percentual: null },
+    ticket_recorrente: { quantas: 0, clientes: 0, valor_mensal: "0", ticket_medio: null, mediana: null, maior_valor: null, participacao_do_maior: null, calculavel: false },
     ...extra,
   };
 }
@@ -179,5 +180,35 @@ describe("Numeros — ciclo médio, cobertura e dependência de canal (23/09/202
 
     expect(screen.getByText("55,8%")).toBeInTheDocument();
     expect(screen.getByText(/86 de 154 propostas/i)).toBeInTheDocument();
+  });
+});
+
+
+describe("Numeros — ticket recorrente", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("mostra a média e a mediana lado a lado, com o peso do maior contrato", async () => {
+    await abrir(
+      indicadores(
+        {},
+        {
+          ticket_recorrente: {
+            quantas: 19, clientes: 17, valor_mensal: "105259.08", ticket_medio: "5539.95",
+            mediana: "2450.00", maior_valor: "40000.00", participacao_do_maior: "38.0", calculavel: true,
+          },
+        },
+      ),
+    );
+    expect(screen.getByText("Ticket recorrente aceito")).toBeInTheDocument();
+    expect(screen.getByText(/5\.539,95/)).toBeInTheDocument();
+    expect(screen.getByText(/2\.450,00/)).toBeInTheDocument();
+    expect(screen.getByText(/19 propostas de 17 clientes/)).toBeInTheDocument();
+    expect(screen.getByText(/pesa 38,0%/)).toBeInTheDocument();
+    expect(screen.getByText(/não é o ticket médio da carteira/i)).toBeInTheDocument();
+  });
+
+  it("sem aceita recorrente diz que não é calculável, não zero", async () => {
+    await abrir(indicadores());
+    expect(screen.getByText(/nenhuma aceita com preço mensal/i)).toBeInTheDocument();
   });
 });

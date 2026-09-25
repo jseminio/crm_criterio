@@ -71,7 +71,14 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
   if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
   if (!dados) return null;
 
-  const { em_aberto: aberto, aceitas, ciclo_medio: ciclo, cobertura, dependencia_de_canal: dependencia } = dados;
+  const {
+    em_aberto: aberto,
+    aceitas,
+    ciclo_medio: ciclo,
+    cobertura,
+    dependencia_de_canal: dependencia,
+    ticket_recorrente: ticket,
+  } = dados;
 
   return (
     <div className="numeros" aria-label="Números do funil">
@@ -101,6 +108,34 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
           <p className="numero-nota">
             {aceitas.sem_preco_mensal} são de valor único e entram só no anual. Este
             valor <strong>não é o MRR</strong> da carteira.
+          </p>
+        )}
+      </Cartao>
+
+      <Cartao
+        rotulo="Ticket recorrente aceito"
+        destaque={ticket.calculavel ? `${dinheiro(ticket.ticket_medio)} por mês` : undefined}
+        pendente={!ticket.calculavel}
+      >
+        {ticket.calculavel ? (
+          <>
+            <p>
+              Mediana <strong>{dinheiro(ticket.mediana)}</strong> por mês
+            </p>
+            <p>
+              {ticket.quantas} proposta{ticket.quantas === 1 ? "" : "s"} de {ticket.clientes}{" "}
+              cliente{ticket.clientes === 1 ? "" : "s"} · {dinheiro(ticket.valor_mensal)} por mês
+            </p>
+            <p className="numero-nota">
+              O maior contrato ({dinheiro(ticket.maior_valor)}) pesa{" "}
+              {percentual(ticket.participacao_do_maior)} do total — por isso a mediana vem junto.
+              Só aceitas com preço mensal; consultoria de valor único fica de fora. Não é o
+              ticket médio da carteira.
+            </p>
+          </>
+        ) : (
+          <p className="numero-estado">
+            Não calculável — nenhuma aceita com preço mensal neste recorte.
           </p>
         )}
       </Cartao>

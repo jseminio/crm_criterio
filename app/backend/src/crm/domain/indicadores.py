@@ -4,10 +4,11 @@
 aqui os que os dados de 2026 sustentam sem que ninguém tenha de escolher uma
 definição. Cada um dos que ficam de fora tem um motivo registrado:
 
-- **Ticket médio** — decisão de Eduardo em 23/09/2026: receita média por
-  grupo na carteira inteira, não venda nova. Mas a carteira inteira **não
-  está no CRM** — só as propostas de 2026. É cálculo pontual, fora daqui
-  (mesma razão que já tirou o MRR de escopo). Ver `../README.md`.
+- **Ticket médio da carteira** — decisão de Eduardo em 23/09/2026: receita
+  média por grupo na carteira inteira. Mas a carteira inteira **não está no
+  CRM** — só as propostas de 2026. É cálculo pontual, fora daqui (mesma razão
+  que já tirou o MRR de escopo). Ver `../README.md`. **Não confundir** com o
+  `TicketRecorrente` abaixo, que mede só as vendas recorrentes aceitas.
 - **MRR** — o oficial é a receita contratada da *carteira inteira*. Aqui só há o
   preço mensal das propostas de 2026, que é outra grandeza. Dar o nome de MRR a
   esse número seria um valor certo com o rótulo errado.
@@ -27,6 +28,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from statistics import median
 from typing import Iterable, Protocol
 
 from crm.domain.listas import Situacao, TipoCanal
@@ -38,6 +40,7 @@ __all__ = [
     "CicloMedioDeVendas",
     "Cobertura",
     "DependenciaDeCanal",
+    "TicketRecorrente",
     "calcular",
 ]
 
@@ -59,6 +62,7 @@ _DIRECIONADORES_DA_VOLUMETRIA = (
 
 
 class _Oportunidade(Protocol):
+    grupo_id: int
     situacao: Situacao
     preco_mensal: Decimal | None
     preco_anual: Decimal | None
@@ -208,6 +212,37 @@ class DependenciaDeCanal:
 
 
 @dataclass(frozen=True)
+class TicketRecorrente:
+    """Ticket das propostas **aceitas e recorrentes** — pedido de Eduardo em
+    25/09/2026.
+
+    Recorrente = aceita com preço mensal **maior que zero**. Consultoria de
+    valor único e proposta sem preço mensal ficam fora: não têm mensalidade
+    para tirar a média. Segue os filtros da tela — para "contratou em 2026",
+    filtre o período pela data de colocação.
+
+    **A média engana quando um contrato pesa muito**, e foi o que aconteceu
+    aqui (um contrato de R$ 40 mil = 38% do total). Por isso a mediana vem
+    junto, e `participacao_do_maior` diz quanto o maior contrato pesa.
+
+    **Não é o ticket médio oficial da carteira** (R$ 7.407,78, decisão de
+    23/09/2026): aquele é receita média por grupo na carteira inteira.
+    """
+
+    quantas: int
+    clientes: int
+    valor_mensal: Decimal
+    ticket_medio: Decimal | None
+    mediana: Decimal | None
+    maior_valor: Decimal | None
+    participacao_do_maior: Decimal | None
+
+    @property
+    def calculavel(self) -> bool:
+        return self.ticket_medio is not None
+
+
+@dataclass(frozen=True)
 class Indicadores:
     em_aberto: Recorte
     aceitas: Recorte
@@ -216,6 +251,7 @@ class Indicadores:
     taxa_de_conversao: TaxaDeConversao
     cobertura: Cobertura
     dependencia_de_canal: DependenciaDeCanal
+    ticket_recorrente: TicketRecorrente
 
 
 def _somar(oportunidades: list[_Oportunidade]) -> Recorte:
@@ -287,6 +323,23 @@ def calcular(oportunidades: Iterable[_Oportunidade]) -> Indicadores:
         da_rede_de_socios=da_rede_de_socios, total=len(todas)
     )
 
+    centavos = Decimal("0.01")
+    mensais = [o.preco_mensal for o in aceitas if o.preco_mensal is not None and o.preco_mensal > 0]
+    total_mensal = sum(mensais, ZERO)
+    if mensais:
+        maior = max(mensais)
+        ticket = TicketRecorrente(
+            quantas=len(mensais),
+            clientes=len({o.grupo_id for o in aceitas if o.preco_mensal is not None and o.preco_mensal > 0}),
+            valor_mensal=total_mensal,
+            ticket_medio=(total_mensal / len(mensais)).quantize(centavos),
+            mediana=Decimal(median(mensais)).quantize(centavos),
+            maior_valor=maior,
+            participacao_do_maior=(maior / total_mensal * 100).quantize(Decimal("0.1")),
+        )
+    else:
+        ticket = TicketRecorrente(0, 0, ZERO, None, None, None, None)
+
     return Indicadores(
         em_aberto=_somar(em_aberto),
         aceitas=_somar(aceitas),
@@ -295,4 +348,5 @@ def calcular(oportunidades: Iterable[_Oportunidade]) -> Indicadores:
         taxa_de_conversao=conversao,
         cobertura=cobertura,
         dependencia_de_canal=dependencia_de_canal,
+        ticket_recorrente=ticket,
     )

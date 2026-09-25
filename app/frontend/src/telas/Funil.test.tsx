@@ -57,6 +57,7 @@ const INDICADORES_VAZIOS: Indicadores = {
     percentual_com_volumetria_completa: null,
   },
   dependencia_de_canal: { da_rede_de_socios: 0, total: 0, percentual: null },
+  ticket_recorrente: { quantas: 0, clientes: 0, valor_mensal: "0", ticket_medio: null, mediana: null, maior_valor: null, participacao_do_maior: null, calculavel: false },
 };
 
 function coluna(situacao: string, oportunidades: ColunaDoFunil["oportunidades"]): ColunaDoFunil {

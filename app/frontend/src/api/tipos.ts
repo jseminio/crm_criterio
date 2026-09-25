@@ -177,6 +177,19 @@ export interface TaxaDeConversao {
   atingiu_a_meta: boolean | null;
 }
 
+/** Ticket das propostas aceitas com preço mensal > 0, com a mediana ao lado.
+ * Não é o ticket médio da carteira (R$ 7.407,78, decisão de 23/09/2026). */
+export interface TicketRecorrente {
+  quantas: number;
+  clientes: number;
+  valor_mensal: string;
+  ticket_medio: string | null;
+  mediana: string | null;
+  maior_valor: string | null;
+  participacao_do_maior: string | null;
+  calculavel: boolean;
+}
+
 export interface Indicadores {
   em_aberto: Recorte;
   aceitas: Recorte;
@@ -185,6 +198,7 @@ export interface Indicadores {
   taxa_de_conversao: TaxaDeConversao;
   cobertura: Cobertura;
   dependencia_de_canal: DependenciaDeCanal;
+  ticket_recorrente: TicketRecorrente;
 }
 
 export interface Execucao {

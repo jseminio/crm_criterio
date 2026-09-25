@@ -384,6 +384,23 @@ class TaxaDeConversaoResposta(Base):
     atingiu_a_meta: bool | None
 
 
+class TicketRecorrenteResposta(Base):
+    """Ticket das propostas aceitas com preço mensal > 0, com a mediana ao lado.
+
+    Não é o ticket médio da carteira. `participacao_do_maior` mostra quanto o
+    maior contrato pesa no total — a média sozinha esconde isso.
+    """
+
+    quantas: int
+    clientes: int
+    valor_mensal: Decimal
+    ticket_medio: Decimal | None
+    mediana: Decimal | None
+    maior_valor: Decimal | None
+    participacao_do_maior: Decimal | None
+    calculavel: bool
+
+
 class IndicadoresResposta(Base):
     em_aberto: RecorteResposta
     aceitas: RecorteResposta
@@ -392,6 +409,7 @@ class IndicadoresResposta(Base):
     taxa_de_conversao: TaxaDeConversaoResposta
     cobertura: CoberturaResposta
     dependencia_de_canal: DependenciaDeCanalResposta
+    ticket_recorrente: TicketRecorrenteResposta
 
 
 class ExecucaoResumo(Base):

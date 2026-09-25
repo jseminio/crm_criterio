@@ -28,6 +28,7 @@ class Op:
     admissoes_desligamentos_mes: int | None = None
     cnpjs_no_escopo: int | None = None
     tomadores_de_servico: int | None = None
+    grupo_id: int = 0
 
 
 #: Os nove direcionadores preenchidos — para os testes de "ficha completa".
@@ -232,3 +233,34 @@ class TestDependenciaDeCanal:
         ind = calcular([])
 
         assert ind.dependencia_de_canal.percentual is None
+
+
+class TestTicketRecorrente:
+    def _aceita(self, valor, grupo=0):
+        return Op(situacao=Situacao.ACEITA, preco_mensal=None if valor is None else D(valor), grupo_id=grupo)
+
+    def test_media_e_mediana_so_das_aceitas_com_preco_mensal(self):
+        t = calcular([
+            self._aceita("1000", 1), self._aceita("2000", 2), self._aceita("9000", 3),
+            self._aceita(None, 4),                         # valor único: fora
+            self._aceita("0", 5),                          # pro bono: fora
+            Op(situacao=Situacao.ENVIAR_PROPOSTA, preco_mensal=D("50000")),  # em aberto: fora
+        ]).ticket_recorrente
+        assert (t.quantas, t.clientes) == (3, 3)
+        assert t.valor_mensal == D("12000")
+        assert t.ticket_medio == D("4000.00") and t.mediana == D("2000.00")
+
+    def test_mostra_o_peso_do_maior_contrato(self):
+        t = calcular([self._aceita("40000", 1), self._aceita("2000", 2), self._aceita("2000", 3)]).ticket_recorrente
+        assert t.maior_valor == D("40000") and t.participacao_do_maior == D("90.9")
+
+    def test_conta_clientes_distintos(self):
+        t = calcular([self._aceita("1000", 7), self._aceita("3000", 7), self._aceita("2000", 8)]).ticket_recorrente
+        assert (t.quantas, t.clientes) == (3, 2)
+
+    def test_mediana_de_quantidade_par(self):
+        assert calcular([self._aceita("1000", 1), self._aceita("2000", 2)]).ticket_recorrente.mediana == D("1500.00")
+
+    def test_sem_nenhuma_nao_e_calculavel_nem_zero(self):
+        t = calcular([self._aceita(None, 1)]).ticket_recorrente
+        assert not t.calculavel and t.ticket_medio is None and t.mediana is None

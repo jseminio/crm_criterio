@@ -612,6 +612,21 @@ poucos grupos grandes (INBEL R$ 44.725, MR R$ 40.589).
 (novo em 23/09/2026 — os oito valores reais das 155 propostas, vindos do
 banco, não de enum: `Oportunidade.servico` é texto livre da planilha).
 
+### Ticket recorrente aceito (25/09/2026)
+
+Pedido de Eduardo: o ticket das vendas recorrentes de 2026, **com a mediana ao lado**.
+Aparece como cartão no funil (`ticket_recorrente` em `GET /api/indicadores`).
+
+- **Recorrente** = proposta aceita com preço mensal **maior que zero**. Consultoria de
+  valor único, proposta sem preço mensal e o diagnóstico pro bono ficam de fora.
+- **Segue os filtros da tela.** Sem filtro: 20 propostas, R$ 5.362,95 de média. Para
+  "contratou em 2026" (data de colocação de 2026): **19 propostas de 17 clientes,
+  R$ 105.259,08 por mês, média R$ 5.539,95 e mediana R$ 2.450,00**.
+- **Traz o peso do maior contrato** (R$ 40.000 = 38% do total): a média sozinha engana.
+- **Não é o ticket médio da carteira** (R$ 7.407,78, decisão de 23/09/2026), que é receita
+  média por grupo na carteira inteira. Grandezas diferentes; o cartão diz isso na tela.
+- Só uma aceita tem data de aceite; por isso "contratou em 2026" usa a data de colocação.
+
 ### Corte por período (22/09/2026)
 
 Pedido de Eduardo: comparar um recorte de tempo contra o resto da carteira —

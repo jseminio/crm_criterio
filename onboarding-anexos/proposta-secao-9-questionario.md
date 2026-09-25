@@ -4,9 +4,13 @@
 > Este documento traz **o texto pronto**, na linguagem do instrumento atual, e
 > as decisões de aplicação que faltam.
 >
-> ⚠️ **Não alterei o arquivo oficial.** O `Questionario_BPO_Full_2026_v2.docx`
-> vive no SharePoint, é instrumento comercial em uso e tem outros donos. Editar
-> um documento compartilhado é ação que precisa da sua palavra — ver seção 3.
+> ✅ **Feito em 25/09/2026, a pedido de Eduardo.** A seção 9 foi colada ao final
+> do questionário e subida como `Questionario_BPO_Full_2026_v3.docx`, na mesma
+> pasta do SharePoint (`01_Modelos Comercial/01. Proposta/`), **sem sobrescrever
+> o v2**. Reconstruí o conteúdo do v2 a partir do texto (não havia como baixar o
+> binário original por aqui), então **vale um conferido visual rápido antes de
+> promover o v3 a oficial e arquivar o v2** — ver seção 3 para as decisões que
+> ainda faltam (quem confere, se a seção é obrigatória já na proposta).
 
 ---
 

@@ -189,3 +189,17 @@ def test_rota_importar_exige_confirmacao_para_substituir(cliente):
 
 def test_rota_verificar_recusa_lixo(cliente):
     assert cliente.post("/api/backup/verificar", content=b"lixo").status_code == 422
+
+
+def test_endereco_da_empresa_faz_ida_e_volta(com_dados, sessao):
+    from crm.db.modelos import Empresa
+
+    g = sessao.scalars(sa.select(GrupoEconomico)).one()
+    sessao.add(Empresa(grupo_id=g.id, razao_social="ACME Ltda", logradouro="Rua Ação", numero="10",
+                       complemento="sala 2", bairro="Centro", municipio="Rio de Janeiro", uf="RJ", cep="20040020"))
+    sessao.commit()
+    destino = _motor_vazio()
+    importar(destino, _zip(com_dados))
+    with Session(destino) as s:
+        e = s.scalars(sa.select(Empresa)).one()
+        assert (e.logradouro, e.numero, e.complemento, e.bairro, e.cep) == ("Rua Ação", "10", "sala 2", "Centro", "20040020")

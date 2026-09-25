@@ -36,6 +36,13 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Endereço da empresa
+
+A tabela `empresa` ganhou, em 25/09/2026, `logradouro`, `numero`, `complemento`,
+`bairro` e `cep` (só os 8 dígitos), somando-se a `municipio` e `uf`, que já
+existiam. Todos opcionais. Nenhuma tela edita esses campos ainda: eles existem
+para receber os dados preenchidos na planilha de lacunas de contato.
+
 ## Backup lógico (exportar e importar os dados)
 
 Leva **os dados**, não o banco: um `.zip` com um arquivo `.jsonl` por tabela e um

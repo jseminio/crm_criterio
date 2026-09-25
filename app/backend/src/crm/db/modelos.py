@@ -134,8 +134,16 @@ class Empresa(CarimboMixin, Base):
     regime_tributario: Mapped[str | None] = mapped_column(sa.String(40))
     inscricao_estadual: Mapped[str | None] = mapped_column(sa.String(20))
     inscricao_municipal: Mapped[str | None] = mapped_column(sa.String(20))
+    logradouro: Mapped[str | None] = mapped_column(sa.String(200))
+    numero: Mapped[str | None] = mapped_column(sa.String(20))
+    complemento: Mapped[str | None] = mapped_column(sa.String(100))
+    bairro: Mapped[str | None] = mapped_column(sa.String(100))
     municipio: Mapped[str | None] = mapped_column(sa.String(100))
     uf: Mapped[str | None] = mapped_column(sa.String(2))
+    cep: Mapped[str | None] = mapped_column(sa.String(8))
+    """Só os oito dígitos, sem hífen — mesma regra do CNPJ. Endereço da empresa
+    (o CNPJ), não do grupo: entrou em 25/09/2026, pedido de Eduardo, para
+    receber os dados preenchidos à mão na planilha de lacunas de contato."""
     situacao: Mapped[SituacaoEmpresa] = mapped_column(
         coluna_lista(SituacaoEmpresa), nullable=False, default=SituacaoEmpresa.ATIVA
     )

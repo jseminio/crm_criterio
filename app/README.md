@@ -17,11 +17,11 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo.
 
 | | |
 |---|---|
-| O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil, agente SDR e sete telas |
-| Testes | **368** no backend, **131** nas telas (26/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
-| Banco | PostgreSQL 18.6 local, onze tabelas (`ficha_de_conta`, `abordagem` e `execucao_do_agente` desde 26/09/2026 — migração `8673eda1df27`, **ainda não aplicada nesta máquina**: rode `alembic upgrade head`). Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
-| API | 33 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
-| Telas | Funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe), contratos (23/09/2026), abordagens do agente SDR (26/09/2026) e conferência da carga. React com TypeScript, em `../frontend` |
+| O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil, agente SDR e nove telas |
+| Testes | **547** no backend, **211** nas telas (26/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Banco | PostgreSQL 18.6 local, treze tabelas (`ficha_de_conta`, `abordagem` e `execucao_do_agente` desde 26/09/2026 — migração `8673eda1df27`, **ainda não aplicada nesta máquina**: rode `alembic upgrade head`). Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
+| API | 45 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
+| Telas | Agenda de follow-up, contatos, funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe), contratos (23/09/2026), abordagens do agente SDR (26/09/2026) e conferência da carga. React com TypeScript, em `../frontend` |
 | Fora do ar | Nuvem, login, backup automático (E1); documento da proposta, ficha de volumetria completa (E4); ticket médio, MRR e os seis indicadores de cobertura que exigem implantação/entrevista/classificação (E5); Clicksign, evento de contrato, renovação, saldo de horas de conforto, Implantação (Etapa 2) |
 
 ## Como rodar
@@ -38,12 +38,199 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Contatos: clientes e prospects segregados (26/09/2026)
+
+Menu **Contatos** (`crm/api/contatos.py`, `crm/domain/contatos.py`). Duas abas, **Clientes** e
+**Prospects**, e dois modos de busca:
+
+- **Empresa:** razão social, CNPJ (com ou sem pontuação) ou nome do grupo. Cliente = uma linha por
+  empresa (CNPJ), com a mensalidade; prospect = o grupo (ou a empresa, quando já existe), com as propostas.
+- **Pessoa:** nome, cargo, e-mail ou telefone.
+- A busca **não depende de acento nem de caixa** ("acao" acha "Ação"), feita em Python porque o
+  PostgreSQL não faz isso sem extensão e a base é pequena.
+- **Lacunas** = o que falta dos sete itens da planilha de lacunas (contato, e-mail, telefone,
+  logradouro, município, UF, CEP). Vários contatos se completam: sem lacuna de e-mail se *algum* tem.
+  Filtro "só com lacunas".
+- O painel da empresa cadastra e edita **contatos** (e-mail validado, papel, *não contatar* com a data)
+  e o **endereço** (UF e CEP validados; CNPJ com dígito verificador e sem repetir). Contato pode ser da
+  empresa ou **só do grupo** (aparece em todas as empresas dele, marcado "do grupo"). Prospect sem empresa
+  ganha uma com "Cadastrar empresa", porque é nela que o endereço mora.
+- `GET /api/contatos/empresas`, `GET /api/contatos/pessoas`, `POST/PATCH /api/contatos/pessoas`,
+  `PATCH /api/empresas/{id}`, `POST /api/grupos/{id}/empresas`.
+
+**Ainda fora:** duplicar contato entre empresas, importação de contatos em lote pela tela (segue pela
+planilha), e as listas de campanha que **respeitam** o *não contatar* (o campo já é gravado).
+
+## Carga da carteira anterior ao CRM (26/09/2026)
+
+A carteira que já existia antes do CRM vem da planilha de saúde da carteira
+(`Rentabilidade_Grupo_COMPLETO.xlsx`, aba **"4. Clientes"**: razão social, CNPJ, grupo econômico,
+escopo e honorário mensal, uma linha por empresa). **O arquivo fica fora do repositório** (dado de
+cliente). Ensaio, sem gravar:
+
+```bash
+cd backend
+~/.venvs/criterio-crm/bin/python scripts/importar_carteira.py ~/Downloads/Rentabilidade_Grupo_COMPLETO.xlsx
+~/.venvs/criterio-crm/bin/python scripts/importar_carteira.py <planilha> --aplicar   # grava, com backup antes
+```
+
+- Cada linha vira uma **Empresa** (por CNPJ) e um **Contrato Ativo** dela, com o honorário como preço
+  mensal. `Contrato` ganhou `empresa_id` e `anterior_ao_crm`.
+- **Não se inventa data de assinatura.** A planilha não a traz, então o contrato fica marcado
+  `anterior_ao_crm`: pode ser Ativo sem `data_inicio`, conta no MRR **desde sempre** e **nunca aparece
+  como "novo"** de um período. Se a data aparecer, basta preenchê-la depois.
+- "Sem grupo" = cliente individual, com grupo de uma empresa só e o nome da razão social. Grupo que
+  **já existe** no CRM é reaproveitado pela *chave do nome* (o de mais propostas, com aviso, se houver
+  vários); Prospect que recebe cliente vira **Cliente**. Nomes diferentes viram grupo novo — a fusão
+  continua sendo um clique humano.
+- **Idempotente** (empresa por CNPJ, contrato por empresa) e **nada é sobrescrito**: preço diferente
+  vira conflito no relatório. Tudo ou nada, com backup antes.
+- Ensaio de 26/09/2026: 58 empresas, 58 contratos, 31 grupos (7 reaproveitados, 24 novos), R$ 227.462,65
+  por mês, nenhum erro (58 CNPJs válidos). 14 escopos "verificar contrato" ficam em branco.
+
+**Reconciliação dos totais (26/09/2026) — resolvida.** O R$ 226.341 oficial é a linha TOTAL da aba de
+Faturamento e bate com a soma das 31 unidades da aba "Margem por Grupo". O CRM (aba "4. Clientes", por
+empresa) difere em **+R$ 1.121,45**, e toda a diferença vem de **4 unidades** (duas a mais, duas a
+menos), cuja decisão de qual valor vale é de Eduardo. O ticket médio de 23/09 (R$ 229.641,20) é o oficial
+mais R$ 3.300 de uma delas. Nada foi alterado no banco por causa disso.
+
+**Três totais que não são o mesmo número:** R$ 227.462,65 (soma das empresas na aba "4. Clientes"),
+R$ 229.641,20 (31 unidades, ticket médio de 23/09, com o grupo Blac pela aba "Margem por Grupo") e
+R$ 226.341 (MRR oficial de 19/09/2026). Conferir antes de tratar o MRR do CRM como o oficial.
+
+## MRR dos contratos registrados (26/09/2026)
+
+`GET /api/mrr` e o painel no topo de **Contratos** (`crm/domain/mrr.py`). Sem parâmetros, vale o
+mês corrente até hoje; `de`/`ate` mudam o período (não passa de hoje).
+
+**⚠️ É parcial, e a tela e a API dizem isso sempre** (`cobertura_completa: false`). O KPI oficial
+de MRR é a receita da **carteira inteira** (R$ 226.341 em 19/09/2026, em planilha fora do CRM);
+aqui só entram os contratos registrados no CRM, e a carteira anterior ainda não foi carregada
+(Etapa 3). Por isso o número **não é comparado com a meta de R$ 400 mil** nem com o alerta de
+R$ 200 mil: seria um "atingimento" enganoso. Hoje há **0 contratos**, então o MRR é R$ 0,00.
+
+- **MRR atual** = preço mensal dos contratos **Ativos**. **Suspenso** aparece à parte. Contrato sem
+  preço mensal (só anual) **fica de fora** e é contado: não se inventa "anual ÷ 12".
+- **Movimento do período:** novos (pelo preço da assinatura) · expansão · reajuste · contração
+  (qualquer queda de preço) · **churn separado por quem decidiu**: cliente (churn de fato) e
+  Critério (saída organizada). A conta fecha: início + novos + expansão + reajuste − contração −
+  churn = fim.
+- **NRR** e **GRR** contam só contratos que já existiam no início do período. Sem MRR no início,
+  **não são calculáveis** (nunca 0%).
+- MRR em qualquer data = MRR atual − o movimento líquido desde então.
+
+**Fora:** comparação com a meta, MRR da carteira anterior (Etapa 3), e a inadimplência (o KPI oficial
+conta receita contratada, e 41% dela estava travada por inadimplência em 19/09/2026: o MRR pode estar
+saudável enquanto o caixa não entra).
+
+## Etapa 2 — eventos de contrato (26/09/2026)
+
+**Decisão de Eduardo: a vigência do contrato começa na assinatura.** Por isso:
+
+- `data_inicio` do contrato é a **data da assinatura**, e o contrato nasce **sem ela** (antes
+  partia da data do aceite — decisão de 23/09/2026 **revista**). Sem a data, **não vira Ativo**.
+- Só contrato **Ativo ou Suspenso** recebe evento; antes da assinatura (409) ou depois de
+  encerrado (409), não. Evento não pode ser anterior à assinatura.
+- **Depois de assinado, preço e data de fim só mudam por evento** (o `PATCH` recusa com 422); e
+  **encerrar só por evento com motivo**. O rascunho inteiro com os mesmos valores não conta como mudança.
+
+`POST /api/contratos/{id}/eventos` valida, grava o evento **com o antes e o depois** e aplica o
+efeito no contrato, tudo na mesma transação (`crm/domain/eventos_de_contrato.py`):
+
+| Tipo | Exige | Efeito |
+|---|---|---|
+| Aditivo | descrição | opcionalmente novo escopo e/ou preço |
+| Reajuste | novo preço | novo preço, para cima ou para baixo |
+| Expansão | novo preço, não menor | novo preço |
+| Contração | novo preço, não maior | novo preço |
+| Renovação | nova data de fim, depois da atual | nova data de fim |
+| Encerramento | **motivo** | situação Encerrado; fim = data do evento |
+
+Cada evento é **imutável**: não há rota para editar nem apagar; errou, registra outro. Ainda não
+registra **quem** (sem login, E1). A tela de Contratos mostra os eventos e registra em dois passos.
+
+**Renovação na agenda:** contrato Ativo com data de fim entra na fila como "Vencimento do
+contrato" (a data usada é a do fim, **sem prazo de aviso inventado**).
+
+**Quem decidiu encerrar (26/09/2026, pedido de Eduardo).** O encerramento também exige a
+**iniciativa**: `Cliente` ou `Critério`. É o que separa *churn* (o cliente saiu) de *saída
+organizada* (a Critério saiu). Fica **separada** da categoria do motivo (que diz *por que*), e as
+duas se combinam livremente: "Preço" pode ser o cliente que achou caro ou a Critério que reajustou
+para sair. O sistema **não amarra** as duas (por exemplo, não obriga "Saída organizada" a ser
+Critério): quem registra decide.
+
+**Correção (26/09/2026).** Sétimo tipo de evento, para corrigir um valor **lançado errado** (por
+exemplo, na carga inicial): exige novo preço **e o motivo**, guarda o antes e o depois, mas **não é
+movimento comercial**: não conta como expansão, contração nem reajuste no MRR, e o MRR do início do
+período já é o valor corrigido. Foi usado para levar 7 contratos ao valor oficial de 19/09/2026 (R$ 226.341,20):
+sem esse tipo, corrigir apareceria como R$ 5.300 de contração e R$ 1.578,54 de expansão que nunca
+aconteceram no negócio. Com o grupo de três empresas (R$ 27.930,00 no oficial, dividido igualmente, R$ 9.310,00 cada, porque a
+planilha não traz a divisão), **o MRR do CRM fechou em R$ 226.341,20, igual ao oficial de 19/09/2026**, com
+movimento zero no mês (7 eventos de correção, 4 unidades).
+
+**Motivo de encerramento (26/09/2026).** O encerramento exige a **categoria do motivo**, de uma
+lista de nove itens (`MotivoDeEncerramento`): Preço · Insatisfação com o serviço · Migrou para
+concorrente · Internalizou a operação · Empresa encerrada, vendida ou reestruturada ·
+Inadimplência · Saída organizada pela Critério · Não precisa mais do serviço · Outro. "Outro"
+exige texto; nas demais o texto é opcional. A categoria só vale no Encerramento (422 nos outros
+tipos). **Lista aprovada por Eduardo em 26/09/2026.** Nenhum documento trazia uma lista de motivos de saída;
+ela partiu da lista de motivos de recusa e do conceito de "saída organizada" (classe C). Fica como
+texto no banco, para mudar com um `UPDATE`. Responde *por que saiu*; *quem decidiu* é o campo `iniciativa`.
+
+**Fora, por decisão pendente:** alçadas de aditivo (presumidas no `anexo-tecnico.md`), NRR,
+Clicksign e implantação.
+
+## Etapa 2 — agenda de follow-up (25/09/2026)
+
+`GET /api/agenda` e a tela **Agenda** montam a fila do que pede uma próxima ação, por urgência
+(`crm/domain/agenda.py`). Baldes: **atrasadas**, **hoje**, **próximos 7 dias**, **depois**,
+**sem data** e **sem próxima ação**. Entra só o que está em aberto: oportunidade não decidida e
+lead ainda no funil.
+
+**O achado que desenhou a tela:** das 50 propostas em aberto, **nenhuma tinha próxima ação**
+(cobertura do processo em 0%). Uma agenda só de datas ficaria vazia; por isso o balde
+"sem próxima ação" existe, vem ordenado por temperatura e valor anual, e a linha permite
+**escrever a próxima ação e a data ali mesmo**, sem abrir o painel. É por esse balde que a
+cobertura do processo sobe.
+
+- **Lembrete é tela, não notificação.** A API do WhatsApp continua pendente.
+- Lead aparece na fila mas se edita na tela **Leads**.
+- Contrato ainda não tem próxima ação; entra junto dos eventos de contrato.
+
+## Histórico de preço e origem da volumetria (E4, 25/09/2026)
+
+**Histórico de preço.** Cada mudança de `preco_mensal` ou `preco_anual` grava uma linha em
+`historico_de_preco`: valor **antes** e **depois**, quando (relógio do servidor), de onde veio
+(`CRM` ou `Recarga da planilha`) e o motivo, se alguém disse ("reajuste anual"). Reajustar
+**não apaga** o preço anterior. A tela pede o motivo só quando o preço muda, e o detalhe da
+oportunidade mostra o histórico, do mais recente para o mais antigo.
+
+- A linha só nasce quando o valor **muda de fato**; salvar o painel sem mexer no preço não cria nada.
+- É **imutável** (não herda o carimbo de alteração) e a API não tem rota para editá-la.
+- Ainda não registra **quem** mudou: não há login. Entra com o E1.
+
+**Origem da volumetria.** Cada um dos nove direcionadores da régua de porte pode dizer se
+veio da **entrevista** ou do **questionário** (`origem_da_volumetria`, um mapa por
+oportunidade). Só vale para campo preenchido: a origem de um campo que voltou a ficar vazio é
+descartada pelo servidor, e a API recusa origem de campo que não seja direcionador (422).
+
+**Ainda fora:** a *lista do que falta para a proposta, com responsável e prazo* e a *geração do
+documento* — a primeira depende de definir os itens, a segunda do modelo oficial e do formato.
+
 ## Endereço da empresa
 
 A tabela `empresa` ganhou, em 25/09/2026, `logradouro`, `numero`, `complemento`,
 `bairro` e `cep` (só os 8 dígitos), somando-se a `municipio` e `uf`, que já
 existiam. Todos opcionais. Nenhuma tela edita esses campos ainda: eles existem
 para receber os dados preenchidos na planilha de lacunas de contato.
+
+### Planilha de lacunas por empresa (26/09/2026)
+
+`exportar_lacunas_contato.py` agora gera **duas abas separadas**: **Clientes** (uma linha por
+empresa/CNPJ, com razão social, CNPJ, escopo e mensalidade já vindos do CRM) e **Prospects** (uma
+linha por grupo que ainda não é cliente). `ID_GRUPO` e `ID_EMPRESA` são a chave; a linha por empresa
+atualiza **aquela** empresa pelo ID, não pelo nome nem pelo CNPJ digitado. A importação lê as duas abas
+e os avisos dizem de qual veio ("Prospects, linha 12"). Planilha intacta = zero mudança.
 
 ### Devolver a planilha de lacunas de contato
 
@@ -114,6 +301,25 @@ Conferir a carga contra uma planilha real — **lê e mostra, não grava nada**:
 ```bash
 ~/.venvs/criterio-crm/bin/python scripts/conferir_carga.py "/caminho/Relatório Performance Comercial 2026.xlsx"
 ```
+
+
+### Backup automático diário
+
+```bash
+cd backend/scripts/agendamento
+./instalar.sh            # agenda para todo dia às 12:00 (launchd, no macOS)
+./instalar.sh remover    # desliga; os arquivos são mantidos
+launchctl kickstart gui/$(id -u)/com.criterio.crm.backup    # roda agora
+```
+
+Grava `~/Backups-CRM/crm-auto-AAAAMMDD-HHMMSS.zip`, **confere o arquivo** e mantém os
+últimos 14 automáticos. A retenção só apaga `crm-auto-*.zip` — nunca um backup manual nem
+o `antes-de-importar-*` — e só depois de um backup novo e conferido. Se o Mac estiver
+dormindo às 12:00, roda ao acordar. Falha (banco fora do ar, arquivo que não confere)
+sai no `backup.log` e numa notificação do macOS; o log não guarda dado de cliente.
+
+**O que este backup não é:** não sai da máquina. Se o disco falhar, ele vai junto. Copiar
+`~/Backups-CRM` para fora (nuvem cifrada, disco externo) continua pendente e faz parte do E1.
 
 ## Desenho
 
@@ -217,6 +423,27 @@ contatos, e cuida de duas coisas que passariam batidas:
 
 Recusa três fusões: um grupo nele mesmo, um grupo já fundido antes, e a que
 fecharia um ciclo deixando os dois sem raiz.
+
+#### Sugestões de fusão (25/09/2026)
+
+`GET /api/grupos/sugestoes-de-fusao` e o painel no topo de **Grupos** apontam grupos que
+parecem ser o mesmo cliente. **Só sugere; nunca funde.** A fusão é um clique de uma pessoa,
+em dois passos, pelo `POST /api/grupos/{id}/fundir` de sempre. Regras em
+`crm/domain/sugestoes_de_fusao.py`:
+
+- **alta:** a *chave* do nome é a mesma (sem acento, sem caixa, sem o que está entre
+  parênteses e sem o que vem depois de " - ");
+- **média:** um nome contém o outro e o menor tem duas palavras ou mais. Cada sugestão
+  média é **um par** de nomes, nunca uma corrente: "João Silva" e "Silva Santos" estão
+  ambos dentro de "João Silva Santos" e viram dois pares, não um bloco de três (corrigido
+  em 26/09/2026 — antes as ligações se encadeavam e um clique fundia clientes diferentes);
+- **fora de propósito:** nome de uma palavra só dentro de outro ("Aeskins" e "Horas
+  adicionais Aeskins") e nomes só parecidos na escrita ("BRA" e "BRAP") — falso positivo demais.
+
+Com os dados de 25/09/2026: 19 sugestões entre os 138 grupos (contagem anterior à
+correção dos pares; pode mudar). "Não é o mesmo cliente" some com a sugestão **só neste
+navegador** (não grava no banco); se o navegador bloquear o armazenamento, ela some só até
+recarregar a página. Quando uma junção falha em parte, o aviso fica no topo do painel.
 
 ### Credenciais
 
@@ -628,6 +855,29 @@ Aparece como cartão no funil (`ticket_recorrente` em `GET /api/indicadores`).
 - **Não é o ticket médio da carteira** (R$ 7.407,78, decisão de 23/09/2026), que é receita
   média por grupo na carteira inteira. Grandezas diferentes; o cartão diz isso na tela.
 - Só uma aceita tem data de aceite; por isso "contratou em 2026" usa a data de colocação.
+
+### Recortes e cenários de ticket (25/09/2026)
+
+Duas tabelas no funil, abaixo dos números, ambas **seguindo os mesmos filtros da tela**:
+
+- **Recortes** (`GET /api/indicadores/recortes?dimensao=servico|tipo_canal|captador`):
+  propostas, aceitas, conversão, contratos recorrentes, mensal aceito, ticket e mediana por corte.
+  Sem valor no campo, o corte aparece como "(não informado)", nunca some.
+- **Cenários de ticket** (`GET /api/indicadores/cenarios-de-ticket`): conservador, base e
+  otimista, com o contrato atípico à parte. **Hipóteses de trabalho, não meta.**
+
+Regra dos cenários (`crm/domain/recortes.py`), estatística e não escolha manual:
+**atípico** = recorrente acima de 3 × a mediana; **conservador** = mediana sem atípicos;
+**base** = média sem atípicos; **otimista** = terceiro quartil sem atípicos; o atípico entra
+pelo menor, médio e maior observados. **Trava** (26/09/2026): o conservador nunca passa do base
+e o otimista nunca fica abaixo dele — mediana e quartil não têm ordem garantida com a média
+(em 100, 1.000, 1.000, 1.000 a mediana é 1.000 e a média, 775). Na tela, "clientes novos" e
+"1 atípico a cada … clientes" são editáveis (padrão 20 e 20) e **não gravam nada**. Menos de 4 contratos recorrentes: "não calculável".
+
+Com o período filtrado por **data de colocação de 2026**: 19 contratos, 2 atípicos, comum de
+R$ 2.450 / R$ 2.956,42 / R$ 3.500 e atípico de R$ 15.000 / R$ 27.500 / R$ 40.000 — os números
+validados em 25/09/2026. **Sem filtro** entra mais um contrato recorrente sem data de colocação
+(20 contratos), e a base cai para R$ 2.903,28. Não considera cancelamento nem o tempo até faturar.
 
 ### Corte por período (22/09/2026)
 

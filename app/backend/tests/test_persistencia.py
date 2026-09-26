@@ -451,3 +451,21 @@ class TestEdicaoNoCrmSobreviveARecarga:
         conflitos = [o for o in execucao.ocorrencias if "mantido o do CRM" in o.texto]
         assert len(conflitos) == 1
         assert conflitos[0].tipo.value == "Precisa de você"
+
+
+class TestHistoricoDePrecoNaRecarga:
+    def test_reajuste_vindo_da_planilha_entra_no_historico(self, sessao: Session):
+        from crm.db.modelos import HistoricoDePreco
+
+        importar(sessao, [proposta()])
+        importar(sessao, [proposta(preco_mensal=Decimal("5500.00"), preco_anual=Decimal("71500.00"))])
+        h = sessao.scalars(sa.select(HistoricoDePreco)).one()
+        assert h.origem == "Recarga da planilha"
+        assert (h.preco_mensal_anterior, h.preco_mensal_novo) == (Decimal("5000.00"), Decimal("5500.00"))
+
+    def test_recarga_sem_mudanca_de_preco_nao_cria_historico(self, sessao: Session):
+        from crm.db.modelos import HistoricoDePreco
+
+        importar(sessao, [proposta()])
+        importar(sessao, [proposta(situacao=Situacao.EM_AVALIACAO)])
+        assert sessao.scalar(sa.select(sa.func.count()).select_from(HistoricoDePreco)) == 0

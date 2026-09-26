@@ -1,7 +1,7 @@
 """agente SDR: ficha da conta, abordagem e execucao do agente
 
 Revisão: 8673eda1df27
-Revisão anterior: b3f1c9a7d2e4
+Revisão anterior: 33f52c219e28
 Criada em: 2026-09-26 20:06:20.629336
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision: str = '8673eda1df27'
-down_revision: str | None = 'b3f1c9a7d2e4'
+down_revision: str | None = '33f52c219e28'
 branch_labels: str | None = None
 depends_on: str | None = None
 

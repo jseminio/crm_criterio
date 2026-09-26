@@ -17,7 +17,10 @@ vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
   return {
     ...real,
-    api: { funil: vi.fn(), indicadores: vi.fn(), oportunidade: vi.fn(), editarOportunidade: vi.fn() },
+    api: {
+      funil: vi.fn(), indicadores: vi.fn(), oportunidade: vi.fn(), editarOportunidade: vi.fn(),
+      recortes: vi.fn().mockResolvedValue([]), cenariosDeTicket: vi.fn().mockResolvedValue(null),
+    },
   };
 });
 
@@ -28,6 +31,9 @@ const LISTAS: Listas = {
   tipos_de_canal: [],
   tipos_de_canal_em_operacao: [],
   motivos_de_recusa: [],
+  motivos_de_encerramento: [],
+  iniciativas_de_encerramento: [],
+  papeis_de_contato: [],
   linhas_de_servico: [],
   situacoes_de_grupo: [],
   captadores: [],
@@ -168,6 +174,8 @@ describe("arrasto no kanban", () => {
       porte: null,
       porte_definido_por: null,
       porte_definido_em: null,
+      origem_da_volumetria: {},
+      historico_de_preco: [],
       sugestao_de_porte: { calculavel: false, pontuacao: null, porte: null, horas_base: null, direcionadores_aplicados: 0 },
     });
     await abrir([

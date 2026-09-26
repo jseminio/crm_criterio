@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { Listas, OportunidadeDetalhe } from "../api/tipos";
+import type { Listas, MudancaDePreco, OportunidadeDetalhe } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro } from "../componentes/estados";
-import { dataHora } from "../formato";
+import { dataHora, dinheiro } from "../formato";
 
 function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
@@ -32,6 +32,46 @@ const DIRECIONADORES: { id: string; rotulo: string; placeholder: string }[] = [
   { id: "tomadores_de_servico", rotulo: "Tomadores de serviço", placeholder: "" },
 ];
 
+function HistoricoDePreco({ mudancas }: { mudancas: MudancaDePreco[] }) {
+  return (
+    <div>
+      <h3 style={{ fontSize: 14, marginBottom: "var(--e2)" }}>Histórico de preço</h3>
+      {mudancas.length === 0 ? (
+        <p className="campo-ajuda" style={{ margin: 0 }}>
+          O preço ainda não mudou desde que a proposta entrou no CRM.
+        </p>
+      ) : (
+        <table className="tabela">
+          <thead>
+            <tr>
+              <th scope="col">Quando</th>
+              <th scope="col">Mensal</th>
+              <th scope="col">Anual</th>
+              <th scope="col">Por quê</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mudancas.map((m) => (
+              <tr key={m.id}>
+                <td>{dataHora(m.registrado_em)}</td>
+                <td>
+                  {dinheiro(m.preco_mensal_anterior)} → {dinheiro(m.preco_mensal_novo)}
+                </td>
+                <td>
+                  {dinheiro(m.preco_anual_anterior)} → {dinheiro(m.preco_anual_novo)}
+                </td>
+                <td>
+                  {m.motivo ?? "—"} <span className="numero-nota">({m.origem})</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 function paresDe<T>(itens: T[]): T[][] {
   const pares: T[][] = [];
   for (let i = 0; i < itens.length; i += 2) pares.push(itens.slice(i, i + 2));
@@ -53,7 +93,7 @@ function VolumetriaEPorte({
 }) {
   const sugestao = detalhe.sugestao_de_porte;
 
-  const numero = (id: string, rotulo: string, placeholder?: string) => (
+  const numero = (id: string, rotulo: string, placeholder?: string, comOrigem = false) => (
     <div className="campo-bloco" key={id}>
       <label className="campo-rotulo" htmlFor={`d-${id}`}>
         {rotulo}
@@ -68,6 +108,19 @@ function VolumetriaEPorte({
         onChange={(e) => mudar(id, e.target.value)}
         placeholder={placeholder}
       />
+      {comOrigem && (
+        <select
+          aria-label={`Origem de ${rotulo}`}
+          className="selecao selecao-origem"
+          value={rascunho[`origem_${id}`] ?? ""}
+          onChange={(e) => mudar(`origem_${id}`, e.target.value)}
+          disabled={(rascunho[id] ?? "") === ""}
+        >
+          <option value="">Origem não informada</option>
+          <option value="Entrevista">Veio da entrevista</option>
+          <option value="Questionário">Veio do questionário</option>
+        </select>
+      )}
     </div>
   );
 
@@ -107,7 +160,7 @@ function VolumetriaEPorte({
 
       {paresDe(DIRECIONADORES).map((par, i) => (
         <div className="formulario-duplo" key={i}>
-          {par.map((d) => numero(d.id, d.rotulo, d.placeholder))}
+          {par.map((d) => numero(d.id, d.rotulo, d.placeholder, true))}
         </div>
       ))}
 
@@ -276,6 +329,10 @@ export function DetalheDaOportunidade({
           e_auditada: d.e_auditada ? "sim" : "",
           porte: d.porte ?? "",
           porte_definido_por: d.porte_definido_por ?? "",
+          motivo_do_preco: "",
+          ...Object.fromEntries(
+            DIRECIONADORES.map((x) => [`origem_${x.id}`, d.origem_da_volumetria?.[x.id] ?? ""]),
+          ),
         });
       })
       .catch((f) => definirErro(f instanceof ErroDaApi ? f.message : "Falha inesperada."));
@@ -299,10 +356,19 @@ export function DetalheDaOportunidade({
     definirErro(null);
     try {
       // Campo vazio vira null, não string vazia: no banco a ausência é null.
-      const mudancas = Object.fromEntries(
-        Object.entries(rascunho).map(([k, v]) =>
-          CAMPOS_BOOLEANOS.has(k) ? [k, v === "sim"] : [k, v === "" ? null : v],
-        ),
+      const mudancas: Record<string, unknown> = Object.fromEntries(
+        Object.entries(rascunho)
+          .filter(([k]) => !k.startsWith("origem_"))
+          .map(([k, v]) =>
+            CAMPOS_BOOLEANOS.has(k) ? [k, v === "sim"] : [k, v === "" ? null : v],
+          ),
+      );
+      // A origem vai como um mapa só, e só de campo que ainda tem valor.
+      mudancas.origem_da_volumetria = Object.fromEntries(
+        DIRECIONADORES.filter((x) => rascunho[`origem_${x.id}`] && rascunho[x.id]).map((x) => [
+          x.id,
+          rascunho[`origem_${x.id}`],
+        ]),
       );
       await api.editarOportunidade(id, mudancas);
       aoSalvar();
@@ -313,6 +379,11 @@ export function DetalheDaOportunidade({
       definirSalvando(false);
     }
   };
+
+  const precoMudou =
+    !!detalhe &&
+    (Number(rascunho.preco_mensal || 0) !== Number(detalhe.preco_mensal || 0) ||
+      Number(rascunho.preco_anual || 0) !== Number(detalhe.preco_anual || 0));
 
   const exigeDataDeAceite = rascunho.situacao === "Aceita" && !rascunho.data_aceite;
 
@@ -461,6 +532,25 @@ export function DetalheDaOportunidade({
               </div>
             </div>
 
+            {precoMudou && (
+              <div className="campo-bloco">
+                <label className="campo-rotulo" htmlFor="d-motivo-preco">
+                  Por que o preço mudou? (opcional)
+                </label>
+                <input
+                  id="d-motivo-preco"
+                  className="entrada"
+                  maxLength={200}
+                  placeholder="reajuste anual, renegociação, correção…"
+                  value={rascunho.motivo_do_preco ?? ""}
+                  onChange={(e) => mudar("motivo_do_preco", e.target.value)}
+                />
+                <p className="campo-ajuda">
+                  O preço anterior não se perde: fica no histórico abaixo.
+                </p>
+              </div>
+            )}
+
             <div className="campo-bloco">
               <label className="campo-rotulo" htmlFor="d-originacao">
                 Data de originação
@@ -600,6 +690,8 @@ export function DetalheDaOportunidade({
               />
             </div>
           </div>
+
+          <HistoricoDePreco mudancas={detalhe.historico_de_preco ?? []} />
 
           <div>
             <h3 style={{ fontSize: 14, marginBottom: "var(--e2)" }}>Vem da planilha</h3>

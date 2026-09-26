@@ -111,3 +111,69 @@ def test_linha_sem_dado_e_ignorada_e_planilha_sem_colunas_e_recusada(sessao, gru
     wb = Workbook(); wb.active.title = "Clientes"; wb.active.append(["outra", "coisa"])
     wb.save(tmp_path / "q.xlsx")
     assert not _rodar(sessao, tmp_path / "q.xlsx").pode_aplicar
+
+
+# ---------------------------------------------------------------- planilha por empresa (26/09/2026)
+
+def _planilha_por_empresa(tmp_path, clientes=(), prospects=()):
+    """Aba Clientes com ID_EMPRESA (uma linha por empresa) e aba Prospects (uma por grupo)."""
+    base = list(COLUNAS)
+    wb = Workbook()
+    c = wb.active
+    c.title = "Clientes"
+    c.append(["ID_EMPRESA"] + base)
+    for l in clientes:
+        c.append([l.get("ID_EMPRESA", "")] + [l.get(t, "") for t in base])
+    p = wb.create_sheet("Prospects")
+    p.append(base)
+    for l in prospects:
+        p.append([l.get(t, "") for t in base])
+    caminho = tmp_path / "por_empresa.xlsx"
+    wb.save(caminho)
+    return caminho
+
+
+def test_linha_por_empresa_usa_o_id_e_preenche_so_o_que_falta(sessao, grupo, tmp_path):
+    e1 = Empresa(grupo_id=grupo.id, razao_social="Alfa Comércio Ltda", cnpj=CNPJ_A)
+    e2 = Empresa(grupo_id=grupo.id, razao_social="Alfa Serviços SA", cnpj=CNPJ_B)
+    sessao.add_all([e1, e2]); sessao.commit()
+    p = _planilha_por_empresa(tmp_path, clientes=[
+        {"ID_EMPRESA": e1.id, "ID_GRUPO": grupo.id, "Razão social": "Alfa Comércio Ltda", "CNPJ (só números)": CNPJ_A,
+         "Logradouro": "Rua Ação", "Município": "Rio de Janeiro", "UF": "RJ", "CEP": "20040-020",
+         "Contato — nome": "Maria", "E-mail": "maria@alfa.com"},
+        {"ID_EMPRESA": e2.id, "ID_GRUPO": grupo.id, "Razão social": "Alfa Serviços SA", "CNPJ (só números)": CNPJ_B,
+         "Contato — nome": "João"},
+    ])
+    rel = _rodar(sessao, p)
+    assert rel.pode_aplicar and rel.empresas_atualizadas == 1 and rel.contatos_criados == 2
+    assert sessao.get(Empresa, e1.id).logradouro == "Rua Ação" and sessao.get(Empresa, e2.id).logradouro is None
+    contatos = {c.nome: c.empresa_id for c in sessao.scalars(sa.select(PessoaContato))}
+    assert contatos == {"Maria": e1.id, "João": e2.id}
+
+
+def test_planilha_intacta_nao_muda_nada(sessao, grupo, tmp_path):
+    e = Empresa(grupo_id=grupo.id, razao_social="Alfa Ltda", cnpj=CNPJ_A)
+    sessao.add(e); sessao.commit()
+    p = _planilha_por_empresa(tmp_path, clientes=[{"ID_EMPRESA": e.id, "ID_GRUPO": grupo.id, "Razão social": "Alfa Ltda", "CNPJ (só números)": CNPJ_A}])
+    rel = _rodar(sessao, p)
+    assert (rel.empresas_atualizadas, rel.contatos_criados, len(rel.conflitos)) == (0, 0, 0)
+
+
+def test_id_de_empresa_de_outro_grupo_e_erro(sessao, grupo, tmp_path):
+    outro = GrupoEconomico(nome="Beta"); sessao.add(outro); sessao.flush()
+    e = Empresa(grupo_id=outro.id, razao_social="Beta Ltda", cnpj=CNPJ_B)
+    sessao.add(e); sessao.commit()
+    rel = _rodar(sessao, _planilha_por_empresa(tmp_path, clientes=[{"ID_EMPRESA": e.id, "ID_GRUPO": grupo.id, "E-mail": "x@y.com"}]))
+    assert not rel.pode_aplicar and "não é do grupo" in " ".join(rel.erros)
+
+
+def test_prospects_e_clientes_sao_lidos_e_o_aviso_diz_a_aba(sessao, grupo, tmp_path):
+    p = _planilha_por_empresa(tmp_path, prospects=[{"ID_GRUPO": grupo.id, "Contato — nome": "Bia", "E-mail": "sem-arroba"}])
+    rel = _rodar(sessao, p)
+    assert any(x.startswith("Prospects, linha 2") for x in rel.erros)
+
+
+def test_planilha_sem_nenhuma_das_duas_abas_e_recusada(sessao, tmp_path):
+    wb = Workbook(); wb.active.title = "Outra"; wb.save(tmp_path / "x.xlsx")
+    rel = Relatorio()
+    assert ler(tmp_path / "x.xlsx", rel) == [] and not rel.pode_aplicar

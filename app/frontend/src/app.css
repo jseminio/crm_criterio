@@ -277,3 +277,42 @@
 .botao-perigo { background: var(--perda); color: var(--branco); }
 .botao-texto-perigo { background: transparent; color: var(--perda); margin-left: auto; }
 .botao-texto-perigo:hover { background: var(--perda-suave); }
+
+/* Sugestões de fusão */
+.sugestoes { list-style: none; margin: var(--e3) 0 0; padding: 0; display: grid; gap: var(--e3); }
+.sugestao { background: var(--surface-card); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e3); }
+.sugestao-cabeca { display: flex; gap: var(--e2); align-items: center; flex-wrap: wrap; margin-bottom: var(--e2); }
+.sugestao-grupos { border: 0; padding: 0; margin: 0 0 var(--e2); display: grid; gap: var(--e1); }
+.sugestao-opcao { font-size: 13px; }
+.sugestao-acoes { display: flex; gap: var(--e2); justify-content: flex-end; }
+/* Recortes e cenários do funil */
+.recortes, .cenarios { margin-top: var(--e4); overflow-x: auto; }
+.recortes .tabela, .cenarios .tabela { min-width: 560px; }
+.recortes-topo { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--e3); margin-bottom: var(--e3); }
+.cenarios-entradas { display: flex; gap: var(--e4); margin-bottom: var(--e3); flex-wrap: wrap; }
+/* Origem de cada campo da volumetria */
+.selecao-origem { margin-top: var(--e1); font-size: 12px; padding: 2px var(--e2); }
+
+/* Agenda de follow-up */
+.agenda { list-style: none; margin: var(--e3) 0 0; padding: 0; display: grid; gap: var(--e2); }
+.agenda-linha { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 1.6fr); gap: var(--e4); align-items: start;
+  background: var(--surface-card); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e3); }
+.agenda-quem { display: flex; flex-direction: column; gap: var(--e1); align-items: flex-start; }
+.agenda-etiquetas { display: flex; gap: var(--e1); flex-wrap: wrap; }
+.agenda-acao { display: grid; grid-template-columns: minmax(0, 1fr) 140px auto; gap: var(--e2); align-items: center; }
+.agenda-acao .estado-texto { grid-column: 1 / -1; }
+@media (max-width: 720px) { .agenda-linha { grid-template-columns: 1fr; } .agenda-acao { grid-template-columns: 1fr; } }
+
+/* Eventos de contrato */
+.eventos { list-style: none; margin: 0 0 var(--e3); padding: 0; display: grid; gap: var(--e2); }
+.evento { border-left: 3px solid var(--borda-forte); padding: var(--e1) var(--e3); font-size: 13px; }
+
+/* Receita (MRR) */
+.receita { margin-bottom: var(--e4); display: grid; gap: var(--e3); }
+.receita-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--e4); flex-wrap: wrap; }
+.receita-retencao p { margin: 0 0 var(--e1); }
+
+/* Contatos */
+.contatos-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e2); }
+.contato-item { display: grid; gap: var(--e1); border-left: 3px solid var(--borda-forte); padding: var(--e1) var(--e3); font-size: 13px; justify-items: start; }
+.contato-form { display: grid; gap: var(--e2); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e3); }

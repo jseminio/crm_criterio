@@ -29,12 +29,18 @@ from crm.carga.identidade import chave_de_origem, detectar_duplicatas
 from crm.carga.planilha_2026 import Proposta, Relatorio
 from crm.db.base import agora
 from crm.db.modelos import (
+    HistoricoDePreco,
     ExecucaoDeCarga,
     GrupoEconomico,
     OcorrenciaDeCarga,
     Oportunidade,
 )
-from crm.domain.listas import Origem, SituacaoGrupo, TipoDeOcorrencia
+from crm.domain.listas import (
+    ORIGEM_DA_MUDANCA_NA_RECARGA,
+    Origem,
+    SituacaoGrupo,
+    TipoDeOcorrencia,
+)
 
 __all__ = [
     "importar",
@@ -320,8 +326,22 @@ def importar(sessao: Session, propostas: Iterable[Proposta]) -> ResultadoImporta
             resultado.inalteradas += 1
             continue
 
+        preco_antes = (existente.preco_mensal, existente.preco_anual)
         for mudanca in mudancas:
             setattr(existente, mudanca.campo, mudanca.para)
+        if (existente.preco_mensal, existente.preco_anual) != preco_antes:
+            # Reajuste que veio da planilha também entra no histórico: sem isto o
+            # preço anterior sumia na recarga.
+            sessao.add(
+                HistoricoDePreco(
+                    oportunidade=existente,
+                    origem=ORIGEM_DA_MUDANCA_NA_RECARGA,
+                    preco_mensal_anterior=preco_antes[0],
+                    preco_mensal_novo=existente.preco_mensal,
+                    preco_anual_anterior=preco_antes[1],
+                    preco_anual_novo=existente.preco_anual,
+                )
+            )
         resultado.mudancas.extend(mudancas)
         resultado.atualizadas += 1
 

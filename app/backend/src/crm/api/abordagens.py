@@ -22,6 +22,7 @@ from crm.db.abordagens import ContaNaoInformada, GrupoNaoEncontrado, JaNaFila, e
 from crm.db.base import agora
 from crm.db.modelos import (
     Abordagem,
+    Empresa,
     ExecucaoDoAgente,
     FichaDeConta,
     GrupoEconomico,
@@ -181,8 +182,12 @@ def _historico_do_crm(sessao: Session, grupo_id: int) -> list[str]:
 
 
 def _contatos(sessao: Session, grupo_id: int) -> list[str]:
+    # Ligado ao grupo ou a uma empresa dele — mesma regra da área de Contatos.
     contatos = sessao.scalars(
-        sa.select(PessoaContato).where(PessoaContato.grupo_id == grupo_id)
+        sa.select(PessoaContato)
+        .outerjoin(Empresa, PessoaContato.empresa_id == Empresa.id)
+        .where(sa.func.coalesce(PessoaContato.grupo_id, Empresa.grupo_id) == grupo_id)
+        .order_by(PessoaContato.id)
     ).all()
     return [
         f"{c.nome}{' — ' + c.cargo if c.cargo else ''}{' (não contatar)' if c.nao_contatar else ''}"

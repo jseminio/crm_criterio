@@ -17,6 +17,7 @@ from crm.domain.listas import (
     LinhaServico,
     MotivoRecusa,
     Origem,
+    OrigemDoDado,
     Situacao,
     SituacaoAbordagem,
     SituacaoContrato,
@@ -24,6 +25,9 @@ from crm.domain.listas import (
     SituacaoLead,
     Temperatura,
     TipoCanal,
+    IniciativaDoEncerramento,
+    MotivoDeEncerramento,
+    TipoDeEventoDeContrato,
     TipoDeOcorrencia,
 )
 
@@ -81,6 +85,78 @@ class GrupoResumo(Base):
     quantas_oportunidades: int = 0
 
 
+class MrrAtualResposta(Base):
+    valor: Decimal
+    contratos: int
+    suspenso_valor: Decimal
+    suspenso_contratos: int
+    sem_preco_mensal: int
+
+
+class MovimentoDeMrrResposta(Base):
+    de: date
+    ate: date
+    mrr_inicio: Decimal
+    novo: Decimal
+    expansao: Decimal
+    reajuste: Decimal
+    contracao: Decimal
+    churn_cliente: Decimal
+    churn_criterio: Decimal
+    churn: Decimal
+    mrr_fim: Decimal
+    variacao: Decimal
+    nrr: Decimal | None
+    grr: Decimal | None
+
+
+class MrrResposta(Base):
+    """O MRR dos **contratos registrados no CRM** — parcial enquanto a carteira anterior
+    não estiver carregada. `cobertura_completa` fica sempre `False` por enquanto: é o
+    aviso de que este número não se compara com a meta de R$ 400 mil."""
+
+    atual: MrrAtualResposta
+    movimento: MovimentoDeMrrResposta
+    contratos_registrados: int
+    contratos_da_carteira_anterior: int
+    """Quantos vieram da carga da planilha de saúde da carteira (sem data de assinatura)."""
+    cobertura_completa: bool
+    aviso: str
+
+
+class ItemDaAgendaResposta(Base):
+    tipo: str
+    id: int
+    titulo: str
+    subtitulo: str | None = None
+    situacao: str
+    temperatura: str | None = None
+    captador: str | None = None
+    valor_anual: Decimal | None = None
+    proxima_acao: str | None = None
+    proxima_acao_em: date | None = None
+    balde: str
+    dias_de_atraso: int
+    dias_desde_o_envio: int | None = None
+
+
+class AgendaResposta(Base):
+    """A fila de follow-up. `contagens` traz todos os baldes, mesmo os vazios."""
+
+    hoje: date
+    contagens: dict[str, int]
+    itens: list[ItemDaAgendaResposta]
+
+
+class SugestaoDeFusao(Base):
+    """Um bloco de grupos que parecem ser o mesmo cliente. Só sugestão."""
+
+    confianca: str
+    motivo: str
+    principal_id: int
+    grupos: list[GrupoResumo]
+
+
 class OportunidadeResumo(Base):
     """O que cabe num cartão do funil."""
 
@@ -111,6 +187,19 @@ class SugestaoDePorteResposta(Base):
     direcionadores_aplicados: int
 
 
+class MudancaDePreco(Base):
+    """Uma linha do histórico de preço: o valor antes, o valor depois, quando e por quê."""
+
+    id: int
+    registrado_em: datetime
+    origem: str
+    motivo: str | None = None
+    preco_mensal_anterior: Decimal | None = None
+    preco_mensal_novo: Decimal | None = None
+    preco_anual_anterior: Decimal | None = None
+    preco_anual_novo: Decimal | None = None
+
+
 class OportunidadeDetalhe(OportunidadeResumo):
     canal: str | None = None
     linha_servico: LinhaServico | None = None
@@ -137,6 +226,11 @@ class OportunidadeDetalhe(OportunidadeResumo):
     servicos_contratados_alem_do_primeiro: int = 0
     tem_consolidacao_de_grupo: bool = False
     e_auditada: bool = False
+
+    origem_da_volumetria: dict[str, str] = {}
+    """`{campo: "Entrevista" | "Questionário"}`, só para campos preenchidos."""
+    historico_de_preco: list[MudancaDePreco] = []
+    """Mais recente primeiro. Só cresce: reajustar não apaga o preço anterior."""
 
     porte: str | None = None
     porte_definido_por: str | None = None
@@ -183,6 +277,12 @@ class OportunidadeEdicao(BaseModel):
     servicos_contratados_alem_do_primeiro: int | None = Field(default=None, ge=0)
     tem_consolidacao_de_grupo: bool | None = None
     e_auditada: bool | None = None
+
+    origem_da_volumetria: dict[str, OrigemDoDado] | None = None
+    """Substitui o mapa inteiro. As chaves precisam ser direcionadores da volumetria."""
+    motivo_do_preco: str | None = Field(default=None, max_length=200)
+    """Por que o preço mudou ("reajuste anual"). Só é lido quando o preço muda de fato;
+    não é gravado na oportunidade, e sim na linha do histórico."""
 
     porte: str | None = Field(default=None, max_length=20)
     porte_definido_por: str | None = Field(default=None, max_length=10)
@@ -282,6 +382,9 @@ class ContratoResumo(Base):
     grupo_id: int
     grupo_nome: str | None = None
     oportunidade_id: int | None = None
+    empresa_id: int | None = None
+    anterior_ao_crm: bool = False
+    """Da carteira que já existia antes do CRM: sem data de assinatura conhecida."""
     escopo: str | None = None
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
@@ -291,9 +394,48 @@ class ContratoResumo(Base):
     signatario: str | None = None
 
 
+class EventoDeContratoResposta(Base):
+    """Um fato do contrato, guardado com o antes e o depois. Só cresce."""
+
+    id: int
+    tipo: TipoDeEventoDeContrato
+    data_do_evento: date
+    registrado_em: datetime
+    descricao: str | None = None
+    motivo_categoria: MotivoDeEncerramento | None = None
+    iniciativa: IniciativaDoEncerramento | None = None
+    preco_mensal_anterior: Decimal | None = None
+    preco_mensal_novo: Decimal | None = None
+    preco_anual_anterior: Decimal | None = None
+    preco_anual_novo: Decimal | None = None
+    escopo_anterior: str | None = None
+    escopo_novo: str | None = None
+    data_fim_anterior: date | None = None
+    data_fim_nova: date | None = None
+
+
 class ContratoDetalhe(ContratoResumo):
     documento_assinado: str | None = None
     observacao: str | None = None
+    eventos: list[EventoDeContratoResposta] = []
+    """Mais recente primeiro."""
+
+
+class EventoDeContratoNovo(BaseModel):
+    """Registra um evento. O que cada tipo exige está em `crm.domain.eventos_de_contrato`."""
+
+    tipo: TipoDeEventoDeContrato
+    data_do_evento: date | None = None
+    """Sem data, vale hoje (data do servidor)."""
+    descricao: str | None = Field(default=None, max_length=500)
+    motivo_categoria: MotivoDeEncerramento | None = None
+    """Só vale no Encerramento; nos outros tipos é recusado."""
+    iniciativa: IniciativaDoEncerramento | None = None
+    """Quem decidiu encerrar. Só vale no Encerramento, onde é obrigatória."""
+    escopo_novo: str | None = Field(default=None, max_length=200)
+    preco_mensal_novo: Decimal | None = None
+    preco_anual_novo: Decimal | None = None
+    data_fim_nova: date | None = None
 
 
 class ContratoEdicao(BaseModel):
@@ -410,6 +552,33 @@ class TicketRecorrenteResposta(Base):
     calculavel: bool
 
 
+class LinhaDeRecorteResposta(Base):
+    chave: str
+    propostas: int
+    em_aberto: int
+    aceitas: int
+    decididas: int
+    conversao: Decimal | None
+    recorrentes: int
+    valor_mensal: Decimal
+    ticket_medio: Decimal | None
+    mediana: Decimal | None
+
+
+class CenariosDeTicketResposta(Base):
+    """Hipóteses de trabalho, não meta. Ver `crm.domain.recortes`."""
+
+    contratos: int
+    atipicos: int
+    limite_do_atipico: Decimal
+    conservador: Decimal
+    base: Decimal
+    otimista: Decimal
+    atipico_minimo: Decimal | None
+    atipico_medio: Decimal | None
+    atipico_maximo: Decimal | None
+
+
 class IndicadoresResposta(Base):
     em_aberto: RecorteResposta
     aceitas: RecorteResposta
@@ -481,6 +650,9 @@ class Listas(BaseModel):
     tipos_de_canal: list[str]
     tipos_de_canal_em_operacao: list[str]
     motivos_de_recusa: list[str]
+    motivos_de_encerramento: list[str]
+    iniciativas_de_encerramento: list[str]
+    papeis_de_contato: list[str]
     linhas_de_servico: list[str]
     situacoes_de_grupo: list[str]
     captadores: list[str]

@@ -25,7 +25,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from crm.db.base import Base, CarimboMixin, coluna_lista
+from crm.db.base import Base, CarimboMixin, agora, coluna_lista
 from crm.domain.listas import (
     CanalDeAbordagem,
     LinhaServico,
@@ -40,6 +40,9 @@ from crm.domain.listas import (
     SituacaoLead,
     Temperatura,
     TipoCanal,
+    IniciativaDoEncerramento,
+    MotivoDeEncerramento,
+    TipoDeEventoDeContrato,
     TipoDeOcorrencia,
 )
 
@@ -53,6 +56,8 @@ __all__ = [
     "FichaDeConta",
     "Abordagem",
     "ExecucaoDoAgente",
+    "EventoDeContrato",
+    "HistoricoDePreco",
     "ExecucaoDeCarga",
     "OcorrenciaDeCarga",
 ]
@@ -365,6 +370,24 @@ class Oportunidade(CarimboMixin, Base):
     carga de novo a desfazia. Tipo JSON genérico, para valer igual nos dois bancos.
     """
 
+    origem_da_volumetria: Mapped[dict[str, str]] = mapped_column(
+        sa.JSON().with_variant(JSONB(), "postgresql"),
+        nullable=False,
+        default=dict,
+        server_default=sa.text("'{}'"),
+    )
+    """De onde veio cada direcionador da volumetria: `{campo: "Entrevista" | "Questionário"}`.
+
+    Só existe para campo preenchido — o servidor descarta a origem de um campo que
+    voltou a ficar vazio. Pedido do E4 (planejamento): cada campo sabe se veio da
+    entrevista ou do questionário.
+    """
+
+    historico_de_preco: Mapped[list["HistoricoDePreco"]] = relationship(
+        back_populates="oportunidade",
+        order_by="HistoricoDePreco.id.desc()",
+    )
+
     linha_planilha: Mapped[int | None] = mapped_column(sa.Integer)
     """Onde estava na aba quando foi importada. Serve para apontar a origem no
     relatório de conferência — **não** é identidade: número de linha se desloca.
@@ -392,6 +415,38 @@ class Oportunidade(CarimboMixin, Base):
         return f"<Oportunidade {self.id} {self.nome!r} {self.situacao.value}>"
 
 
+class HistoricoDePreco(Base):
+    """Uma mudança de preço, guardada como aconteceu — E4 (reajuste).
+
+    Cada linha diz o preço **antes** e **depois**, quando, de onde veio (CRM ou
+    recarga da planilha) e, se alguém disse, por quê ("reajuste anual",
+    "renegociação"). Sem isto, reajustar apagava o preço anterior.
+
+    **Imutável de propósito**, como `ExecucaoDeCarga`: não herda o carimbo de
+    alteração. Um histórico que se reescreve deixa de ser histórico. Ainda não há
+    login, então não há "quem mudou" — entra com o E1.
+    """
+
+    __tablename__ = "historico_de_preco"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    oportunidade_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("oportunidade.id"), nullable=False, index=True
+    )
+    registrado_em: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), default=agora, nullable=False
+    )
+    origem: Mapped[str] = mapped_column(sa.String(30), nullable=False)
+    motivo: Mapped[str | None] = mapped_column(sa.String(200))
+
+    preco_mensal_anterior: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_mensal_novo: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_anual_anterior: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_anual_novo: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+
+    oportunidade: Mapped["Oportunidade"] = relationship(back_populates="historico_de_preco")
+
+
 class Contrato(CarimboMixin, Base):
     """Nasce de uma oportunidade aceita — começo da Etapa 2 (E2 "fechar o
     ciclo"), 23/09/2026.
@@ -415,6 +470,17 @@ class Contrato(CarimboMixin, Base):
     """A oportunidade aceita que originou o contrato. Nula se o contrato
     nascer direto na tela, sem passar pelo funil."""
 
+    empresa_id: Mapped[int | None] = mapped_column(sa.ForeignKey("empresa.id"), index=True)
+    """O CNPJ a que o contrato se refere. Nulo quando o contrato é do grupo inteiro (o que
+    nasce da conversão de uma oportunidade, que ainda não conhece o CNPJ)."""
+    anterior_ao_crm: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default=sa.false()
+    )
+    """Contrato da carteira que já existia **antes** do CRM (carga de 26/09/2026, a partir da
+    planilha de saúde da carteira). A data de assinatura dele é desconhecida, e **não se
+    inventa uma**: pode ficar Ativo sem `data_inicio`, e no MRR conta como existente desde
+    sempre — nunca como "novo" de um período."""
+
     escopo: Mapped[str | None] = mapped_column(sa.String(200))
     preco_mensal: Mapped[Decimal | None] = mapped_column(DINHEIRO)
     preco_anual: Mapped[Decimal | None] = mapped_column(DINHEIRO)
@@ -436,6 +502,10 @@ class Contrato(CarimboMixin, Base):
 
     grupo: Mapped[GrupoEconomico] = relationship(back_populates="contratos")
     oportunidade: Mapped["Oportunidade | None"] = relationship()
+    empresa: Mapped["Empresa | None"] = relationship()
+    eventos: Mapped[list["EventoDeContrato"]] = relationship(
+        back_populates="contrato", order_by="EventoDeContrato.id.desc()"
+    )
 
     def __repr__(self) -> str:
         return f"<Contrato {self.id} grupo={self.grupo_id} {self.situacao.value}>"
@@ -554,6 +624,52 @@ class ExecucaoDoAgente(Base):
     conhecido — nunca zero, que pareceria "saiu de graça"."""
     deu_certo: Mapped[bool] = mapped_column(sa.Boolean, nullable=False)
     erro: Mapped[str | None] = mapped_column(sa.Text)
+
+
+class EventoDeContrato(Base):
+    """Algo que aconteceu com o contrato depois de assinado: aditivo, reajuste,
+    expansão, contração, renovação ou encerramento.
+
+    Guarda o **antes e o depois** do que o evento mudou. **Imutável** (não herda o
+    carimbo de alteração): errou, registra outro evento — o histórico não se
+    reescreve. Ainda não registra *quem* (sem login; entra com o E1).
+    Regras em `crm.domain.eventos_de_contrato`.
+    """
+
+    __tablename__ = "evento_de_contrato"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contrato_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("contrato.id"), nullable=False, index=True
+    )
+    tipo: Mapped[TipoDeEventoDeContrato] = mapped_column(
+        coluna_lista(TipoDeEventoDeContrato), nullable=False, index=True
+    )
+    data_do_evento: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    registrado_em: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), default=agora, nullable=False
+    )
+    descricao: Mapped[str | None] = mapped_column(sa.String(500))
+    """No encerramento, detalha a `motivo_categoria` (obrigatório só em "Outro")."""
+    motivo_categoria: Mapped[MotivoDeEncerramento | None] = mapped_column(
+        coluna_lista(MotivoDeEncerramento, tamanho=60), index=True
+    )
+    """Só no encerramento. Nulo em qualquer outro evento."""
+    iniciativa: Mapped[IniciativaDoEncerramento | None] = mapped_column(
+        coluna_lista(IniciativaDoEncerramento), index=True
+    )
+    """Quem decidiu encerrar: `Cliente` ou `Critério`. Só no encerramento."""
+
+    preco_mensal_anterior: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_mensal_novo: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_anual_anterior: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_anual_novo: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    escopo_anterior: Mapped[str | None] = mapped_column(sa.String(200))
+    escopo_novo: Mapped[str | None] = mapped_column(sa.String(200))
+    data_fim_anterior: Mapped[date | None] = mapped_column(sa.Date)
+    data_fim_nova: Mapped[date | None] = mapped_column(sa.Date)
+
+    contrato: Mapped[Contrato] = relationship(back_populates="eventos")
 
 
 class ExecucaoDeCarga(Base):

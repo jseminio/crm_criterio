@@ -3,12 +3,24 @@
 import type {
   AbordagemDetalhe,
   AbordagemResumo,
+  Agenda,
+  EnderecoDeContato,
+  EntidadeDeContato,
+  PaginaDeContatos,
+  PessoaComOrigem,
+  PessoaDeContato,
+  TipoDeContato,
+  Mrr,
+  CenariosDeTicket,
   ColunaDoFunil,
+  DimensaoDeRecorte,
+  LinhaDeRecorte,
   ContratoDetalhe,
   ContratoResumo,
   Execucao,
   ExecucaoDetalhe,
   GrupoResumo,
+  SugestaoDeFusao,
   Indicadores,
   LeadResumo,
   Listas,
@@ -114,6 +126,34 @@ export const api = {
       substituir ? { "X-Confirmacao": "SUBSTITUIR" } : {},
     ),
 
+  contatosPorEmpresa: (tipo: TipoDeContato, busca: string, soComLacunas: boolean) =>
+    pedir<PaginaDeContatos<EntidadeDeContato>>(
+      comParametros("/api/contatos/empresas", { tipo, busca, so_com_lacunas: soComLacunas || undefined, limite: 200 }),
+    ),
+
+  contatosPorPessoa: (tipo: TipoDeContato, busca: string) =>
+    pedir<PaginaDeContatos<PessoaComOrigem>>(comParametros("/api/contatos/pessoas", { tipo, busca, limite: 200 })),
+
+  criarContato: (dados: Record<string, unknown>) =>
+    pedir<PessoaDeContato>("/api/contatos/pessoas", { method: "POST", body: JSON.stringify(dados) }),
+
+  editarContato: (id: number, mudancas: Record<string, unknown>) =>
+    pedir<PessoaDeContato>(`/api/contatos/pessoas/${id}`, { method: "PATCH", body: JSON.stringify(mudancas) }),
+
+  editarEmpresa: (id: number, mudancas: Record<string, unknown>) =>
+    pedir<EnderecoDeContato>(`/api/empresas/${id}`, { method: "PATCH", body: JSON.stringify(mudancas) }),
+
+  criarEmpresaDoGrupo: (grupoId: number, dados: Record<string, unknown> = {}) =>
+    pedir<{ id: number; razao_social: string; cnpj: string | null }>(`/api/grupos/${grupoId}/empresas`, {
+      method: "POST",
+      body: JSON.stringify(dados),
+    }),
+
+  mrr: (de?: string) => pedir<Mrr>(comParametros("/api/mrr", { de })),
+
+  agenda: (captador?: string[]) =>
+    pedir<Agenda>(comParametros("/api/agenda", { captador })),
+
   listas: () => pedir<Listas>("/api/listas"),
 
   funil: (filtros: FiltrosDoFunil = {}) =>
@@ -130,6 +170,12 @@ export const api = {
 
   indicadores: (filtros: FiltrosDoFunil = {}) =>
     pedir<Indicadores>(comParametros("/api/indicadores", { ...filtros })),
+
+  recortes: (dimensao: DimensaoDeRecorte, filtros: FiltrosDoFunil = {}) =>
+    pedir<LinhaDeRecorte[]>(comParametros("/api/indicadores/recortes", { dimensao, ...filtros })),
+
+  cenariosDeTicket: (filtros: FiltrosDoFunil = {}) =>
+    pedir<CenariosDeTicket | null>(comParametros("/api/indicadores/cenarios-de-ticket", { ...filtros })),
 
   oportunidades: (filtros: FiltrosDoFunil & { situacao?: string[]; grupo_id?: number } = {}) =>
     pedir<Pagina<OportunidadeResumo>>(
@@ -171,6 +217,8 @@ export const api = {
   grupos: (filtros: { busca?: string; limite?: number; incluir_fundidos?: boolean } = {}) =>
     pedir<Pagina<GrupoResumo>>(comParametros("/api/grupos", { limite: 500, ...filtros })),
 
+  sugestoesDeFusao: () => pedir<SugestaoDeFusao[]>("/api/grupos/sugestoes-de-fusao"),
+
   fundirGrupos: (principalId: number, absorvidoId: number) =>
     pedir<GrupoResumo>(`/api/grupos/${principalId}/fundir`, {
       method: "POST",
@@ -181,6 +229,12 @@ export const api = {
     pedir<Pagina<ContratoResumo>>(comParametros("/api/contratos", { ...filtros, limite: 500 })),
 
   contrato: (id: number) => pedir<ContratoDetalhe>(`/api/contratos/${id}`),
+
+  registrarEventoDeContrato: (id: number, evento: Record<string, unknown>) =>
+    pedir<ContratoDetalhe>(`/api/contratos/${id}/eventos`, {
+      method: "POST",
+      body: JSON.stringify(evento),
+    }),
 
   editarContrato: (id: number, mudancas: Record<string, unknown>) =>
     pedir<ContratoDetalhe>(`/api/contratos/${id}`, {

@@ -62,3 +62,11 @@ export function dataHora(iso: string | null | undefined): string {
   const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   return `${dia} às ${hora}`;
 }
+
+/** CNPJ com pontuação (00.000.000/0000-00). Se não tiver 14 dígitos, devolve como veio. */
+export function cnpj(valor: string | null | undefined): string {
+  if (!valor) return "—";
+  const d = valor.replace(/\D/g, "");
+  if (d.length !== 14) return valor;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}

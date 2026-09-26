@@ -185,10 +185,84 @@ class Origem(Enum):
     CARGA_2026 = "Carga 2026"
     CRM = "CRM"
     KIT_BRUNO_2026 = "Recuperação e-mail/WhatsApp (Bruno)"
+    CARTEIRA_ANTERIOR = "Carteira anterior ao CRM"
     """Propostas de 2026 do kit de transferência que o Bruno passou ao Eduardo
     em 22/09/2026 — reconstruídas por ele a partir do próprio e-mail e WhatsApp,
     enquanto foi o comercial exclusivo da Critério. Origem própria, não é
     'Carga 2026' (não veio da planilha) nem 'CRM' (não nasceu digitada aqui)."""
+
+
+class TipoDeEventoDeContrato(Enum):
+    """O que aconteceu com um contrato depois de assinado — Etapa 2.
+
+    Cada evento é um fato **imutável**: corrigir um erro é registrar outro evento,
+    nunca reescrever o anterior. É o que sustenta, depois, expansão, contração e
+    encerramento com motivo (insumos de NRR e churn).
+    """
+
+    ADITIVO = "Aditivo"
+    REAJUSTE = "Reajuste"
+    EXPANSAO = "Expansão"
+    CONTRACAO = "Contração"
+    RENOVACAO = "Renovação"
+    ENCERRAMENTO = "Encerramento"
+    CORRECAO = "Correção"
+    """Corrige um valor **lançado errado** (por exemplo, na carga inicial). Guarda o antes e o
+    depois e o motivo, mas **não é um movimento comercial**: não conta como expansão, contração
+    nem reajuste no MRR do período."""
+
+
+class IniciativaDoEncerramento(Enum):
+    """Quem decidiu encerrar o contrato — separa saída do cliente de saída da Critério.
+
+    Pedido de Eduardo em 26/09/2026: é o que distingue *churn* (o cliente saiu) de
+    *saída organizada* (a Critério saiu). Fica **separado** da categoria do motivo: a
+    categoria diz *por que*, a iniciativa diz *quem*. Os dois se combinam livremente
+    ("Preço" pode ser o cliente que achou caro ou a Critério que reajustou para sair).
+    """
+
+    CLIENTE = "Cliente"
+    CRITERIO = "Critério"
+
+
+class MotivoDeEncerramento(Enum):
+    """Por que um contrato foi encerrado — insumo da análise de saída (churn).
+
+    ⚠️ **Proposta, ainda não aprovada por Eduardo.** Nenhum documento do projeto traz uma
+    lista de motivos de saída; esta parte da lista de motivos de recusa que já existe
+    (Preço, Concorrência, Internalizou, Escopo, Outro) e do conceito de "saída organizada"
+    do modelo de classificação da carteira (classe C). Guardada como texto legível, não
+    como tipo nativo do banco, para poder mudar com um `UPDATE` quando for aprovada.
+
+    A lista responde *por que saiu*, não *quem decidiu*. Se a análise precisar separar saída
+    por iniciativa do cliente de saída por iniciativa da Critério, isso vira um segundo campo.
+    """
+
+    PRECO = "Preço"
+    INSATISFACAO = "Insatisfação com o serviço"
+    CONCORRENCIA = "Migrou para concorrente"
+    INTERNALIZOU = "Internalizou a operação"
+    EMPRESA_ENCERROU = "Empresa encerrada, vendida ou reestruturada"
+    INADIMPLENCIA = "Inadimplência"
+    SAIDA_ORGANIZADA = "Saída organizada pela Critério"
+    NAO_PRECISA_MAIS = "Não precisa mais do serviço"
+    OUTRO = "Outro"
+
+
+class OrigemDoDado(Enum):
+    """De onde veio um dado da ficha de volumetria — E4.
+
+    Guardar a origem de cada campo é o que permite, depois, dizer quanto do porte
+    saiu de um número declarado no questionário e quanto de uma conversa.
+    """
+
+    ENTREVISTA = "Entrevista"
+    QUESTIONARIO = "Questionário"
+
+
+#: De onde vem uma mudança de preço registrada no histórico.
+ORIGEM_DA_MUDANCA_NO_CRM = "CRM"
+ORIGEM_DA_MUDANCA_NA_RECARGA = "Recarga da planilha"
 
 
 class TipoDeOcorrencia(Enum):

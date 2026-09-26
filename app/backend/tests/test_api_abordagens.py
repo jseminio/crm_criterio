@@ -17,7 +17,7 @@ from crm.agente.envio import EnvioFalhou
 from crm.agente.sdr import AgenteFalhou, Preparo
 from crm.api.abordagens import Servicos
 from crm.api.app import criar_app
-from crm.db.modelos import ExecucaoDoAgente, GrupoEconomico, PessoaContato
+from crm.db.modelos import Empresa, ExecucaoDoAgente, GrupoEconomico, PessoaContato
 from crm.domain.listas import SituacaoGrupo
 
 PREPARO = Preparo(
@@ -241,6 +241,33 @@ def test_contato_nao_contatar_trava_a_aprovacao(cliente, ambiente, sessao: Sessi
     assert resposta.status_code == 422
     assert "não contatar" in resposta.json()["detail"]
     assert ambiente.envios == []
+
+
+def test_contato_da_empresa_entra_na_ficha_sem_email_nem_telefone(cliente, ambiente, sessao):
+    abordagem = _nova(cliente)
+    outro = GrupoEconomico(nome="Outra conta")
+    sessao.add(outro)
+    sessao.flush()
+    empresa = Empresa(grupo_id=abordagem["grupo_id"], razao_social="Omega Ltda")
+    sessao.add(empresa)
+    sessao.flush()
+    sessao.add_all(
+        [
+            PessoaContato(
+                empresa_id=empresa.id, nome="Bia", cargo="Controller",
+                email="bia@omega.com.br", telefone="21999990000",
+            ),
+            PessoaContato(grupo_id=abordagem["grupo_id"], nome="Caio"),
+            PessoaContato(grupo_id=outro.id, nome="Dora"),
+        ]
+    )
+    sessao.commit()
+
+    cliente.post(f"/api/abordagens/{abordagem['id']}/preparar")
+
+    contatos = ambiente.agente.pedidos[0]["contexto"].contatos
+    assert contatos == ["Bia — Controller", "Caio"]
+    assert "bia@omega.com.br" not in repr(ambiente.agente.pedidos[0]["contexto"])
 
 
 def test_whatsapp_aprova_com_link_e_a_pessoa_marca_enviada(cliente, ambiente):

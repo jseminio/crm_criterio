@@ -51,6 +51,18 @@ export interface SugestaoDePorte {
   direcionadores_aplicados: number;
 }
 
+/** Uma mudança de preço: antes, depois, quando e por quê. Só cresce. */
+export interface MudancaDePreco {
+  id: number;
+  registrado_em: string;
+  origem: string;
+  motivo: string | null;
+  preco_mensal_anterior: string | null;
+  preco_mensal_novo: string | null;
+  preco_anual_anterior: string | null;
+  preco_anual_novo: string | null;
+}
+
 export interface OportunidadeDetalhe extends OportunidadeResumo {
   canal: string | null;
   linha_servico: string | null;
@@ -61,6 +73,9 @@ export interface OportunidadeDetalhe extends OportunidadeResumo {
   observacao: string | null;
   origem: string;
   linha_planilha: number | null;
+  /** {campo: "Entrevista" | "Questionário"}, só de campo preenchido. */
+  origem_da_volumetria: Record<string, string>;
+  historico_de_preco: MudancaDePreco[];
 
   complexidade: number | null;
   risco_tecnico: number | null;
@@ -119,6 +134,9 @@ export interface Listas {
   tipos_de_canal: string[];
   tipos_de_canal_em_operacao: string[];
   motivos_de_recusa: string[];
+  motivos_de_encerramento: string[];
+  iniciativas_de_encerramento: string[];
+  papeis_de_contato: string[];
   linhas_de_servico: string[];
   situacoes_de_grupo: string[];
   captadores: string[];
@@ -237,6 +255,9 @@ export interface ContratoResumo {
   grupo_id: number;
   grupo_nome: string | null;
   oportunidade_id: number | null;
+  empresa_id: number | null;
+  /** Da carteira que já existia antes do CRM: sem data de assinatura conhecida. */
+  anterior_ao_crm: boolean;
   escopo: string | null;
   preco_mensal: string | null;
   preco_anual: string | null;
@@ -246,9 +267,32 @@ export interface ContratoResumo {
   signatario: string | null;
 }
 
+/** Um fato do contrato depois de assinado, com o antes e o depois. Só cresce. */
+export interface EventoDeContrato {
+  id: number;
+  tipo: "Aditivo" | "Reajuste" | "Expansão" | "Contração" | "Renovação" | "Encerramento" | "Correção";
+  data_do_evento: string;
+  registrado_em: string;
+  descricao: string | null;
+  /** Só no Encerramento. */
+  motivo_categoria: string | null;
+  /** Quem decidiu encerrar: "Cliente" ou "Critério". Só no Encerramento. */
+  iniciativa: string | null;
+  preco_mensal_anterior: string | null;
+  preco_mensal_novo: string | null;
+  preco_anual_anterior: string | null;
+  preco_anual_novo: string | null;
+  escopo_anterior: string | null;
+  escopo_novo: string | null;
+  data_fim_anterior: string | null;
+  data_fim_nova: string | null;
+}
+
 export interface ContratoDetalhe extends ContratoResumo {
   documento_assinado: string | null;
   observacao: string | null;
+  /** Mais recente primeiro. */
+  eventos: EventoDeContrato[];
 }
 
 export interface Ocorrencia {
@@ -311,4 +355,158 @@ export interface ResumoDasAbordagens {
   aguardando_aprovacao: number;
   custo_usd: string | null;
   custo_parcial: boolean;
+}
+
+/** Um bloco de grupos que parecem ser o mesmo cliente. Só sugestão: quem funde é uma pessoa. */
+export interface SugestaoDeFusao {
+  confianca: "alta" | "média";
+  motivo: string;
+  principal_id: number;
+  grupos: GrupoResumo[];
+}
+
+export type DimensaoDeRecorte = "servico" | "tipo_canal" | "captador";
+
+/** Um corte do funil por serviço, canal ou captador. */
+export interface LinhaDeRecorte {
+  chave: string;
+  propostas: number;
+  em_aberto: number;
+  aceitas: number;
+  decididas: number;
+  conversao: string | null;
+  recorrentes: number;
+  valor_mensal: string;
+  ticket_medio: string | null;
+  mediana: string | null;
+}
+
+/** Hipóteses de trabalho, não meta. Atípico = acima de 3 × a mediana. */
+export interface CenariosDeTicket {
+  contratos: number;
+  atipicos: number;
+  limite_do_atipico: string;
+  conservador: string;
+  base: string;
+  otimista: string;
+  atipico_minimo: string | null;
+  atipico_medio: string | null;
+  atipico_maximo: string | null;
+}
+
+export type BaldeDaAgenda = "atrasada" | "hoje" | "proximos_7_dias" | "depois" | "sem_data" | "sem_acao";
+
+export interface ItemDaAgenda {
+  tipo: "oportunidade" | "lead" | "contrato";
+  id: number;
+  titulo: string;
+  subtitulo: string | null;
+  situacao: string;
+  temperatura: string | null;
+  captador: string | null;
+  valor_anual: string | null;
+  proxima_acao: string | null;
+  proxima_acao_em: string | null;
+  balde: BaldeDaAgenda;
+  dias_de_atraso: number;
+  dias_desde_o_envio: number | null;
+}
+
+/** A fila de follow-up. `contagens` traz todos os baldes, mesmo os vazios. */
+export interface Agenda {
+  hoje: string;
+  contagens: Record<BaldeDaAgenda, number>;
+  itens: ItemDaAgenda[];
+}
+
+export interface MrrAtual {
+  valor: string;
+  contratos: number;
+  suspenso_valor: string;
+  suspenso_contratos: number;
+  sem_preco_mensal: number;
+}
+
+export interface MovimentoDeMrr {
+  de: string;
+  ate: string;
+  mrr_inicio: string;
+  novo: string;
+  expansao: string;
+  reajuste: string;
+  contracao: string;
+  churn_cliente: string;
+  churn_criterio: string;
+  churn: string;
+  mrr_fim: string;
+  variacao: string;
+  nrr: string | null;
+  grr: string | null;
+}
+
+/** MRR dos contratos registrados no CRM. Parcial: a carteira anterior não está aqui. */
+export interface Mrr {
+  atual: MrrAtual;
+  movimento: MovimentoDeMrr;
+  contratos_registrados: number;
+  contratos_da_carteira_anterior: number;
+  cobertura_completa: boolean;
+  aviso: string;
+}
+
+export type TipoDeContato = "cliente" | "prospect";
+
+export interface PessoaDeContato {
+  id: number;
+  nome: string;
+  cargo: string | null;
+  email: string | null;
+  telefone: string | null;
+  papel: string | null;
+  observacao: string | null;
+  nao_contatar: boolean;
+  empresa_id: number | null;
+  grupo_id: number | null;
+  /** Ligada só ao grupo, não a esta empresa. */
+  do_grupo: boolean;
+}
+
+export interface EnderecoDeContato {
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  municipio: string | null;
+  uf: string | null;
+  cep: string | null;
+}
+
+/** Cliente: uma empresa (CNPJ). Prospect: o grupo, ou a empresa quando já existe. */
+export interface EntidadeDeContato {
+  tipo: TipoDeContato;
+  grupo_id: number;
+  grupo_nome: string;
+  empresa_id: number | null;
+  razao_social: string | null;
+  nome_fantasia: string | null;
+  cnpj: string | null;
+  endereco: EnderecoDeContato;
+  /** Só cliente. */
+  mensalidade: string | null;
+  /** Só prospect. */
+  propostas: number;
+  contatos: PessoaDeContato[];
+  /** Dos sete itens (contato, e-mail, telefone, logradouro, município, UF, CEP), o que falta. */
+  lacunas: string[];
+}
+
+export interface PessoaComOrigem extends PessoaDeContato {
+  tipo: TipoDeContato;
+  grupo_nome: string;
+  razao_social: string | null;
+}
+
+export interface PaginaDeContatos<T> {
+  total: number;
+  itens: T[];
 }

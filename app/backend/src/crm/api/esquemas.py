@@ -73,6 +73,30 @@ class GrupoResumo(Base):
     quantas_oportunidades: int = 0
 
 
+class ItemDaAgendaResposta(Base):
+    tipo: str
+    id: int
+    titulo: str
+    subtitulo: str | None = None
+    situacao: str
+    temperatura: str | None = None
+    captador: str | None = None
+    valor_anual: Decimal | None = None
+    proxima_acao: str | None = None
+    proxima_acao_em: date | None = None
+    balde: str
+    dias_de_atraso: int
+    dias_desde_o_envio: int | None = None
+
+
+class AgendaResposta(Base):
+    """A fila de follow-up. `contagens` traz todos os baldes, mesmo os vazios."""
+
+    hoje: date
+    contagens: dict[str, int]
+    itens: list[ItemDaAgendaResposta]
+
+
 class SugestaoDeFusao(Base):
     """Um bloco de grupos que parecem ser o mesmo cliente. Só sugestão."""
 

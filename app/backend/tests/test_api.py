@@ -914,3 +914,27 @@ class TestRecortesECenarios:
     def test_cenarios_sem_base_devolve_null(self, cliente, carteira):
         r = cliente.get("/api/indicadores/cenarios-de-ticket")
         assert r.status_code == 200 and r.json() is None
+
+
+class TestAgenda:
+    def test_lista_so_o_que_esta_em_aberto_e_conta_os_baldes(self, cliente, carteira):
+        r = cliente.get("/api/agenda", params={"hoje": "2026-09-25"})
+        assert r.status_code == 200
+        corpo = r.json()
+        assert set(corpo["contagens"]) == {"atrasada", "hoje", "proximos_7_dias", "depois", "sem_data", "sem_acao"}
+        assert sum(corpo["contagens"].values()) == len(corpo["itens"])
+        assert all(i["situacao"] not in ("Aceita", "Recusada", "Perdido") for i in corpo["itens"] if i["tipo"] == "oportunidade")
+
+    def test_definir_a_proxima_acao_tira_a_proposta_do_balde_sem_acao(self, cliente, carteira):
+        antes = cliente.get("/api/agenda", params={"hoje": "2026-09-25"}).json()
+        op = next(i for i in antes["itens"] if i["tipo"] == "oportunidade" and i["balde"] == "sem_acao")
+        cliente.patch(f"/api/oportunidades/{op['id']}", json={"proxima_acao": "ligar", "proxima_acao_em": "2026-09-20"})
+        depois = cliente.get("/api/agenda", params={"hoje": "2026-09-25"}).json()
+        item = next(i for i in depois["itens"] if i["tipo"] == "oportunidade" and i["id"] == op["id"])
+        assert (item["balde"], item["dias_de_atraso"]) == ("atrasada", 5)
+        assert depois["contagens"]["sem_acao"] == antes["contagens"]["sem_acao"] - 1
+
+    def test_filtra_por_captador(self, cliente, carteira):
+        todos = cliente.get("/api/agenda").json()["itens"]
+        so_el = cliente.get("/api/agenda", params={"captador": "EL"}).json()["itens"]
+        assert 0 < len(so_el) <= len(todos) and all(i["captador"] == "EL" for i in so_el)

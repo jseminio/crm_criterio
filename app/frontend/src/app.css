@@ -243,3 +243,13 @@
 .cenarios-entradas { display: flex; gap: var(--e4); margin-bottom: var(--e3); flex-wrap: wrap; }
 /* Origem de cada campo da volumetria */
 .selecao-origem { margin-top: var(--e1); font-size: 12px; padding: 2px var(--e2); }
+
+/* Agenda de follow-up */
+.agenda { list-style: none; margin: var(--e3) 0 0; padding: 0; display: grid; gap: var(--e2); }
+.agenda-linha { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 1.6fr); gap: var(--e4); align-items: start;
+  background: var(--surface-card); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e3); }
+.agenda-quem { display: flex; flex-direction: column; gap: var(--e1); align-items: flex-start; }
+.agenda-etiquetas { display: flex; gap: var(--e1); flex-wrap: wrap; }
+.agenda-acao { display: grid; grid-template-columns: minmax(0, 1fr) 140px auto; gap: var(--e2); align-items: center; }
+.agenda-acao .estado-texto { grid-column: 1 / -1; }
+@media (max-width: 720px) { .agenda-linha { grid-template-columns: 1fr; } .agenda-acao { grid-template-columns: 1fr; } }

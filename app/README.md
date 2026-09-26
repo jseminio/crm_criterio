@@ -36,6 +36,23 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Etapa 2 — agenda de follow-up (25/09/2026)
+
+`GET /api/agenda` e a tela **Agenda** montam a fila do que pede uma próxima ação, por urgência
+(`crm/domain/agenda.py`). Baldes: **atrasadas**, **hoje**, **próximos 7 dias**, **depois**,
+**sem data** e **sem próxima ação**. Entra só o que está em aberto: oportunidade não decidida e
+lead ainda no funil.
+
+**O achado que desenhou a tela:** das 50 propostas em aberto, **nenhuma tinha próxima ação**
+(cobertura do processo em 0%). Uma agenda só de datas ficaria vazia; por isso o balde
+"sem próxima ação" existe, vem ordenado por temperatura e valor anual, e a linha permite
+**escrever a próxima ação e a data ali mesmo**, sem abrir o painel. É por esse balde que a
+cobertura do processo sobe.
+
+- **Lembrete é tela, não notificação.** A API do WhatsApp continua pendente.
+- Lead aparece na fila mas se edita na tela **Leads**.
+- Contrato ainda não tem próxima ação; entra junto dos eventos de contrato.
+
 ## Histórico de preço e origem da volumetria (E4, 25/09/2026)
 
 **Histórico de preço.** Cada mudança de `preco_mensal` ou `preco_anual` grava uma linha em

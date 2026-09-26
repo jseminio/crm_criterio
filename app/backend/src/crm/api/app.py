@@ -42,6 +42,7 @@ from crm.db.modelos import (
 from crm.db.sessao import criar_engine, criar_fabrica_de_sessao, url_do_banco
 from crm.domain import indicadores as regras_de_indicadores
 from crm.domain.sugestoes_de_fusao import sugerir as sugerir_fusoes
+from crm.domain import agenda as regras_da_agenda
 from crm.domain import recortes as regras_de_recortes
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
@@ -514,6 +515,37 @@ def _registrar(api: FastAPI) -> None:
             data_tipo, data_de, data_ate, servico,
         )
         return [linha[0] for linha in sessao.execute(consulta).all()]
+
+    @api.get("/api/agenda", response_model=e.AgendaResposta, tags=["follow-up"])
+    def agenda(
+        sessao: Session = Depends(obter_sessao),
+        captador: list[str] | None = Query(default=None),
+        hoje: date | None = None,
+    ) -> e.AgendaResposta:
+        """A fila de follow-up: oportunidades em aberto e leads no funil, por
+        urgência. `hoje` existe para teste; sem ele vale a data do servidor."""
+        dia = hoje or date.today()
+        consulta = _consulta_de_oportunidades(None, captador, None, None, None, None)
+        em_aberto = [
+            (linha[0], linha[1])
+            for linha in sessao.execute(consulta).all()
+            if not linha[0].situacao.decidida
+        ]
+        consulta_de_leads = sa.select(Lead).where(
+            Lead.situacao.in_([s for s in SituacaoLead if s.aberto])
+        )
+        if captador:
+            consulta_de_leads = consulta_de_leads.where(Lead.captador.in_(captador))
+        leads = list(sessao.scalars(consulta_de_leads))
+        itens = regras_da_agenda.montar(oportunidades=em_aberto, leads=leads, hoje=dia)
+        contagens = {b: 0 for b in regras_da_agenda.BALDES}
+        for i in itens:
+            contagens[i.balde] += 1
+        return e.AgendaResposta(
+            hoje=dia,
+            contagens=contagens,
+            itens=[e.ItemDaAgendaResposta.model_validate(i) for i in itens],
+        )
 
     @api.get(
         "/api/indicadores/recortes",

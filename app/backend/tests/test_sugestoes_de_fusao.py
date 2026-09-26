@@ -50,3 +50,27 @@ def test_principal_e_o_grupo_com_mais_propostas():
 
 def test_sem_parecidos_nao_devolve_nada():
     assert sugerir([G(1, "Alfa"), G(2, "Beta")]) == []
+
+
+def test_ligacao_media_nao_encadeia_nomes_sem_relacao():
+    """Regressão: "joao silva" e "silva santos" estão ambos dentro de "joao silva
+    santos", mas não um no outro. Antes caíam num bloco só, e um clique fundia os três."""
+    s = sugerir([G(1, "João Silva"), G(2, "Silva Santos"), G(3, "João Silva Santos")])
+    assert _nomes(s) == [[1, 3], [2, 3]]
+    assert all(x.confianca == "média" for x in s)
+    assert not any({1, 2} <= set(x.ids) for x in s)
+
+
+def test_nome_generico_dentro_de_varios_clientes_nao_os_junta():
+    s = sugerir([G(1, "BPO Contábil"), G(2, "BPO Contábil Andréa Curcio"), G(3, "BPO Contábil Sete Brasil")])
+    assert _nomes(s) == [[1, 2], [1, 3]]
+    assert not any({2, 3} <= set(x.ids) for x in s)
+
+
+def test_par_medio_leva_todos_os_grupos_de_cada_nome():
+    s = sugerir([G(1, "Andréa Curcio"), G(2, "BPO Contábil Andréa Curcio - A"), G(3, "BPO Contábil Andréa Curcio - B")])
+    alta = [x for x in s if x.confianca == "alta"]
+    media = [x for x in s if x.confianca == "média"]
+    assert _nomes(alta) == [[2, 3]]
+    assert _nomes(media) == [[1, 2, 3]]
+    assert media[0].motivo == "Um nome contém o outro: andrea curcio ⊂ bpo contabil andrea curcio."

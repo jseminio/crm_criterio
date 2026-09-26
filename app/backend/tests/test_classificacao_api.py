@@ -102,3 +102,70 @@ def test_traz_as_empresas_do_grupo_com_a_mensalidade(cliente, sessao: Session):
     emp = cliente.get("/api/carteira/classificacao").json()["itens"][0]["empresas"]
     assert [e["razao_social"] for e in emp] == ["Alfa Comércio Ltda", "Alfa Serviços SA"]
     assert Decimal(emp[0]["mensalidade"]) == Decimal("700") and emp[1]["mensalidade"] is None
+
+
+def _grupo_classificado(sessao: Session, receita: str = "1000") -> GrupoEconomico:
+    n = regra.Notas(receita=3, rentabilidade=3, complexidade=3, disciplina=3, risco=3, cross_sell=3, adimplencia=5, semaforo=1, churn=1)
+    g = GrupoEconomico(nome="Alfa", situacao=SituacaoGrupo.CLIENTE)
+    sessao.add(g); sessao.flush()
+    _snap(sessao, g, date(2026, 7, 31), receita, n)
+    sessao.commit()
+    return g
+
+
+AUTOR = {"autor": "Eduardo Luiz", "motivo": "Reunião de carteira de setembro"}
+
+
+def test_editar_notas_grava_leitura_nova_e_preserva_a_anterior(cliente, sessao: Session):
+    g = _grupo_classificado(sessao)
+    r = cliente.post(f"/api/carteira/grupos/{g.id}/notas", json={**AUTOR, "adimplencia": 1, "churn": 5})
+    assert r.status_code == 201, r.text
+    corpo = r.json()
+    assert corpo["item"]["em_cobranca"] is True and corpo["item"]["eixo_de_acao"].startswith("Cobrança")
+    assert corpo["item"]["notas"]["atribuido_por"] == "Eduardo Luiz"
+    assert corpo["item"]["notas"]["complexidade"] == "3.00"  # o que não veio, copia da leitura anterior
+    hist = cliente.get(f"/api/carteira/grupos/{g.id}/historico").json()
+    assert len(hist) == 2 and hist[1]["fonte"] == "teste" and hist[1]["notas"]["adimplencia"] == "5.00"
+    assert cliente.get("/api/carteira/classificacao").json()["itens"][0]["notas"]["churn"] == 5
+
+
+def test_editar_recalcula_o_isc(cliente, sessao: Session):
+    g = _grupo_classificado(sessao)
+    antes = Decimal(cliente.get("/api/carteira/classificacao").json()["isc"]["valor"])
+    depois = cliente.post(f"/api/carteira/grupos/{g.id}/notas", json={**AUTOR, "semaforo": 3, "churn": 5}).json()["isc"]["valor"]
+    assert Decimal(depois) < antes
+
+
+def test_mudar_complexidade_avisa_que_a_rentabilidade_nao_foi_recalculada(cliente, sessao: Session):
+    g = _grupo_classificado(sessao)
+    corpo = cliente.post(f"/api/carteira/grupos/{g.id}/notas", json={**AUTOR, "complexidade": 5}).json()
+    assert any("rentabilidade não foi recalculada" in a for a in corpo["avisos"])
+    assert any("editada à mão" in a for a in cliente.get("/api/carteira/classificacao").json()["avisos"])
+
+
+def test_duas_edicoes_no_mesmo_dia_viram_revisoes_1_e_2(cliente, sessao: Session):
+    g = _grupo_classificado(sessao)
+    cliente.post(f"/api/carteira/grupos/{g.id}/notas", json={**AUTOR, "churn": 2})
+    cliente.post(f"/api/carteira/grupos/{g.id}/notas", json={**AUTOR, "churn": 3})
+    hist = cliente.get(f"/api/carteira/grupos/{g.id}/historico").json()
+    assert [h["revisao"] for h in hist[:2]] == [2, 1] and hist[0]["notas"]["churn"] == 3
+
+
+@pytest.mark.parametrize("corpo,codigo", [
+    ({"adimplencia": 6}, 422), ({"semaforo": 4}, 422), ({"churn": 0}, 422),
+    ({}, 422), ({"autor": "E", "churn": 2}, 422), ({"motivo": "", "churn": 2}, 422),
+])
+def test_edicao_invalida_e_recusada(cliente, sessao: Session, corpo, codigo):
+    g = _grupo_classificado(sessao)
+    r = cliente.post(f"/api/carteira/grupos/{g.id}/notas", json={**AUTOR, **corpo})
+    assert r.status_code == codigo
+    assert len(cliente.get(f"/api/carteira/grupos/{g.id}/historico").json()) == 1
+
+
+def test_grupo_fundido_ou_sem_classificacao_e_recusado(cliente, sessao: Session):
+    a = GrupoEconomico(nome="Sem", situacao=SituacaoGrupo.CLIENTE)
+    f = GrupoEconomico(nome="Fund", situacao=SituacaoGrupo.FUNDIDO)
+    sessao.add_all([a, f]); sessao.flush(); f.fundido_em_id = a.id; sessao.commit()
+    assert cliente.post(f"/api/carteira/grupos/{a.id}/notas", json={**AUTOR, "churn": 2}).status_code == 409
+    assert cliente.post(f"/api/carteira/grupos/{f.id}/notas", json={**AUTOR, "churn": 2}).status_code == 409
+    assert cliente.post("/api/carteira/grupos/99999/notas", json={**AUTOR, "churn": 2}).status_code == 404

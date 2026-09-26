@@ -51,6 +51,18 @@ export interface SugestaoDePorte {
   direcionadores_aplicados: number;
 }
 
+/** Uma mudança de preço: antes, depois, quando e por quê. Só cresce. */
+export interface MudancaDePreco {
+  id: number;
+  registrado_em: string;
+  origem: string;
+  motivo: string | null;
+  preco_mensal_anterior: string | null;
+  preco_mensal_novo: string | null;
+  preco_anual_anterior: string | null;
+  preco_anual_novo: string | null;
+}
+
 export interface OportunidadeDetalhe extends OportunidadeResumo {
   canal: string | null;
   linha_servico: string | null;
@@ -61,6 +73,9 @@ export interface OportunidadeDetalhe extends OportunidadeResumo {
   observacao: string | null;
   origem: string;
   linha_planilha: number | null;
+  /** {campo: "Entrevista" | "Questionário"}, só de campo preenchido. */
+  origem_da_volumetria: Record<string, string>;
+  historico_de_preco: MudancaDePreco[];
 
   complexidade: number | null;
   risco_tecnico: number | null;

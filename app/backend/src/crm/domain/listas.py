@@ -161,6 +161,22 @@ class Origem(Enum):
     'Carga 2026' (não veio da planilha) nem 'CRM' (não nasceu digitada aqui)."""
 
 
+class OrigemDoDado(Enum):
+    """De onde veio um dado da ficha de volumetria — E4.
+
+    Guardar a origem de cada campo é o que permite, depois, dizer quanto do porte
+    saiu de um número declarado no questionário e quanto de uma conversa.
+    """
+
+    ENTREVISTA = "Entrevista"
+    QUESTIONARIO = "Questionário"
+
+
+#: De onde vem uma mudança de preço registrada no histórico.
+ORIGEM_DA_MUDANCA_NO_CRM = "CRM"
+ORIGEM_DA_MUDANCA_NA_RECARGA = "Recarga da planilha"
+
+
 class TipoDeOcorrencia(Enum):
     """O que uma linha do relatório de conferência pede de quem lê.
 

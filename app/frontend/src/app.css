@@ -228,3 +228,6 @@
 .aba[aria-selected="true"] { color: var(--texto-forte); border-bottom-color: var(--azul-noturno); }
 .aba-contagem { font-variant-numeric: tabular-nums; color: var(--texto-fraco); margin-left: var(--e1); }
 .botao[aria-pressed="true"] { background: var(--surface-brand); color: var(--branco); border-color: var(--surface-brand); }
+
+/* Origem de cada campo da volumetria */
+.selecao-origem { margin-top: var(--e1); font-size: 12px; padding: 2px var(--e2); }

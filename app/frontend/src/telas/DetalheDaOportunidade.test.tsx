@@ -59,6 +59,8 @@ function oportunidade(extra: Partial<OportunidadeDetalhe> = {}): OportunidadeDet
     observacao: null,
     origem: "Carga 2026",
     linha_planilha: 42,
+    origem_da_volumetria: {},
+    historico_de_preco: [],
     complexidade: null,
     risco_tecnico: null,
     documentos_fiscais_mes: null,
@@ -289,5 +291,70 @@ describe("Volumetria e porte — a régua sugere, nunca decide (E4, 23/09/2026)"
     );
 
     expect(screen.getByText(/confirmado por EL em/i)).toBeInTheDocument();
+  });
+});
+
+
+describe("Histórico de preço e origem da volumetria (E4, 25/09/2026)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("sem mudança de preço, diz que o preço ainda não mudou", async () => {
+    await abrir(oportunidade());
+    expect(screen.getByText(/o preço ainda não mudou/i)).toBeInTheDocument();
+  });
+
+  it("mostra o histórico com antes, depois, motivo e origem", async () => {
+    await abrir(
+      oportunidade({
+        historico_de_preco: [
+          {
+            id: 1, registrado_em: "2026-09-25T15:00:00+00:00", origem: "CRM", motivo: "reajuste anual",
+            preco_mensal_anterior: "4500.00", preco_mensal_novo: "5000.00",
+            preco_anual_anterior: "58500.00", preco_anual_novo: "65000.00",
+          },
+        ],
+      }),
+    );
+    expect(screen.getByText(/reajuste anual/)).toBeInTheDocument();
+    expect(screen.getByText(/4\.500,00.*→.*5\.000,00/)).toBeInTheDocument();
+  });
+
+  it("o campo de motivo só aparece quando o preço é alterado", async () => {
+    await abrir(oportunidade());
+    expect(screen.queryByLabelText(/por que o preço mudou/i)).toBeNull();
+    await userEvent.clear(screen.getByLabelText("Preço mensal"));
+    await userEvent.type(screen.getByLabelText("Preço mensal"), "5500");
+    expect(screen.getByLabelText(/por que o preço mudou/i)).toBeInTheDocument();
+  });
+
+  it("envia o motivo junto do novo preço", async () => {
+    vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
+    await abrir(oportunidade());
+    await userEvent.clear(screen.getByLabelText("Preço mensal"));
+    await userEvent.type(screen.getByLabelText("Preço mensal"), "5500");
+    await userEvent.type(screen.getByLabelText(/por que o preço mudou/i), "reajuste anual");
+    await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+    await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledOnce());
+    const [, mudancas] = vi.mocked(api.editarOportunidade).mock.calls[0];
+    expect(mudancas.preco_mensal).toBe("5500");
+    expect(mudancas.motivo_do_preco).toBe("reajuste anual");
+  });
+
+  it("a origem só pode ser escolhida para direcionador preenchido", async () => {
+    await abrir(oportunidade({ documentos_fiscais_mes: 100 }));
+    expect(screen.getByLabelText("Origem de Documentos fiscais/mês")).toBeEnabled();
+    expect(screen.getByLabelText("Origem de Pagamentos/mês")).toBeDisabled();
+  });
+
+  it("envia a origem como um mapa só dos campos preenchidos", async () => {
+    vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
+    await abrir(oportunidade({ documentos_fiscais_mes: 100, origem_da_volumetria: { documentos_fiscais_mes: "Entrevista" } }));
+    expect(screen.getByLabelText("Origem de Documentos fiscais/mês")).toHaveValue("Entrevista");
+    await userEvent.selectOptions(screen.getByLabelText("Origem de Documentos fiscais/mês"), "Questionário");
+    await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+    await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledOnce());
+    const [, mudancas] = vi.mocked(api.editarOportunidade).mock.calls[0];
+    expect(mudancas.origem_da_volumetria).toEqual({ documentos_fiscais_mes: "Questionário" });
+    expect(Object.keys(mudancas).some((k) => k.startsWith("origem_") && k !== "origem_da_volumetria")).toBe(false);
   });
 });

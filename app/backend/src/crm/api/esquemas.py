@@ -16,6 +16,7 @@ from crm.domain.listas import (
     LinhaServico,
     MotivoRecusa,
     Origem,
+    OrigemDoDado,
     Situacao,
     SituacaoContrato,
     SituacaoGrupo,
@@ -102,6 +103,19 @@ class SugestaoDePorteResposta(Base):
     direcionadores_aplicados: int
 
 
+class MudancaDePreco(Base):
+    """Uma linha do histórico de preço: o valor antes, o valor depois, quando e por quê."""
+
+    id: int
+    registrado_em: datetime
+    origem: str
+    motivo: str | None = None
+    preco_mensal_anterior: Decimal | None = None
+    preco_mensal_novo: Decimal | None = None
+    preco_anual_anterior: Decimal | None = None
+    preco_anual_novo: Decimal | None = None
+
+
 class OportunidadeDetalhe(OportunidadeResumo):
     canal: str | None = None
     linha_servico: LinhaServico | None = None
@@ -128,6 +142,11 @@ class OportunidadeDetalhe(OportunidadeResumo):
     servicos_contratados_alem_do_primeiro: int = 0
     tem_consolidacao_de_grupo: bool = False
     e_auditada: bool = False
+
+    origem_da_volumetria: dict[str, str] = {}
+    """`{campo: "Entrevista" | "Questionário"}`, só para campos preenchidos."""
+    historico_de_preco: list[MudancaDePreco] = []
+    """Mais recente primeiro. Só cresce: reajustar não apaga o preço anterior."""
 
     porte: str | None = None
     porte_definido_por: str | None = None
@@ -174,6 +193,12 @@ class OportunidadeEdicao(BaseModel):
     servicos_contratados_alem_do_primeiro: int | None = Field(default=None, ge=0)
     tem_consolidacao_de_grupo: bool | None = None
     e_auditada: bool | None = None
+
+    origem_da_volumetria: dict[str, OrigemDoDado] | None = None
+    """Substitui o mapa inteiro. As chaves precisam ser direcionadores da volumetria."""
+    motivo_do_preco: str | None = Field(default=None, max_length=200)
+    """Por que o preço mudou ("reajuste anual"). Só é lido quando o preço muda de fato;
+    não é gravado na oportunidade, e sim na linha do histórico."""
 
     porte: str | None = Field(default=None, max_length=20)
     porte_definido_por: str | None = Field(default=None, max_length=10)

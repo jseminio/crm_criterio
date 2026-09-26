@@ -444,6 +444,8 @@ export interface EntidadeDeContato {
   endereco: EnderecoDeContato;
   /** Só cliente. */
   mensalidade: string | null;
+  /** Cliente com contrato recorrente em vigor. Sem ele, é cliente **não recorrente** (consultoria pontual). */
+  recorrente: boolean;
   /** Só prospect. */
   propostas: number;
   contatos: PessoaDeContato[];

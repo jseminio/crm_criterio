@@ -469,3 +469,21 @@ class TestHistoricoDePrecoNaRecarga:
         importar(sessao, [proposta()])
         importar(sessao, [proposta(situacao=Situacao.EM_AVALIACAO)])
         assert sessao.scalar(sa.select(sa.func.count()).select_from(HistoricoDePreco)) == 0
+
+
+class TestAceiteFazCliente:
+    def test_a_recarga_promove_a_cliente_o_grupo_com_proposta_aceita(self, sessao: Session):
+        importar(sessao, [
+            proposta(nome_oportunidade="Fechou", linha=1, situacao=Situacao.ACEITA, data_aceite=date(2026, 5, 1)),
+            proposta(nome_oportunidade="Em aberto", linha=2),
+        ])
+        grupos = {g.nome: g.situacao for g in sessao.scalars(sa.select(GrupoEconomico))}
+        assert grupos["Fechou"] is SituacaoGrupo.CLIENTE and grupos["Em aberto"] is SituacaoGrupo.PROSPECT
+
+    def test_grupo_fundido_nao_e_promovido(self, sessao: Session):
+        importar(sessao, [proposta(nome_oportunidade="X", situacao=Situacao.ACEITA, data_aceite=date(2026, 5, 1))])
+        g = sessao.scalars(sa.select(GrupoEconomico)).one()
+        g.situacao = SituacaoGrupo.FUNDIDO
+        sessao.commit()
+        importar(sessao, [proposta(nome_oportunidade="X", situacao=Situacao.ACEITA, data_aceite=date(2026, 5, 1))])
+        assert sessao.scalars(sa.select(GrupoEconomico)).one().situacao is SituacaoGrupo.FUNDIDO

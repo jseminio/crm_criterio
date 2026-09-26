@@ -275,8 +275,13 @@ def _registrar(api: FastAPI) -> None:
             return SimpleNamespace(id=r.id, nome=r.nome, quantas_oportunidades=r.quantas_oportunidades,
                                    empresas=empresas_do_grupo.get(r.id, []))
 
-        clientes = [com_empresas(r) for r in resumos.values() if r.situacao is SituacaoGrupo.CLIENTE]
-        prospects = [com_empresas(r) for r in resumos.values() if r.situacao is SituacaoGrupo.PROSPECT]
+        # Alvos: clientes da carteira (têm empresa cadastrada). Candidatos: grupos **sem** empresa,
+        # sejam prospects ou clientes não recorrentes (proposta aceita, sem contrato): é onde ficam
+        # os nomes digitados pelo comercial ("ASM retomada… - 3AW") que duplicam um cliente da carteira.
+        todos = [com_empresas(r) for r in resumos.values()]
+        clientes = [g for g, r in zip(todos, resumos.values()) if r.situacao is SituacaoGrupo.CLIENTE and g.empresas]
+        prospects = [g for g, r in zip(todos, resumos.values())
+                     if not g.empresas and r.situacao in (SituacaoGrupo.PROSPECT, SituacaoGrupo.CLIENTE)]
         ja_juntos = [set(s.ids) for s in por_nome]
         do_cliente = [
             s for s in sugerir_clientes(prospects, clientes)
@@ -785,6 +790,10 @@ def _registrar(api: FastAPI) -> None:
         ):
             raise HTTPException(422, "para marcar como aceita, informe a data do aceite")
 
+        # Proposta aceita faz do grupo um cliente — recorrente (contrato) ou não (consultoria
+        # pontual). Decisão de Eduardo, 26/09/2026.
+        if oportunidade.situacao is Situacao.ACEITA and oportunidade.grupo.situacao is SituacaoGrupo.PROSPECT:
+            oportunidade.grupo.situacao = SituacaoGrupo.CLIENTE
         sessao.flush()
         return _detalhe_de(oportunidade, oportunidade.grupo.nome)
 

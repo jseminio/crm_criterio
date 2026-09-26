@@ -69,6 +69,9 @@ class Entidade(Base):
     endereco: Endereco = Endereco()
     mensalidade: str | None = None
     """Só cliente: preço mensal do contrato em vigor."""
+    recorrente: bool = False
+    """Cliente com contrato recorrente em vigor. Cliente sem ele é **não recorrente** (por exemplo,
+    consultoria pontual): decisão de Eduardo, 26/09/2026. Sempre falso para prospect."""
     propostas: int = 0
     """Só prospect: quantas propostas o grupo tem."""
     contatos: list[Pessoa] = []
@@ -206,8 +209,8 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
             do_grupo = por_grupo.get(g.id, [])
             emps = empresas.get(g.id, [])
             if not emps:
-                if tipo == "cliente":
-                    continue  # cliente sem empresa cadastrada não deveria existir; a carga sempre cria a empresa
+                # Cliente sem empresa cadastrada = cliente **não recorrente** (a carteira sempre cria a
+                # empresa; a consultoria pontual não). Aparece pelo grupo, como o prospect.
                 ps = [_pessoa(p, None) for p in do_grupo]
                 saida.append(Entidade(tipo=tipo, grupo_id=g.id, grupo_nome=g.nome, propostas=propostas.get(g.id, 0),
                                       contatos=ps, lacunas=lacunas_de(None, ps)))
@@ -218,7 +221,8 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
                 saida.append(Entidade(
                     tipo=tipo, grupo_id=g.id, grupo_nome=g.nome, empresa_id=e.id, razao_social=e.razao_social,
                     nome_fantasia=e.nome_fantasia, cnpj=e.cnpj, endereco=Endereco.model_validate(e),
-                    mensalidade=str(v) if v is not None else None, propostas=propostas.get(g.id, 0),
+                    mensalidade=str(v) if v is not None else None, recorrente=v is not None and tipo == "cliente",
+                    propostas=propostas.get(g.id, 0),
                     contatos=ps, lacunas=lacunas_de(e, ps),
                 ))
         return saida

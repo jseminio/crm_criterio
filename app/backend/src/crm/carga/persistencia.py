@@ -38,6 +38,7 @@ from crm.db.modelos import (
 from crm.domain.listas import (
     ORIGEM_DA_MUDANCA_NA_RECARGA,
     Origem,
+    Situacao,
     SituacaoGrupo,
     TipoDeOcorrencia,
 )
@@ -346,6 +347,15 @@ def importar(sessao: Session, propostas: Iterable[Proposta]) -> ResultadoImporta
         resultado.atualizadas += 1
 
     sessao.flush()
+    # Proposta aceita faz do grupo um cliente (recorrente ou não): decisão de 26/09/2026.
+    sessao.execute(
+        sa.update(GrupoEconomico)
+        .where(
+            GrupoEconomico.situacao == SituacaoGrupo.PROSPECT,
+            GrupoEconomico.id.in_(sa.select(Oportunidade.grupo_id).where(Oportunidade.situacao == Situacao.ACEITA)),
+        )
+        .values(situacao=SituacaoGrupo.CLIENTE)
+    )
     return resultado
 
 

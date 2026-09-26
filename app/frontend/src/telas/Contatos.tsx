@@ -115,7 +115,7 @@ export function Contatos({ listas }: { listas: Listas | null }) {
         <table className="tabela" aria-label="Empresas">
           <thead>
             <tr>
-              <th scope="col">{tipo === "cliente" ? "Empresa" : "Prospect"}</th>
+              <th scope="col">{tipo === "cliente" ? "Cliente" : "Prospect"}</th>
               <th scope="col">CNPJ</th>
               <th scope="col">Contatos</th>
               <th scope="col">Lacunas</th>
@@ -129,11 +129,12 @@ export function Contatos({ listas }: { listas: Listas | null }) {
                 <td>
                   <button type="button" className="link-de-tabela" onClick={() => definirAberto(e)}>{e.razao_social ?? e.grupo_nome}</button>
                   {e.razao_social && e.razao_social !== e.grupo_nome && <span className="numero-nota"> · {e.grupo_nome}</span>}
+                  {tipo === "cliente" && !e.recorrente && <span className="etiqueta etiqueta-neutra" style={{ marginLeft: 6 }}>Não recorrente</span>}
                 </td>
                 <td>{formatarCnpj(e.cnpj)}</td>
                 <td>{e.contatos.length ? e.contatos.map((p) => p.nome).join(", ") : "—"}</td>
                 <td><Lacunas itens={e.lacunas} /></td>
-                <td className="tabela-numero">{tipo === "cliente" ? (e.mensalidade ? dinheiro(e.mensalidade) : "—") : e.propostas}</td>
+                <td className="tabela-numero">{tipo === "cliente" ? (e.mensalidade ? dinheiro(e.mensalidade) : `${e.propostas} prop.`) : e.propostas}</td>
                 <td><button type="button" className="botao botao-secundario" onClick={() => definirAberto(e)}>Abrir</button></td>
               </tr>
             ))}

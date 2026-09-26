@@ -18,7 +18,7 @@ const p = (o: Partial<PessoaDeContato> = {}): PessoaDeContato => ({
 });
 const ent = (o: Partial<EntidadeDeContato> = {}): EntidadeDeContato => ({
   tipo: "cliente", grupo_id: 1, grupo_nome: "Grupo Alfa", empresa_id: 10, razao_social: "Alfa Ltda", nome_fantasia: null,
-  cnpj: "11222333000181", endereco: E, mensalidade: "1500.00", propostas: 0, contatos: [], lacunas: ["Contato"], ...o,
+  cnpj: "11222333000181", endereco: E, mensalidade: "1500.00", recorrente: true, propostas: 0, contatos: [], lacunas: ["Contato"], ...o,
 });
 const abrir = (e = ent(), aoMudar = vi.fn()) => {
   render(<DetalheDoContato entidade={e} listas={LISTAS} aoFechar={vi.fn()} aoMudar={aoMudar} />);
@@ -59,6 +59,11 @@ describe("DetalheDoContato", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cadastrar empresa" }));
     await waitFor(() => expect(api.criarEmpresaDoGrupo).toHaveBeenCalledWith(1));
     expect(aoMudar).toHaveBeenCalled();
+  });
+
+  it("o subtítulo diz 'cliente não recorrente' quando não há contrato", () => {
+    abrir(ent({ recorrente: false, mensalidade: null }));
+    expect(screen.getByText(/Cliente não recorrente/)).toBeInTheDocument();
   });
 
   it("mostra os contatos, o do grupo marcado e o 'não contatar'", () => {

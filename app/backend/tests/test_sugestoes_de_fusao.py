@@ -114,3 +114,26 @@ class TestProspectQueJaECliente:
 
     def test_sem_parecido_nao_devolve_nada(self):
         assert sugerir_clientes([GE(10, "Zeta")], [GE(1, "Grupo Alfa")]) == []
+
+
+def test_api_sugere_tambem_o_cliente_nao_recorrente_que_duplica_um_da_carteira(engine, sessao):
+    """Depois que a proposta aceita torna o grupo Cliente, o duplicado não pode sumir das sugestões."""
+    from fastapi.testclient import TestClient
+    from sqlalchemy.orm import sessionmaker
+
+    from crm.api.app import criar_app
+    from crm.db.modelos import Empresa, GrupoEconomico
+    from crm.domain.listas import SituacaoGrupo
+
+    carteira = GrupoEconomico(nome="Grupo 3AW", situacao=SituacaoGrupo.CLIENTE)
+    pontual = GrupoEconomico(nome="ASM retomada pelo Antonio - 3AW", situacao=SituacaoGrupo.CLIENTE)  # aceita, sem empresa
+    outro = GrupoEconomico(nome="Zeta Qualquer", situacao=SituacaoGrupo.CLIENTE)
+    sessao.add_all([carteira, pontual, outro]); sessao.flush()
+    sessao.add(Empresa(grupo_id=carteira.id, razao_social="3AW BRASIL PROPAGANDA S.A.", cnpj="11222333000181"))
+    sessao.commit()
+    fabrica = sessionmaker(bind=engine, expire_on_commit=False, future=True)
+    with TestClient(criar_app(fabrica)) as c:
+        s = c.get("/api/grupos/sugestoes-de-fusao").json()
+    pares = [{g["id"] for g in x["grupos"]} for x in s]
+    assert {carteira.id, pontual.id} in pares and all(outro.id not in p for p in pares)
+    assert next(x for x in s if {g["id"] for g in x["grupos"]} == {carteira.id, pontual.id})["principal_id"] == carteira.id

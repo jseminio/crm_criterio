@@ -23,7 +23,7 @@ const pessoa = (o: Partial<PessoaDeContato> = {}): PessoaDeContato => ({
 });
 const entidade = (o: Partial<EntidadeDeContato> = {}): EntidadeDeContato => ({
   tipo: "cliente", grupo_id: 1, grupo_nome: "Grupo Alfa", empresa_id: 10, razao_social: "Alfa Comércio Ltda",
-  nome_fantasia: null, cnpj: "11222333000181", endereco: SEM_ENDERECO, mensalidade: "1500.00", propostas: 0,
+  nome_fantasia: null, cnpj: "11222333000181", endereco: SEM_ENDERECO, mensalidade: "1500.00", recorrente: true, propostas: 0,
   contatos: [], lacunas: ["Contato", "E-mail", "Telefone", "Logradouro", "Município", "UF", "CEP"], ...o,
 });
 const dePessoa = (o: Partial<PessoaComOrigem> = {}): PessoaComOrigem => ({
@@ -92,6 +92,23 @@ describe("Contatos — clientes e prospects separados", () => {
     render(<Contatos listas={null} />);
     await userEvent.click(await screen.findByRole("button", { name: "Pessoa" }));
     expect(await screen.findByText("Não contatar")).toBeInTheDocument();
+  });
+
+  it("cliente não recorrente aparece marcado, com as propostas no lugar da mensalidade", async () => {
+    vi.mocked(api.contatosPorEmpresa).mockResolvedValue({
+      total: 1,
+      itens: [entidade({ empresa_id: null, razao_social: null, cnpj: null, mensalidade: null, recorrente: false, propostas: 2, grupo_nome: "Consultoria Pontual" })],
+    });
+    render(<Contatos listas={null} />);
+    expect(await screen.findByText("Consultoria Pontual")).toBeInTheDocument();
+    expect(screen.getByText("Não recorrente")).toBeInTheDocument();
+    expect(screen.getByText("2 prop.")).toBeInTheDocument();
+  });
+
+  it("cliente recorrente não leva o rótulo", async () => {
+    render(<Contatos listas={null} />);
+    await screen.findByText("Alfa Comércio Ltda");
+    expect(screen.queryByText("Não recorrente")).toBeNull();
   });
 
   it("abrir a empresa mostra o painel com o que falta", async () => {

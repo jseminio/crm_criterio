@@ -207,7 +207,7 @@ export function DetalheDoContato({
       titulo={titulo}
       subtitulo={
         entidade.tipo === "cliente"
-          ? `Cliente · ${entidade.grupo_nome}${entidade.mensalidade ? ` · ${dinheiro(entidade.mensalidade)}/mês` : ""}`
+          ? `${entidade.recorrente ? "Cliente" : "Cliente não recorrente"} · ${entidade.grupo_nome}${entidade.mensalidade ? ` · ${dinheiro(entidade.mensalidade)}/mês` : ""}`
           : `Prospect · ${entidade.propostas} proposta${entidade.propostas === 1 ? "" : "s"}`
       }
       aoFechar={aoFechar}

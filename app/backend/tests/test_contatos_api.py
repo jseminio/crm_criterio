@@ -162,3 +162,26 @@ class TestEmpresa:
         assert cliente.post("/api/grupos/9999/empresas", json={}).status_code == 404
         itens = cliente.get("/api/contatos/empresas", params={"tipo": "prospect", "busca": "acao"}).json()["itens"]
         assert itens[0]["empresa_id"] == r.json()["id"]
+
+
+class TestClienteNaoRecorrente:
+    """Cliente sem contrato recorrente (consultoria pontual) também é cliente — decisão de 26/09/2026."""
+
+    def test_cliente_sem_empresa_aparece_como_nao_recorrente(self, cliente, sessao, base):
+        g = GrupoEconomico(nome="Consultoria Pontual SA", situacao=SituacaoGrupo.CLIENTE)
+        sessao.add(g); sessao.flush()
+        sessao.add(Oportunidade(grupo_id=g.id, nome="Diagnóstico", situacao=Situacao.ACEITA))
+        sessao.commit()
+        itens = cliente.get("/api/contatos/empresas", params={"tipo": "cliente"}).json()["itens"]
+        pontual = next(i for i in itens if i["grupo_nome"] == "Consultoria Pontual SA")
+        assert (pontual["empresa_id"], pontual["recorrente"], pontual["propostas"]) == (None, False, 1)
+
+    def test_cliente_com_contrato_ativo_e_recorrente_e_prospect_nunca_e(self, cliente, base):
+        c = cliente.get("/api/contatos/empresas", params={"tipo": "cliente", "busca": "comercio"}).json()["itens"][0]
+        assert c["recorrente"] is True
+        p = cliente.get("/api/contatos/empresas", params={"tipo": "prospect"}).json()["itens"]
+        assert all(i["recorrente"] is False for i in p)
+
+    def test_empresa_de_cliente_sem_contrato_ativo_tambem_nao_e_recorrente(self, cliente, base):
+        e2 = next(i for i in cliente.get("/api/contatos/empresas", params={"tipo": "cliente", "busca": "servicos"}).json()["itens"])
+        assert e2["recorrente"] is False and e2["mensalidade"] is None

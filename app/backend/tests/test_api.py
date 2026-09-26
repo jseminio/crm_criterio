@@ -1159,3 +1159,25 @@ class TestTicketDaCarteira:
     def test_sem_contrato_o_ticket_e_nulo(self, cliente):
         a = cliente.get("/api/mrr", params={"hoje": "2026-09-25"}).json()["atual"]
         assert (a["grupos"], a["ticket_por_grupo"], a["mediana_por_grupo"]) == (0, None, None)
+
+
+class TestAceiteFazCliente:
+    def test_aceitar_a_proposta_promove_o_grupo_de_prospect_a_cliente(self, cliente, sessao, carteira):
+        from crm.domain.listas import SituacaoGrupo
+
+        alfa = sessao.get(GrupoEconomico, carteira["alfa"]) if "alfa" in carteira else sessao.scalars(sa.select(GrupoEconomico)).first()
+        assert alfa.situacao is SituacaoGrupo.PROSPECT
+        op = sessao.scalars(sa.select(Oportunidade).where(Oportunidade.grupo_id == alfa.id)).first()
+        r = cliente.patch(f"/api/oportunidades/{op.id}", json={"situacao": "Aceita", "data_aceite": "2026-09-01"})
+        assert r.status_code == 200
+        sessao.expire_all()
+        assert sessao.get(GrupoEconomico, alfa.id).situacao is SituacaoGrupo.CLIENTE
+
+    def test_mudar_outra_coisa_nao_promove(self, cliente, sessao, carteira):
+        from crm.domain.listas import SituacaoGrupo
+
+        alfa = sessao.scalars(sa.select(GrupoEconomico)).first()
+        op = sessao.scalars(sa.select(Oportunidade).where(Oportunidade.grupo_id == alfa.id, Oportunidade.situacao != Situacao.ACEITA)).first()
+        cliente.patch(f"/api/oportunidades/{op.id}", json={"observacao": "oi"})
+        sessao.expire_all()
+        assert sessao.get(GrupoEconomico, alfa.id).situacao is SituacaoGrupo.PROSPECT

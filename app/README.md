@@ -36,6 +36,21 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Cliente não recorrente (26/09/2026)
+
+Decisão de Eduardo: **quem fechou uma proposta é cliente**, com contrato recorrente ou sem (consultoria
+pontual). Antes, só a carteira recorrente era "Cliente". Agora:
+
+- **Proposta aceita torna o grupo Cliente**, sozinho, ao aceitar na tela e na recarga da planilha.
+  `scripts/promover_clientes_por_aceite.py` corrigiu o que já existia: **32 grupos** passaram de Prospect a
+  Cliente (backup antes). Hoje: 63 clientes (57 recorrentes + 32 não recorrentes, mais o Tabor, baixado) e 99 prospects.
+- **Recorrente** = tem contrato Ativo com preço mensal. Sem ele, é **não recorrente**: aparece em
+  Contatos → Clientes com o rótulo "Não recorrente" e as propostas no lugar da mensalidade. **Não entra no
+  MRR nem no ticket** (esses vêm dos contratos).
+- Os não recorrentes não têm empresa cadastrada (só a carteira tem), então aparecem pelo **grupo**.
+- A sugestão "prospect que já é cliente" passou a comparar os grupos **sem empresa** (prospects e clientes
+  não recorrentes) com os clientes da carteira, para não perder as duplicatas depois da promoção.
+
 ## Contatos: clientes e prospects segregados (26/09/2026)
 
 Menu **Contatos** (`crm/api/contatos.py`, `crm/domain/contatos.py`). Duas abas, **Clientes** e
@@ -534,7 +549,9 @@ razão social; as propostas usam o nome que o comercial digitou, como "ASM retom
 cliente**; cada sugestão é um **par** (cliente, prospect) com o cliente como principal, nunca uma
 corrente. O motivo diz **onde** a palavra apareceu (no nome do grupo, evidência mais forte, ou numa
 empresa). Prospects que apontam para dois clientes ficam de fora. Só sugere: quem funde é uma pessoa.
-Em 26/09/2026: 28 pares, 14 com a palavra no nome do grupo e 14 só na razão social de uma empresa.
+Os candidatos são os grupos **sem empresa cadastrada**, sejam prospects ou clientes não recorrentes, e os
+alvos são os clientes da carteira. Em 26/09/2026: 28 pares, 14 com a palavra no nome do grupo e 14 só na
+razão social de uma empresa.
 ## A carga de 2026
 
 `crm/carga/persistencia.py` grava as propostas e **sabe rodar de novo** — que é o

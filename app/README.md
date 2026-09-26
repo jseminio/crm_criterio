@@ -963,6 +963,21 @@ dispensável, e o cartão não se move.
 > real — mas **não pude confirmar com um mouse de verdade** nesta máquina.
 > **Peço para Eduardo confirmar amanhã** arrastando um cartão de verdade.
 
+## Movimento reduzido (26/09/2026)
+
+Quem liga "reduzir movimento" no sistema operacional deixa de ver transição e
+animação na tela. Antes só o esqueleto de carregamento respeitava a preferência;
+o destaque da coluna do kanban ao arrastar esmaecia mesmo assim. Agora uma
+regra só, no **fim** de `frontend/src/app.css`, vale para todo elemento: a
+duração cai para quase zero (não `none`), então o estado final continua
+aparecendo — a coluna-alvo ainda fica destacada, só que sem esmaecer.
+
+A regra ser global e a última do arquivo é o que cobre a transição que alguém
+criar depois. `movimento.test.ts` confere as duas coisas; verificado quebrando a
+regra de propósito (o teste falha) e no Chromium, com e sem a preferência
+ligada: sem ela, 0,1 s na coluna e 1,4 s em loop no esqueleto; com ela, ~0 nos
+dois. O jsdom não avalia `@media`, por isso a checagem no navegador.
+
 ## Checar os tipos de verdade
 
 ```bash

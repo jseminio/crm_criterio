@@ -102,6 +102,12 @@ describe("Carteira", () => {
     expect(legenda).toHaveTextContent(/vale o primeiro que se aplica/);
   });
 
+  it("a coluna Eixo de ação remete à legenda no rodapé", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira />);
+    expect(await screen.findByText("Legenda do Eixo de Ação no rodapé")).toBeInTheDocument();
+  });
+
   it("marca o grupo sem contrato ativo", async () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({ itens: [item({ sem_contrato_ativo: true })] }));
     render(<Carteira />);

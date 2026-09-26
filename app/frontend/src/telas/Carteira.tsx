@@ -174,7 +174,7 @@ export function Carteira() {
               <th>Classe</th>
               <th>Alerta</th>
               <th className="tabela-numero">Churn</th>
-              <th>Eixo de ação</th>
+              <th>Eixo de ação <span className="carteira-remissao">Legenda do Eixo de Ação no rodapé</span></th>
             </tr>
           </thead>
           <tbody>

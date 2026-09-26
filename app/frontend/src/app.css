@@ -170,7 +170,6 @@
 .esqueleto-linhas span:nth-child(2) { width: 82%; }
 .esqueleto-linhas span:nth-child(3) { width: 60%; }
 @keyframes brilho { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
-@media (prefers-reduced-motion: reduce) { .esqueleto-linhas span { animation: none } }
 
 .recado { background: var(--surface-ai-soft); border: 1px solid var(--azul-neve);
   border-radius: var(--raio-md); padding: var(--e3) var(--e4); font-size: 13px;
@@ -316,3 +315,18 @@
 .contatos-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e2); }
 .contato-item { display: grid; gap: var(--e1); border-left: 3px solid var(--borda-forte); padding: var(--e1) var(--e3); font-size: 13px; justify-items: start; }
 .contato-form { display: grid; gap: var(--e2); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e3); }
+
+/* Movimento reduzido (26/09/2026). Fica no FIM do arquivo e vale para todo
+   elemento, para cobrir também a transição e a animação que alguém criar
+   depois — uma regra por componente já deixou a coluna do kanban de fora.
+   A duração cai para quase zero em vez de `none` para que o estado final
+   continue sendo aplicado (o destaque da coluna-alvo ainda aparece, só que
+   sem esmaecer). O teste `movimento.test.ts` confere que ela segue aqui. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -42,6 +42,7 @@ As regras do PAD-002 que aparecem no código:
 | Números em `R$ 1.248.300,00` | `formato.ts` |
 | Logomarca sozinha | `.marca` — nada ao lado. Sem o arquivo oficial, o nome é composto, nunca redesenhado |
 | Sem emoji na interface | — |
+| Movimento reduzido respeitado (exigência do README do design system) | Regra global no fim de `app.css`: com `prefers-reduced-motion`, transições e animações caem para quase zero. `movimento.test.ts` confere que ela segue sendo a última do arquivo |
 
 **Vazio sem dados e vazio por filtro são telas diferentes**, de propósito. O
 primeiro se resolve cadastrando, o segundo limpando filtro. Dizer "nada

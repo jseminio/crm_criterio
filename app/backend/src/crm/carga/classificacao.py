@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 from crm.db.modelos import ClassificacaoDoGrupo, Empresa, GrupoEconomico
 from crm.domain import classificacao as regra
+from crm.domain import rentabilidade as rentab
 
 __all__ = ["Linha", "Relatorio", "ler", "aplicar"]
 
@@ -68,6 +69,9 @@ class Linha:
     margem: Decimal | None
     horas: Decimal | None
     notas: regra.Notas
+    nota_da_planilha: Decimal | None = None
+    """Só quando a rentabilidade foi recalculada: a nota que a planilha tinha."""
+    recalculada: bool = False
 
 
 @dataclass
@@ -79,6 +83,9 @@ class Relatorio:
     avisos: list[str] = field(default_factory=list)
     isc_da_planilha: Decimal | None = None
     isc_do_crm: regra.Isc | None = None
+    isc_revisado: regra.Isc | None = None
+    mudancas_de_nota: int = 0
+    mudancas_de_classe: int = 0
     por_classe: dict[str, int] = field(default_factory=dict)
 
     @property
@@ -86,26 +93,84 @@ class Relatorio:
         return not self.erros
 
 
-def _cnpjs_por_unidade(caminho: Path, rel: Relatorio) -> dict[str, list[str]]:
+def _cnpjs_por_unidade(caminho: Path, rel: Relatorio) -> dict[str, list[dict]]:
     ws = load_workbook(caminho, data_only=True)[ABA_CLIENTES]
     cab = {}
     for r in range(1, 12):
-        nomes = {str(c.value).replace("\n", " ").strip(): i for i, c in enumerate(ws[r]) if c.value is not None}
+        nomes = {" ".join(str(c.value).split()): i for i, c in enumerate(ws[r]) if c.value is not None}
         if "Razão Social" in nomes and "CNPJ" in nomes and "Grupo Econômico" in nomes:
             cab, primeira = nomes, r + 1
             break
     if not cab:
         rel.erros.append(f"Não achei o cabeçalho da aba “{ABA_CLIENTES}” na planilha de rentabilidade.")
         return {}
-    unidades: dict[str, list[str]] = {}
+    unidades: dict[str, list[dict]] = {}
     for row in ws.iter_rows(min_row=primeira, values_only=True):
         razao = row[cab["Razão Social"]]
         if not razao:
             continue
         grupo = str(row[cab["Grupo Econômico"]] or "").strip()
         chave = _norm(razao) if not grupo or _norm(grupo) == "sem grupo" else _norm(grupo)
-        unidades.setdefault(chave, []).append(re.sub(r"\D", "", str(row[cab["CNPJ"]] or "")))
+        def _n(coluna):
+            v = row[cab[coluna]] if coluna in cab else None
+            return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+        ajuste = row[cab["Ajuste manual de horas (opcional)"]] if "Ajuste manual de horas (opcional)" in cab else None
+        unidades.setdefault(chave, []).append({
+            "cnpj": re.sub(r"\D", "", str(row[cab["CNPJ"]] or "")),
+            "porte": str(row[cab["PORTE"]] or "").strip() if "PORTE" in cab else "",
+            "honorario": row[cab["Honorário (R$/mês)"]] if "Honorário (R$/mês)" in cab else None,
+            "ajuste": ajuste, "compl": _n("Complexidade"), "disc": _n("Disciplina"), "risco": _n("Risco Técnico"),
+        })
     return unidades
+
+
+def _recalcular_rentabilidade(linha: Linha, empresas: list[dict], rel: Relatorio, rotulo: str) -> None:
+    """Margem e nota recalculadas no CRM, com a disciplina invertida (decisão de 26/09/2026 sobre o defeito 7.2).
+
+    Confere antes que a **fórmula viva** da planilha (sem inversão) reproduz a nota que ela tinha: se não
+    reproduz, o insumo (porte, honorário, notas) não é o que se pensa e a gravação é bloqueada."""
+    soma = sum(Decimal(str(e["honorario"] or 0)) for e in empresas)
+    if abs(soma - linha.receita) > Decimal("0.01"):
+        if len(empresas) == 1:
+            rel.avisos.append(
+                f"{rotulo}: o honorário na planilha de rentabilidade ({soma}) difere da receita oficial ({linha.receita}); "
+                "usei a oficial, já que a unidade tem uma só empresa."
+            )
+            empresas = [{**empresas[0], "honorario": linha.receita}]
+        else:
+            rel.avisos.append(
+                f"{rotulo}: os honorários das empresas somam {soma}, e a receita oficial é {linha.receita}; "
+                "não dá para ratear, então a unidade ficou com a nota de rentabilidade da planilha."
+            )
+            return
+    try:
+        lista = [
+            rentab.Empresa(
+                honorario=Decimal(str(e["honorario"])), porte=e["porte"], complexidade=e["compl"], disciplina=e["disc"],
+                risco=e["risco"], ajuste_manual_de_horas=Decimal(str(e["ajuste"])) if isinstance(e["ajuste"], (int, float)) else None,
+            )
+            for e in empresas
+        ]
+        viva = rentab.margem_do_grupo(lista, inverter_disciplina=False)
+        certa = rentab.margem_do_grupo(lista, inverter_disciplina=True)
+    except (KeyError, TypeError, ValueError) as erro:
+        rel.erros.append(f"{rotulo}: não consegui recalcular a rentabilidade ({erro!r}).")
+        return
+    if viva.nota != int(linha.notas.rentabilidade):
+        rel.erros.append(f"{rotulo}: a fórmula viva da planilha daria nota {viva.nota}, e a planilha tem {linha.notas.rentabilidade}.")
+        return
+    if certa.nota is None:
+        rel.erros.append(f"{rotulo}: sem margem calculável.")
+        return
+    linha.nota_da_planilha = linha.notas.rentabilidade
+    linha.notas = regra.Notas(**{**linha.notas.__dict__, "rentabilidade": Decimal(certa.nota)})
+    linha.margem = certa.margem.quantize(Decimal("0.0001"))
+    linha.horas = sum(
+        (e.ajuste_manual_de_horas if e.ajuste_manual_de_horas and e.ajuste_manual_de_horas > 0 else rentab.PARAMETROS_DE_RENTABILIDADE.horas_base[e.porte])
+        for e in lista
+    ).quantize(Decimal("0.01"))
+    linha.recalculada = True
 
 
 def _destino(sessao: Session, grupo_id: int) -> int:
@@ -118,7 +183,7 @@ def _destino(sessao: Session, grupo_id: int) -> int:
     raise RuntimeError("cadeia de fusões longa demais")
 
 
-def ler(classificacao: Path, rentabilidade: Path, sessao: Session, rel: Relatorio) -> list[Linha]:
+def ler(classificacao: Path, rentabilidade: Path, sessao: Session, rel: Relatorio, recalcular: bool = False) -> list[Linha]:
     wb = load_workbook(classificacao, data_only=True)
     for aba in (ABA_CLASSIFICACAO, ABA_ISC):
         if aba not in wb.sheetnames:
@@ -154,7 +219,7 @@ def ler(classificacao: Path, rentabilidade: Path, sessao: Session, rel: Relatori
             rel.erros.append(f"{rotulo}: não achei os CNPJs da unidade na aba “{ABA_CLIENTES}”.")
             continue
         destinos = set()
-        for cnpj in ciqs:
+        for cnpj in (x["cnpj"] for x in ciqs):
             e = sessao.scalars(sa.select(Empresa).where(Empresa.cnpj == cnpj)).first()
             if e is None:
                 rel.erros.append(f"{rotulo}: o CNPJ {cnpj} não está no CRM.")
@@ -199,33 +264,49 @@ def ler(classificacao: Path, rentabilidade: Path, sessao: Session, rel: Relatori
         if eixo_planilha != eixo:
             rel.erros.append(f"{rotulo}: eixo de ação do CRM ({eixo}) ≠ planilha ({row[19]}).")
 
-        linhas.append(Linha(
+        linha = Linha(
             unidade=str(row[0]).replace("▸", "").strip(), grupo_id=destinos.pop(),
             receita=Decimal(str(row[3])).quantize(Decimal("0.01")),
             margem=Decimal(str(row[4])).quantize(Decimal("0.0001")) if _num(row[4]) is not None else None,
             horas=Decimal(str(row[5])).quantize(Decimal("0.01")) if _num(row[5]) is not None else None,
             notas=notas,
-        ))
+        )
+        if recalcular:
+            _recalcular_rentabilidade(linha, ciqs, rel, rotulo)
+        linhas.append(linha)
         rel.por_classe[letra] = rel.por_classe.get(letra, 0) + 1
 
     # Conferência do ISC
+    def _da_planilha(l: Linha) -> regra.Notas:
+        return regra.Notas(**{**l.notas.__dict__, "rentabilidade": l.nota_da_planilha}) if l.recalculada else l.notas
+
     calculado = regra.isc(
-        regra.Unidade(l.receita, regra.classe(regra.score(l.notas)), l.notas.semaforo, l.notas.churn) for l in linhas
+        regra.Unidade(l.receita, regra.classe(regra.score(_da_planilha(l))), l.notas.semaforo, l.notas.churn) for l in linhas
     )
     rel.isc_do_crm = calculado
     if calculado and rel.isc_da_planilha is not None and abs(float(calculado.valor) - float(rel.isc_da_planilha)) > 0.01:
         rel.erros.append(f"ISC do CRM {float(calculado.valor):.2f} ≠ planilha {float(rel.isc_da_planilha):.2f}.")
+    if recalcular:
+        revisado = regra.isc(
+            regra.Unidade(l.receita, regra.classe(regra.score(l.notas)), l.notas.semaforo, l.notas.churn) for l in linhas
+        )
+        rel.isc_revisado = revisado
+        for l in (x for x in linhas if x.recalculada):
+            antes = regra.Notas(**{**l.notas.__dict__, "rentabilidade": l.nota_da_planilha})
+            rel.mudancas_de_nota += l.notas.rentabilidade != l.nota_da_planilha
+            rel.mudancas_de_classe += regra.classe(regra.score(antes)) != regra.classe(regra.score(l.notas))
     grupos_repetidos = {l.grupo_id for l in linhas if sum(1 for x in linhas if x.grupo_id == l.grupo_id) > 1}
     if grupos_repetidos:
         rel.erros.append("Duas unidades da planilha caem no mesmo grupo do CRM (fusão entre unidades diferentes?).")
     return linhas
 
 
-def aplicar(sessao: Session, linhas: list[Linha], rel: Relatorio, referencia: date, fonte: str) -> None:
-    """Grava um snapshot por grupo. Idempotente por (grupo, data de referência)."""
+def aplicar(sessao: Session, linhas: list[Linha], rel: Relatorio, referencia: date, fonte: str, revisao: int = 1) -> None:
+    """Grava um snapshot por grupo. Idempotente por (grupo, data de referência, revisão)."""
     for l in linhas:
         if sessao.scalars(sa.select(ClassificacaoDoGrupo).where(
-            ClassificacaoDoGrupo.grupo_id == l.grupo_id, ClassificacaoDoGrupo.referencia == referencia
+            ClassificacaoDoGrupo.grupo_id == l.grupo_id, ClassificacaoDoGrupo.referencia == referencia,
+            ClassificacaoDoGrupo.revisao == revisao,
         )).first():
             rel.ja_existiam += 1
             continue
@@ -233,8 +314,8 @@ def aplicar(sessao: Session, linhas: list[Linha], rel: Relatorio, referencia: da
         pontos = regra.score(n)
         letra = regra.classe(pontos)
         sessao.add(ClassificacaoDoGrupo(
-            grupo_id=l.grupo_id, referencia=referencia, fonte=fonte, versao_dos_parametros=regra.PARAMETROS.versao,
-            receita_mensal=l.receita, margem=l.margem, horas_por_mes=l.horas, rentabilidade_da_planilha=True,
+            grupo_id=l.grupo_id, referencia=referencia, revisao=revisao, fonte=fonte, versao_dos_parametros=regra.PARAMETROS.versao,
+            receita_mensal=l.receita, margem=l.margem, horas_por_mes=l.horas, rentabilidade_da_planilha=not l.recalculada,
             nota_receita=n.receita, nota_rentabilidade=n.rentabilidade, complexidade=n.complexidade,
             disciplina=n.disciplina, risco_tecnico=n.risco, cross_sell=n.cross_sell, adimplencia=n.adimplencia,
             semaforo=n.semaforo, churn=n.churn, score=pontos.quantize(Decimal("0.0001")), classe=letra,

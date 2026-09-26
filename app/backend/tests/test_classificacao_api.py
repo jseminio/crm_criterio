@@ -22,11 +22,11 @@ def cliente(engine):
         yield c
 
 
-def _snap(sessao: Session, grupo: GrupoEconomico, ref: date, receita: str, n: regra.Notas) -> None:
+def _snap(sessao: Session, grupo: GrupoEconomico, ref: date, receita: str, n: regra.Notas, revisao: int = 1) -> None:
     pontos = regra.score(n)
     letra = regra.classe(pontos)
     sessao.add(ClassificacaoDoGrupo(
-        grupo_id=grupo.id, referencia=ref, fonte="teste", versao_dos_parametros=regra.PARAMETROS.versao,
+        grupo_id=grupo.id, referencia=ref, revisao=revisao, fonte="teste", versao_dos_parametros=regra.PARAMETROS.versao,
         receita_mensal=Decimal(receita), nota_receita=n.receita, nota_rentabilidade=n.rentabilidade,
         complexidade=n.complexidade, disciplina=n.disciplina, risco_tecnico=n.risco, cross_sell=n.cross_sell,
         adimplencia=n.adimplencia, semaforo=n.semaforo, churn=n.churn, score=pontos, classe=letra,
@@ -75,3 +75,15 @@ def test_grupo_fundido_nao_aparece(cliente, sessao: Session):
     _snap(sessao, f, date(2026, 7, 31), "100", n)
     sessao.commit()
     assert cliente.get("/api/carteira/classificacao").json()["itens"] == []
+
+
+def test_na_mesma_referencia_a_revisao_maior_vence(cliente, sessao: Session):
+    ruim = regra.Notas(receita=1, rentabilidade=1, complexidade=5, disciplina=1, risco=5, cross_sell=1, adimplencia=1, semaforo=3, churn=5)
+    bom = regra.Notas(receita=5, rentabilidade=5, complexidade=1, disciplina=5, risco=1, cross_sell=5, adimplencia=5, semaforo=1, churn=1)
+    a = GrupoEconomico(nome="Alfa", situacao=SituacaoGrupo.CLIENTE)
+    sessao.add(a); sessao.flush()
+    _snap(sessao, a, date(2026, 7, 31), "1000", ruim, revisao=1)
+    _snap(sessao, a, date(2026, 7, 31), "1000", bom, revisao=2)
+    sessao.commit()
+    itens = cliente.get("/api/carteira/classificacao").json()["itens"]
+    assert len(itens) == 1 and itens[0]["classe"] == "A"

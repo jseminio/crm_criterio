@@ -30,6 +30,8 @@ def main() -> int:
     p.add_argument("classificacao")
     p.add_argument("rentabilidade")
     p.add_argument("--aplicar", action="store_true")
+    p.add_argument("--recalcular-rentabilidade", action="store_true",
+                   help="recalcula margem e nota de rentabilidade no CRM, com a disciplina invertida (defeito 7.2); grava como revisão 2")
     p.add_argument("--referencia", default="2026-07-31", help="data a que a planilha se refere (AAAA-MM-DD)")
     a = p.parse_args()
     referencia = date.fromisoformat(a.referencia)
@@ -37,7 +39,7 @@ def main() -> int:
     rel = Relatorio()
     engine = criar_engine()
     with Session(engine) as s:
-        linhas = ler(Path(a.classificacao), Path(a.rentabilidade), s, rel)
+        linhas = ler(Path(a.classificacao), Path(a.rentabilidade), s, rel, recalcular=a.recalcular_rentabilidade)
         if a.aplicar and rel.pode_aplicar:
             pasta = Path.home() / "Backups-CRM"
             pasta.mkdir(exist_ok=True, mode=0o700)
@@ -45,7 +47,9 @@ def main() -> int:
             exportar(engine, copia)
             copia.chmod(0o600)
             print(f"Backup antes: {copia}")
-            aplicar(s, linhas, rel, referencia, f"Planilha de saúde da carteira ({Path(a.classificacao).name})")
+            aplicar(s, linhas, rel, referencia, f"Planilha de saúde da carteira ({Path(a.classificacao).name})"
+                    + ("; rentabilidade recalculada no CRM (disciplina invertida)" if a.recalcular_rentabilidade else ""),
+                    revisao=2 if a.recalcular_rentabilidade else 1)
             s.commit()
         else:
             s.rollback()
@@ -57,6 +61,9 @@ def main() -> int:
         print(f"ISC do CRM: {float(i.valor):.2f} ({i.zona})  ·  da planilha: {float(rel.isc_da_planilha):.2f}"
               f"  ·  classe {float(i.componente_classe):.2f} · semáforo {float(i.componente_semaforo):.2f} · churn {float(i.componente_churn):.2f}"
               f"  ·  receita {float(i.receita_total):,.2f}")
+    if rel.isc_revisado:
+        r = rel.isc_revisado
+        print(f"Com a rentabilidade recalculada: ISC {float(r.valor):.2f} ({r.zona}) · {rel.mudancas_de_nota} notas de rentabilidade e {rel.mudancas_de_classe} classes mudam")
     if a.aplicar:
         print(f"Snapshots: {rel.criadas} novos, {rel.ja_existiam} já existiam")
     for titulo, itens in (("ERROS (bloqueiam a gravação)", rel.erros), ("AVISOS", rel.avisos)):

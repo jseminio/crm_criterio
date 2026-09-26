@@ -20,9 +20,14 @@ from crm.db.modelos import ClassificacaoDoGrupo, Contrato, GrupoEconomico
 from crm.domain import classificacao as regra
 from crm.domain.listas import SituacaoContrato
 
-AVISO_RENTABILIDADE = (
+AVISO_DA_PLANILHA = (
     "A nota de rentabilidade vem da planilha de saúde da carteira, sem recálculo: a regra de atrito/disciplina "
     "ainda está pendente de validação (defeito 7.2)."
+)
+
+AVISO_RECALCULADA = (
+    "A rentabilidade foi recalculada no CRM com a disciplina invertida (6 − disciplina), corrigindo o defeito 7.2 "
+    "da planilha (decisão de 26/09/2026). As demais notas vêm da planilha de saúde da carteira."
 )
 
 
@@ -67,18 +72,19 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
 
     @r.get("/classificacao", response_model=ClassificacaoDaCarteira)
     def classificacao(sessao: Session = Depends(obter_sessao)) -> ClassificacaoDaCarteira:
-        ultima = (
-            sa.select(ClassificacaoDoGrupo.grupo_id, sa.func.max(ClassificacaoDoGrupo.referencia).label("ref"))
-            .group_by(ClassificacaoDoGrupo.grupo_id).subquery()
-        )
-        linhas = sessao.execute(
+        todas = sessao.execute(
             sa.select(ClassificacaoDoGrupo, GrupoEconomico.nome)
-            .join(ultima, sa.and_(ClassificacaoDoGrupo.grupo_id == ultima.c.grupo_id,
-                                  ClassificacaoDoGrupo.referencia == ultima.c.ref))
             .join(GrupoEconomico, GrupoEconomico.id == ClassificacaoDoGrupo.grupo_id)
             .where(GrupoEconomico.fundido_em_id.is_(None))
-            .order_by(ClassificacaoDoGrupo.receita_mensal.desc())
+            .order_by(ClassificacaoDoGrupo.referencia.desc(), ClassificacaoDoGrupo.revisao.desc())
         ).all()
+        vistos: set[int] = set()
+        linhas = []
+        for c, nome in todas:  # a leitura mais recente de cada grupo: referência maior, depois revisão maior
+            if c.grupo_id not in vistos:
+                vistos.add(c.grupo_id)
+                linhas.append((c, nome))
+        linhas.sort(key=lambda x: x[0].receita_mensal, reverse=True)
         if not linhas:
             return ClassificacaoDaCarteira(referencia=None, versao_dos_parametros=None, isc=None, por_classe={},
                                            itens=[], avisos=[])
@@ -97,7 +103,14 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         por_classe: dict[str, int] = {}
         for i in itens:
             por_classe[i.classe] = por_classe.get(i.classe, 0) + 1
-        avisos = [AVISO_RENTABILIDADE]
+        da_planilha = [nome for c, nome in linhas if c.rentabilidade_da_planilha]
+        if len(da_planilha) == len(linhas):
+            avisos = [AVISO_DA_PLANILHA]
+        else:
+            avisos = [AVISO_RECALCULADA]
+            if da_planilha:
+                avisos.append(f"{len(da_planilha)} grupo(s) mantiveram a nota de rentabilidade da planilha, porque os honorários "
+                              "das empresas não fecham com a receita oficial: " + ", ".join(da_planilha) + ".")
         parados = [i.grupo_nome for i in itens if i.sem_contrato_ativo]
         if parados:
             avisos.append(f"{len(parados)} grupo(s) sem contrato ativo hoje continuam no snapshot da referência: "

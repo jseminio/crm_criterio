@@ -21,6 +21,8 @@ __all__ = [
     "SituacaoGrupo",
     "SituacaoEmpresa",
     "SituacaoContrato",
+    "SituacaoAbordagem",
+    "CanalDeAbordagem",
     "PapelContato",
     "Origem",
     "TipoDeOcorrencia",
@@ -133,6 +135,34 @@ class SituacaoContrato(Enum):
     @property
     def em_vigor(self) -> bool:
         return self is SituacaoContrato.ATIVO
+
+
+class SituacaoAbordagem(Enum):
+    """Onde a abordagem de uma conta âncora está — agente SDR, 26/09/2026.
+
+    Só a pessoa tira uma abordagem de "Aguardando aprovação": o agente
+    prepara, nunca envia (decisão de Eduardo em 26/09/2026).
+    """
+
+    A_PREPARAR = "A preparar"
+    PESQUISANDO = "Pesquisando"
+    AGUARDANDO_APROVACAO = "Aguardando aprovação"
+    APROVADA = "Aprovada"
+    """Só no WhatsApp: aprovada, esperando a pessoa enviar pelo aplicativo.
+    O e-mail vai de "Aguardando aprovação" direto para "Enviada"."""
+    ENVIADA = "Enviada"
+    DESCARTADA = "Descartada"
+    ERRO = "Erro"
+    BLOQUEADA = "Bloqueada"
+    """Nunca gravada: é como a tela vê uma abordagem a preparar sem quem a
+    apresente. Calculada na leitura, para não haver duas fontes da mesma regra."""
+
+
+class CanalDeAbordagem(Enum):
+    """Por onde a mensagem aprovada sai."""
+
+    EMAIL = "E-mail"
+    WHATSAPP = "WhatsApp"
 
 
 class PapelContato(Enum):

@@ -23,6 +23,14 @@ const TOM_POR_SITUACAO: Record<string, string> = {
   "Aguardando assinatura": "espera",
   Ativo: "ganho",
   Suspenso: "espera",
+  "A preparar": "neutra",
+  Pesquisando: "andamento",
+  "Aguardando aprovação": "espera",
+  Aprovada: "andamento",
+  Enviada: "ganho",
+  Descartada: "neutra",
+  Erro: "perda",
+  Bloqueada: "perda",
 };
 
 const TOM_POR_TEMPERATURA: Record<string, string> = {

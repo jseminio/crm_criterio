@@ -5,6 +5,7 @@ import "./tokens.css";
 import "./app.css";
 import { api } from "./api/cliente";
 import type { Listas } from "./api/tipos";
+import { Abordagens } from "./telas/Abordagens";
 import { Agenda } from "./telas/Agenda";
 import { Conferencia } from "./telas/Conferencia";
 import { Contatos } from "./telas/Contatos";
@@ -16,7 +17,17 @@ import { Leads } from "./telas/Leads";
 import { Lista } from "./telas/Lista";
 import { usarDados } from "./usarDados";
 
-type Tela = "agenda" | "contatos" | "funil" | "lista" | "leads" | "grupos" | "contratos" | "conferencia" | "configuracoes";
+type Tela =
+  | "agenda"
+  | "contatos"
+  | "funil"
+  | "lista"
+  | "leads"
+  | "grupos"
+  | "contratos"
+  | "abordagens"
+  | "conferencia"
+  | "configuracoes";
 
 const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[] = [
   {
@@ -60,6 +71,12 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     rotulo: "Contratos",
     titulo: "Contratos",
     descricao: "O que a oportunidade aceita virou — começo da Etapa 2.",
+  },
+  {
+    chave: "abordagens",
+    rotulo: "Abordagens",
+    titulo: "Abordagens",
+    descricao: "O agente SDR prepara a ficha e o rascunho. Nada sai sem a sua aprovação.",
   },
   {
     chave: "conferencia",
@@ -128,6 +145,7 @@ export default function App() {
           {tela === "leads" && <Leads listas={listas} />}
           {tela === "grupos" && <Grupos listas={listas} />}
           {tela === "contratos" && <Contratos listas={listas} />}
+          {tela === "abordagens" && <Abordagens />}
           {tela === "conferencia" && <Conferencia />}
           {tela === "configuracoes" && <Configuracoes />}
         </main>

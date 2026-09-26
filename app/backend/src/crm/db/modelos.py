@@ -56,6 +56,7 @@ __all__ = [
     "FichaDeConta",
     "Abordagem",
     "ExecucaoDoAgente",
+    "ClassificacaoDoGrupo",
     "EventoDeContrato",
     "FusaoDeGrupos",
     "HistoricoDePreco",
@@ -414,6 +415,57 @@ class Oportunidade(CarimboMixin, Base):
 
     def __repr__(self) -> str:
         return f"<Oportunidade {self.id} {self.nome!r} {self.situacao.value}>"
+
+
+NOTA = sa.Numeric(4, 2)  # nota de grupo é média das empresas: vem com casas decimais
+
+
+class ClassificacaoDoGrupo(Base):
+    """Uma leitura da classificação de um grupo em uma data — Etapa 3 (26/09/2026).
+
+    **Snapshot imutável**: nova classificação = nova linha, nunca sobrescreve a anterior (é o que
+    permite comparar o ISC de um mês com o do mês seguinte). Guarda as notas de entrada, o que o CRM
+    calculou e **qual versão dos parâmetros** o produziu. A regra está em `crm.domain.classificacao`.
+
+    **A nota de rentabilidade não é calculada pelo CRM ainda**: vem da planilha (defeito 7.2, margem e
+    atrito, à espera de conferência). `rentabilidade_da_planilha` diz isso em cada linha.
+    """
+
+    __tablename__ = "classificacao_do_grupo"
+    __table_args__ = (sa.UniqueConstraint("grupo_id", "referencia", name="uq_classificacao_grupo_referencia"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    grupo_id: Mapped[int] = mapped_column(sa.ForeignKey("grupo_economico.id"), nullable=False, index=True)
+    referencia: Mapped[date] = mapped_column(sa.Date, nullable=False, index=True)
+    """A data a que a leitura se refere (a da planilha), não a do carregamento."""
+    fonte: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    versao_dos_parametros: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    registrado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+
+    receita_mensal: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    margem: Mapped[Decimal | None] = mapped_column(sa.Numeric(6, 4))
+    horas_por_mes: Mapped[Decimal | None] = mapped_column(sa.Numeric(8, 2))
+    rentabilidade_da_planilha: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=True, server_default=sa.true())
+
+    nota_receita: Mapped[Decimal] = mapped_column(NOTA, nullable=False)
+    nota_rentabilidade: Mapped[Decimal] = mapped_column(NOTA, nullable=False)
+    complexidade: Mapped[Decimal] = mapped_column(NOTA, nullable=False)
+    disciplina: Mapped[Decimal] = mapped_column(NOTA, nullable=False)
+    risco_tecnico: Mapped[Decimal] = mapped_column(NOTA, nullable=False)
+    cross_sell: Mapped[Decimal] = mapped_column(NOTA, nullable=False)
+    adimplencia: Mapped[Decimal] = mapped_column(NOTA, nullable=False)
+    semaforo: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False)
+    churn: Mapped[int | None] = mapped_column(sa.SmallInteger)
+    """Nota de churn 1 a 5. Antes escondida dentro da fórmula da planilha (defeito 7.1): aqui é campo."""
+
+    score: Mapped[Decimal] = mapped_column(sa.Numeric(6, 4), nullable=False)
+    classe: Mapped[str] = mapped_column(sa.String(1), nullable=False, index=True)
+    classe_efetiva: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    alerta_de_churn: Mapped[str | None] = mapped_column(sa.String(1))
+    em_cobranca: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
+    eixo_de_acao: Mapped[str] = mapped_column(sa.String(60), nullable=False, index=True)
+
+    grupo: Mapped[GrupoEconomico] = relationship()
 
 
 class FusaoDeGrupos(Base):

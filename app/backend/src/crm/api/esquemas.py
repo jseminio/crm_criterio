@@ -109,6 +109,8 @@ class MrrResposta(Base):
     atual: MrrAtualResposta
     movimento: MovimentoDeMrrResposta
     contratos_registrados: int
+    contratos_da_carteira_anterior: int
+    """Quantos vieram da carga da planilha de saúde da carteira (sem data de assinatura)."""
     cobertura_completa: bool
     aviso: str
 
@@ -371,6 +373,9 @@ class ContratoResumo(Base):
     grupo_id: int
     grupo_nome: str | None = None
     oportunidade_id: int | None = None
+    empresa_id: int | None = None
+    anterior_ao_crm: bool = False
+    """Da carteira que já existia antes do CRM: sem data de assinatura conhecida."""
     escopo: str | None = None
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None

@@ -36,6 +36,37 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Carga da carteira anterior ao CRM (26/09/2026)
+
+A carteira que já existia antes do CRM vem da planilha de saúde da carteira
+(`Rentabilidade_Grupo_COMPLETO.xlsx`, aba **"4. Clientes"**: razão social, CNPJ, grupo econômico,
+escopo e honorário mensal, uma linha por empresa). **O arquivo fica fora do repositório** (dado de
+cliente). Ensaio, sem gravar:
+
+```bash
+cd backend
+~/.venvs/criterio-crm/bin/python scripts/importar_carteira.py ~/Downloads/Rentabilidade_Grupo_COMPLETO.xlsx
+~/.venvs/criterio-crm/bin/python scripts/importar_carteira.py <planilha> --aplicar   # grava, com backup antes
+```
+
+- Cada linha vira uma **Empresa** (por CNPJ) e um **Contrato Ativo** dela, com o honorário como preço
+  mensal. `Contrato` ganhou `empresa_id` e `anterior_ao_crm`.
+- **Não se inventa data de assinatura.** A planilha não a traz, então o contrato fica marcado
+  `anterior_ao_crm`: pode ser Ativo sem `data_inicio`, conta no MRR **desde sempre** e **nunca aparece
+  como "novo"** de um período. Se a data aparecer, basta preenchê-la depois.
+- "Sem grupo" = cliente individual, com grupo de uma empresa só e o nome da razão social. Grupo que
+  **já existe** no CRM é reaproveitado pela *chave do nome* (o de mais propostas, com aviso, se houver
+  vários); Prospect que recebe cliente vira **Cliente**. Nomes diferentes viram grupo novo — a fusão
+  continua sendo um clique humano.
+- **Idempotente** (empresa por CNPJ, contrato por empresa) e **nada é sobrescrito**: preço diferente
+  vira conflito no relatório. Tudo ou nada, com backup antes.
+- Ensaio de 26/09/2026: 58 empresas, 58 contratos, 31 grupos (7 reaproveitados, 24 novos), R$ 227.462,65
+  por mês, nenhum erro (58 CNPJs válidos). 14 escopos "verificar contrato" ficam em branco.
+
+**Três totais que não são o mesmo número:** R$ 227.462,65 (soma das empresas na aba "4. Clientes"),
+R$ 229.641,20 (31 unidades, ticket médio de 23/09, com o grupo Blac pela aba "Margem por Grupo") e
+R$ 226.341 (MRR oficial de 19/09/2026). Conferir antes de tratar o MRR do CRM como o oficial.
+
 ## MRR dos contratos registrados (26/09/2026)
 
 `GET /api/mrr` e o painel no topo de **Contratos** (`crm/domain/mrr.py`). Sem parâmetros, vale o

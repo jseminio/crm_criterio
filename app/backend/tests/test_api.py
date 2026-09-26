@@ -1085,3 +1085,26 @@ class TestMrr:
     def test_periodo_no_futuro_ou_invertido_e_422(self, cliente):
         assert cliente.get("/api/mrr", params={"hoje": "2026-09-25", "ate": "2026-12-01"}).status_code == 422
         assert cliente.get("/api/mrr", params={"hoje": "2026-09-25", "de": "2026-09-20", "ate": "2026-09-10"}).status_code == 422
+
+
+class TestMrrComCarteiraAnterior:
+    def test_aviso_muda_quando_ha_contrato_da_carteira_anterior(self, cliente, sessao, carteira):
+        from crm.db.modelos import Contrato
+        from crm.domain.listas import SituacaoContrato as S
+
+        g = sessao.get(GrupoEconomico, carteira["grupo"]) if "grupo" in carteira else sessao.scalars(sa.select(GrupoEconomico)).first()
+        sessao.add(Contrato(grupo_id=g.id, anterior_ao_crm=True, situacao=S.ATIVO, preco_mensal=Decimal("3000.00")))
+        sessao.commit()
+        c = cliente.get("/api/mrr", params={"hoje": "2026-09-25"}).json()
+        assert c["atual"]["valor"] == "3000.00" and c["contratos_da_carteira_anterior"] == 1
+        assert c["cobertura_completa"] is True and "Inclui a carteira anterior" in c["aviso"]
+        assert (c["movimento"]["mrr_inicio"], c["movimento"]["novo"]) == ("3000.00", "0.00")
+
+    def test_contrato_da_carteira_anterior_ativa_sem_data_de_assinatura(self, cliente, sessao, carteira):
+        from crm.db.modelos import Contrato
+        from crm.domain.listas import SituacaoContrato as S
+
+        g = sessao.scalars(sa.select(GrupoEconomico)).first()
+        c = Contrato(grupo_id=g.id, anterior_ao_crm=True, situacao=S.AGUARDANDO_ASSINATURA, preco_mensal=Decimal("100"))
+        sessao.add(c); sessao.commit()
+        assert cliente.patch(f"/api/contratos/{c.id}", json={"situacao": "Ativo"}).status_code == 200

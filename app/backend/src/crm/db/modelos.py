@@ -465,6 +465,17 @@ class Contrato(CarimboMixin, Base):
     """A oportunidade aceita que originou o contrato. Nula se o contrato
     nascer direto na tela, sem passar pelo funil."""
 
+    empresa_id: Mapped[int | None] = mapped_column(sa.ForeignKey("empresa.id"), index=True)
+    """O CNPJ a que o contrato se refere. Nulo quando o contrato é do grupo inteiro (o que
+    nasce da conversão de uma oportunidade, que ainda não conhece o CNPJ)."""
+    anterior_ao_crm: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default=sa.false()
+    )
+    """Contrato da carteira que já existia **antes** do CRM (carga de 26/09/2026, a partir da
+    planilha de saúde da carteira). A data de assinatura dele é desconhecida, e **não se
+    inventa uma**: pode ficar Ativo sem `data_inicio`, e no MRR conta como existente desde
+    sempre — nunca como "novo" de um período."""
+
     escopo: Mapped[str | None] = mapped_column(sa.String(200))
     preco_mensal: Mapped[Decimal | None] = mapped_column(DINHEIRO)
     preco_anual: Mapped[Decimal | None] = mapped_column(DINHEIRO)
@@ -486,6 +497,7 @@ class Contrato(CarimboMixin, Base):
 
     grupo: Mapped[GrupoEconomico] = relationship(back_populates="contratos")
     oportunidade: Mapped["Oportunidade | None"] = relationship()
+    empresa: Mapped["Empresa | None"] = relationship()
     eventos: Mapped[list["EventoDeContrato"]] = relationship(
         back_populates="contrato", order_by="EventoDeContrato.id.desc()"
     )

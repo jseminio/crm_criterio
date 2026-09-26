@@ -18,7 +18,7 @@ vi.mock("../api/cliente", async () => {
 
 const resumo = (o: Partial<ContratoResumo> = {}): ContratoResumo => ({
   id: 7, grupo_id: 1, grupo_nome: "Alfa", oportunidade_id: 1, escopo: "BPO", preco_mensal: "1000.00",
-  preco_anual: "12000.00", data_inicio: null, data_fim: null, situacao: "Aguardando assinatura", signatario: null, ...o,
+  preco_anual: "12000.00", empresa_id: null, anterior_ao_crm: false, data_inicio: null, data_fim: null, situacao: "Aguardando assinatura", signatario: null, ...o,
 });
 const detalhe = (o: Partial<ContratoDetalhe> = {}): ContratoDetalhe => ({ ...resumo(o), documento_assinado: null, observacao: null, eventos: [], ...o } as ContratoDetalhe);
 
@@ -64,6 +64,14 @@ describe("Contratos — vigência na assinatura (25/09/2026)", () => {
     await abrir({ situacao: "Ativo", data_inicio: "2026-03-01" });
     const opcoes = Array.from(screen.getByLabelText("Situação", { selector: "#c-situacao" }).querySelectorAll("option")).map((o) => o.textContent);
     expect(opcoes).not.toContain("Encerrado");
+  });
+
+  it("contrato da carteira anterior ativa sem data de assinatura e a lista diz que é anterior ao CRM", async () => {
+    await abrir({ anterior_ao_crm: true, situacao: "Aguardando assinatura" });
+    expect(screen.getByText("anterior ao CRM")).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Situação", { selector: "#c-situacao" }), "Ativo");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: /salvar alterações/i })).toBeEnabled();
   });
 
   it("antes de assinar, o preço continua editável", async () => {

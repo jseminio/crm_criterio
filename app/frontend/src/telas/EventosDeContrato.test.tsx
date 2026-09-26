@@ -11,7 +11,7 @@ vi.mock("../api/cliente", async () => {
 });
 
 const contrato = (o: Partial<ContratoDetalhe> = {}): ContratoDetalhe => ({
-  id: 7, grupo_id: 1, grupo_nome: "Alfa", oportunidade_id: 1, escopo: "BPO Contábil",
+  id: 7, grupo_id: 1, grupo_nome: "Alfa", oportunidade_id: 1, empresa_id: null, anterior_ao_crm: false, escopo: "BPO Contábil",
   preco_mensal: "1000.00", preco_anual: "12000.00", data_inicio: "2026-03-01", data_fim: "2027-03-01",
   situacao: "Ativo", signatario: null, documento_assinado: null, observacao: null, eventos: [], ...o,
 });

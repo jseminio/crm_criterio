@@ -254,6 +254,9 @@ export interface ContratoResumo {
   grupo_id: number;
   grupo_nome: string | null;
   oportunidade_id: number | null;
+  empresa_id: number | null;
+  /** Da carteira que já existia antes do CRM: sem data de assinatura conhecida. */
+  anterior_ao_crm: boolean;
   escopo: string | null;
   preco_mensal: string | null;
   preco_anual: string | null;
@@ -392,6 +395,7 @@ export interface Mrr {
   atual: MrrAtual;
   movimento: MovimentoDeMrr;
   contratos_registrados: number;
+  contratos_da_carteira_anterior: number;
   cobertura_completa: boolean;
   aviso: string;
 }

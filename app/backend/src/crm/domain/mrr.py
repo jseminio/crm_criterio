@@ -55,6 +55,7 @@ class _Contrato(Protocol):
     situacao: SituacaoContrato
     preco_mensal: Decimal | None
     data_inicio: date | None
+    """`None` só na carteira anterior ao CRM: existe desde antes de qualquer período."""
     eventos: list[_Evento]
 
 
@@ -122,11 +123,12 @@ def _fluxos(contratos: Iterable[_Contrato], de: date, ate: date, *, so_existente
     """Soma os movimentos com data em [de, ate]. Devolve (novo, expansao, reajuste, contracao, churn_cliente, churn_criterio)."""
     novo = expansao = reajuste = contracao = churn_c = churn_k = ZERO
     for c in contratos:
-        if c.situacao is SituacaoContrato.AGUARDANDO_ASSINATURA or c.data_inicio is None:
+        if c.situacao is SituacaoContrato.AGUARDANDO_ASSINATURA:
             continue
-        if so_existentes_em is not None and c.data_inicio >= so_existentes_em:
+        # Sem data de início = carteira anterior ao CRM: já existia, nunca é "novo".
+        if so_existentes_em is not None and c.data_inicio is not None and c.data_inicio >= so_existentes_em:
             continue
-        if de <= c.data_inicio <= ate:
+        if c.data_inicio is not None and de <= c.data_inicio <= ate:
             inicial = _preco_inicial(c)
             if inicial and inicial > 0:
                 novo += inicial

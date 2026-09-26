@@ -53,7 +53,9 @@ function EdicaoDeContrato({
   // depois registrados. O servidor recusa; aqui a tela nem deixa digitar.
   const assinado = situacaoAtual === "Ativo" || situacaoAtual === "Suspenso";
   const encerrado = situacaoAtual === "Encerrado";
-  const semAssinatura = rascunho.situacao === "Ativo" && !rascunho.data_inicio;
+  // Contrato da carteira anterior ao CRM não tem a data e não precisa dela.
+  const semAssinatura =
+    rascunho.situacao === "Ativo" && !rascunho.data_inicio && !contrato.anterior_ao_crm;
 
   const mudar = (campo: string, valor: string) =>
     definirRascunho((atual) => ({ ...atual, [campo]: valor }));
@@ -309,7 +311,13 @@ export function Contratos({ listas }: { listas: Listas | null }) {
                   <Etiqueta texto={contrato.situacao} />
                 </td>
                 <td>{dinheiro(contrato.preco_mensal)}</td>
-                <td>{data(contrato.data_inicio)}</td>
+                <td>
+                  {contrato.data_inicio
+                    ? data(contrato.data_inicio)
+                    : contrato.anterior_ao_crm
+                      ? <span className="numero-nota">anterior ao CRM</span>
+                      : "—"}
+                </td>
                 <td>{contrato.signatario ?? "—"}</td>
                 <td style={{ whiteSpace: "nowrap" }}>
                   <button

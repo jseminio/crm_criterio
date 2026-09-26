@@ -112,3 +112,22 @@ class TestMovimento:
               C(D("600"), situacao=S.ENCERRADO, eventos=[Ev(T.ENCERRAMENTO, date(2026, 9, 9), iniciativa=I.CLIENTE)])]
         m = movimento(cs, date(2026, 9, 1), HOJE, HOJE)
         assert m.mrr_inicio + m.novo + m.expansao + m.reajuste - m.contracao - m.churn == m.mrr_fim
+
+
+class TestCarteiraAnteriorSemDataDeAssinatura:
+    """Contrato da carteira que existia antes do CRM: sem `data_inicio`, existe desde sempre."""
+
+    def test_nunca_e_novo_mas_seu_churn_e_seu_reajuste_contam(self):
+        legado = C(D("1000"), data_inicio=None, situacao=S.ENCERRADO,
+                   eventos=[Ev(T.ENCERRAMENTO, date(2026, 9, 10), iniciativa=I.CLIENTE)])
+        reajustado = C(D("1500"), data_inicio=None, eventos=[Ev(T.REAJUSTE, date(2026, 9, 5), D("1400"), D("1500"))])
+        m = movimento([legado, reajustado], date(2026, 9, 1), HOJE, HOJE)
+        assert m.novo == D("0.00")
+        assert (m.churn_cliente, m.reajuste) == (D("1000"), D("100"))
+        assert (m.mrr_inicio, m.mrr_fim) == (D("2400"), D("1500"))
+        assert m.nrr == D("62.5")  # (2400 + 100 − 1000) / 2400: os dois já existiam no início
+
+    def test_a_conta_fecha_com_contratos_sem_data(self):
+        cs = [C(D("1000"), data_inicio=None), C(D("700"), data_inicio=date(2026, 9, 3))]
+        m = movimento(cs, date(2026, 9, 1), HOJE, HOJE)
+        assert m.mrr_inicio + m.novo + m.expansao + m.reajuste - m.contracao - m.churn == m.mrr_fim

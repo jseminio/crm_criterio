@@ -545,6 +545,7 @@ def _registrar(api: FastAPI) -> None:
         if inicio > fim:
             raise HTTPException(422, "o início do período não pode ser depois do fim")
         contratos = list(sessao.scalars(sa.select(Contrato)))
+        da_carteira = sum(1 for c in contratos if c.anterior_ao_crm)
         mov = regras_de_mrr.movimento(contratos, inicio, fim, dia)
         return e.MrrResposta(
             atual=e.MrrAtualResposta.model_validate(regras_de_mrr.mrr_atual(contratos)),
@@ -556,9 +557,14 @@ def _registrar(api: FastAPI) -> None:
                 nrr=mov.nrr, grr=mov.grr,
             ),
             contratos_registrados=len(contratos),
-            cobertura_completa=False,
+            contratos_da_carteira_anterior=da_carteira,
+            cobertura_completa=da_carteira > 0,
             aviso=(
-                "Só entram os contratos registrados no CRM. A carteira anterior ao CRM ainda "
+                "Inclui a carteira anterior ao CRM, carregada da planilha de saúde da carteira "
+                f"({da_carteira} contratos, sem data de assinatura), mais o que foi registrado depois. "
+                "Confira contra o MRR oficial antes de comparar com a meta: a fonte é outra."
+                if da_carteira
+                else "Só entram os contratos registrados no CRM. A carteira anterior ao CRM ainda "
                 "não foi carregada (Etapa 3): este MRR é parcial e não se compara com a meta."
             ),
         )
@@ -868,10 +874,12 @@ def _registrar(api: FastAPI) -> None:
         for campo, valor in mudancas.items():
             setattr(contrato, campo, valor)
         # A vigência começa na assinatura: sem a data, o contrato não vira Ativo.
+        # (Contrato da carteira anterior ao CRM não tem a data e não precisa dela.)
         if (
             "situacao" in mudancas
             and contrato.situacao is SituacaoContrato.ATIVO
             and contrato.data_inicio is None
+            and not contrato.anterior_ao_crm
         ):
             raise HTTPException(422, "para ativar o contrato, informe a data da assinatura (início da vigência)")
         sessao.flush()

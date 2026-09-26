@@ -18,7 +18,7 @@ const mrr = (o: Partial<Mrr> = {}, mov: Partial<Mrr["movimento"]> = {}, atual: P
     contracao: "0.00", churn_cliente: "0.00", churn_criterio: "0.00", churn: "0.00", mrr_fim: "0.00",
     variacao: "0.00", nrr: null, grr: null, ...mov,
   },
-  contratos_registrados: 0, cobertura_completa: false, aviso: AVISO, ...o,
+  contratos_registrados: 0, contratos_da_carteira_anterior: 0, cobertura_completa: false, aviso: AVISO, ...o,
 });
 
 describe("Receita (MRR)", () => {

@@ -170,7 +170,6 @@
 .esqueleto-linhas span:nth-child(2) { width: 82%; }
 .esqueleto-linhas span:nth-child(3) { width: 60%; }
 @keyframes brilho { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
-@media (prefers-reduced-motion: reduce) { .esqueleto-linhas span { animation: none } }
 
 .recado { background: var(--surface-ai-soft); border: 1px solid var(--azul-neve);
   border-radius: var(--raio-md); padding: var(--e3) var(--e4); font-size: 13px;
@@ -229,6 +228,55 @@
 .aba-contagem { font-variant-numeric: tabular-nums; color: var(--texto-fraco); margin-left: var(--e1); }
 .botao[aria-pressed="true"] { background: var(--surface-brand); color: var(--branco); border-color: var(--surface-brand); }
 
+/* ------------------------------------------------------ abordagens (SDR) */
+/* Amostra aprovada por Eduardo em 26/09/2026: fila à esquerda, conta aberta à
+   direita. O painel da conta é um painel lateral fixo na tela — um dos três
+   lugares onde o PAD-002 permite sombra. */
+.abordagens { display: grid; grid-template-columns: minmax(0, 1fr) minmax(420px, 600px);
+  gap: var(--e5); align-items: start; }
+@media (max-width: 1100px) { .abordagens { grid-template-columns: minmax(0, 1fr); } }
+.abordagens-fila { display: flex; flex-direction: column; gap: var(--e4); min-width: 0; }
+.abordagens-fila .filtros { margin-bottom: 0; align-items: flex-end; }
+.empurra-direita { margin-left: auto; }
+.linha-selecionada td { background: var(--andamento-suave); }
+.texto-atencao { color: var(--perda); font-weight: 500; }
+.texto-medio { color: var(--texto-medio); }
+.numeros-tres { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 0; }
+
+.abordagem-painel { background: var(--surface-card); border: 1px solid var(--borda);
+  border-radius: var(--raio-lg); box-shadow: var(--sombra-painel); display: flex;
+  flex-direction: column; position: sticky; top: 0; max-height: calc(100vh - 140px); min-width: 0; }
+.abordagem-painel .painel-rodape { justify-content: flex-start; flex-wrap: wrap; }
+.abordagem-painel .painel-cabecalho { align-items: flex-start; }
+.abordagem-painel-vazio { padding: var(--e8) var(--e6); align-items: center; box-shadow: none; }
+.abordagem-secao { display: flex; flex-direction: column; gap: var(--e2); }
+.abordagem-secao h3 { font-family: var(--fonte-ui); font-size: 12px; font-weight: 600; margin: 0;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--texto-medio); }
+.abordagem-secao-topo { display: flex; justify-content: space-between; align-items: center; gap: var(--e3); }
+.abordagem-painel textarea.entrada { resize: vertical; line-height: 1.55; font: inherit; }
+.ficha-linha { margin: 0; font-size: 13px; }
+.ficha-fatos { margin: var(--e1) 0 0; padding-left: var(--e5); display: flex; flex-direction: column; gap: var(--e1); }
+.linha-de-acao { display: flex; gap: var(--e2); }
+.linha-de-acao .entrada { flex: 1; }
+
+.segmentado { display: inline-flex; border: 1px solid var(--borda); border-radius: var(--raio-sm); overflow: hidden; }
+.segmentado button { appearance: none; border: 0; background: transparent; color: var(--texto-medio);
+  padding: var(--e1) var(--e3); cursor: pointer; font-size: 13px; min-height: 30px; }
+.segmentado button[aria-pressed="true"] { background: var(--surface-brand); color: var(--branco); }
+.segmentado button:disabled { cursor: not-allowed; }
+
+/* Regra 4 do PAD-002: a conferência tem ícone e palavra, nunca só cor. */
+.conferencias { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column;
+  gap: var(--e1); font-size: 13px; }
+.conferencias li { display: flex; gap: var(--e2); align-items: center; }
+.conferencia-ok svg, .conferencia-ok strong { color: var(--ganho); }
+.conferencia-atencao svg, .conferencia-atencao strong { color: var(--espera); }
+.conferencias strong { font-weight: 500; }
+
+.botao-perigo { background: var(--perda); color: var(--branco); }
+.botao-texto-perigo { background: transparent; color: var(--perda); margin-left: auto; }
+.botao-texto-perigo:hover { background: var(--perda-suave); }
+
 /* Sugestões de fusão */
 .sugestoes { list-style: none; margin: var(--e3) 0 0; padding: 0; display: grid; gap: var(--e3); }
 .sugestao { background: var(--surface-card); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e3); }
@@ -267,3 +315,18 @@
 .contatos-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e2); }
 .contato-item { display: grid; gap: var(--e1); border-left: 3px solid var(--borda-forte); padding: var(--e1) var(--e3); font-size: 13px; justify-items: start; }
 .contato-form { display: grid; gap: var(--e2); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e3); }
+
+/* Movimento reduzido (26/09/2026). Fica no FIM do arquivo e vale para todo
+   elemento, para cobrir também a transição e a animação que alguém criar
+   depois — uma regra por componente já deixou a coluna do kanban de fora.
+   A duração cai para quase zero em vez de `none` para que o estado final
+   continue sendo aplicado (o destaque da coluna-alvo ainda aparece, só que
+   sem esmaecer). O teste `movimento.test.ts` confere que ela segue aqui. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

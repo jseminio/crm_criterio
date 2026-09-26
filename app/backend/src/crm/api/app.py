@@ -19,7 +19,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from datetime import date
-from typing import Iterator, Literal
+from typing import Callable, Iterator, Literal
 
 import sqlalchemy as sa
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -27,6 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, sessionmaker
 
 from crm.api import esquemas as e
+from crm.api.abordagens import Servicos, roteador_de_abordagens, servicos_reais
 from crm.api.backup import roteador as roteador_de_backup
 from crm.api.contatos import roteador as roteador_de_contatos
 from crm.api.contatos import roteador_de_empresas
@@ -95,8 +96,12 @@ def obter_sessao() -> Iterator[Session]:
         sessao.close()
 
 
-def criar_app(fabrica: sessionmaker[Session] | None = None) -> FastAPI:
-    """Monta a aplicação. `fabrica` existe para o teste usar seu próprio banco."""
+def criar_app(
+    fabrica: sessionmaker[Session] | None = None,
+    servicos: Callable[[], Servicos] | None = None,
+) -> FastAPI:
+    """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
+    próprio banco e um agente falso, sem chave nem rede."""
 
     @asynccontextmanager
     async def ciclo_de_vida(_: FastAPI):
@@ -119,6 +124,9 @@ def criar_app(fabrica: sessionmaker[Session] | None = None) -> FastAPI:
     )
     _registrar(api)
     api.include_router(roteador_de_backup(lambda: _fabrica.kw["bind"]))
+    api.include_router(
+        roteador_de_abordagens(obter_sessao, lambda: _fabrica, servicos or servicos_reais)
+    )
     api.include_router(roteador_de_contatos(obter_sessao))
     api.include_router(roteador_de_empresas(obter_sessao))
     return api

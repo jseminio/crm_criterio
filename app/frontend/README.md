@@ -25,8 +25,10 @@ Abre em `http://localhost:5173`. O Vite encaminha `/api` para a API em
 
 Os tokens vêm do **PAD-002**, aprovado por Eduardo em 19/09/2026, e estão em
 `src/tokens.css`. As cores da marca são exatas do manual e **nunca
-reajustadas**. Se esta folha e o artefato do design system divergirem, vale o
-artefato — a nota do padrão é explícita nisso.
+reajustadas**. Desde 23/09/2026, quando o CRM se separou do vortexOS, **esta
+folha é a fonte da verdade**: se ela e o artefato do design system divergirem,
+vale a folha. A nota do PAD-002 no vault do vortexOS fica como registro da
+decisão e não é mais consultada.
 
 As regras do PAD-002 que aparecem no código:
 
@@ -40,6 +42,7 @@ As regras do PAD-002 que aparecem no código:
 | Números em `R$ 1.248.300,00` | `formato.ts` |
 | Logomarca sozinha | `.marca` — nada ao lado. Sem o arquivo oficial, o nome é composto, nunca redesenhado |
 | Sem emoji na interface | — |
+| Movimento reduzido respeitado (exigência do README do design system) | Regra global no fim de `app.css`: com `prefers-reduced-motion`, transições e animações caem para quase zero. `movimento.test.ts` confere que ela segue sendo a última do arquivo |
 
 **Vazio sem dados e vazio por filtro são telas diferentes**, de propósito. O
 primeiro se resolve cadastrando, o segundo limpando filtro. Dizer "nada

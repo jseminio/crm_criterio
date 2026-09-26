@@ -28,10 +28,11 @@ def ambiente_isolado(tmp_path, monkeypatch):
     enquanto não havia `.env` e quebraram no instante em que ele foi criado.
     Teste que depende do ambiente local não prova nada.
     """
+    from crm.agente.config import VARIAVEIS as DO_AGENTE
     from crm.db import sessao as modulo
 
     monkeypatch.setattr(modulo, "ARQUIVO_ENV", tmp_path / "sem-env")
-    for nome in (modulo.VARIAVEL, *modulo.PARTES.values()):
+    for nome in (modulo.VARIAVEL, *modulo.PARTES.values(), *DO_AGENTE.values()):
         monkeypatch.delenv(nome, raising=False)
 
 

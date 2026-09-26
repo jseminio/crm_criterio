@@ -1,6 +1,8 @@
 /** O acesso à API. Um lugar só, para o erro ter uma forma só. */
 
 import type {
+  AbordagemDetalhe,
+  AbordagemResumo,
   Agenda,
   EnderecoDeContato,
   EntidadeDeContato,
@@ -26,6 +28,7 @@ import type {
   OportunidadeDetalhe,
   OportunidadeResumo,
   Pagina,
+  ResumoDasAbordagens,
 } from "./tipos";
 
 export class ErroDaApi extends Error {
@@ -244,4 +247,38 @@ export const api = {
       method: "POST",
       body: JSON.stringify(dados),
     }),
+
+  abordagens: () => pedir<Pagina<AbordagemResumo>>("/api/abordagens"),
+
+  abordagem: (id: number) => pedir<AbordagemDetalhe>(`/api/abordagens/${id}`),
+
+  resumoDasAbordagens: (mes: string) =>
+    pedir<ResumoDasAbordagens>(comParametros("/api/abordagens/resumo", { mes })),
+
+  editarAbordagem: (id: number, mudancas: Record<string, unknown>) =>
+    pedir<AbordagemDetalhe>(`/api/abordagens/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(mudancas),
+    }),
+
+  prepararAbordagem: (id: number) =>
+    pedir<AbordagemDetalhe>(`/api/abordagens/${id}/preparar`, { method: "POST" }),
+
+  pedirOutraVersao: (id: number, instrucao: string) =>
+    pedir<AbordagemDetalhe>(`/api/abordagens/${id}/nova-versao`, {
+      method: "POST",
+      body: JSON.stringify({ instrucao }),
+    }),
+
+  aprovarAbordagem: (id: number) =>
+    pedir<AbordagemDetalhe>(`/api/abordagens/${id}/aprovar`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+
+  marcarAbordagemEnviada: (id: number) =>
+    pedir<AbordagemDetalhe>(`/api/abordagens/${id}/marcar-enviada`, { method: "POST" }),
+
+  descartarAbordagem: (id: number) =>
+    pedir<AbordagemDetalhe>(`/api/abordagens/${id}/descartar`, { method: "POST" }),
 };

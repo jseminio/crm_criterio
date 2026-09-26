@@ -95,11 +95,11 @@ describe("Carteira", () => {
   it("traz a legenda do eixo de ação, com os cinco eixos e o que cada um significa", async () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
     render(<Carteira />);
-    const legenda = (await screen.findByText("Legenda do eixo de ação")).closest("details")!;
+    const legenda = (await screen.findByText(/Legenda do eixo de ação/)).closest("details")!;
     for (const nome of ["Cobrança — sem tratamento preferencial", "Reter já (crítico)", "Reter / vigiar", "Saída organizada", "Sem urgência de churn"])
       expect(legenda).toHaveTextContent(nome);
     expect(legenda).toHaveTextContent(/Adimplência ≤ 2/);
-    expect(legenda).toHaveTextContent(/vale o primeiro eixo que se aplica/);
+    expect(legenda).toHaveTextContent(/vale o primeiro que se aplica/);
   });
 
   it("marca o grupo sem contrato ativo", async () => {

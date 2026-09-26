@@ -161,19 +161,6 @@ export function Carteira() {
         </label>
       </div>
 
-      <details className="carteira-legenda-eixos" open>
-        <summary>Legenda do eixo de ação</summary>
-        <p className="numero-nota">Ordem de precedência: vale o primeiro eixo que se aplica ao grupo.</p>
-        <ol>
-          {LEGENDA_DOS_EIXOS.map((e) => (
-            <li key={e.nome}>
-              <strong>{e.nome}</strong>
-              <span>{e.quando}</span>
-              <span>{e.significa}</span>
-            </li>
-          ))}
-        </ol>
-      </details>
 
       {itens.length === 0 ? (
         <VazioPorFiltro aoLimpar={() => definirEixo("")} />
@@ -238,6 +225,16 @@ export function Carteira() {
         ▸ grupo (consolidado) · + mostra as empresas do grupo · • empresa (CNPJ) · classe efetiva = letra + semáforo · ⚠ risco de churn em A/B · ⚑ saída a organizar em C ·
         $$$ adimplência ≤ 2 trava a classe, sem rebaixar
       </p>
+      <details className="carteira-legenda-eixos" open>
+        <summary>Legenda do eixo de ação (vale o primeiro que se aplica)</summary>
+        <ol>
+          {LEGENDA_DOS_EIXOS.map((e) => (
+            <li key={e.nome}>
+              <strong>{e.nome}:</strong> {e.quando} {e.significa}
+            </li>
+          ))}
+        </ol>
+      </details>
       <ul className="carteira-notas" aria-label="Observações sobre estes números">
         {dados.avisos.map((a) => <li key={a}>{a}</li>)}
       </ul>

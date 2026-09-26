@@ -372,13 +372,10 @@
 .carteira-mais-vazio { display: inline-block; width: 22px; margin-right: var(--e2); }
 .carteira .tabela .carteira-empresa td { padding-left: calc(var(--e3) + 30px); color: var(--isc-cinza-2); font-size: 12px; background: var(--isc-painel); }
 .carteira .tabela .carteira-empresa td + td { padding-left: var(--e3); }
-.carteira-legenda-eixos { background: var(--isc-painel); border-radius: var(--raio-md); padding: var(--e3) var(--e5); font-size: 12.5px; }
-.carteira-legenda-eixos summary { cursor: pointer; font-weight: 700; color: var(--isc-marino); }
-.carteira-legenda-eixos ol { margin: var(--e2) 0 0; padding: 0; list-style: none; display: grid; gap: var(--e2); }
-.carteira-legenda-eixos li { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 1.2fr) minmax(0, 2fr); gap: var(--e3);
-  border-top: 1px solid var(--isc-linha); padding-top: var(--e2); }
-.carteira-legenda-eixos strong { color: var(--isc-marino); }
-@media (max-width: 800px) { .carteira-legenda-eixos li { grid-template-columns: 1fr; gap: var(--e1); } }
+.carteira-legenda-eixos { font-size: 11px; color: var(--isc-cinza-2); }
+.carteira-legenda-eixos summary { cursor: pointer; font-weight: 700; color: var(--isc-cinza); }
+.carteira-legenda-eixos ol { margin: var(--e1) 0 0; padding: 0 0 0 var(--e4); display: grid; gap: 2px; }
+.carteira-legenda-eixos strong { color: var(--isc-cinza); }
 .carteira-classe { font-weight: 700; color: var(--isc-marino); }
 .carteira-legenda { font-size: 11px; color: var(--isc-cinza-2); margin: 0; }
 .isc-como { background: var(--isc-painel); border-radius: var(--raio-md); padding: var(--e3) var(--e5); font-size: 12.5px; }

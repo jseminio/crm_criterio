@@ -171,6 +171,8 @@ describe("arrasto no kanban", () => {
       porte: null,
       porte_definido_por: null,
       porte_definido_em: null,
+      origem_da_volumetria: {},
+      historico_de_preco: [],
       sugestao_de_porte: { calculavel: false, pontuacao: null, porte: null, horas_base: null, direcionadores_aplicados: 0 },
     });
     await abrir([

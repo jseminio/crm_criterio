@@ -32,6 +32,7 @@ from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, fundir_grupos
 from crm.db.modelos import (
     Contrato,
+    HistoricoDePreco,
     ExecucaoDeCarga,
     GrupoEconomico,
     Lead,
@@ -42,8 +43,10 @@ from crm.db.sessao import criar_engine, criar_fabrica_de_sessao, url_do_banco
 from crm.domain import indicadores as regras_de_indicadores
 from crm.domain.sugestoes_de_fusao import sugerir as sugerir_fusoes
 from crm.domain import recortes as regras_de_recortes
+from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
 from crm.domain.listas import (
+    ORIGEM_DA_MUDANCA_NO_CRM,
     LinhaServico,
     MotivoRecusa,
     Origem,
@@ -585,6 +588,11 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(404, "oportunidade não encontrada")
 
         mudancas = corpo.model_dump(exclude_unset=True)
+        # Estes dois não são colunas da oportunidade que se copiam por `setattr`:
+        # o motivo vai para a linha do histórico, e a origem tem validação própria.
+        motivo_do_preco = mudancas.pop("motivo_do_preco", None)
+        origem_da_volumetria = mudancas.pop("origem_da_volumetria", None)
+        preco_antes = (oportunidade.preco_mensal, oportunidade.preco_anual)
 
         # Lembra o que foi mudado AQUI e a planilha também controla, para a
         # recarga não desfazer. Só conta o que de fato mudou de valor: abrir o
@@ -601,6 +609,37 @@ def _registrar(api: FastAPI) -> None:
 
         for campo, valor in mudancas.items():
             setattr(oportunidade, campo, valor)
+        # Histórico de preço: só quando o valor mudou de fato (a tela manda o
+        # rascunho inteiro a cada salvar). Guarda antes e depois; nada é apagado.
+        preco_depois = (oportunidade.preco_mensal, oportunidade.preco_anual)
+        if preco_depois != preco_antes:
+            sessao.add(
+                HistoricoDePreco(
+                    oportunidade_id=oportunidade.id,
+                    origem=ORIGEM_DA_MUDANCA_NO_CRM,
+                    motivo=(motivo_do_preco or "").strip() or None,
+                    preco_mensal_anterior=preco_antes[0],
+                    preco_mensal_novo=preco_depois[0],
+                    preco_anual_anterior=preco_antes[1],
+                    preco_anual_novo=preco_depois[1],
+                )
+            )
+
+        # Origem da volumetria: só para direcionador da régua e só para campo
+        # preenchido. A origem de um campo que voltou a ficar vazio é descartada.
+        campos_validos = {d.campo for d in DIRECIONADORES_DA_VOLUMETRIA}
+        if origem_da_volumetria is not None:
+            invalidos = sorted(set(origem_da_volumetria) - campos_validos)
+            if invalidos:
+                raise HTTPException(422, f"origem só vale para direcionadores da volumetria: {', '.join(invalidos)}")
+            oportunidade.origem_da_volumetria = {k: v.value for k, v in origem_da_volumetria.items()}
+        if origem_da_volumetria is not None or any(c in mudancas for c in campos_validos):
+            oportunidade.origem_da_volumetria = {
+                k: v
+                for k, v in (oportunidade.origem_da_volumetria or {}).items()
+                if getattr(oportunidade, k, None) is not None
+            }
+
         if editados:
             # Nova lista, não mutação: o SQLAlchemy não enxerga alteração no
             # lugar de um valor JSON.

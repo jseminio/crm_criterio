@@ -36,6 +36,26 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Histórico de preço e origem da volumetria (E4, 25/09/2026)
+
+**Histórico de preço.** Cada mudança de `preco_mensal` ou `preco_anual` grava uma linha em
+`historico_de_preco`: valor **antes** e **depois**, quando (relógio do servidor), de onde veio
+(`CRM` ou `Recarga da planilha`) e o motivo, se alguém disse ("reajuste anual"). Reajustar
+**não apaga** o preço anterior. A tela pede o motivo só quando o preço muda, e o detalhe da
+oportunidade mostra o histórico, do mais recente para o mais antigo.
+
+- A linha só nasce quando o valor **muda de fato**; salvar o painel sem mexer no preço não cria nada.
+- É **imutável** (não herda o carimbo de alteração) e a API não tem rota para editá-la.
+- Ainda não registra **quem** mudou: não há login. Entra com o E1.
+
+**Origem da volumetria.** Cada um dos nove direcionadores da régua de porte pode dizer se
+veio da **entrevista** ou do **questionário** (`origem_da_volumetria`, um mapa por
+oportunidade). Só vale para campo preenchido: a origem de um campo que voltou a ficar vazio é
+descartada pelo servidor, e a API recusa origem de campo que não seja direcionador (422).
+
+**Ainda fora:** a *lista do que falta para a proposta, com responsável e prazo* e a *geração do
+documento* — a primeira depende de definir os itens, a segunda do modelo oficial e do formato.
+
 ## Endereço da empresa
 
 A tabela `empresa` ganhou, em 25/09/2026, `logradouro`, `numero`, `complemento`,

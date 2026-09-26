@@ -36,6 +36,29 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Contatos: clientes e prospects segregados (26/09/2026)
+
+Menu **Contatos** (`crm/api/contatos.py`, `crm/domain/contatos.py`). Duas abas, **Clientes** e
+**Prospects**, e dois modos de busca:
+
+- **Empresa:** razão social, CNPJ (com ou sem pontuação) ou nome do grupo. Cliente = uma linha por
+  empresa (CNPJ), com a mensalidade; prospect = o grupo (ou a empresa, quando já existe), com as propostas.
+- **Pessoa:** nome, cargo, e-mail ou telefone.
+- A busca **não depende de acento nem de caixa** ("acao" acha "Ação"), feita em Python porque o
+  PostgreSQL não faz isso sem extensão e a base é pequena.
+- **Lacunas** = o que falta dos sete itens da planilha de lacunas (contato, e-mail, telefone,
+  logradouro, município, UF, CEP). Vários contatos se completam: sem lacuna de e-mail se *algum* tem.
+  Filtro "só com lacunas".
+- O painel da empresa cadastra e edita **contatos** (e-mail validado, papel, *não contatar* com a data)
+  e o **endereço** (UF e CEP validados; CNPJ com dígito verificador e sem repetir). Contato pode ser da
+  empresa ou **só do grupo** (aparece em todas as empresas dele, marcado "do grupo"). Prospect sem empresa
+  ganha uma com "Cadastrar empresa", porque é nela que o endereço mora.
+- `GET /api/contatos/empresas`, `GET /api/contatos/pessoas`, `POST/PATCH /api/contatos/pessoas`,
+  `PATCH /api/empresas/{id}`, `POST /api/grupos/{id}/empresas`.
+
+**Ainda fora:** duplicar contato entre empresas, importação de contatos em lote pela tela (segue pela
+planilha), e as listas de campanha que **respeitam** o *não contatar* (o campo já é gravado).
+
 ## Carga da carteira anterior ao CRM (26/09/2026)
 
 A carteira que já existia antes do CRM vem da planilha de saúde da carteira
@@ -62,6 +85,12 @@ cd backend
   vira conflito no relatório. Tudo ou nada, com backup antes.
 - Ensaio de 26/09/2026: 58 empresas, 58 contratos, 31 grupos (7 reaproveitados, 24 novos), R$ 227.462,65
   por mês, nenhum erro (58 CNPJs válidos). 14 escopos "verificar contrato" ficam em branco.
+
+**Reconciliação dos totais (26/09/2026).** O R$ 226.341 oficial é a linha TOTAL da aba de
+Faturamento e bate com a soma das 31 unidades da aba "Margem por Grupo". O CRM (aba "4. Clientes", por
+empresa) difere em **+R$ 1.121,45**, e toda a diferença vem de **4 unidades** (duas a mais, duas a
+menos), cuja decisão de qual valor vale é de Eduardo. O ticket médio de 23/09 (R$ 229.641,20) é o oficial
+mais R$ 3.300 de uma delas. Nada foi alterado no banco por causa disso.
 
 **Três totais que não são o mesmo número:** R$ 227.462,65 (soma das empresas na aba "4. Clientes"),
 R$ 229.641,20 (31 unidades, ticket médio de 23/09, com o grupo Blac pela aba "Margem por Grupo") e

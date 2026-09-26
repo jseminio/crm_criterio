@@ -2,7 +2,7 @@
  * "números em R$ 1.248.300,00" e "estado nunca só por cor". */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { data, dataHora, dinheiro, dinheiroCurto, prazo } from "./formato";
+import { cnpj, data, dataHora, dinheiro, dinheiroCurto, prazo } from "./formato";
 
 describe("dinheiro", () => {
   // Intl.NumberFormat("pt-BR") insere um espaço fino sem quebra (\u00a0)
@@ -111,5 +111,15 @@ describe("dataHora", () => {
 
   it("mostra travessão para data inválida em vez de 'Invalid Date'", () => {
     expect(dataHora("isto não é uma data")).toBe("—");
+  });
+});
+
+
+describe("cnpj", () => {
+  it("põe a pontuação nos 14 dígitos", () => expect(cnpj("11222333000181")).toBe("11.222.333/0001-81"));
+  it("aceita já pontuado", () => expect(cnpj("11.222.333/0001-81")).toBe("11.222.333/0001-81"));
+  it("vazio vira traço e valor estranho é devolvido como veio", () => {
+    expect(cnpj(null)).toBe("—");
+    expect(cnpj("123")).toBe("123");
   });
 });

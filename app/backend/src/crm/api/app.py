@@ -27,6 +27,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from crm.api import esquemas as e
 from crm.api.backup import roteador as roteador_de_backup
+from crm.api.contatos import roteador as roteador_de_contatos
+from crm.api.contatos import roteador_de_empresas
 from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
 from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, fundir_grupos
@@ -56,6 +58,7 @@ from crm.domain.listas import (
     MotivoDeEncerramento,
     MotivoRecusa,
     Origem,
+    PapelContato,
     Situacao,
     SituacaoContrato,
     SituacaoGrupo,
@@ -113,6 +116,8 @@ def criar_app(fabrica: sessionmaker[Session] | None = None) -> FastAPI:
     )
     _registrar(api)
     api.include_router(roteador_de_backup(lambda: _fabrica.kw["bind"]))
+    api.include_router(roteador_de_contatos(obter_sessao))
+    api.include_router(roteador_de_empresas(obter_sessao))
     return api
 
 
@@ -193,6 +198,7 @@ def _registrar(api: FastAPI) -> None:
             motivos_de_recusa=_valores(MotivoRecusa),
             motivos_de_encerramento=_valores(MotivoDeEncerramento),
             iniciativas_de_encerramento=_valores(IniciativaDoEncerramento),
+            papeis_de_contato=_valores(PapelContato),
             linhas_de_servico=_valores(LinhaServico),
             situacoes_de_grupo=_valores(SituacaoGrupo),
             captadores=sorted(_CAPTADORES),

@@ -136,6 +136,7 @@ export interface Listas {
   motivos_de_recusa: string[];
   motivos_de_encerramento: string[];
   iniciativas_de_encerramento: string[];
+  papeis_de_contato: string[];
   linhas_de_servico: string[];
   situacoes_de_grupo: string[];
   captadores: string[];
@@ -398,4 +399,61 @@ export interface Mrr {
   contratos_da_carteira_anterior: number;
   cobertura_completa: boolean;
   aviso: string;
+}
+
+export type TipoDeContato = "cliente" | "prospect";
+
+export interface PessoaDeContato {
+  id: number;
+  nome: string;
+  cargo: string | null;
+  email: string | null;
+  telefone: string | null;
+  papel: string | null;
+  observacao: string | null;
+  nao_contatar: boolean;
+  empresa_id: number | null;
+  grupo_id: number | null;
+  /** Ligada só ao grupo, não a esta empresa. */
+  do_grupo: boolean;
+}
+
+export interface EnderecoDeContato {
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  municipio: string | null;
+  uf: string | null;
+  cep: string | null;
+}
+
+/** Cliente: uma empresa (CNPJ). Prospect: o grupo, ou a empresa quando já existe. */
+export interface EntidadeDeContato {
+  tipo: TipoDeContato;
+  grupo_id: number;
+  grupo_nome: string;
+  empresa_id: number | null;
+  razao_social: string | null;
+  nome_fantasia: string | null;
+  cnpj: string | null;
+  endereco: EnderecoDeContato;
+  /** Só cliente. */
+  mensalidade: string | null;
+  /** Só prospect. */
+  propostas: number;
+  contatos: PessoaDeContato[];
+  /** Dos sete itens (contato, e-mail, telefone, logradouro, município, UF, CEP), o que falta. */
+  lacunas: string[];
+}
+
+export interface PessoaComOrigem extends PessoaDeContato {
+  tipo: TipoDeContato;
+  grupo_nome: string;
+  razao_social: string | null;
+}
+
+export interface PaginaDeContatos<T> {
+  total: number;
+  itens: T[];
 }

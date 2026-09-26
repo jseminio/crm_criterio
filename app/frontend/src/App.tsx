@@ -7,6 +7,7 @@ import { api } from "./api/cliente";
 import type { Listas } from "./api/tipos";
 import { Agenda } from "./telas/Agenda";
 import { Conferencia } from "./telas/Conferencia";
+import { Contatos } from "./telas/Contatos";
 import { Configuracoes } from "./telas/Configuracoes";
 import { Contratos } from "./telas/Contratos";
 import { Funil } from "./telas/Funil";
@@ -15,7 +16,7 @@ import { Leads } from "./telas/Leads";
 import { Lista } from "./telas/Lista";
 import { usarDados } from "./usarDados";
 
-type Tela = "agenda" | "funil" | "lista" | "leads" | "grupos" | "contratos" | "conferencia" | "configuracoes";
+type Tela = "agenda" | "contatos" | "funil" | "lista" | "leads" | "grupos" | "contratos" | "conferencia" | "configuracoes";
 
 const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[] = [
   {
@@ -23,6 +24,12 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     rotulo: "Agenda",
     titulo: "Agenda de follow-up",
     descricao: "O que pede uma próxima ação agora, por urgência.",
+  },
+  {
+    chave: "contatos",
+    rotulo: "Contatos",
+    titulo: "Contatos",
+    descricao: "Quem falar em cada empresa: clientes e prospects separados.",
   },
   {
     chave: "funil",
@@ -115,6 +122,7 @@ export default function App() {
               aoAbrirLeads={() => definirTela("leads")}
               aoAbrirContratos={() => definirTela("contratos")}
             />}
+          {tela === "contatos" && <Contatos listas={listas} />}
           {tela === "funil" && <Funil listas={listas} />}
           {tela === "lista" && <Lista listas={listas} />}
           {tela === "leads" && <Leads listas={listas} />}

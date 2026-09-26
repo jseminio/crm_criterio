@@ -262,3 +262,8 @@
 .receita { margin-bottom: var(--e4); display: grid; gap: var(--e3); }
 .receita-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--e4); flex-wrap: wrap; }
 .receita-retencao p { margin: 0 0 var(--e1); }
+
+/* Contatos */
+.contatos-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e2); }
+.contato-item { display: grid; gap: var(--e1); border-left: 3px solid var(--borda-forte); padding: var(--e1) var(--e3); font-size: 13px; justify-items: start; }
+.contato-form { display: grid; gap: var(--e2); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e3); }

@@ -643,6 +643,7 @@ class Listas(BaseModel):
     motivos_de_recusa: list[str]
     motivos_de_encerramento: list[str]
     iniciativas_de_encerramento: list[str]
+    papeis_de_contato: list[str]
     linhas_de_servico: list[str]
     situacoes_de_grupo: list[str]
     captadores: list[str]

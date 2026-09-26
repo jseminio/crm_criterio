@@ -28,6 +28,7 @@ const LISTAS: Listas = {
   motivos_de_recusa: ["Preço", "Concorrência"],
   motivos_de_encerramento: [],
   iniciativas_de_encerramento: [],
+  papeis_de_contato: [],
   linhas_de_servico: [],
   situacoes_de_grupo: [],
   captadores: [],

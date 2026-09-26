@@ -2,6 +2,12 @@
 
 import type {
   Agenda,
+  EnderecoDeContato,
+  EntidadeDeContato,
+  PaginaDeContatos,
+  PessoaComOrigem,
+  PessoaDeContato,
+  TipoDeContato,
   Mrr,
   CenariosDeTicket,
   ColunaDoFunil,
@@ -116,6 +122,29 @@ export const api = {
       arquivo,
       substituir ? { "X-Confirmacao": "SUBSTITUIR" } : {},
     ),
+
+  contatosPorEmpresa: (tipo: TipoDeContato, busca: string, soComLacunas: boolean) =>
+    pedir<PaginaDeContatos<EntidadeDeContato>>(
+      comParametros("/api/contatos/empresas", { tipo, busca, so_com_lacunas: soComLacunas || undefined, limite: 200 }),
+    ),
+
+  contatosPorPessoa: (tipo: TipoDeContato, busca: string) =>
+    pedir<PaginaDeContatos<PessoaComOrigem>>(comParametros("/api/contatos/pessoas", { tipo, busca, limite: 200 })),
+
+  criarContato: (dados: Record<string, unknown>) =>
+    pedir<PessoaDeContato>("/api/contatos/pessoas", { method: "POST", body: JSON.stringify(dados) }),
+
+  editarContato: (id: number, mudancas: Record<string, unknown>) =>
+    pedir<PessoaDeContato>(`/api/contatos/pessoas/${id}`, { method: "PATCH", body: JSON.stringify(mudancas) }),
+
+  editarEmpresa: (id: number, mudancas: Record<string, unknown>) =>
+    pedir<EnderecoDeContato>(`/api/empresas/${id}`, { method: "PATCH", body: JSON.stringify(mudancas) }),
+
+  criarEmpresaDoGrupo: (grupoId: number, dados: Record<string, unknown> = {}) =>
+    pedir<{ id: number; razao_social: string; cnpj: string | null }>(`/api/grupos/${grupoId}/empresas`, {
+      method: "POST",
+      body: JSON.stringify(dados),
+    }),
 
   mrr: (de?: string) => pedir<Mrr>(comParametros("/api/mrr", { de })),
 

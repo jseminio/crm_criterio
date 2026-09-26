@@ -177,6 +177,30 @@ class TipoDeEventoDeContrato(Enum):
     ENCERRAMENTO = "Encerramento"
 
 
+class MotivoDeEncerramento(Enum):
+    """Por que um contrato foi encerrado — insumo da análise de saída (churn).
+
+    ⚠️ **Proposta, ainda não aprovada por Eduardo.** Nenhum documento do projeto traz uma
+    lista de motivos de saída; esta parte da lista de motivos de recusa que já existe
+    (Preço, Concorrência, Internalizou, Escopo, Outro) e do conceito de "saída organizada"
+    do modelo de classificação da carteira (classe C). Guardada como texto legível, não
+    como tipo nativo do banco, para poder mudar com um `UPDATE` quando for aprovada.
+
+    A lista responde *por que saiu*, não *quem decidiu*. Se a análise precisar separar saída
+    por iniciativa do cliente de saída por iniciativa da Critério, isso vira um segundo campo.
+    """
+
+    PRECO = "Preço"
+    INSATISFACAO = "Insatisfação com o serviço"
+    CONCORRENCIA = "Migrou para concorrente"
+    INTERNALIZOU = "Internalizou a operação"
+    EMPRESA_ENCERROU = "Empresa encerrada, vendida ou reestruturada"
+    INADIMPLENCIA = "Inadimplência"
+    SAIDA_ORGANIZADA = "Saída organizada pela Critério"
+    NAO_PRECISA_MAIS = "Não precisa mais do serviço"
+    OUTRO = "Outro"
+
+
 class OrigemDoDado(Enum):
     """De onde veio um dado da ficha de volumetria — E4.
 

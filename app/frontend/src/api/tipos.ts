@@ -134,6 +134,7 @@ export interface Listas {
   tipos_de_canal: string[];
   tipos_de_canal_em_operacao: string[];
   motivos_de_recusa: string[];
+  motivos_de_encerramento: string[];
   linhas_de_servico: string[];
   situacoes_de_grupo: string[];
   captadores: string[];
@@ -268,6 +269,8 @@ export interface EventoDeContrato {
   data_do_evento: string;
   registrado_em: string;
   descricao: string | null;
+  /** Só no Encerramento. */
+  motivo_categoria: string | null;
   preco_mensal_anterior: string | null;
   preco_mensal_novo: string | null;
   preco_anual_anterior: string | null;

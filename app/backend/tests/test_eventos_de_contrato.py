@@ -9,6 +9,7 @@ from decimal import Decimal as D
 import pytest
 
 from crm.domain.eventos_de_contrato import ErroDeEvento, Pedido, efeito_do_evento
+from crm.domain.listas import MotivoDeEncerramento as M
 from crm.domain.listas import SituacaoContrato as S
 from crm.domain.listas import TipoDeEventoDeContrato as T
 
@@ -103,8 +104,19 @@ class TestAditivoRenovacaoEncerramento:
         with pytest.raises(ErroDeEvento):
             efeito_do_evento(C(data_fim=None), pedido(T.RENOVACAO, data_fim_nova=HOJE))
 
-    def test_encerramento_exige_motivo_e_fecha_o_contrato(self):
-        with pytest.raises(ErroDeEvento, match="motivo"):
+    def test_encerramento_exige_a_categoria_do_motivo(self):
+        with pytest.raises(ErroDeEvento, match="categoria do motivo"):
             efeito_do_evento(C(), pedido(T.ENCERRAMENTO))
-        e = efeito_do_evento(C(), pedido(T.ENCERRAMENTO, descricao="cliente migrou de contador"))
+        with pytest.raises(ErroDeEvento, match="categoria do motivo"):
+            efeito_do_evento(C(), pedido(T.ENCERRAMENTO, descricao="só texto, sem categoria"))
+
+    def test_encerramento_com_categoria_fecha_o_contrato_sem_exigir_texto(self):
+        e = efeito_do_evento(C(), pedido(T.ENCERRAMENTO, motivo_categoria=M.PRECO))
         assert e == {"situacao": S.ENCERRADO, "data_fim": HOJE}
+
+    def test_categoria_outro_exige_texto(self):
+        with pytest.raises(ErroDeEvento, match="Outro"):
+            efeito_do_evento(C(), pedido(T.ENCERRAMENTO, motivo_categoria=M.OUTRO))
+        with pytest.raises(ErroDeEvento, match="Outro"):
+            efeito_do_evento(C(), pedido(T.ENCERRAMENTO, motivo_categoria=M.OUTRO, descricao="  "))
+        assert efeito_do_evento(C(), pedido(T.ENCERRAMENTO, motivo_categoria=M.OUTRO, descricao="fusão com outra empresa"))

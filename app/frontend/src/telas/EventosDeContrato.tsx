@@ -38,9 +38,12 @@ function Efeito({ e }: { e: EventoDeContrato }) {
 export function EventosDeContrato({
   contrato,
   aoRegistrar,
+  motivos = [],
 }: {
   contrato: ContratoDetalhe;
   aoRegistrar: (atualizado: ContratoDetalhe) => void;
+  /** A lista de categorias de motivo de encerramento, vinda de `/api/listas`. */
+  motivos?: string[];
 }) {
   const assinado = contrato.situacao === "Ativo" || contrato.situacao === "Suspenso";
   const [tipo, definirTipo] = useState<Tipo>("Reajuste");
@@ -55,8 +58,12 @@ export function EventosDeContrato({
   };
   const ajuda = TIPOS.find((t) => t.valor === tipo)!.ajuda;
   const pedeMotivo = tipo === "Encerramento";
-  const pedeDescricao = tipo === "Aditivo" || pedeMotivo;
+  const categoriaOutro = pedeMotivo && campos.motivo_categoria === "Outro";
+  // Aditivo sempre descreve; no encerramento o texto só é obrigatório quando a
+  // categoria é "Outro" — nas demais, a categoria já diz o porquê.
+  const pedeDescricao = tipo === "Aditivo" || categoriaOutro;
   const faltaDado =
+    (pedeMotivo && !campos.motivo_categoria) ||
     (pedeDescricao && (campos.descricao ?? "").trim().length < 3) ||
     (tipo === "Renovação" && !campos.data_fim_nova) ||
     (["Reajuste", "Expansão", "Contração"].includes(tipo) && !campos.preco_mensal_novo && !campos.preco_anual_novo);
@@ -66,7 +73,7 @@ export function EventosDeContrato({
     definirErro(null);
     try {
       const corpo: Record<string, unknown> = { tipo, data_do_evento: campos.data_do_evento || null };
-      for (const k of ["descricao", "escopo_novo", "preco_mensal_novo", "preco_anual_novo", "data_fim_nova"]) {
+      for (const k of ["descricao", "motivo_categoria", "escopo_novo", "preco_mensal_novo", "preco_anual_novo", "data_fim_nova"]) {
         if (campos[k]) corpo[k] = campos[k];
       }
       const atualizado = await api.registrarEventoDeContrato(contrato.id, corpo);
@@ -96,7 +103,8 @@ export function EventosDeContrato({
                 <span className="numero-nota"> · registrado em {dataHora(ev.registrado_em)}</span>
               </div>
               <div className="numero-nota"><Efeito e={ev} /></div>
-              {ev.descricao && <div>{ev.tipo === "Encerramento" ? "Motivo: " : ""}{ev.descricao}</div>}
+              {ev.motivo_categoria && <div>Motivo: <strong>{ev.motivo_categoria}</strong></div>}
+              {ev.descricao && <div>{ev.descricao}</div>}
             </li>
           ))}
         </ul>
@@ -151,9 +159,20 @@ export function EventosDeContrato({
             </div>
           )}
 
+          {pedeMotivo && (
+            <div className="campo-bloco">
+              <label className="campo-rotulo" htmlFor="ev-categoria">Motivo do encerramento</label>
+              <select id="ev-categoria" className="selecao" value={campos.motivo_categoria ?? ""} onChange={(e) => mudar("motivo_categoria", e.target.value)}>
+                <option value="">Escolha a categoria</option>
+                {motivos.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <p className="campo-ajuda">Alimenta a análise de saída (churn). A lista é uma proposta, ainda a aprovar.</p>
+            </div>
+          )}
+
           <div className="campo-bloco">
             <label className="campo-rotulo" htmlFor="ev-desc">
-              {pedeMotivo ? "Motivo do encerramento" : pedeDescricao ? "O que foi aditado" : "Motivo (opcional)"}
+              {pedeMotivo ? (categoriaOutro ? "Descreva o motivo" : "Detalhe (opcional)") : pedeDescricao ? "O que foi aditado" : "Motivo (opcional)"}
             </label>
             <input id="ev-desc" className="entrada" maxLength={500} value={campos.descricao ?? ""} onChange={(e) => mudar("descricao", e.target.value)} placeholder={pedeMotivo ? "ex.: o cliente migrou de contador" : "ex.: reajuste anual pelo IPCA"} />
           </div>

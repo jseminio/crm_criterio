@@ -37,7 +37,7 @@ describe("EventosDeContrato", () => {
         contrato={contrato({
           eventos: [{
             id: 1, tipo: "Reajuste", data_do_evento: "2026-09-01", registrado_em: "2026-09-25T15:00:00+00:00",
-            descricao: "IPCA", preco_mensal_anterior: "1000.00", preco_mensal_novo: "1100.00",
+            descricao: "IPCA", motivo_categoria: null, preco_mensal_anterior: "1000.00", preco_mensal_novo: "1100.00",
             preco_anual_anterior: null, preco_anual_novo: null, escopo_anterior: null, escopo_novo: null,
             data_fim_anterior: null, data_fim_nova: null,
           }],
@@ -63,12 +63,52 @@ describe("EventosDeContrato", () => {
     await waitFor(() => expect(aoRegistrar).toHaveBeenCalled());
   });
 
-  it("encerramento exige o motivo antes de liberar", async () => {
-    render(<EventosDeContrato contrato={contrato()} aoRegistrar={vi.fn()} />);
+  const MOTIVOS = ["Preço", "Migrou para concorrente", "Outro"];
+
+  it("encerramento exige a categoria do motivo antes de liberar", async () => {
+    render(<EventosDeContrato contrato={contrato()} aoRegistrar={vi.fn()} motivos={MOTIVOS} />);
     await userEvent.selectOptions(screen.getByLabelText("Registrar evento"), "Encerramento");
     expect(screen.getByRole("button", { name: /registrar encerramento/i })).toBeDisabled();
-    await userEvent.type(screen.getByLabelText("Motivo do encerramento"), "migrou de contador");
+    await userEvent.selectOptions(screen.getByLabelText("Motivo do encerramento"), "Preço");
     expect(screen.getByRole("button", { name: /registrar encerramento/i })).toBeEnabled();
+  });
+
+  it("a categoria 'Outro' exige texto; as demais, não", async () => {
+    render(<EventosDeContrato contrato={contrato()} aoRegistrar={vi.fn()} motivos={MOTIVOS} />);
+    await userEvent.selectOptions(screen.getByLabelText("Registrar evento"), "Encerramento");
+    await userEvent.selectOptions(screen.getByLabelText("Motivo do encerramento"), "Outro");
+    expect(screen.getByRole("button", { name: /registrar encerramento/i })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("Descreva o motivo"), "fusão com outra empresa");
+    expect(screen.getByRole("button", { name: /registrar encerramento/i })).toBeEnabled();
+  });
+
+  it("envia a categoria junto do encerramento", async () => {
+    vi.mocked(api.registrarEventoDeContrato).mockResolvedValue(contrato({ situacao: "Encerrado" }));
+    render(<EventosDeContrato contrato={contrato()} aoRegistrar={vi.fn()} motivos={MOTIVOS} />);
+    await userEvent.selectOptions(screen.getByLabelText("Registrar evento"), "Encerramento");
+    await userEvent.selectOptions(screen.getByLabelText("Motivo do encerramento"), "Migrou para concorrente");
+    await userEvent.click(screen.getByRole("button", { name: /registrar encerramento/i }));
+    await userEvent.click(screen.getByRole("button", { name: /confirmar encerramento/i }));
+    await waitFor(() => expect(api.registrarEventoDeContrato).toHaveBeenCalledWith(7, { tipo: "Encerramento", data_do_evento: null, motivo_categoria: "Migrou para concorrente" }));
+  });
+
+  it("o histórico mostra a categoria do motivo do encerramento", () => {
+    render(
+      <EventosDeContrato
+        aoRegistrar={vi.fn()}
+        contrato={contrato({
+          situacao: "Encerrado",
+          eventos: [{
+            id: 2, tipo: "Encerramento", data_do_evento: "2026-09-20", registrado_em: "2026-09-25T15:00:00+00:00",
+            descricao: "foi para outro escritório", motivo_categoria: "Migrou para concorrente",
+            preco_mensal_anterior: null, preco_mensal_novo: null, preco_anual_anterior: null, preco_anual_novo: null,
+            escopo_anterior: null, escopo_novo: null, data_fim_anterior: "2027-03-01", data_fim_nova: "2026-09-20",
+          }],
+        })}
+      />,
+    );
+    expect(screen.getByText("Migrou para concorrente")).toBeInTheDocument();
+    expect(screen.getByText("foi para outro escritório")).toBeInTheDocument();
   });
 
   it("renovação pede a nova data de fim", async () => {

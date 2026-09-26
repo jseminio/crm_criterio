@@ -26,6 +26,7 @@ const LISTAS: Listas = {
   tipos_de_canal: [],
   tipos_de_canal_em_operacao: [],
   motivos_de_recusa: ["Preço", "Concorrência"],
+  motivos_de_encerramento: [],
   linhas_de_servico: [],
   situacoes_de_grupo: [],
   captadores: [],

@@ -18,10 +18,12 @@ const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "En
 
 function EdicaoDeContrato({
   contrato,
+  motivos,
   aoFechar,
   aoSalvar,
 }: {
   contrato: ContratoResumo;
+  motivos: string[];
   aoFechar: () => void;
   aoSalvar: () => void;
 }) {
@@ -224,7 +226,7 @@ function EdicaoDeContrato({
         </div>
       </div>
 
-      {detalhe && <EventosDeContrato contrato={detalhe} aoRegistrar={aoRegistrarEvento} />}
+      {detalhe && <EventosDeContrato contrato={detalhe} aoRegistrar={aoRegistrarEvento} motivos={motivos} />}
 
       <div className="recado">
         Sem assinatura eletrônica ainda (Clicksign fica para depois) e sem renovação automática:
@@ -234,7 +236,7 @@ function EdicaoDeContrato({
   );
 }
 
-export function Contratos({ listas: _listas }: { listas: Listas | null }) {
+export function Contratos({ listas }: { listas: Listas | null }) {
   const [situacao, definirSituacao] = useState("");
   const [editando, definirEditando] = useState<ContratoResumo | null>(null);
 
@@ -322,6 +324,7 @@ export function Contratos({ listas: _listas }: { listas: Listas | null }) {
       {editando && (
         <EdicaoDeContrato
           contrato={editando}
+          motivos={listas?.motivos_de_encerramento ?? []}
           aoFechar={() => definirEditando(null)}
           aoSalvar={recarregar}
         />

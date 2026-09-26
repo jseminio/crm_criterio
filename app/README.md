@@ -65,8 +65,17 @@ registra **quem** (sem login, E1). A tela de Contratos mostra os eventos e regis
 **Renovação na agenda:** contrato Ativo com data de fim entra na fila como "Vencimento do
 contrato" (a data usada é a do fim, **sem prazo de aviso inventado**).
 
-**Fora, por decisão pendente:** categoria de motivo de encerramento (hoje é texto livre; a análise
-de saída/churn vai querer uma lista), alçadas de aditivo (presumidas no `anexo-tecnico.md`), NRR,
+**Motivo de encerramento (26/09/2026).** O encerramento exige a **categoria do motivo**, de uma
+lista de nove itens (`MotivoDeEncerramento`): Preço · Insatisfação com o serviço · Migrou para
+concorrente · Internalizou a operação · Empresa encerrada, vendida ou reestruturada ·
+Inadimplência · Saída organizada pela Critério · Não precisa mais do serviço · Outro. "Outro"
+exige texto; nas demais o texto é opcional. A categoria só vale no Encerramento (422 nos outros
+tipos). **⚠️ A lista é uma proposta, ainda não aprovada por Eduardo:** nenhum documento traz uma
+lista de motivos de saída, e esta parte da lista de motivos de recusa e do conceito de "saída
+organizada" (classe C). Fica como texto no banco, para mudar com um `UPDATE`. Ela responde *por que
+saiu*, não *quem decidiu*; se a análise precisar dessa separação, vira um segundo campo.
+
+**Fora, por decisão pendente:** alçadas de aditivo (presumidas no `anexo-tecnico.md`), NRR,
 Clicksign e implantação.
 
 ## Etapa 2 — agenda de follow-up (25/09/2026)

@@ -985,15 +985,33 @@ class TestEventosDeContrato:
         assert r.status_code == 201 and r.json()["data_fim"] == "2028-03-01"
         assert r.json()["eventos"][0]["data_fim_anterior"] == "2027-03-01"
 
-    def test_encerramento_exige_motivo_e_fecha_o_contrato(self, cliente, carteira):
+    def test_encerramento_exige_categoria_e_fecha_o_contrato(self, cliente, carteira):
         cid = self._contrato_ativo(cliente, carteira)
         assert cliente.patch(f"/api/contratos/{cid}", json={"situacao": "Encerrado"}).status_code == 422
-        assert cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento"}).status_code == 422
-        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento", "descricao": "migrou de contador", "data_do_evento": "2026-09-20"})
+        assert cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento", "descricao": "só texto"}).status_code == 422
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={
+            "tipo": "Encerramento", "motivo_categoria": "Migrou para concorrente",
+            "descricao": "foi para outro escritório", "data_do_evento": "2026-09-20"})
         assert r.status_code == 201
         assert (r.json()["situacao"], r.json()["data_fim"]) == ("Encerrado", "2026-09-20")
+        ev = r.json()["eventos"][0]
+        assert (ev["motivo_categoria"], ev["descricao"]) == ("Migrou para concorrente", "foi para outro escritório")
         # encerrado não recebe mais nada
         assert cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Aditivo", "descricao": "x y z"}).status_code == 409
+
+    def test_categoria_de_motivo_fora_da_lista_e_recusada(self, cliente, carteira):
+        cid = self._contrato_ativo(cliente, carteira)
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento", "motivo_categoria": "Palpite"})
+        assert r.status_code == 422
+
+    def test_categoria_so_vale_no_encerramento(self, cliente, carteira):
+        cid = self._contrato_ativo(cliente, carteira)
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Reajuste", "preco_mensal_novo": "9000", "motivo_categoria": "Preço"})
+        assert r.status_code == 422 and "Encerramento" in r.json()["detail"]
+
+    def test_a_lista_de_motivos_vem_da_api_de_listas(self, cliente):
+        lista = cliente.get("/api/listas").json()["motivos_de_encerramento"]
+        assert "Preço" in lista and lista[-1] == "Outro" and len(lista) == 9
 
     def test_expansao_nao_reduz(self, cliente, carteira):
         cid = self._contrato_ativo(cliente, carteira)

@@ -23,6 +23,7 @@ from crm.domain.listas import (
     SituacaoLead,
     Temperatura,
     TipoCanal,
+    MotivoDeEncerramento,
     TipoDeEventoDeContrato,
     TipoDeOcorrencia,
 )
@@ -349,6 +350,7 @@ class EventoDeContratoResposta(Base):
     data_do_evento: date
     registrado_em: datetime
     descricao: str | None = None
+    motivo_categoria: MotivoDeEncerramento | None = None
     preco_mensal_anterior: Decimal | None = None
     preco_mensal_novo: Decimal | None = None
     preco_anual_anterior: Decimal | None = None
@@ -373,6 +375,8 @@ class EventoDeContratoNovo(BaseModel):
     data_do_evento: date | None = None
     """Sem data, vale hoje (data do servidor)."""
     descricao: str | None = Field(default=None, max_length=500)
+    motivo_categoria: MotivoDeEncerramento | None = None
+    """Só vale no Encerramento; nos outros tipos é recusado."""
     escopo_novo: str | None = Field(default=None, max_length=200)
     preco_mensal_novo: Decimal | None = None
     preco_anual_novo: Decimal | None = None
@@ -591,6 +595,7 @@ class Listas(BaseModel):
     tipos_de_canal: list[str]
     tipos_de_canal_em_operacao: list[str]
     motivos_de_recusa: list[str]
+    motivos_de_encerramento: list[str]
     linhas_de_servico: list[str]
     situacoes_de_grupo: list[str]
     captadores: list[str]

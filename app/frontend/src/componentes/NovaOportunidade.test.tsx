@@ -20,6 +20,7 @@ const LISTAS: Listas = {
   tipos_de_canal: ["Sócios"],
   tipos_de_canal_em_operacao: ["Sócios"],
   motivos_de_recusa: [],
+  motivos_de_encerramento: [],
   linhas_de_servico: [],
   situacoes_de_grupo: [],
   captadores: ["EL", "BO"],

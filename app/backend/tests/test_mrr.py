@@ -131,3 +131,27 @@ class TestCarteiraAnteriorSemDataDeAssinatura:
         cs = [C(D("1000"), data_inicio=None), C(D("700"), data_inicio=date(2026, 9, 3))]
         m = movimento(cs, date(2026, 9, 1), HOJE, HOJE)
         assert m.mrr_inicio + m.novo + m.expansao + m.reajuste - m.contracao - m.churn == m.mrr_fim
+
+
+class TestCorrecaoNaoEMovimento:
+    """Corrigir um valor lançado errado não é expansão, contração nem reajuste."""
+
+    def test_correcao_nao_aparece_no_movimento(self):
+        c = C(D("1200"), data_inicio=None, eventos=[Ev(T.CORRECAO, date(2026, 9, 20), D("4500"), D("1200"))])
+        m = movimento([c], date(2026, 9, 1), HOJE, HOJE)
+        assert (m.expansao, m.reajuste, m.contracao, m.novo) == (D("0.00"),) * 4
+        # o MRR do início já era o valor corrigido: a correção reescreve o lançamento, não o movimenta
+        assert (m.mrr_inicio, m.mrr_fim) == (D("1200"), D("1200"))
+        assert m.nrr == D("100.0") and m.grr == D("100.0")
+
+    def test_reajuste_depois_da_correcao_continua_contando(self):
+        c = C(D("1300"), data_inicio=None, eventos=[
+            Ev(T.CORRECAO, date(2026, 9, 5), D("4500"), D("1200")),
+            Ev(T.REAJUSTE, date(2026, 9, 20), D("1200"), D("1300")),
+        ])
+        m = movimento([c], date(2026, 9, 1), HOJE, HOJE)
+        assert (m.reajuste, m.mrr_inicio, m.mrr_fim) == (D("100"), D("1200"), D("1300"))
+
+    def test_novo_nao_usa_o_antes_de_uma_correcao(self):
+        c = C(D("1000"), data_inicio=date(2026, 9, 2), eventos=[Ev(T.CORRECAO, date(2026, 9, 3), D("9999"), D("1000"))])
+        assert movimento([c], date(2026, 9, 1), HOJE, HOJE).novo == D("1000")

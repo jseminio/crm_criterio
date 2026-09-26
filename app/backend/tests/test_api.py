@@ -1108,3 +1108,33 @@ class TestMrrComCarteiraAnterior:
         c = Contrato(grupo_id=g.id, anterior_ao_crm=True, situacao=S.AGUARDANDO_ASSINATURA, preco_mensal=Decimal("100"))
         sessao.add(c); sessao.commit()
         assert cliente.patch(f"/api/contratos/{c.id}", json={"situacao": "Ativo"}).status_code == 200
+
+
+class TestCorrecaoDeCarga:
+    def test_correcao_guarda_antes_e_depois_e_nao_mexe_no_movimento(self, cliente, sessao, carteira):
+        from crm.db.modelos import Contrato
+        from crm.domain.listas import SituacaoContrato as S
+
+        g = sessao.scalars(sa.select(GrupoEconomico)).first()
+        c = Contrato(grupo_id=g.id, anterior_ao_crm=True, situacao=S.ATIVO, preco_mensal=Decimal("4500.00"))
+        sessao.add(c); sessao.commit()
+        antes = cliente.get("/api/mrr", params={"hoje": "2026-09-25", "de": "2026-09-01"}).json()["movimento"]
+        r = cliente.post(f"/api/contratos/{c.id}/eventos", json={"tipo": "Correção", "preco_mensal_novo": "1200.00",
+                                                                 "descricao": "valor lançado errado na carga", "data_do_evento": "2026-09-20"})
+        assert r.status_code == 201 and r.json()["preco_mensal"] == "1200.00"
+        ev = r.json()["eventos"][0]
+        assert (ev["tipo"], ev["preco_mensal_anterior"], ev["preco_mensal_novo"]) == ("Correção", "4500.00", "1200.00")
+        depois = cliente.get("/api/mrr", params={"hoje": "2026-09-25", "de": "2026-09-01"}).json()
+        assert depois["atual"]["valor"] == "1200.00"
+        m = depois["movimento"]
+        assert (m["contracao"], m["expansao"], m["reajuste"]) == ("0.00", "0.00", "0.00")
+        assert (m["mrr_inicio"], m["mrr_fim"]) == ("1200.00", "1200.00")
+
+    def test_correcao_sem_motivo_e_recusada(self, cliente, sessao, carteira):
+        from crm.db.modelos import Contrato
+        from crm.domain.listas import SituacaoContrato as S
+
+        g = sessao.scalars(sa.select(GrupoEconomico)).first()
+        c = Contrato(grupo_id=g.id, anterior_ao_crm=True, situacao=S.ATIVO, preco_mensal=Decimal("100"))
+        sessao.add(c); sessao.commit()
+        assert cliente.post(f"/api/contratos/{c.id}/eventos", json={"tipo": "Correção", "preco_mensal_novo": "50"}).status_code == 422

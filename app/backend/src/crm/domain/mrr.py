@@ -12,7 +12,8 @@ Regras (decisão de Eduardo em 26/09/2026: a vigência começa na assinatura):
   não fatura, mas ainda não saiu. Aguardando assinatura e Encerrado ficam fora.
 - Contrato sem preço mensal (só anual) **não entra**: não se inventa "anual ÷ 12". A
   contagem de quem ficou de fora vai junto.
-- **Movimento do período**, por evento e por assinatura:
+- **Movimento do período**, por evento e por assinatura (a **Correção** de um valor lançado
+  errado **não conta**: não foi um movimento comercial):
   **novo** (assinado no período) · **expansão** (Expansão e Aditivo que aumentam) ·
   **reajuste** (Reajuste que aumenta) · **contração** (Contração e qualquer queda de preço) ·
   **churn** (Encerramento, pelo preço mensal que o contrato tinha), separado por
@@ -114,7 +115,7 @@ def mrr_atual(contratos: Iterable[_Contrato]) -> MrrAtual:
 def _preco_inicial(c: _Contrato) -> Decimal | None:
     """O preço mensal na assinatura: o "antes" do primeiro evento que o mudou."""
     for ev in sorted(c.eventos, key=lambda e: e.id):
-        if ev.preco_mensal_novo is not None and ev.preco_mensal_anterior is not None:
+        if ev.tipo is not T.CORRECAO and ev.preco_mensal_novo is not None and ev.preco_mensal_anterior is not None:
             return ev.preco_mensal_anterior
     return c.preco_mensal
 
@@ -135,6 +136,8 @@ def _fluxos(contratos: Iterable[_Contrato], de: date, ate: date, *, so_existente
         for ev in c.eventos:
             if not (de <= ev.data_do_evento <= ate):
                 continue
+            if ev.tipo is T.CORRECAO:
+                continue  # corrige um lançamento errado; o MRR do passado também já era o corrigido
             if ev.tipo is T.ENCERRAMENTO:
                 # O preço não muda no encerramento: o que se perde é o que o contrato valia.
                 # Se o contrato foi reajustado depois... não pode: encerrado não recebe evento.

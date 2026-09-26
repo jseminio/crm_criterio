@@ -157,6 +157,14 @@ duas se combinam livremente: "Preço" pode ser o cliente que achou caro ou a Cri
 para sair. O sistema **não amarra** as duas (por exemplo, não obriga "Saída organizada" a ser
 Critério): quem registra decide.
 
+**Correção (26/09/2026).** Sétimo tipo de evento, para corrigir um valor **lançado errado** (por
+exemplo, na carga inicial): exige novo preço **e o motivo**, guarda o antes e o depois, mas **não é
+movimento comercial**: não conta como expansão, contração nem reajuste no MRR, e o MRR do início do
+período já é o valor corrigido. Foi usado para levar 4 contratos ao valor oficial de 19/09/2026 (R$ 226.341,20):
+sem esse tipo, corrigir apareceria como R$ 5.300 de contração e R$ 1.578,54 de expansão que nunca
+aconteceram no negócio. Depois das correções o MRR do CRM ficou em R$ 223.741,19; **resta uma unidade
+(um grupo de três empresas, R$ 2.600,01) para chegar ao oficial**.
+
 **Motivo de encerramento (26/09/2026).** O encerramento exige a **categoria do motivo**, de uma
 lista de nove itens (`MotivoDeEncerramento`): Preço · Insatisfação com o serviço · Migrou para
 concorrente · Internalizou a operação · Empresa encerrada, vendida ou reestruturada ·

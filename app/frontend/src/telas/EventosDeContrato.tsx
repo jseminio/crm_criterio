@@ -18,10 +18,11 @@ const TIPOS: { valor: Tipo; ajuda: string }[] = [
   { valor: "Contração", ajuda: "O cliente reduz o escopo: o novo preço não pode ser maior." },
   { valor: "Aditivo", ajuda: "Qualquer alteração contratual. Descreva o que mudou; escopo e preço são opcionais." },
   { valor: "Renovação", ajuda: "Estende a vigência: informe a nova data de fim." },
+  { valor: "Correção", ajuda: "Corrige um valor lançado errado, com o motivo. Não conta como expansão nem contração no MRR." },
   { valor: "Encerramento", ajuda: "Encerra o contrato. O motivo é obrigatório e alimenta a análise de saída." },
 ];
 
-const PRECOS: Tipo[] = ["Reajuste", "Expansão", "Contração", "Aditivo"];
+const PRECOS: Tipo[] = ["Reajuste", "Expansão", "Contração", "Aditivo", "Correção"];
 
 function Efeito({ e }: { e: EventoDeContrato }) {
   const partes: string[] = [];
@@ -64,12 +65,12 @@ export function EventosDeContrato({
   const categoriaOutro = pedeMotivo && campos.motivo_categoria === "Outro";
   // Aditivo sempre descreve; no encerramento o texto só é obrigatório quando a
   // categoria é "Outro" — nas demais, a categoria já diz o porquê.
-  const pedeDescricao = tipo === "Aditivo" || categoriaOutro;
+  const pedeDescricao = tipo === "Aditivo" || tipo === "Correção" || categoriaOutro;
   const faltaDado =
     (pedeMotivo && (!campos.iniciativa || !campos.motivo_categoria)) ||
     (pedeDescricao && (campos.descricao ?? "").trim().length < 3) ||
     (tipo === "Renovação" && !campos.data_fim_nova) ||
-    (["Reajuste", "Expansão", "Contração"].includes(tipo) && !campos.preco_mensal_novo && !campos.preco_anual_novo);
+    (["Reajuste", "Expansão", "Contração", "Correção"].includes(tipo) && !campos.preco_mensal_novo && !campos.preco_anual_novo);
 
   const registrar = async () => {
     definirSalvando(true);
@@ -187,7 +188,7 @@ export function EventosDeContrato({
 
           <div className="campo-bloco">
             <label className="campo-rotulo" htmlFor="ev-desc">
-              {pedeMotivo ? (categoriaOutro ? "Descreva o motivo" : "Detalhe (opcional)") : pedeDescricao ? "O que foi aditado" : "Motivo (opcional)"}
+              {pedeMotivo ? (categoriaOutro ? "Descreva o motivo" : "Detalhe (opcional)") : tipo === "Correção" ? "Motivo da correção" : pedeDescricao ? "O que foi aditado" : "Motivo (opcional)"}
             </label>
             <input id="ev-desc" className="entrada" maxLength={500} value={campos.descricao ?? ""} onChange={(e) => mudar("descricao", e.target.value)} placeholder={pedeMotivo ? "ex.: o cliente migrou de contador" : "ex.: reajuste anual pelo IPCA"} />
           </div>

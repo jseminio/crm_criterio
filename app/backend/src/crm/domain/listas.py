@@ -176,6 +176,10 @@ class TipoDeEventoDeContrato(Enum):
     CONTRACAO = "Contração"
     RENOVACAO = "Renovação"
     ENCERRAMENTO = "Encerramento"
+    CORRECAO = "Correção"
+    """Corrige um valor **lançado errado** (por exemplo, na carga inicial). Guarda o antes e o
+    depois e o motivo, mas **não é um movimento comercial**: não conta como expansão, contração
+    nem reajuste no MRR do período."""
 
 
 class IniciativaDoEncerramento(Enum):

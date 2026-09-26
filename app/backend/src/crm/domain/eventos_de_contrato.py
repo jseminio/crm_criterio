@@ -16,6 +16,7 @@ Cada tipo:
 | Expansão | novo preço, **não menor** | novo preço |
 | Contração | novo preço, **não maior** | novo preço |
 | Renovação | nova data de fim, **depois** da atual | nova data de fim |
+| Correção | novo preço **e o motivo** | novo preço, para cima ou para baixo; **não** entra no movimento do MRR |
 | Encerramento | **quem decidiu** (cliente ou Critério) e a **categoria do motivo** (`Outro` exige texto) | situação Encerrado; fim = data do evento |
 
 Funções puras: não tocam no banco. Quem chama grava o evento e aplica o efeito.
@@ -121,6 +122,14 @@ def efeito_do_evento(contrato: _Contrato, pedido: Pedido) -> dict[str, object]:
                 mudou = True
         if not mudou:
             raise ErroDeEvento(f"{tipo.value}: o novo preço é igual ao atual.")
+        efeito.update(novos_precos)
+
+    elif tipo is T.CORRECAO:
+        if not novos_precos:
+            raise ErroDeEvento("Correção: informe o novo preço mensal e/ou anual.")
+        _texto_obrigatorio(pedido, "o motivo da correção")
+        if all(getattr(contrato, campo) == novo for campo, novo in novos_precos.items()):
+            raise ErroDeEvento("Correção: o novo preço é igual ao atual.")
         efeito.update(novos_precos)
 
     elif tipo is T.RENOVACAO:

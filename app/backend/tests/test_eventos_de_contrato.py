@@ -130,3 +130,23 @@ class TestAditivoRenovacaoEncerramento:
         with pytest.raises(ErroDeEvento, match="Outro"):
             efeito_do_evento(C(), pedido(T.ENCERRAMENTO, iniciativa=I.CLIENTE, motivo_categoria=M.OUTRO, descricao="  "))
         assert efeito_do_evento(C(), pedido(T.ENCERRAMENTO, iniciativa=I.CLIENTE, motivo_categoria=M.OUTRO, descricao="fusão com outra empresa"))
+
+
+class TestCorrecao:
+    def test_exige_novo_preco_e_motivo(self):
+        with pytest.raises(ErroDeEvento, match="novo preço"):
+            efeito_do_evento(C(), pedido(T.CORRECAO, descricao="valor lançado errado"))
+        with pytest.raises(ErroDeEvento, match="motivo da correção"):
+            efeito_do_evento(C(), pedido(T.CORRECAO, preco_mensal_novo=D("900")))
+
+    def test_corrige_para_cima_ou_para_baixo(self):
+        assert efeito_do_evento(C(), pedido(T.CORRECAO, preco_mensal_novo=D("400"), descricao="valor lançado errado")) == {"preco_mensal": D("400")}
+        assert efeito_do_evento(C(), pedido(T.CORRECAO, preco_mensal_novo=D("2000"), descricao="valor lançado errado")) == {"preco_mensal": D("2000")}
+
+    def test_preco_igual_ao_atual_nao_e_correcao(self):
+        with pytest.raises(ErroDeEvento, match="igual ao atual"):
+            efeito_do_evento(C(), pedido(T.CORRECAO, preco_mensal_novo=D("1000.00"), descricao="valor lançado errado"))
+
+    def test_contrato_encerrado_ou_nao_assinado_nao_recebe(self):
+        with pytest.raises(ErroDeEvento):
+            efeito_do_evento(C(situacao=S.ENCERRADO), pedido(T.CORRECAO, preco_mensal_novo=D("1"), descricao="valor lançado errado"))

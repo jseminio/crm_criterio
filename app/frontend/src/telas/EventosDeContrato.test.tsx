@@ -117,6 +117,17 @@ describe("EventosDeContrato", () => {
     expect(screen.getByText("foi para outro escritório")).toBeInTheDocument();
   });
 
+  it("correção exige o novo preço e o motivo, e explica que não é movimento do MRR", async () => {
+    render(<EventosDeContrato contrato={contrato()} aoRegistrar={vi.fn()} />);
+    await userEvent.selectOptions(screen.getByLabelText("Registrar evento"), "Correção");
+    expect(screen.getByText(/não conta como expansão nem contração/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /registrar correção/i })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("Novo preço mensal"), "900");
+    expect(screen.getByRole("button", { name: /registrar correção/i })).toBeDisabled(); // falta o motivo
+    await userEvent.type(screen.getByLabelText("Motivo da correção"), "valor lançado errado");
+    expect(screen.getByRole("button", { name: /registrar correção/i })).toBeEnabled();
+  });
+
   it("renovação pede a nova data de fim", async () => {
     render(<EventosDeContrato contrato={contrato()} aoRegistrar={vi.fn()} />);
     await userEvent.selectOptions(screen.getByLabelText("Registrar evento"), "Renovação");

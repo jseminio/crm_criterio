@@ -270,7 +270,7 @@ export interface ContratoResumo {
 /** Um fato do contrato depois de assinado, com o antes e o depois. Só cresce. */
 export interface EventoDeContrato {
   id: number;
-  tipo: "Aditivo" | "Reajuste" | "Expansão" | "Contração" | "Renovação" | "Encerramento";
+  tipo: "Aditivo" | "Reajuste" | "Expansão" | "Contração" | "Renovação" | "Encerramento" | "Correção";
   data_do_evento: string;
   registrado_em: string;
   descricao: string | null;

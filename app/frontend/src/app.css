@@ -228,3 +228,9 @@
 .aba[aria-selected="true"] { color: var(--texto-forte); border-bottom-color: var(--azul-noturno); }
 .aba-contagem { font-variant-numeric: tabular-nums; color: var(--texto-fraco); margin-left: var(--e1); }
 .botao[aria-pressed="true"] { background: var(--surface-brand); color: var(--branco); border-color: var(--surface-brand); }
+
+/* Recortes e cenários do funil */
+.recortes, .cenarios { margin-top: var(--e4); overflow-x: auto; }
+.recortes .tabela, .cenarios .tabela { min-width: 560px; }
+.recortes-topo { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--e3); margin-bottom: var(--e3); }
+.cenarios-entradas { display: flex; gap: var(--e4); margin-bottom: var(--e3); flex-wrap: wrap; }

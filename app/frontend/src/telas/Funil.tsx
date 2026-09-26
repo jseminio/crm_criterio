@@ -12,7 +12,9 @@ import {
   type EstadoDosFiltros,
 } from "../componentes/Filtros";
 import { NovaOportunidade } from "../componentes/NovaOportunidade";
+import { CenariosDeTicket } from "../componentes/CenariosDeTicket";
 import { Numeros } from "../componentes/Numeros";
+import { Recortes } from "../componentes/Recortes";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { dinheiroCurto, prazo } from "../formato";
 import { usarDados } from "../usarDados";
@@ -136,6 +138,8 @@ export function Funil({ listas }: { listas: Listas | null }) {
   return (
     <>
       <Numeros filtros={filtros} />
+      <Recortes filtros={filtros} />
+      <CenariosDeTicket filtros={filtros} />
       <Filtros
         filtros={filtros}
         aoMudar={definirFiltros}

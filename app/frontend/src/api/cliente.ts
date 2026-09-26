@@ -1,7 +1,10 @@
 /** O acesso à API. Um lugar só, para o erro ter uma forma só. */
 
 import type {
+  CenariosDeTicket,
   ColunaDoFunil,
+  DimensaoDeRecorte,
+  LinhaDeRecorte,
   ContratoDetalhe,
   ContratoResumo,
   Execucao,
@@ -127,6 +130,12 @@ export const api = {
 
   indicadores: (filtros: FiltrosDoFunil = {}) =>
     pedir<Indicadores>(comParametros("/api/indicadores", { ...filtros })),
+
+  recortes: (dimensao: DimensaoDeRecorte, filtros: FiltrosDoFunil = {}) =>
+    pedir<LinhaDeRecorte[]>(comParametros("/api/indicadores/recortes", { dimensao, ...filtros })),
+
+  cenariosDeTicket: (filtros: FiltrosDoFunil = {}) =>
+    pedir<CenariosDeTicket | null>(comParametros("/api/indicadores/cenarios-de-ticket", { ...filtros })),
 
   oportunidades: (filtros: FiltrosDoFunil & { situacao?: string[]; grupo_id?: number } = {}) =>
     pedir<Pagina<OportunidadeResumo>>(

@@ -627,6 +627,27 @@ Aparece como cartão no funil (`ticket_recorrente` em `GET /api/indicadores`).
   média por grupo na carteira inteira. Grandezas diferentes; o cartão diz isso na tela.
 - Só uma aceita tem data de aceite; por isso "contratou em 2026" usa a data de colocação.
 
+### Recortes e cenários de ticket (25/09/2026)
+
+Duas tabelas no funil, abaixo dos números, ambas **seguindo os mesmos filtros da tela**:
+
+- **Recortes** (`GET /api/indicadores/recortes?dimensao=servico|tipo_canal|captador`):
+  propostas, aceitas, conversão, contratos recorrentes, mensal aceito, ticket e mediana por corte.
+  Sem valor no campo, o corte aparece como "(não informado)", nunca some.
+- **Cenários de ticket** (`GET /api/indicadores/cenarios-de-ticket`): conservador, base e
+  otimista, com o contrato atípico à parte. **Hipóteses de trabalho, não meta.**
+
+Regra dos cenários (`crm/domain/recortes.py`), estatística e não escolha manual:
+**atípico** = recorrente acima de 3 × a mediana; **conservador** = mediana; **base** = média
+sem atípicos; **otimista** = terceiro quartil sem atípicos; o atípico entra pelo menor, médio e
+maior observados. Na tela, "clientes novos" e "1 atípico a cada … clientes" são editáveis (padrão
+20 e 20) e **não gravam nada**. Menos de 4 contratos recorrentes: "não calculável".
+
+Com o período filtrado por **data de colocação de 2026**: 19 contratos, 2 atípicos, comum de
+R$ 2.450 / R$ 2.956,42 / R$ 3.500 e atípico de R$ 15.000 / R$ 27.500 / R$ 40.000 — os números
+validados em 25/09/2026. **Sem filtro** entra mais um contrato recorrente sem data de colocação
+(20 contratos), e a base cai para R$ 2.903,28. Não considera cancelamento nem o tempo até faturar.
+
 ### Corte por período (22/09/2026)
 
 Pedido de Eduardo: comparar um recorte de tempo contra o resto da carteira —

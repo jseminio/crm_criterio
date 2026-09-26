@@ -228,3 +228,11 @@
 .aba[aria-selected="true"] { color: var(--texto-forte); border-bottom-color: var(--azul-noturno); }
 .aba-contagem { font-variant-numeric: tabular-nums; color: var(--texto-fraco); margin-left: var(--e1); }
 .botao[aria-pressed="true"] { background: var(--surface-brand); color: var(--branco); border-color: var(--surface-brand); }
+
+/* Sugestões de fusão */
+.sugestoes { list-style: none; margin: var(--e3) 0 0; padding: 0; display: grid; gap: var(--e3); }
+.sugestao { background: var(--surface-card); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e3); }
+.sugestao-cabeca { display: flex; gap: var(--e2); align-items: center; flex-wrap: wrap; margin-bottom: var(--e2); }
+.sugestao-grupos { border: 0; padding: 0; margin: 0 0 var(--e2); display: grid; gap: var(--e1); }
+.sugestao-opcao { font-size: 13px; }
+.sugestao-acoes { display: flex; gap: var(--e2); justify-content: flex-end; }

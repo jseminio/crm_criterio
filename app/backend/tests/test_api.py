@@ -876,3 +876,27 @@ class TestEdicaoNaTelaSobreviveARecargaDaPlanilha:
         sessao.expire_all()
         assert sessao.get(Oportunidade, id_).data_aceite == Data(2026, 4, 15)
         assert any("mantido o do CRM" in o.texto for o in resultado.ocorrencias)
+
+
+class TestSugestoesDeFusao:
+    def test_sugere_sem_fundir_nada(self, cliente, sessao):
+        a = GrupoEconomico(nome="Sete Brasil (Leo Fraga) - BPO Contábil", origem=Origem.CARGA_2026)
+        b = GrupoEconomico(nome="Sete Brasil (Leo Fraga) - Bacen", origem=Origem.CARGA_2026)
+        c = GrupoEconomico(nome="Beta", origem=Origem.CARGA_2026)
+        sessao.add_all([a, b, c])
+        sessao.commit()
+        r = cliente.get("/api/grupos/sugestoes-de-fusao")
+        assert r.status_code == 200
+        corpo = r.json()
+        assert len(corpo) == 1 and corpo[0]["confianca"] == "alta"
+        assert {g["id"] for g in corpo[0]["grupos"]} == {a.id, b.id}
+        assert corpo[0]["principal_id"] in {a.id, b.id}
+        # nada foi fundido
+        assert all(g["fundido_em_id"] is None for g in cliente.get("/api/grupos").json()["itens"])
+
+    def test_grupo_ja_fundido_nao_e_sugerido(self, cliente, sessao):
+        a = GrupoEconomico(nome="Alfa - x", origem=Origem.CARGA_2026)
+        b = GrupoEconomico(nome="Alfa - y", origem=Origem.CARGA_2026)
+        sessao.add_all([a, b]); sessao.flush()
+        cliente.post(f"/api/grupos/{a.id}/fundir", json={"absorvido_id": b.id})
+        assert cliente.get("/api/grupos/sugestoes-de-fusao").json() == []

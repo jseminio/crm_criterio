@@ -40,6 +40,7 @@ from crm.db.modelos import (
 )
 from crm.db.sessao import criar_engine, criar_fabrica_de_sessao, url_do_banco
 from crm.domain import indicadores as regras_de_indicadores
+from crm.domain.sugestoes_de_fusao import sugerir as sugerir_fusoes
 from crm.domain import porte as regras_de_porte
 from crm.domain.listas import (
     LinhaServico,
@@ -221,6 +222,35 @@ def _registrar(api: FastAPI) -> None:
             resumo.quantas_oportunidades = quantidade or 0
             itens.append(resumo)
         return e.Pagina(total=total or 0, itens=itens)
+
+    @api.get(
+        "/api/grupos/sugestoes-de-fusao", response_model=list[e.SugestaoDeFusao], tags=["grupos"]
+    )
+    def sugestoes_de_fusao(sessao: Session = Depends(obter_sessao)) -> list[e.SugestaoDeFusao]:
+        """Blocos de grupos que parecem ser o mesmo cliente. **Não funde nada**:
+        quem confirma é uma pessoa, pelo `POST /api/grupos/{id}/fundir`."""
+        quantas = (
+            sa.select(sa.func.count(Oportunidade.id))
+            .where(Oportunidade.grupo_id == GrupoEconomico.id)
+            .scalar_subquery()
+        )
+        linhas = sessao.execute(
+            sa.select(GrupoEconomico, quantas).where(GrupoEconomico.fundido_em_id.is_(None))
+        ).all()
+        resumos: dict[int, e.GrupoResumo] = {}
+        for grupo, quantidade in linhas:
+            r = e.GrupoResumo.model_validate(grupo)
+            r.quantas_oportunidades = quantidade or 0
+            resumos[grupo.id] = r
+        return [
+            e.SugestaoDeFusao(
+                confianca=s.confianca,
+                motivo=s.motivo,
+                principal_id=s.principal_id,
+                grupos=[resumos[i] for i in s.ids],
+            )
+            for s in sugerir_fusoes(resumos.values())
+        ]
 
     @api.post("/api/grupos/{grupo_id}/fundir", response_model=e.GrupoResumo, tags=["grupos"])
     def fundir(

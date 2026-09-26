@@ -7,6 +7,7 @@ import type {
   Execucao,
   ExecucaoDetalhe,
   GrupoResumo,
+  SugestaoDeFusao,
   Indicadores,
   LeadResumo,
   Listas,
@@ -167,6 +168,8 @@ export const api = {
 
   grupos: (filtros: { busca?: string; limite?: number; incluir_fundidos?: boolean } = {}) =>
     pedir<Pagina<GrupoResumo>>(comParametros("/api/grupos", { limite: 500, ...filtros })),
+
+  sugestoesDeFusao: () => pedir<SugestaoDeFusao[]>("/api/grupos/sugestoes-de-fusao"),
 
   fundirGrupos: (principalId: number, absorvidoId: number) =>
     pedir<GrupoResumo>(`/api/grupos/${principalId}/fundir`, {

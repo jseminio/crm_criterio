@@ -72,6 +72,15 @@ class GrupoResumo(Base):
     quantas_oportunidades: int = 0
 
 
+class SugestaoDeFusao(Base):
+    """Um bloco de grupos que parecem ser o mesmo cliente. Só sugestão."""
+
+    confianca: str
+    motivo: str
+    principal_id: int
+    grupos: list[GrupoResumo]
+
+
 class OportunidadeResumo(Base):
     """O que cabe num cartão do funil."""
 

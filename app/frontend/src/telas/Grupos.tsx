@@ -13,6 +13,7 @@ import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { usarDados } from "../usarDados";
 import { DetalheDoGrupo } from "./DetalheDoGrupo";
+import { SugestoesDeFusao } from "./SugestoesDeFusao";
 
 function Fusao({
   principal,
@@ -162,6 +163,8 @@ export function Grupos({ listas }: { listas: Listas | null }) {
           proposta e são o melhor lugar para começar.
         </div>
       )}
+
+      <SugestoesDeFusao aoJuntar={recarregar} />
 
       {carregando && <Carregando rotulo="Carregando os grupos" />}
       {erro && !carregando && <Erro mensagem={erro} aoTentarDeNovo={recarregar} />}

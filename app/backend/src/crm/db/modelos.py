@@ -443,6 +443,9 @@ class ClassificacaoDoGrupo(Base):
     fonte: Mapped[str] = mapped_column(sa.String(200), nullable=False)
     versao_dos_parametros: Mapped[str] = mapped_column(sa.String(40), nullable=False)
     registrado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+    atribuido_por: Mapped[str | None] = mapped_column(sa.String(120))
+    """Quem mudou as notas humanas numa edição manual; `None` nas cargas de planilha."""
+    motivo: Mapped[str | None] = mapped_column(sa.String(500))
 
     receita_mensal: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
     margem: Mapped[Decimal | None] = mapped_column(sa.Numeric(6, 4))

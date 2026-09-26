@@ -52,9 +52,12 @@ CAMPOS_CONTATO = ("contato_nome", "contato_cargo", "email", "telefone")
 
 @dataclass
 class Linha:
-    n: int
+    n: str
+    """Rótulo de onde a linha está ("Linha 5", "Prospects, linha 12"), para os avisos."""
     id_grupo: int
     dados: dict[str, str]
+    id_empresa: int | None = None
+    """Presente nas linhas por empresa (aba Clientes da planilha nova): aponta a empresa certa."""
     avisos: list[str] = field(default_factory=list)
 
 
@@ -103,16 +106,32 @@ def _so_digitos(v: str) -> str:
     return re.sub(r"\D", "", v)
 
 
+ABAS = ("Clientes", "Prospects")
+
+
 def ler(caminho: Path, rel: Relatorio) -> list[Linha]:
-    """Lê e valida a aba Clientes. Só considera as colunas a preencher."""
-    ws = load_workbook(caminho, data_only=True)["Clientes"]
+    """Lê e valida as abas Clientes e Prospects. Só considera as colunas a preencher."""
+    wb = load_workbook(caminho, data_only=True)
+    abas = [a for a in ABAS if a in wb.sheetnames]
+    if not abas:
+        rel.erros.append("A planilha não tem a aba Clientes nem a Prospects. Use o modelo gerado pelo CRM.")
+        return []
+    linhas: list[Linha] = []
+    for aba in abas:
+        linhas.extend(_ler_aba(wb[aba], aba, rel))
+    return linhas
+
+
+def _ler_aba(ws, aba: str, rel: Relatorio) -> list[Linha]:
+    prefixo = "Linha" if aba == "Clientes" else f"{aba}, linha"
     cab = {_texto(c.value): i for i, c in enumerate(ws[1])}
     faltam = [t for t in COLUNAS if t not in cab]
     if faltam:
-        rel.erros.append(f"Planilha sem as colunas: {', '.join(faltam)}. Use o modelo gerado pelo CRM.")
+        rel.erros.append(f"Aba {aba} sem as colunas: {', '.join(faltam)}. Use o modelo gerado pelo CRM.")
         return []
     linhas: list[Linha] = []
-    for n, row in enumerate(ws.iter_rows(min_row=2, values_only=True), 2):
+    for numero, row in enumerate(ws.iter_rows(min_row=2, values_only=True), 2):
+        n = f"{prefixo} {numero}"
         bruto = {campo: _texto(row[cab[t]]) for t, campo in COLUNAS.items()}
         if not bruto["id_grupo"] or not bruto["id_grupo"].isdigit():
             continue  # rodapé de totais e linhas em branco
@@ -121,25 +140,26 @@ def ler(caminho: Path, rel: Relatorio) -> list[Linha]:
         if not preench:
             rel.linhas_vazias += 1
             continue
-        lin = Linha(n, int(bruto["id_grupo"]), preench)
+        id_emp = _texto(row[cab["ID_EMPRESA"]]) if "ID_EMPRESA" in cab else ""
+        lin = Linha(n, int(bruto["id_grupo"]), preench, int(id_emp) if id_emp.isdigit() else None)
         d = lin.dados
 
         if "cnpj" in d:
             d["cnpj"] = _so_digitos(d["cnpj"])
             if not cnpj_valido(d["cnpj"]):
-                rel.erros.append(f"Linha {n}: CNPJ inválido ({d['cnpj']!r}).")
+                rel.erros.append(f"{n}: CNPJ inválido ({d['cnpj']!r}).")
         if "cep" in d:
             d["cep"] = _so_digitos(d["cep"])
             if len(d["cep"]) != 8:
-                rel.erros.append(f"Linha {n}: CEP deve ter 8 dígitos ({d['cep']!r}).")
+                rel.erros.append(f"{n}: CEP deve ter 8 dígitos ({d['cep']!r}).")
         if "uf" in d:
             d["uf"] = d["uf"].upper()
             if d["uf"] not in UFS:
-                rel.erros.append(f"Linha {n}: UF inválida ({d['uf']!r}).")
+                rel.erros.append(f"{n}: UF inválida ({d['uf']!r}).")
         if "email" in d:
             d["email"] = d["email"].lower()
             if not _EMAIL.match(d["email"]):
-                rel.erros.append(f"Linha {n}: e-mail inválido ({d['email']!r}).")
+                rel.erros.append(f"{n}: e-mail inválido ({d['email']!r}).")
         if "numero_compl" in d:
             m = _NUMERO.match(d.pop("numero_compl"))
             if m:
@@ -148,14 +168,14 @@ def ler(caminho: Path, rel: Relatorio) -> list[Linha]:
                     d["complemento"] = m.group(2).strip()
             else:
                 d["complemento"] = _texto(row[cab["Número / compl."]])
-                lin.avisos.append(f"Linha {n}: número não reconhecido; texto inteiro foi para o complemento.")
+                lin.avisos.append(f"{n}: número não reconhecido; texto inteiro foi para o complemento.")
         for campo, limite in (("numero", 20), ("complemento", 100), ("logradouro", 200), ("bairro", 100),
                               ("municipio", 100), ("razao_social", 200), ("contato_nome", 200), ("email", 200)):
             if len(d.get(campo, "")) > limite:
-                rel.erros.append(f"Linha {n}: {campo} passa de {limite} caracteres.")
+                rel.erros.append(f"{n}: {campo} passa de {limite} caracteres.")
         tem_empresa = any(k in d for k in CAMPOS_EMPRESA)
         if tem_empresa and "razao_social" not in d and "cnpj" not in d:
-            lin.avisos.append(f"Linha {n}: sem razão social; usei o nome do grupo.")
+            lin.avisos.append(f"{n}: sem razão social; usei o nome do grupo.")
         rel.avisos.extend(lin.avisos)
         linhas.append(lin)
 
@@ -164,7 +184,7 @@ def ler(caminho: Path, rel: Relatorio) -> list[Linha]:
         c = lin.dados.get("cnpj")
         if c:
             if c in vistos and vistos[c] != lin.id_grupo:
-                rel.erros.append(f"Linha {lin.n}: o CNPJ {c} já aparece em outro cliente (ID {vistos[c]}).")
+                rel.erros.append(f"{lin.n}: o CNPJ {c} já aparece em outro cliente (ID {vistos[c]}).")
             vistos.setdefault(c, lin.id_grupo)
     return linhas
 
@@ -190,16 +210,25 @@ def aplicar(sessao: Session, linhas: list[Linha], rel: Relatorio, *, sobrescreve
     for lin in linhas:
         grupo = sessao.get(GrupoEconomico, lin.id_grupo)
         if grupo is None:
-            rel.erros.append(f"Linha {lin.n}: não existe grupo com ID {lin.id_grupo}.")
+            rel.erros.append(f"{lin.n}: não existe grupo com ID {lin.id_grupo}.")
             continue
         d = lin.dados
         vals_e = {k: d[k] for k in CAMPOS_EMPRESA if k in d}
         empresa: Empresa | None = None
-        if vals_e:
+        if lin.id_empresa is not None:
+            # Linha por empresa: vale o ID, não o nome nem o CNPJ digitado.
+            empresa = sessao.get(Empresa, lin.id_empresa)
+            if empresa is None or empresa.grupo_id != grupo.id:
+                rel.erros.append(f"{lin.n}: a empresa {lin.id_empresa} não existe ou não é do grupo {grupo.id}.")
+                continue
+            if _preencher(empresa, {k: v for k, v in vals_e.items()}, f"{lin.n} (empresa)", rel, sobrescrever):
+                rel.empresas_atualizadas += 1
+            sessao.flush()
+        elif vals_e:
             if "cnpj" in d:
                 empresa = sessao.scalars(sa.select(Empresa).where(Empresa.cnpj == d["cnpj"])).first()
                 if empresa and empresa.grupo_id != grupo.id:
-                    rel.erros.append(f"Linha {lin.n}: o CNPJ {d['cnpj']} já pertence a outro cliente no CRM.")
+                    rel.erros.append(f"{lin.n}: o CNPJ {d['cnpj']} já pertence a outro cliente no CRM.")
                     continue
             if empresa is None:
                 razao = d.get("razao_social") or grupo.nome
@@ -209,9 +238,9 @@ def aplicar(sessao: Session, linhas: list[Linha], rel: Relatorio, *, sobrescreve
             if empresa is None:
                 empresa = Empresa(grupo_id=grupo.id, razao_social=d.get("razao_social") or grupo.nome)
                 sessao.add(empresa)
-                _preencher(empresa, {k: v for k, v in vals_e.items() if k != "razao_social"}, f"Linha {lin.n}", rel, sobrescrever)
+                _preencher(empresa, {k: v for k, v in vals_e.items() if k != "razao_social"}, f"{lin.n}", rel, sobrescrever)
                 rel.empresas_criadas += 1
-            elif _preencher(empresa, vals_e, f"Linha {lin.n} (empresa)", rel, sobrescrever):
+            elif _preencher(empresa, vals_e, f"{lin.n} (empresa)", rel, sobrescrever):
                 rel.empresas_atualizadas += 1
             sessao.flush()
 
@@ -230,6 +259,6 @@ def aplicar(sessao: Session, linhas: list[Linha], rel: Relatorio, *, sobrescreve
             if achado is None:
                 sessao.add(PessoaContato(nome=nome or d.get("email") or grupo.nome, **dono, **vals_c))
                 rel.contatos_criados += 1
-            elif _preencher(achado, vals_c, f"Linha {lin.n} (contato)", rel, sobrescrever):
+            elif _preencher(achado, vals_c, f"{lin.n} (contato)", rel, sobrescrever):
                 rel.contatos_atualizados += 1
             sessao.flush()

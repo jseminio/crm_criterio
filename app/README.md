@@ -184,6 +184,14 @@ A tabela `empresa` ganhou, em 25/09/2026, `logradouro`, `numero`, `complemento`,
 existiam. Todos opcionais. Nenhuma tela edita esses campos ainda: eles existem
 para receber os dados preenchidos na planilha de lacunas de contato.
 
+### Planilha de lacunas por empresa (26/09/2026)
+
+`exportar_lacunas_contato.py` agora gera **duas abas separadas**: **Clientes** (uma linha por
+empresa/CNPJ, com razão social, CNPJ, escopo e mensalidade já vindos do CRM) e **Prospects** (uma
+linha por grupo que ainda não é cliente). `ID_GRUPO` e `ID_EMPRESA` são a chave; a linha por empresa
+atualiza **aquela** empresa pelo ID, não pelo nome nem pelo CNPJ digitado. A importação lê as duas abas
+e os avisos dizem de qual veio ("Prospects, linha 12"). Planilha intacta = zero mudança.
+
 ### Devolver a planilha de lacunas de contato
 
 ```bash

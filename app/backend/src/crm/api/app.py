@@ -17,6 +17,7 @@ existir.**
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from types import SimpleNamespace
 from datetime import date
 from typing import Iterator, Literal
 
@@ -34,6 +35,7 @@ from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, fundir_grupos
 from crm.db.modelos import (
     Contrato,
+    Empresa,
     EventoDeContrato,
     HistoricoDePreco,
     ExecucaoDeCarga,
@@ -45,6 +47,7 @@ from crm.db.modelos import (
 from crm.db.sessao import criar_engine, criar_fabrica_de_sessao, url_do_banco
 from crm.domain import indicadores as regras_de_indicadores
 from crm.domain.sugestoes_de_fusao import sugerir as sugerir_fusoes
+from crm.domain.sugestoes_de_fusao import sugerir_clientes
 from crm.domain import agenda as regras_da_agenda
 from crm.domain import eventos_de_contrato as regras_de_eventos
 from crm.domain import mrr as regras_de_mrr
@@ -261,6 +264,24 @@ def _registrar(api: FastAPI) -> None:
             r = e.GrupoResumo.model_validate(grupo)
             r.quantas_oportunidades = quantidade or 0
             resumos[grupo.id] = r
+        por_nome = list(sugerir_fusoes(resumos.values()))
+
+        # Prospect que já é cliente: cruza pelo nome das empresas de cada grupo.
+        empresas_do_grupo: dict[int, list[str]] = {}
+        for gid, razao in sessao.execute(sa.select(Empresa.grupo_id, Empresa.razao_social)):
+            empresas_do_grupo.setdefault(gid, []).append(razao)
+
+        def com_empresas(r: e.GrupoResumo) -> SimpleNamespace:
+            return SimpleNamespace(id=r.id, nome=r.nome, quantas_oportunidades=r.quantas_oportunidades,
+                                   empresas=empresas_do_grupo.get(r.id, []))
+
+        clientes = [com_empresas(r) for r in resumos.values() if r.situacao is SituacaoGrupo.CLIENTE]
+        prospects = [com_empresas(r) for r in resumos.values() if r.situacao is SituacaoGrupo.PROSPECT]
+        ja_juntos = [set(s.ids) for s in por_nome]
+        do_cliente = [
+            s for s in sugerir_clientes(prospects, clientes)
+            if not any(set(s.ids) <= bloco for bloco in ja_juntos)  # já veio numa sugestão por nome
+        ]
         return [
             e.SugestaoDeFusao(
                 confianca=s.confianca,
@@ -268,7 +289,7 @@ def _registrar(api: FastAPI) -> None:
                 principal_id=s.principal_id,
                 grupos=[resumos[i] for i in s.ids],
             )
-            for s in sugerir_fusoes(resumos.values())
+            for s in [*por_nome, *do_cliente]
         ]
 
     @api.post("/api/grupos/{grupo_id}/fundir", response_model=e.GrupoResumo, tags=["grupos"])

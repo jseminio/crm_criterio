@@ -27,7 +27,7 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Iterable, Protocol
 
-__all__ = ["chave_do_nome", "sugerir", "Sugestao"]
+__all__ = ["chave_do_nome", "sugerir", "sugerir_clientes", "Sugestao"]
 
 _PALAVRAS_VAZIAS = {"ltda", "sa", "s", "a", "me", "epp", "eireli", "de", "da", "do", "dos", "das", "e", "grupo"}
 
@@ -95,4 +95,85 @@ def sugerir(grupos: Iterable[_Grupo]) -> list[Sugestao]:
                 )
 
     sugestoes.sort(key=lambda s: (s.confianca != "alta", -len(s.ids), s.ids))
+    return sugestoes
+
+
+# ----------------------------------------------------------- prospect que já é cliente
+
+#: Palavras que aparecem em muitos nomes e não identificam ninguém. Não é uma lista fechada:
+#: a exigência de a palavra apontar para **um único** cliente já filtra a maior parte do ruído.
+_GENERICAS = {
+    "ltda", "sa", "grupo", "group", "brasil", "brasileira", "comercio", "servicos", "industria", "ind", "com",
+    "participacoes", "empreendimentos", "imobiliarios", "consultoria", "assessoria", "gestao", "holding",
+    "investimentos", "capital", "empresa", "empresas", "sociedade", "bpo", "contabil", "contabilidade",
+    "financeiro", "fiscal", "tributaria", "tributario", "transacao", "retomada", "pelo", "pela", "horas",
+    "adicionais", "pro", "bono", "filial", "proposta", "contrato", "formalizar", "retificacao", "migracao",
+    "encerramento", "constituicao", "abertura", "calculo", "calculos", "distribuicao", "dividendos", "ata",
+    "reajuste", "volume", "passado", "individual", "indicacao", "revisao", "sao", "santa", "santo", "dos", "das",
+    "nossa", "novo", "nova", "faltam", "posto", "casa", "saude", "tecnologia", "plataforma", "digital",
+}
+
+
+class _GrupoComEmpresas(Protocol):
+    id: int
+    nome: str
+    quantas_oportunidades: int
+    empresas: list[str]
+    """Razões sociais das empresas do grupo. Vazio para prospect sem empresa."""
+
+
+def _palavras(*textos: str) -> set[str]:
+    juntos = " ".join(t for t in textos if t)
+    s = unicodedata.normalize("NFKD", juntos).encode("ascii", "ignore").decode().lower()
+    return {t for t in re.findall(r"[a-z0-9]{3,}", s) if t not in _GENERICAS and not t.isdigit()}
+
+
+def sugerir_clientes(
+    prospects: Iterable[_GrupoComEmpresas], clientes: Iterable[_GrupoComEmpresas]
+) -> list[Sugestao]:
+    """Prospects que provavelmente já são um cliente da carteira, pelo nome das empresas.
+
+    A carga da carteira usa o nome do grupo econômico e a razão social das empresas, e as
+    propostas de 2026 usam o nome que o comercial digitou ("ASM retomada pelo Antonio - 3AW"
+    para o cliente "Grupo 3AW"). A busca por nome do grupo não vê isso.
+
+    Regra: a **palavra em comum** (sem acento, 3+ letras, fora de uma lista de genéricas) precisa
+    apontar para **exatamente um cliente**. "Gestão" aparece em vários e não conta; "3aw" aparece
+    em um só e conta. **Cada sugestão é um par** (cliente, prospect), com o cliente como principal:
+    nada de corrente que junte clientes diferentes num clique só.
+    """
+    clientes = list(clientes)
+    palavras_do_cliente = {c.id: _palavras(c.nome, *c.empresas) for c in clientes}
+    dono: dict[str, set[int]] = {}
+    for cid, ps in palavras_do_cliente.items():
+        for p in ps:
+            dono.setdefault(p, set()).add(cid)
+    por_id = {c.id: c for c in clientes}
+
+    sugestoes: list[Sugestao] = []
+    for pr in prospects:
+        achou: dict[int, list[str]] = {}
+        for p in _palavras(pr.nome, *pr.empresas):
+            donos = dono.get(p, set())
+            if len(donos) == 1:
+                achou.setdefault(next(iter(donos)), []).append(p)
+        if len(achou) != 1:
+            continue  # nenhuma, ou a mesma prospect aponta para clientes diferentes: ambíguo
+        cid, comuns = next(iter(achou.items()))
+        cliente = por_id[cid]
+        no_nome = _palavras(cliente.nome)
+        onde = [
+            f"“{w}” (no nome do grupo)" if w in no_nome
+            else f"“{w}” (na empresa {next((r for r in cliente.empresas if w in _palavras(r)), '?')})"
+            for w in sorted(comuns)
+        ]
+        sugestoes.append(
+            Sugestao(
+                confianca="média",
+                motivo=f"Já é cliente? Em comum com {cliente.nome}: " + "; ".join(onde) + ".",
+                ids=sorted([cid, pr.id]),
+                principal_id=cid,
+            )
+        )
+    sugestoes.sort(key=lambda x: (x.principal_id, x.ids))
     return sugestoes

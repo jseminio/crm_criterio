@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from crm.domain.sugestoes_de_fusao import chave_do_nome, sugerir
+from crm.domain.sugestoes_de_fusao import chave_do_nome, sugerir, sugerir_clientes
 
 
 @dataclass
@@ -74,3 +74,43 @@ def test_par_medio_leva_todos_os_grupos_de_cada_nome():
     assert _nomes(alta) == [[2, 3]]
     assert _nomes(media) == [[1, 2, 3]]
     assert media[0].motivo == "Um nome contém o outro: andrea curcio ⊂ bpo contabil andrea curcio."
+
+
+@dataclass
+class GE:
+    id: int
+    nome: str
+    quantas_oportunidades: int = 0
+    empresas: list[str] = None
+
+    def __post_init__(self):
+        self.empresas = self.empresas or []
+
+
+class TestProspectQueJaECliente:
+    def test_acha_pela_palavra_em_comum_com_o_nome_do_grupo(self):
+        s = sugerir_clientes([GE(10, "ASM retomada pelo Antonio - 3AW")], [GE(1, "Grupo 3AW", empresas=["3AW BRASIL PROPAGANDA S.A."])])
+        assert len(s) == 1 and s[0].ids == [1, 10] and s[0].principal_id == 1 and "3aw" in s[0].motivo and "no nome do grupo" in s[0].motivo
+
+    def test_acha_pelo_nome_de_uma_das_empresas_do_grupo(self):
+        s = sugerir_clientes([GE(10, "Cedae Saúde")], [GE(1, "Grupo Inbel", empresas=["CEDAE SAUDE ASSISTENCIA LTDA", "INBEL SA"])])
+        assert [x.ids for x in s] == [[1, 10]]
+        assert "na empresa CEDAE SAUDE ASSISTENCIA LTDA" in s[0].motivo   # diz onde a palavra apareceu
+
+    def test_palavra_generica_nao_liga_ninguem(self):
+        assert sugerir_clientes([GE(10, "GI Gestão")], [GE(1, "F102 Consultoria e Gestão")]) == []
+
+    def test_palavra_que_aponta_para_dois_clientes_e_ambigua_e_nao_sugere(self):
+        clientes = [GE(1, "Alfa Delta"), GE(2, "Beta Delta")]
+        assert sugerir_clientes([GE(10, "Delta Prospect")], clientes) == []
+
+    def test_prospect_que_aponta_para_dois_clientes_diferentes_e_ignorado(self):
+        clientes = [GE(1, "Grupo Voa"), GE(2, "Grupo Sunsto")]
+        assert sugerir_clientes([GE(10, "Voa Sunsto Tech")], clientes) == []
+
+    def test_cada_sugestao_e_um_par_com_o_cliente_como_principal(self):
+        s = sugerir_clientes([GE(10, "Voa Sales Tech"), GE(11, "Holding Duda - VOA")], [GE(1, "Grupo Voa")])
+        assert [(x.ids, x.principal_id) for x in s] == [([1, 10], 1), ([1, 11], 1)]
+
+    def test_sem_parecido_nao_devolve_nada(self):
+        assert sugerir_clientes([GE(10, "Zeta")], [GE(1, "Grupo Alfa")]) == []

@@ -527,6 +527,14 @@ como interpolação, e a senha chega codificada para endereço, cheia de `%23` e
 `%40`. Passá-la por ali derrubava a migração com `invalid interpolation syntax`
 — erro que não menciona senha nem URL, e custa caro para diagnosticar.
 
+**Prospect que já é cliente (26/09/2026).** Depois da carga da carteira, `sugerir_clientes` cruza cada
+prospect com os clientes pelo **nome das empresas** de cada grupo (a carteira usa o grupo econômico e a
+razão social; as propostas usam o nome que o comercial digitou, como "ASM retomada… - 3AW" para o "Grupo
+3AW"). A **palavra em comum** (3+ letras, fora de uma lista de genéricas) precisa apontar para **um único
+cliente**; cada sugestão é um **par** (cliente, prospect) com o cliente como principal, nunca uma
+corrente. O motivo diz **onde** a palavra apareceu (no nome do grupo, evidência mais forte, ou numa
+empresa). Prospects que apontam para dois clientes ficam de fora. Só sugere: quem funde é uma pessoa.
+Em 26/09/2026: 28 pares, 14 com a palavra no nome do grupo e 14 só na razão social de uma empresa.
 ## A carga de 2026
 
 `crm/carga/persistencia.py` grava as propostas e **sabe rodar de novo** — que é o

@@ -432,10 +432,12 @@ class ClassificacaoDoGrupo(Base):
     """
 
     __tablename__ = "classificacao_do_grupo"
-    __table_args__ = (sa.UniqueConstraint("grupo_id", "referencia", name="uq_classificacao_grupo_referencia"),)
+    __table_args__ = (sa.UniqueConstraint("grupo_id", "referencia", "revisao", name="uq_classificacao_grupo_referencia"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     grupo_id: Mapped[int] = mapped_column(sa.ForeignKey("grupo_economico.id"), nullable=False, index=True)
+    revisao: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False, default=1, server_default="1")
+    """Nova leitura da mesma referência (ex.: rentabilidade recalculada): revisão maior vence, a anterior fica."""
     referencia: Mapped[date] = mapped_column(sa.Date, nullable=False, index=True)
     """A data a que a leitura se refere (a da planilha), não a do carregamento."""
     fonte: Mapped[str] = mapped_column(sa.String(200), nullable=False)

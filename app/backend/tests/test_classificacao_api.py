@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
 from crm.api.app import criar_app
-from crm.db.modelos import ClassificacaoDoGrupo, Contrato, GrupoEconomico
+from crm.db.modelos import ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico
 from crm.domain import classificacao as regra
 from crm.domain.listas import SituacaoContrato, SituacaoGrupo
 
@@ -22,11 +22,11 @@ def cliente(engine):
         yield c
 
 
-def _snap(sessao: Session, grupo: GrupoEconomico, ref: date, receita: str, n: regra.Notas) -> None:
+def _snap(sessao: Session, grupo: GrupoEconomico, ref: date, receita: str, n: regra.Notas, revisao: int = 1) -> None:
     pontos = regra.score(n)
     letra = regra.classe(pontos)
     sessao.add(ClassificacaoDoGrupo(
-        grupo_id=grupo.id, referencia=ref, fonte="teste", versao_dos_parametros=regra.PARAMETROS.versao,
+        grupo_id=grupo.id, referencia=ref, revisao=revisao, fonte="teste", versao_dos_parametros=regra.PARAMETROS.versao,
         receita_mensal=Decimal(receita), nota_receita=n.receita, nota_rentabilidade=n.rentabilidade,
         complexidade=n.complexidade, disciplina=n.disciplina, risco_tecnico=n.risco, cross_sell=n.cross_sell,
         adimplencia=n.adimplencia, semaforo=n.semaforo, churn=n.churn, score=pontos, classe=letra,
@@ -75,3 +75,30 @@ def test_grupo_fundido_nao_aparece(cliente, sessao: Session):
     _snap(sessao, f, date(2026, 7, 31), "100", n)
     sessao.commit()
     assert cliente.get("/api/carteira/classificacao").json()["itens"] == []
+
+
+def test_na_mesma_referencia_a_revisao_maior_vence(cliente, sessao: Session):
+    ruim = regra.Notas(receita=1, rentabilidade=1, complexidade=5, disciplina=1, risco=5, cross_sell=1, adimplencia=1, semaforo=3, churn=5)
+    bom = regra.Notas(receita=5, rentabilidade=5, complexidade=1, disciplina=5, risco=1, cross_sell=5, adimplencia=5, semaforo=1, churn=1)
+    a = GrupoEconomico(nome="Alfa", situacao=SituacaoGrupo.CLIENTE)
+    sessao.add(a); sessao.flush()
+    _snap(sessao, a, date(2026, 7, 31), "1000", ruim, revisao=1)
+    _snap(sessao, a, date(2026, 7, 31), "1000", bom, revisao=2)
+    sessao.commit()
+    itens = cliente.get("/api/carteira/classificacao").json()["itens"]
+    assert len(itens) == 1 and itens[0]["classe"] == "A"
+
+
+def test_traz_as_empresas_do_grupo_com_a_mensalidade(cliente, sessao: Session):
+    n = regra.Notas(receita=3, rentabilidade=3, complexidade=3, disciplina=3, risco=3, cross_sell=3, adimplencia=3, semaforo=1, churn=2)
+    a = GrupoEconomico(nome="Alfa", situacao=SituacaoGrupo.CLIENTE)
+    sessao.add(a); sessao.flush()
+    e1 = Empresa(grupo_id=a.id, razao_social="Alfa Comércio Ltda", cnpj="11222333000181")
+    e2 = Empresa(grupo_id=a.id, razao_social="Alfa Serviços SA")
+    sessao.add_all([e1, e2]); sessao.flush()
+    sessao.add(Contrato(grupo_id=a.id, empresa_id=e1.id, situacao=SituacaoContrato.ATIVO, preco_mensal=Decimal("700")))
+    _snap(sessao, a, date(2026, 7, 31), "700", n)
+    sessao.commit()
+    emp = cliente.get("/api/carteira/classificacao").json()["itens"][0]["empresas"]
+    assert [e["razao_social"] for e in emp] == ["Alfa Comércio Ltda", "Alfa Serviços SA"]
+    assert Decimal(emp[0]["mensalidade"]) == Decimal("700") and emp[1]["mensalidade"] is None

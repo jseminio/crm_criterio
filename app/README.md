@@ -18,7 +18,7 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil, agente SDR e nove telas |
-| Testes | **547** no backend, **211** nas telas (26/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Testes | **554** no backend, **215** nas telas (26/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
 | Banco | PostgreSQL 18.6 local, treze tabelas (`ficha_de_conta`, `abordagem` e `execucao_do_agente` desde 26/09/2026 — migração `8673eda1df27`, **ainda não aplicada nesta máquina**: rode `alembic upgrade head`). Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
 | API | 45 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Agenda de follow-up, contatos, funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe), contratos (23/09/2026), abordagens do agente SDR (26/09/2026) e conferência da carga. React com TypeScript, em `../frontend` |
@@ -1081,7 +1081,7 @@ build` já usa `tsc -b` corretamente; o risco era só nas checagens manuais.
 
 ## Testes das telas
 
-131 testes com **Vitest** e **Testing Library**, em `frontend/src/**/*.test.{ts,tsx}`:
+215 testes com **Vitest** e **Testing Library**, em `frontend/src/**/*.test.{ts,tsx}`:
 
 ```bash
 cd frontend && npx vitest run

@@ -50,6 +50,7 @@ from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
 from crm.domain.listas import (
     ORIGEM_DA_MUDANCA_NO_CRM,
+    IniciativaDoEncerramento,
     LinhaServico,
     MotivoDeEncerramento,
     MotivoRecusa,
@@ -190,6 +191,7 @@ def _registrar(api: FastAPI) -> None:
             tipos_de_canal_em_operacao=[c.value for c in TipoCanal if c.em_operacao],
             motivos_de_recusa=_valores(MotivoRecusa),
             motivos_de_encerramento=_valores(MotivoDeEncerramento),
+            iniciativas_de_encerramento=_valores(IniciativaDoEncerramento),
             linhas_de_servico=_valores(LinhaServico),
             situacoes_de_grupo=_valores(SituacaoGrupo),
             captadores=sorted(_CAPTADORES),
@@ -858,13 +860,14 @@ def _registrar(api: FastAPI) -> None:
             data_do_evento=corpo.data_do_evento or date.today(),
             descricao=(corpo.descricao or "").strip() or None,
             motivo_categoria=corpo.motivo_categoria,
+            iniciativa=corpo.iniciativa,
             escopo_novo=corpo.escopo_novo,
             preco_mensal_novo=corpo.preco_mensal_novo,
             preco_anual_novo=corpo.preco_anual_novo,
             data_fim_nova=corpo.data_fim_nova,
         )
-        if corpo.motivo_categoria is not None and corpo.tipo is not TipoDeEventoDeContrato.ENCERRAMENTO:
-            raise HTTPException(422, "a categoria do motivo só vale no Encerramento")
+        if (corpo.motivo_categoria is not None or corpo.iniciativa is not None) and corpo.tipo is not TipoDeEventoDeContrato.ENCERRAMENTO:
+            raise HTTPException(422, "a categoria do motivo e a iniciativa só valem no Encerramento")
         try:
             efeito = regras_de_eventos.efeito_do_evento(contrato, pedido)
         except regras_de_eventos.ErroDeEvento as erro:
@@ -877,6 +880,7 @@ def _registrar(api: FastAPI) -> None:
                 data_do_evento=pedido.data_do_evento,
                 descricao=pedido.descricao,
                 motivo_categoria=pedido.motivo_categoria,
+                iniciativa=pedido.iniciativa,
                 preco_mensal_anterior=contrato.preco_mensal,
                 preco_mensal_novo=efeito.get("preco_mensal"),
                 preco_anual_anterior=contrato.preco_anual,

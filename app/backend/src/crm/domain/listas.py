@@ -177,6 +177,19 @@ class TipoDeEventoDeContrato(Enum):
     ENCERRAMENTO = "Encerramento"
 
 
+class IniciativaDoEncerramento(Enum):
+    """Quem decidiu encerrar o contrato — separa saída do cliente de saída da Critério.
+
+    Pedido de Eduardo em 26/09/2026: é o que distingue *churn* (o cliente saiu) de
+    *saída organizada* (a Critério saiu). Fica **separado** da categoria do motivo: a
+    categoria diz *por que*, a iniciativa diz *quem*. Os dois se combinam livremente
+    ("Preço" pode ser o cliente que achou caro ou a Critério que reajustou para sair).
+    """
+
+    CLIENTE = "Cliente"
+    CRITERIO = "Critério"
+
+
 class MotivoDeEncerramento(Enum):
     """Por que um contrato foi encerrado — insumo da análise de saída (churn).
 

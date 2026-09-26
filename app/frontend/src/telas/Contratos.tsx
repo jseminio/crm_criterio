@@ -19,11 +19,13 @@ const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "En
 function EdicaoDeContrato({
   contrato,
   motivos,
+  iniciativas,
   aoFechar,
   aoSalvar,
 }: {
   contrato: ContratoResumo;
   motivos: string[];
+  iniciativas: string[];
   aoFechar: () => void;
   aoSalvar: () => void;
 }) {
@@ -226,7 +228,7 @@ function EdicaoDeContrato({
         </div>
       </div>
 
-      {detalhe && <EventosDeContrato contrato={detalhe} aoRegistrar={aoRegistrarEvento} motivos={motivos} />}
+      {detalhe && <EventosDeContrato contrato={detalhe} aoRegistrar={aoRegistrarEvento} motivos={motivos} iniciativas={iniciativas} />}
 
       <div className="recado">
         Sem assinatura eletrônica ainda (Clicksign fica para depois) e sem renovação automática:
@@ -325,6 +327,7 @@ export function Contratos({ listas }: { listas: Listas | null }) {
         <EdicaoDeContrato
           contrato={editando}
           motivos={listas?.motivos_de_encerramento ?? []}
+          iniciativas={listas?.iniciativas_de_encerramento ?? []}
           aoFechar={() => definirEditando(null)}
           aoSalvar={recarregar}
         />

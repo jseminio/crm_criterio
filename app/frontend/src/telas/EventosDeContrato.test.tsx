@@ -37,7 +37,7 @@ describe("EventosDeContrato", () => {
         contrato={contrato({
           eventos: [{
             id: 1, tipo: "Reajuste", data_do_evento: "2026-09-01", registrado_em: "2026-09-25T15:00:00+00:00",
-            descricao: "IPCA", motivo_categoria: null, preco_mensal_anterior: "1000.00", preco_mensal_novo: "1100.00",
+            descricao: "IPCA", motivo_categoria: null, iniciativa: null, preco_mensal_anterior: "1000.00", preco_mensal_novo: "1100.00",
             preco_anual_anterior: null, preco_anual_novo: null, escopo_anterior: null, escopo_novo: null,
             data_fim_anterior: null, data_fim_nova: null,
           }],
@@ -70,12 +70,16 @@ describe("EventosDeContrato", () => {
     await userEvent.selectOptions(screen.getByLabelText("Registrar evento"), "Encerramento");
     expect(screen.getByRole("button", { name: /registrar encerramento/i })).toBeDisabled();
     await userEvent.selectOptions(screen.getByLabelText("Motivo do encerramento"), "Preço");
+    // só a categoria não basta: falta dizer quem decidiu
+    expect(screen.getByRole("button", { name: /registrar encerramento/i })).toBeDisabled();
+    await userEvent.selectOptions(screen.getByLabelText("Quem decidiu encerrar?"), "Critério");
     expect(screen.getByRole("button", { name: /registrar encerramento/i })).toBeEnabled();
   });
 
   it("a categoria 'Outro' exige texto; as demais, não", async () => {
     render(<EventosDeContrato contrato={contrato()} aoRegistrar={vi.fn()} motivos={MOTIVOS} />);
     await userEvent.selectOptions(screen.getByLabelText("Registrar evento"), "Encerramento");
+    await userEvent.selectOptions(screen.getByLabelText("Quem decidiu encerrar?"), "Cliente");
     await userEvent.selectOptions(screen.getByLabelText("Motivo do encerramento"), "Outro");
     expect(screen.getByRole("button", { name: /registrar encerramento/i })).toBeDisabled();
     await userEvent.type(screen.getByLabelText("Descreva o motivo"), "fusão com outra empresa");
@@ -86,10 +90,11 @@ describe("EventosDeContrato", () => {
     vi.mocked(api.registrarEventoDeContrato).mockResolvedValue(contrato({ situacao: "Encerrado" }));
     render(<EventosDeContrato contrato={contrato()} aoRegistrar={vi.fn()} motivos={MOTIVOS} />);
     await userEvent.selectOptions(screen.getByLabelText("Registrar evento"), "Encerramento");
+    await userEvent.selectOptions(screen.getByLabelText("Quem decidiu encerrar?"), "Cliente");
     await userEvent.selectOptions(screen.getByLabelText("Motivo do encerramento"), "Migrou para concorrente");
     await userEvent.click(screen.getByRole("button", { name: /registrar encerramento/i }));
     await userEvent.click(screen.getByRole("button", { name: /confirmar encerramento/i }));
-    await waitFor(() => expect(api.registrarEventoDeContrato).toHaveBeenCalledWith(7, { tipo: "Encerramento", data_do_evento: null, motivo_categoria: "Migrou para concorrente" }));
+    await waitFor(() => expect(api.registrarEventoDeContrato).toHaveBeenCalledWith(7, { tipo: "Encerramento", data_do_evento: null, motivo_categoria: "Migrou para concorrente", iniciativa: "Cliente" }));
   });
 
   it("o histórico mostra a categoria do motivo do encerramento", () => {
@@ -100,7 +105,7 @@ describe("EventosDeContrato", () => {
           situacao: "Encerrado",
           eventos: [{
             id: 2, tipo: "Encerramento", data_do_evento: "2026-09-20", registrado_em: "2026-09-25T15:00:00+00:00",
-            descricao: "foi para outro escritório", motivo_categoria: "Migrou para concorrente",
+            descricao: "foi para outro escritório", motivo_categoria: "Migrou para concorrente", iniciativa: "Cliente",
             preco_mensal_anterior: null, preco_mensal_novo: null, preco_anual_anterior: null, preco_anual_novo: null,
             escopo_anterior: null, escopo_novo: null, data_fim_anterior: "2027-03-01", data_fim_nova: "2026-09-20",
           }],
@@ -108,6 +113,7 @@ describe("EventosDeContrato", () => {
       />,
     );
     expect(screen.getByText("Migrou para concorrente")).toBeInTheDocument();
+    expect(screen.getByText("Cliente")).toBeInTheDocument(); // quem decidiu
     expect(screen.getByText("foi para outro escritório")).toBeInTheDocument();
   });
 

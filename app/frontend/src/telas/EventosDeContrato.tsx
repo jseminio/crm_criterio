@@ -39,11 +39,14 @@ export function EventosDeContrato({
   contrato,
   aoRegistrar,
   motivos = [],
+  iniciativas = ["Cliente", "Critério"],
 }: {
   contrato: ContratoDetalhe;
   aoRegistrar: (atualizado: ContratoDetalhe) => void;
   /** A lista de categorias de motivo de encerramento, vinda de `/api/listas`. */
   motivos?: string[];
+  /** Quem pode decidir encerrar, vindo de `/api/listas` (Cliente, Critério). */
+  iniciativas?: string[];
 }) {
   const assinado = contrato.situacao === "Ativo" || contrato.situacao === "Suspenso";
   const [tipo, definirTipo] = useState<Tipo>("Reajuste");
@@ -63,7 +66,7 @@ export function EventosDeContrato({
   // categoria é "Outro" — nas demais, a categoria já diz o porquê.
   const pedeDescricao = tipo === "Aditivo" || categoriaOutro;
   const faltaDado =
-    (pedeMotivo && !campos.motivo_categoria) ||
+    (pedeMotivo && (!campos.iniciativa || !campos.motivo_categoria)) ||
     (pedeDescricao && (campos.descricao ?? "").trim().length < 3) ||
     (tipo === "Renovação" && !campos.data_fim_nova) ||
     (["Reajuste", "Expansão", "Contração"].includes(tipo) && !campos.preco_mensal_novo && !campos.preco_anual_novo);
@@ -73,7 +76,7 @@ export function EventosDeContrato({
     definirErro(null);
     try {
       const corpo: Record<string, unknown> = { tipo, data_do_evento: campos.data_do_evento || null };
-      for (const k of ["descricao", "motivo_categoria", "escopo_novo", "preco_mensal_novo", "preco_anual_novo", "data_fim_nova"]) {
+      for (const k of ["descricao", "motivo_categoria", "iniciativa", "escopo_novo", "preco_mensal_novo", "preco_anual_novo", "data_fim_nova"]) {
         if (campos[k]) corpo[k] = campos[k];
       }
       const atualizado = await api.registrarEventoDeContrato(contrato.id, corpo);
@@ -103,6 +106,7 @@ export function EventosDeContrato({
                 <span className="numero-nota"> · registrado em {dataHora(ev.registrado_em)}</span>
               </div>
               <div className="numero-nota"><Efeito e={ev} /></div>
+              {ev.iniciativa && <div>Quem decidiu: <strong>{ev.iniciativa}</strong></div>}
               {ev.motivo_categoria && <div>Motivo: <strong>{ev.motivo_categoria}</strong></div>}
               {ev.descricao && <div>{ev.descricao}</div>}
             </li>
@@ -156,6 +160,17 @@ export function EventosDeContrato({
               <label className="campo-rotulo" htmlFor="ev-fim">Nova data de fim</label>
               <input id="ev-fim" type="date" className="entrada" value={campos.data_fim_nova ?? ""} onChange={(e) => mudar("data_fim_nova", e.target.value)} />
               <p className="campo-ajuda">Hoje o contrato termina em {contrato.data_fim ? data(contrato.data_fim) : "— (sem data de fim)"}.</p>
+            </div>
+          )}
+
+          {pedeMotivo && (
+            <div className="campo-bloco">
+              <label className="campo-rotulo" htmlFor="ev-iniciativa">Quem decidiu encerrar?</label>
+              <select id="ev-iniciativa" className="selecao" value={campos.iniciativa ?? ""} onChange={(e) => mudar("iniciativa", e.target.value)}>
+                <option value="">Escolha</option>
+                {iniciativas.map((i) => <option key={i} value={i}>{i}</option>)}
+              </select>
+              <p className="campo-ajuda">Separa saída do cliente (churn) de saída da Critério (saída organizada).</p>
             </div>
           )}
 

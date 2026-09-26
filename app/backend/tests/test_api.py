@@ -989,29 +989,39 @@ class TestEventosDeContrato:
         cid = self._contrato_ativo(cliente, carteira)
         assert cliente.patch(f"/api/contratos/{cid}", json={"situacao": "Encerrado"}).status_code == 422
         assert cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento", "descricao": "só texto"}).status_code == 422
+        # sem quem decidiu, não encerra
+        assert cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento", "motivo_categoria": "Preço"}).status_code == 422
         r = cliente.post(f"/api/contratos/{cid}/eventos", json={
-            "tipo": "Encerramento", "motivo_categoria": "Migrou para concorrente",
+            "tipo": "Encerramento", "iniciativa": "Cliente", "motivo_categoria": "Migrou para concorrente",
             "descricao": "foi para outro escritório", "data_do_evento": "2026-09-20"})
         assert r.status_code == 201
         assert (r.json()["situacao"], r.json()["data_fim"]) == ("Encerrado", "2026-09-20")
         ev = r.json()["eventos"][0]
-        assert (ev["motivo_categoria"], ev["descricao"]) == ("Migrou para concorrente", "foi para outro escritório")
+        assert (ev["iniciativa"], ev["motivo_categoria"], ev["descricao"]) == ("Cliente", "Migrou para concorrente", "foi para outro escritório")
         # encerrado não recebe mais nada
         assert cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Aditivo", "descricao": "x y z"}).status_code == 409
 
     def test_categoria_de_motivo_fora_da_lista_e_recusada(self, cliente, carteira):
         cid = self._contrato_ativo(cliente, carteira)
-        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento", "motivo_categoria": "Palpite"})
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento", "iniciativa": "Cliente", "motivo_categoria": "Palpite"})
+        assert r.status_code == 422
+
+    def test_iniciativa_fora_da_lista_e_recusada(self, cliente, carteira):
+        cid = self._contrato_ativo(cliente, carteira)
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento", "iniciativa": "Ninguém", "motivo_categoria": "Preço"})
         assert r.status_code == 422
 
     def test_categoria_so_vale_no_encerramento(self, cliente, carteira):
         cid = self._contrato_ativo(cliente, carteira)
         r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Reajuste", "preco_mensal_novo": "9000", "motivo_categoria": "Preço"})
         assert r.status_code == 422 and "Encerramento" in r.json()["detail"]
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Reajuste", "preco_mensal_novo": "9000", "iniciativa": "Cliente"})
+        assert r.status_code == 422 and "Encerramento" in r.json()["detail"]
 
     def test_a_lista_de_motivos_vem_da_api_de_listas(self, cliente):
         lista = cliente.get("/api/listas").json()["motivos_de_encerramento"]
         assert "Preço" in lista and lista[-1] == "Outro" and len(lista) == 9
+        assert cliente.get("/api/listas").json()["iniciativas_de_encerramento"] == ["Cliente", "Critério"]
 
     def test_expansao_nao_reduz(self, cliente, carteira):
         cid = self._contrato_ativo(cliente, carteira)

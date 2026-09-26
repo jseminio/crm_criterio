@@ -38,6 +38,7 @@ from crm.domain.listas import (
     SituacaoLead,
     Temperatura,
     TipoCanal,
+    IniciativaDoEncerramento,
     MotivoDeEncerramento,
     TipoDeEventoDeContrato,
     TipoDeOcorrencia,
@@ -522,6 +523,10 @@ class EventoDeContrato(Base):
         coluna_lista(MotivoDeEncerramento, tamanho=60), index=True
     )
     """Só no encerramento. Nulo em qualquer outro evento."""
+    iniciativa: Mapped[IniciativaDoEncerramento | None] = mapped_column(
+        coluna_lista(IniciativaDoEncerramento), index=True
+    )
+    """Quem decidiu encerrar: `Cliente` ou `Critério`. Só no encerramento."""
 
     preco_mensal_anterior: Mapped[Decimal | None] = mapped_column(DINHEIRO)
     preco_mensal_novo: Mapped[Decimal | None] = mapped_column(DINHEIRO)

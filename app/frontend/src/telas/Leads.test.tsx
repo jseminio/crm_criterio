@@ -28,6 +28,7 @@ const LISTAS: Listas = {
   tipos_de_canal_em_operacao: ["Sócios", "Parceiros"],
   motivos_de_recusa: [],
   motivos_de_encerramento: [],
+  iniciativas_de_encerramento: [],
   linhas_de_servico: [],
   situacoes_de_grupo: [],
   captadores: ["EL", "BO"],

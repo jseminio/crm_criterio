@@ -16,7 +16,7 @@ Cada tipo:
 | Expansão | novo preço, **não menor** | novo preço |
 | Contração | novo preço, **não maior** | novo preço |
 | Renovação | nova data de fim, **depois** da atual | nova data de fim |
-| Encerramento | **categoria do motivo** (`Outro` exige texto) | situação Encerrado; fim = data do evento |
+| Encerramento | **quem decidiu** (cliente ou Critério) e a **categoria do motivo** (`Outro` exige texto) | situação Encerrado; fim = data do evento |
 
 Funções puras: não tocam no banco. Quem chama grava o evento e aplica o efeito.
 """
@@ -28,7 +28,12 @@ from datetime import date
 from decimal import Decimal
 from typing import Protocol
 
-from crm.domain.listas import MotivoDeEncerramento, SituacaoContrato, TipoDeEventoDeContrato
+from crm.domain.listas import (
+    IniciativaDoEncerramento,
+    MotivoDeEncerramento,
+    SituacaoContrato,
+    TipoDeEventoDeContrato,
+)
 
 __all__ = ["ErroDeEvento", "Pedido", "efeito_do_evento"]
 
@@ -63,6 +68,7 @@ class Pedido:
     preco_anual_novo: Decimal | None = None
     data_fim_nova: date | None = None
     motivo_categoria: MotivoDeEncerramento | None = None
+    iniciativa: IniciativaDoEncerramento | None = None
 
 
 def _texto_obrigatorio(pedido: Pedido, o_que: str) -> None:
@@ -126,6 +132,8 @@ def efeito_do_evento(contrato: _Contrato, pedido: Pedido) -> dict[str, object]:
         efeito["data_fim"] = pedido.data_fim_nova
 
     elif tipo is T.ENCERRAMENTO:
+        if pedido.iniciativa is None:
+            raise ErroDeEvento("Encerramento: informe quem decidiu encerrar (cliente ou Critério).")
         if pedido.motivo_categoria is None:
             raise ErroDeEvento("Encerramento: escolha a categoria do motivo.")
         if pedido.motivo_categoria is MotivoDeEncerramento.OUTRO:

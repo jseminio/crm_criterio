@@ -54,7 +54,7 @@ export function Receita() {
   return (
     <section className="numero receita" aria-label="MRR dos contratos registrados">
       <div className="recado" role="note">
-        <strong>MRR parcial.</strong> {dados.aviso}
+        <strong>{dados.cobertura_completa ? "Confira a fonte." : "MRR parcial."}</strong> {dados.aviso}
       </div>
 
       <div className="receita-topo">
@@ -66,9 +66,22 @@ export function Receita() {
               {atual.contratos} contrato{atual.contratos === 1 ? "" : "s"} ativo{atual.contratos === 1 ? "" : "s"}
               {atual.suspenso_contratos > 0 && ` · ${dinheiro(atual.suspenso_valor)} em ${atual.suspenso_contratos} suspenso${atual.suspenso_contratos === 1 ? "" : "s"}`}
             </p>
+            {atual.ticket_por_grupo !== null && (
+              <p>
+                Ticket médio por grupo <strong>{dinheiro(atual.ticket_por_grupo)}</strong>
+                {" · "}mediana <strong>{dinheiro(atual.mediana_por_grupo)}</strong>
+                {" · "}{atual.grupos} grupo{atual.grupos === 1 ? "" : "s"}
+              </p>
+            )}
             {atual.sem_preco_mensal > 0 && (
               <p className="numero-nota">
                 {atual.sem_preco_mensal} contrato{atual.sem_preco_mensal === 1 ? "" : "s"} sem preço mensal ficou de fora da soma.
+              </p>
+            )}
+            {atual.ticket_por_grupo !== null && (
+              <p className="numero-nota">
+                Receita média por grupo, na carteira inteira (não é venda nova). Empresas do mesmo grupo
+                contam como um; a mediana vai junto porque poucos grupos grandes puxam a média.
               </p>
             )}
             {dados.contratos_registrados === 0 && (

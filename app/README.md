@@ -809,35 +809,22 @@ junto do número**, nunca só o valor pelado.
   (`TipoCanal.SOCIOS`). Insight que o documento de negócio já tinha calculado
   à mão (56% em 19/09/2026); agora atualiza sozinho a cada filtro.
 
-### Ticket médio — por que não está na tela (23/09/2026)
+### Ticket médio da carteira (26/09/2026, recalculado)
 
-Eduardo decidiu: receita média por grupo, **na carteira inteira** — não venda
-nova. Mas a carteira inteira não está no CRM (só as 155 propostas de 2026),
-pela mesma razão que já tira o MRR de escopo. Calculei pontualmente, fora do
-CRM, a partir de `Rentabilidade_Grupo_COMPLETO.xlsx` (fica em `~/Downloads`,
-**fora do repositório** — dado de cliente, LGPD amarelo).
+Definição de Eduardo (23/09/2026): **receita mensal média por grupo, na carteira inteira**, não venda nova.
+Antes ficava de fora da tela porque a carteira não estava no CRM; agora está, e o ticket sai dos
+contratos ativos (`ticket_por_grupo` e `mediana_por_grupo` em `GET /api/mrr`, no painel de **Contratos**).
+Empresas do mesmo grupo contam como um; cliente individual é um grupo de uma empresa. A mediana vai junto:
+poucos grupos grandes puxam a média (os 2 maiores somam 37,7% do total).
 
-Duas idas e voltas até fechar:
+| Momento | Grupos | Total mensal | Ticket médio | Mediana |
+|---|---|---|---|---|
+| 23/09 (divulgado; Tabor a R$ 4.500) | 31 | R$ 229.641,20 | R$ 7.407,78 | — |
+| 26/09, valores corrigidos | 31 | R$ 226.341,20 | **R$ 7.301,33** | R$ 3.200,00 |
+| 26/09, após a baixa do Tabor (30/06/2026) | **30** | R$ 225.141,20 | **R$ 7.504,71** | R$ 3.481,42 |
 
-1. **Aba "Margem por Grupo" × aba "4. Clientes" pareciam divergir** (R$
-   12.069,36 vs R$ 8.385,65) — era erro meu de agregação, não dado
-   inconsistente. Reconciliando grupo a grupo, 14 dos 15 batem exatamente
-   quando "4. Clientes" é **somado** por CNPJ (não "um valor só quando os
-   CNPJs empatam"). O único que não batia — Grupo Blac, R$ 2.600,01 de
-   diferença real entre as abas — Eduardo confirmou em 23/09/2026: vale o
-   valor da aba "Margem por Grupo" (R$ 27.930,00).
-2. **16 empresas sem grupo econômico ficaram de fora da primeira conta.**
-   Eduardo confirmou: são 16 clientes individuais de verdade, cada um sua
-   própria unidade — entram um a um, não como grupo.
-
-**Ticket médio final: R$ 7.407,78** (31 unidades — 15 grupos + 16 empresas
-individuais; total mensal R$ 229.641,20). Mediana R$ 3.762,83, bem mais perto
-da meta oficial de R$ 3.000 que a média — a média é puxada para cima por
-poucos grupos grandes (INBEL R$ 44.725, MR R$ 40.589).
-
-`GET /api/indicadores` aceita os mesmos filtros do funil, mais `servico`
-(novo em 23/09/2026 — os oito valores reais das 155 propostas, vindos do
-banco, não de enum: `Oportunidade.servico` é texto livre da planilha).
+O ticket **sobe** com a baixa do Tabor (que estava abaixo da média), e o R$ 7.407,78 de 23/09 usava um
+valor errado. Meta oficial: R$ 3.000, e a mediana está perto dela.
 
 ### Ticket recorrente aceito (25/09/2026)
 

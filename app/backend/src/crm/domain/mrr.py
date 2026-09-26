@@ -29,6 +29,7 @@ até hoje.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from statistics import median
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Iterable, Protocol
@@ -53,6 +54,7 @@ class _Evento(Protocol):
 
 class _Contrato(Protocol):
     id: int
+    grupo_id: int
     situacao: SituacaoContrato
     preco_mensal: Decimal | None
     data_inicio: date | None
@@ -68,6 +70,14 @@ class MrrAtual:
     suspenso_contratos: int
     sem_preco_mensal: int
     """Ativos e suspensos sem preço mensal: ficaram de fora da soma."""
+    grupos: int = 0
+    """Quantos grupos (clientes) têm contrato ativo com preço mensal."""
+    ticket_por_grupo: Decimal | None = None
+    """Ticket médio da carteira: **receita mensal média por grupo** (decisão de Eduardo em
+    23/09/2026: por grupo, na carteira inteira, não venda nova). Um grupo com várias empresas
+    conta como **um**; cliente individual é um grupo de uma empresa. `None` sem contrato ativo."""
+    mediana_por_grupo: Decimal | None = None
+    """A mediana vai junto: 2 grupos respondem por ~38% do total, e a média sozinha engana."""
 
 
 @dataclass(frozen=True)
@@ -97,6 +107,7 @@ class Movimento:
 def mrr_atual(contratos: Iterable[_Contrato]) -> MrrAtual:
     valor = suspenso = ZERO
     ativos = suspensos = sem_preco = 0
+    por_grupo: dict[int, Decimal] = {}
     for c in contratos:
         if c.situacao not in (SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO):
             continue
@@ -106,10 +117,17 @@ def mrr_atual(contratos: Iterable[_Contrato]) -> MrrAtual:
         if c.situacao is SituacaoContrato.ATIVO:
             valor += c.preco_mensal
             ativos += 1
+            por_grupo[c.grupo_id] = por_grupo.get(c.grupo_id, ZERO) + c.preco_mensal
         else:
             suspenso += c.preco_mensal
             suspensos += 1
-    return MrrAtual(valor, ativos, suspenso, suspensos, sem_preco)
+    totais = list(por_grupo.values())
+    return MrrAtual(
+        valor, ativos, suspenso, suspensos, sem_preco,
+        grupos=len(totais),
+        ticket_por_grupo=(valor / len(totais)).quantize(CENTAVOS) if totais else None,
+        mediana_por_grupo=Decimal(median(totais)).quantize(CENTAVOS) if totais else None,
+    )
 
 
 def _preco_inicial(c: _Contrato) -> Decimal | None:

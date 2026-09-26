@@ -12,7 +12,7 @@ vi.mock("../api/cliente", async () => {
 const AVISO = "Só entram os contratos registrados no CRM. A carteira anterior ainda não foi carregada.";
 
 const mrr = (o: Partial<Mrr> = {}, mov: Partial<Mrr["movimento"]> = {}, atual: Partial<Mrr["atual"]> = {}): Mrr => ({
-  atual: { valor: "0.00", contratos: 0, suspenso_valor: "0.00", suspenso_contratos: 0, sem_preco_mensal: 0, ...atual },
+  atual: { valor: "0.00", contratos: 0, suspenso_valor: "0.00", suspenso_contratos: 0, sem_preco_mensal: 0, grupos: 0, ticket_por_grupo: null, mediana_por_grupo: null, ...atual },
   movimento: {
     de: "2026-09-01", ate: "2026-09-25", mrr_inicio: "0.00", novo: "0.00", expansao: "0.00", reajuste: "0.00",
     contracao: "0.00", churn_cliente: "0.00", churn_criterio: "0.00", churn: "0.00", mrr_fim: "0.00",
@@ -30,6 +30,31 @@ describe("Receita (MRR)", () => {
     expect(await screen.findByText(/MRR parcial/)).toBeInTheDocument();
     expect(screen.getByText(/carteira anterior ainda não foi carregada/)).toBeInTheDocument();
     expect(screen.getByText(/2 contratos ativos/)).toBeInTheDocument();
+  });
+
+  it("mostra o ticket médio por grupo com a mediana ao lado", async () => {
+    vi.mocked(api.mrr).mockResolvedValue(
+      mrr({ contratos_registrados: 58 }, {}, { valor: "225141.20", contratos: 57, grupos: 30, ticket_por_grupo: "7504.71", mediana_por_grupo: "3481.42" }),
+    );
+    render(<Receita />);
+    expect(await screen.findByText(/7\.504,71/)).toBeInTheDocument();
+    expect(screen.getByText(/3\.481,42/)).toBeInTheDocument();
+    expect(screen.getByText(/30 grupos/)).toBeInTheDocument();
+    expect(screen.getByText(/não é venda nova/i)).toBeInTheDocument();
+  });
+
+  it("sem contrato ativo não mostra ticket, em vez de zero", async () => {
+    vi.mocked(api.mrr).mockResolvedValue(mrr());
+    render(<Receita />);
+    await screen.findByText(/MRR parcial/);
+    expect(screen.queryByText(/ticket médio por grupo/i)).toBeNull();
+  });
+
+  it("com a carteira carregada o aviso deixa de dizer 'parcial' e pede para conferir a fonte", async () => {
+    vi.mocked(api.mrr).mockResolvedValue(mrr({ cobertura_completa: true, contratos_da_carteira_anterior: 58, aviso: "Inclui a carteira anterior ao CRM." }));
+    render(<Receita />);
+    expect(await screen.findByText("Confira a fonte.")).toBeInTheDocument();
+    expect(screen.queryByText(/MRR parcial/)).toBeNull();
   });
 
   it("sem contrato nenhum, diz que ainda não há, não só mostra zero", async () => {

@@ -1138,3 +1138,24 @@ class TestCorrecaoDeCarga:
         c = Contrato(grupo_id=g.id, anterior_ao_crm=True, situacao=S.ATIVO, preco_mensal=Decimal("100"))
         sessao.add(c); sessao.commit()
         assert cliente.post(f"/api/contratos/{c.id}/eventos", json={"tipo": "Correção", "preco_mensal_novo": "50"}).status_code == 422
+
+
+class TestTicketDaCarteira:
+    def test_ticket_por_grupo_e_mediana_na_api_do_mrr(self, cliente, sessao, carteira):
+        from crm.db.modelos import Contrato
+        from crm.domain.listas import SituacaoContrato as S
+
+        g1, g2 = sessao.scalars(sa.select(GrupoEconomico).order_by(GrupoEconomico.id)).all()[:2]
+        sessao.add_all([
+            Contrato(grupo_id=g1.id, anterior_ao_crm=True, situacao=S.ATIVO, preco_mensal=Decimal("1000.00")),
+            Contrato(grupo_id=g1.id, anterior_ao_crm=True, situacao=S.ATIVO, preco_mensal=Decimal("2000.00")),
+            Contrato(grupo_id=g2.id, anterior_ao_crm=True, situacao=S.ATIVO, preco_mensal=Decimal("6000.00")),
+        ])
+        sessao.commit()
+        a = cliente.get("/api/mrr", params={"hoje": "2026-09-25"}).json()["atual"]
+        assert (a["grupos"], a["contratos"], a["valor"]) == (2, 3, "9000.00")
+        assert (a["ticket_por_grupo"], a["mediana_por_grupo"]) == ("4500.00", "4500.00")
+
+    def test_sem_contrato_o_ticket_e_nulo(self, cliente):
+        a = cliente.get("/api/mrr", params={"hoje": "2026-09-25"}).json()["atual"]
+        assert (a["grupos"], a["ticket_por_grupo"], a["mediana_por_grupo"]) == (0, None, None)

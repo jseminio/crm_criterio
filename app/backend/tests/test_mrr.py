@@ -35,6 +35,8 @@ class C:
     situacao: S = S.ATIVO
     eventos: list[Ev] = field(default_factory=list)
     id: int = field(default_factory=lambda: next(_id))
+    grupo_id: int = field(default_factory=lambda: next(_id))
+    """Por padrão cada contrato é de um grupo diferente."""
 
 
 class TestMrrAtual:
@@ -155,3 +157,31 @@ class TestCorrecaoNaoEMovimento:
     def test_novo_nao_usa_o_antes_de_uma_correcao(self):
         c = C(D("1000"), data_inicio=date(2026, 9, 2), eventos=[Ev(T.CORRECAO, date(2026, 9, 3), D("9999"), D("1000"))])
         assert movimento([c], date(2026, 9, 1), HOJE, HOJE).novo == D("1000")
+
+
+class TestTicketPorGrupo:
+    """Ticket médio da carteira: receita mensal média por grupo (decisão de 23/09/2026)."""
+
+    def test_um_grupo_com_varias_empresas_conta_uma_vez(self):
+        m = mrr_atual([C(D("1000"), grupo_id=1), C(D("2000"), grupo_id=1), C(D("3000"), grupo_id=2)])
+        assert (m.grupos, m.valor) == (2, D("6000"))
+        assert m.ticket_por_grupo == D("3000.00")          # 6000 / 2 grupos, não / 3 contratos
+        assert m.mediana_por_grupo == D("3000.00")
+
+    def test_a_mediana_vem_junto_porque_a_media_engana(self):
+        cs = [C(D("1000"), grupo_id=1), C(D("1000"), grupo_id=2), C(D("1000"), grupo_id=3), C(D("21000"), grupo_id=4)]
+        m = mrr_atual(cs)
+        assert (m.ticket_por_grupo, m.mediana_por_grupo) == (D("6000.00"), D("1000.00"))
+
+    def test_so_conta_ativo_com_preco_mensal(self):
+        m = mrr_atual([C(D("1000"), grupo_id=1), C(D("500"), grupo_id=2, situacao=S.SUSPENSO),
+                       C(D("700"), grupo_id=3, situacao=S.ENCERRADO), C(None, grupo_id=4)])
+        assert (m.grupos, m.ticket_por_grupo) == (1, D("1000.00"))
+
+    def test_grupo_que_so_tem_contrato_encerrado_nao_entra(self):
+        m = mrr_atual([C(D("1000"), grupo_id=1), C(D("9000"), grupo_id=2, situacao=S.ENCERRADO)])
+        assert m.grupos == 1 and m.ticket_por_grupo == D("1000.00")
+
+    def test_sem_contrato_ativo_nao_calcula_nem_devolve_zero(self):
+        m = mrr_atual([])
+        assert (m.grupos, m.ticket_por_grupo, m.mediana_por_grupo) == (0, None, None)

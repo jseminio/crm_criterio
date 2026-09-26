@@ -372,6 +372,10 @@ export interface MrrAtual {
   suspenso_valor: string;
   suspenso_contratos: number;
   sem_preco_mensal: number;
+  grupos: number;
+  /** Receita mensal média por grupo (decisão de 23/09/2026). */
+  ticket_por_grupo: string | null;
+  mediana_por_grupo: string | null;
 }
 
 export interface MovimentoDeMrr {

@@ -82,6 +82,9 @@ class MrrAtualResposta(Base):
     suspenso_valor: Decimal
     suspenso_contratos: int
     sem_preco_mensal: int
+    grupos: int = 0
+    ticket_por_grupo: Decimal | None = None
+    mediana_por_grupo: Decimal | None = None
 
 
 class MovimentoDeMrrResposta(Base):

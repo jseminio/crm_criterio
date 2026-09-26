@@ -216,6 +216,22 @@ contatos, e cuida de duas coisas que passariam batidas:
 Recusa três fusões: um grupo nele mesmo, um grupo já fundido antes, e a que
 fecharia um ciclo deixando os dois sem raiz.
 
+#### Sugestões de fusão (25/09/2026)
+
+`GET /api/grupos/sugestoes-de-fusao` e o painel no topo de **Grupos** apontam grupos que
+parecem ser o mesmo cliente. **Só sugere; nunca funde.** A fusão é um clique de uma pessoa,
+em dois passos, pelo `POST /api/grupos/{id}/fundir` de sempre. Regras em
+`crm/domain/sugestoes_de_fusao.py`:
+
+- **alta:** a *chave* do nome é a mesma (sem acento, sem caixa, sem o que está entre
+  parênteses e sem o que vem depois de " - ");
+- **média:** um nome contém o outro e o menor tem duas palavras ou mais;
+- **fora de propósito:** nome de uma palavra só dentro de outro ("Aeskins" e "Horas
+  adicionais Aeskins") e nomes só parecidos na escrita ("BRA" e "BRAP") — falso positivo demais.
+
+Com os dados de 25/09/2026: 19 sugestões entre os 138 grupos. "Não é o mesmo cliente" some
+com a sugestão **só neste navegador** (não grava no banco).
+
 ### Credenciais
 
 Nada disso está no `alembic.ini`, que é versionado. O código lê o `.env`

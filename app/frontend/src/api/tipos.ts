@@ -258,3 +258,12 @@ export interface Ocorrencia {
   campo: string | null;
   texto: string;
 }
+
+
+/** Um bloco de grupos que parecem ser o mesmo cliente. Só sugestão: quem funde é uma pessoa. */
+export interface SugestaoDeFusao {
+  confianca: "alta" | "média";
+  motivo: string;
+  principal_id: number;
+  grupos: GrupoResumo[];
+}

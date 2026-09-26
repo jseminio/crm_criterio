@@ -16,7 +16,7 @@ const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO R
 type Campos = Record<string, string>;
 const vazio = (v: string | null | undefined) => v ?? "";
 
-function FormularioDePessoa({
+export function FormularioDePessoa({
   inicial,
   papeis,
   rotulo,

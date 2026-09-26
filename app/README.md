@@ -55,6 +55,8 @@ pontual). Antes, só a carteira recorrente era "Cliente". Agora:
 
 ## Contatos: clientes e prospects segregados (26/09/2026)
 
+**Nova pessoa (26/09/2026).** O botão "Nova pessoa", no topo do menu Contatos, abre um painel para cadastrar uma pessoa sem precisar abrir antes uma empresa: busca a empresa, o CNPJ ou o grupo (entre clientes e prospects), escolhe se a pessoa fica ligada só à empresa ou ao grupo todo (prospect sem empresa liga ao grupo) e preenche nome, cargo, e-mail, telefone, papel, observação e "não contatar". Usa a mesma rota `POST /api/contatos/pessoas`, que exige empresa OU grupo.
+
 Menu **Contatos** (`crm/api/contatos.py`, `crm/domain/contatos.py`). Duas abas, **Clientes** e
 **Prospects**, e dois modos de busca:
 

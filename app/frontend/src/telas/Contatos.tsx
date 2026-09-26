@@ -13,6 +13,7 @@ import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/
 import { cnpj as formatarCnpj, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
 import { DetalheDoContato } from "./DetalheDoContato";
+import { NovaPessoa } from "./NovaPessoa";
 
 type Modo = "empresa" | "pessoa";
 const ROTULO: Record<TipoDeContato, string> = { cliente: "Clientes", prospect: "Prospects" };
@@ -42,6 +43,7 @@ export function Contatos({ listas }: { listas: Listas | null }) {
   const [texto, definirTexto] = useState("");
   const [soComLacunas, definirSoComLacunas] = useState(false);
   const [aberto, definirAberto] = useState<EntidadeDeContato | null>(null);
+  const [cadastrando, definirCadastrando] = useState(false);
   const busca = useAtrasado(texto);
 
   const empresas = usarDados<PaginaDeContatos<EntidadeDeContato> | null>(
@@ -64,6 +66,10 @@ export function Contatos({ listas }: { listas: Listas | null }) {
   const nada = !atual.carregando && !atual.erro && total === 0;
   return (
     <>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--e2)" }}>
+        <button type="button" className="botao botao-primario" onClick={() => definirCadastrando(true)}>Nova pessoa</button>
+      </div>
+
       <div className="abas" role="tablist" aria-label="Clientes e prospects">
         {(["cliente", "prospect"] as TipoDeContato[]).map((t) => (
           <button key={t} type="button" role="tab" className="aba" aria-selected={tipo === t}
@@ -107,7 +113,7 @@ export function Contatos({ listas }: { listas: Listas | null }) {
       {nada && !texto && !soComLacunas && (
         <VazioSemDados
           titulo={modo === "empresa" ? `Nenhum ${tipo === "cliente" ? "cliente" : "prospect"} cadastrado` : "Nenhuma pessoa de contato ainda"}
-          explicacao={modo === "pessoa" ? "Abra uma empresa na aba “Empresa” e adicione o primeiro contato." : "Os clientes vêm da carteira; os prospects, das propostas."}
+          explicacao={modo === "pessoa" ? "Use “Nova pessoa” para cadastrar o primeiro contato." : "Os clientes vêm da carteira; os prospects, das propostas."}
         />
       )}
 
@@ -168,6 +174,8 @@ export function Contatos({ listas }: { listas: Listas | null }) {
       )}
 
       {total !== undefined && total > 0 && <p className="numero-nota">{total} resultado{total === 1 ? "" : "s"}</p>}
+
+      {cadastrando && <NovaPessoa listas={listas} aoFechar={() => definirCadastrando(false)} aoCriar={recarregar} />}
 
       {aberta && <DetalheDoContato entidade={aberta} listas={listas} aoFechar={() => definirAberto(null)} aoMudar={recarregar} />}
     </>

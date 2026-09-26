@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
@@ -116,5 +116,70 @@ describe("Contatos — clientes e prospects separados", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Alfa Comércio Ltda" }));
     expect(await screen.findByText(/Falta:/)).toBeInTheDocument();
     expect(screen.getByText("Nenhum contato cadastrado ainda.")).toBeInTheDocument();
+  });
+
+  describe("Nova pessoa (cadastro direto no menu)", () => {
+    const abrir = async () => {
+      render(<Contatos listas={null} />);
+      await screen.findByText("Alfa Comércio Ltda");
+      await userEvent.click(screen.getByRole("button", { name: "Nova pessoa" }));
+    };
+    const escolherEmpresa = async () => {
+      await userEvent.type(screen.getByLabelText(/empresa, cnpj ou grupo/i), "alfa");
+      const lista = await screen.findByRole("list", { name: "Resultados da busca" });
+      await userEvent.click((await within(lista).findAllByRole("button", { name: "Escolher" }))[0]);
+    };
+
+    it("cadastra a pessoa ligada só à empresa escolhida", async () => {
+      vi.mocked(api.criarContato).mockResolvedValue(pessoa());
+      await abrir();
+      await escolherEmpresa();
+      await userEvent.type(screen.getByLabelText("Nome"), "João Souza");
+      await userEvent.click(screen.getByRole("button", { name: "Cadastrar pessoa" }));
+      await waitFor(() => expect(api.criarContato).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(api.criarContato).mock.calls[0][0]).toMatchObject({ nome: "João Souza", empresa_id: 10 });
+      expect(vi.mocked(api.criarContato).mock.calls[0][0]).not.toHaveProperty("grupo_id");
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("pode ligar ao grupo todo", async () => {
+      vi.mocked(api.criarContato).mockResolvedValue(pessoa());
+      await abrir();
+      await escolherEmpresa();
+      await userEvent.click(screen.getByRole("radio", { name: /ao grupo todo/i }));
+      await userEvent.type(screen.getByLabelText("Nome"), "Ana");
+      await userEvent.click(screen.getByRole("button", { name: "Cadastrar pessoa" }));
+      await waitFor(() => expect(api.criarContato).toHaveBeenCalled());
+      expect(vi.mocked(api.criarContato).mock.calls[0][0]).toMatchObject({ nome: "Ana", grupo_id: 1 });
+      expect(vi.mocked(api.criarContato).mock.calls[0][0]).not.toHaveProperty("empresa_id");
+    });
+
+    it("prospect sem empresa liga ao grupo, sem perguntar", async () => {
+      vi.mocked(api.contatosPorEmpresa).mockResolvedValue({ total: 1, itens: [entidade({ tipo: "prospect", empresa_id: null, razao_social: null, cnpj: null, grupo_nome: "Beta Prospect", grupo_id: 2 })] });
+      vi.mocked(api.criarContato).mockResolvedValue(pessoa());
+      render(<Contatos listas={null} />);
+      await screen.findByText("Beta Prospect");
+      await userEvent.click(screen.getByRole("button", { name: "Nova pessoa" }));
+      await userEvent.type(screen.getByLabelText(/empresa, cnpj ou grupo/i), "beta");
+      await userEvent.click((await within(await screen.findByRole("list", { name: "Resultados da busca" })).findAllByRole("button", { name: "Escolher" }))[0]);
+      expect(screen.queryByRole("radio")).toBeNull();
+      await userEvent.type(screen.getByLabelText("Nome"), "Carla");
+      await userEvent.click(screen.getByRole("button", { name: "Cadastrar pessoa" }));
+      await waitFor(() => expect(api.criarContato).toHaveBeenCalled());
+      expect(vi.mocked(api.criarContato).mock.calls[0][0]).toMatchObject({ nome: "Carla", grupo_id: 2 });
+    });
+
+    it("não deixa cadastrar sem escolher onde a pessoa trabalha", async () => {
+      await abrir();
+      expect(screen.queryByRole("button", { name: "Cadastrar pessoa" })).toBeNull();
+      expect(screen.getByText("1. Onde esta pessoa trabalha?")).toBeInTheDocument();
+    });
+
+    it("avisa quando a busca não acha nada", async () => {
+      await abrir();
+      vi.mocked(api.contatosPorEmpresa).mockResolvedValue({ total: 0, itens: [] });
+      await userEvent.type(screen.getByLabelText(/empresa, cnpj ou grupo/i), "zzz");
+      expect(await screen.findByText(/nada encontrado/i)).toBeInTheDocument();
+    });
   });
 });

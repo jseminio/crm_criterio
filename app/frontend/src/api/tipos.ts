@@ -534,3 +534,38 @@ export interface FusaoFeita {
   contratos: number;
   pode_desfazer: boolean;
 }
+
+export interface ItemDaCarteira {
+  grupo_id: number;
+  grupo_nome: string;
+  receita_mensal: string;
+  score: string;
+  classe: string;
+  classe_efetiva: string;
+  alerta_de_churn: string | null;
+  em_cobranca: boolean;
+  eixo_de_acao: string;
+  semaforo: number;
+  churn: number | null;
+  sem_contrato_ativo: boolean;
+}
+
+export interface IscDaCarteira {
+  valor: string;
+  zona: string;
+  componente_classe: string;
+  componente_semaforo: string;
+  componente_churn: string;
+  receita_total: string;
+  grupos: number;
+  fora_do_isc: number;
+}
+
+export interface ClassificacaoDaCarteira {
+  referencia: string | null;
+  versao_dos_parametros: string | null;
+  isc: IscDaCarteira | null;
+  por_classe: Record<string, number>;
+  itens: ItemDaCarteira[];
+  avisos: string[];
+}

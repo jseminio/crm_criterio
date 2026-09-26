@@ -8,6 +8,7 @@ import type { Listas } from "./api/tipos";
 import { Abordagens } from "./telas/Abordagens";
 import { Agenda } from "./telas/Agenda";
 import { Conferencia } from "./telas/Conferencia";
+import { Carteira } from "./telas/Carteira";
 import { Contatos } from "./telas/Contatos";
 import { Configuracoes } from "./telas/Configuracoes";
 import { Contratos } from "./telas/Contratos";
@@ -25,6 +26,7 @@ type Tela =
   | "leads"
   | "grupos"
   | "contratos"
+  | "carteira"
   | "abordagens"
   | "conferencia"
   | "configuracoes";
@@ -71,6 +73,12 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     rotulo: "Contratos",
     titulo: "Contratos",
     descricao: "O que a oportunidade aceita virou — começo da Etapa 2.",
+  },
+  {
+    chave: "carteira",
+    rotulo: "Carteira",
+    titulo: "Classificação da carteira",
+    descricao: "Classe, Score e eixo de ação por grupo, e o índice de saúde (ISC).",
   },
   {
     chave: "abordagens",
@@ -145,6 +153,7 @@ export default function App() {
           {tela === "leads" && <Leads listas={listas} />}
           {tela === "grupos" && <Grupos listas={listas} />}
           {tela === "contratos" && <Contratos listas={listas} />}
+          {tela === "carteira" && <Carteira />}
           {tela === "abordagens" && <Abordagens />}
           {tela === "conferencia" && <Conferencia />}
           {tela === "configuracoes" && <Configuracoes />}

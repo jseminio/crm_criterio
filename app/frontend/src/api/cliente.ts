@@ -12,6 +12,7 @@ import type {
   PessoaDeContato,
   TipoDeContato,
   Mrr,
+  ClassificacaoDaCarteira,
   CenariosDeTicket,
   ColunaDoFunil,
   DimensaoDeRecorte,
@@ -150,6 +151,7 @@ export const api = {
       body: JSON.stringify(dados),
     }),
 
+  classificacaoDaCarteira: () => pedir<ClassificacaoDaCarteira>("/api/carteira/classificacao"),
   mrr: (de?: string) => pedir<Mrr>(comParametros("/api/mrr", { de })),
 
   agenda: (captador?: string[]) =>

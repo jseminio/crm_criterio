@@ -321,6 +321,12 @@
 .fusao-linha { display: flex; justify-content: space-between; align-items: center; gap: var(--e3); flex-wrap: wrap;
   background: var(--surface-card); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e2) var(--e3); font-size: 13px; }
 
+/* Carteira (classificação e ISC) */
+.carteira { display: grid; gap: var(--e3); margin-bottom: var(--e4); }
+.carteira-topo { display: flex; gap: var(--e4); flex-wrap: wrap; align-items: flex-start; }
+.carteira-componentes { display: flex; gap: var(--e4); flex-wrap: wrap; font-size: 13px; }
+.carteira-filtro { display: flex; gap: var(--e2); align-items: end; flex-wrap: wrap; }
+
 /* Movimento reduzido (26/09/2026). Fica no FIM do arquivo e vale para todo
    elemento, para cobrir também a transição e a animação que alguém criar
    depois — uma regra por componente já deixou a coluna do kanban de fora.

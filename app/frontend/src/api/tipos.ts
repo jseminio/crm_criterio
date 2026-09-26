@@ -311,3 +311,28 @@ export interface CenariosDeTicket {
   atipico_medio: string | null;
   atipico_maximo: string | null;
 }
+
+export type BaldeDaAgenda = "atrasada" | "hoje" | "proximos_7_dias" | "depois" | "sem_data" | "sem_acao";
+
+export interface ItemDaAgenda {
+  tipo: "oportunidade" | "lead";
+  id: number;
+  titulo: string;
+  subtitulo: string | null;
+  situacao: string;
+  temperatura: string | null;
+  captador: string | null;
+  valor_anual: string | null;
+  proxima_acao: string | null;
+  proxima_acao_em: string | null;
+  balde: BaldeDaAgenda;
+  dias_de_atraso: number;
+  dias_desde_o_envio: number | null;
+}
+
+/** A fila de follow-up. `contagens` traz todos os baldes, mesmo os vazios. */
+export interface Agenda {
+  hoje: string;
+  contagens: Record<BaldeDaAgenda, number>;
+  itens: ItemDaAgenda[];
+}

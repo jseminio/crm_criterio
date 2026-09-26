@@ -1,6 +1,7 @@
 /** O acesso à API. Um lugar só, para o erro ter uma forma só. */
 
 import type {
+  Agenda,
   CenariosDeTicket,
   ColunaDoFunil,
   DimensaoDeRecorte,
@@ -114,6 +115,9 @@ export const api = {
       arquivo,
       substituir ? { "X-Confirmacao": "SUBSTITUIR" } : {},
     ),
+
+  agenda: (captador?: string[]) =>
+    pedir<Agenda>(comParametros("/api/agenda", { captador })),
 
   listas: () => pedir<Listas>("/api/listas"),
 

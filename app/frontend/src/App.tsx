@@ -5,6 +5,7 @@ import "./tokens.css";
 import "./app.css";
 import { api } from "./api/cliente";
 import type { Listas } from "./api/tipos";
+import { Agenda } from "./telas/Agenda";
 import { Conferencia } from "./telas/Conferencia";
 import { Configuracoes } from "./telas/Configuracoes";
 import { Contratos } from "./telas/Contratos";
@@ -14,9 +15,15 @@ import { Leads } from "./telas/Leads";
 import { Lista } from "./telas/Lista";
 import { usarDados } from "./usarDados";
 
-type Tela = "funil" | "lista" | "leads" | "grupos" | "contratos" | "conferencia" | "configuracoes";
+type Tela = "agenda" | "funil" | "lista" | "leads" | "grupos" | "contratos" | "conferencia" | "configuracoes";
 
 const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[] = [
+  {
+    chave: "agenda",
+    rotulo: "Agenda",
+    titulo: "Agenda de follow-up",
+    descricao: "O que pede uma próxima ação agora, por urgência.",
+  },
   {
     chave: "funil",
     rotulo: "Funil",
@@ -103,6 +110,7 @@ export default function App() {
         </header>
 
         <main className="area">
+          {tela === "agenda" && <Agenda listas={listas} aoAbrirLeads={() => definirTela("leads")} />}
           {tela === "funil" && <Funil listas={listas} />}
           {tela === "lista" && <Lista listas={listas} />}
           {tela === "leads" && <Leads listas={listas} />}

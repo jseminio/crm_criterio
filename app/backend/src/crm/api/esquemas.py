@@ -13,10 +13,12 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 from crm.domain.listas import (
+    CanalDeAbordagem,
     LinhaServico,
     MotivoRecusa,
     Origem,
     Situacao,
+    SituacaoAbordagem,
     SituacaoContrato,
     SituacaoGrupo,
     SituacaoLead,
@@ -38,6 +40,13 @@ __all__ = [
     "ConversaoDeLead",
     "ContratoResumo",
     "ContratoDetalhe",
+    "AbordagemResumo",
+    "AbordagemDetalhe",
+    "AbordagemNova",
+    "AbordagemEdicao",
+    "PedidoDeVersao",
+    "Aprovacao",
+    "ResumoDasAbordagens",
     "ContratoEdicao",
     "ConversaoEmContrato",
     "Fusao",
@@ -477,3 +486,103 @@ class Listas(BaseModel):
     captadores: list[str]
     portes: list[str]
     servicos: list[str]
+
+
+# ---------------------------------------------------------------- abordagens
+class ConferenciaResposta(BaseModel):
+    regra: str
+    ok: bool
+    texto: str
+
+
+class FatoResposta(BaseModel):
+    fato: str
+    fonte: str
+
+
+class FichaResposta(Base):
+    historico: str
+    pesquisa: list[FatoResposta]
+    quem_decide: str | None = None
+    modelo: str
+    criado_em: datetime
+
+
+class AbordagemResumo(BaseModel):
+    """O que cabe numa linha da fila de abordagens."""
+
+    id: int
+    grupo_id: int
+    grupo_nome: str
+    mes: str
+    quem_apresenta: str | None = None
+    canal: CanalDeAbordagem
+    situacao: SituacaoAbordagem
+    """Já com "Bloqueada" calculada — ver `crm.domain.abordagem.situacao_exibida`."""
+    proximo_passo: str
+    atualizado_em: datetime
+
+
+class AbordagemDetalhe(AbordagemResumo):
+    contexto: str | None = None
+    destinatario: str | None = None
+    assunto: str | None = None
+    mensagem: str | None = None
+    versao: int
+    erro: str | None = None
+    ficha: FichaResposta | None = None
+    conferencias: list[ConferenciaResposta]
+    pode_aprovar: bool
+    aprovada_por: str | None = None
+    aprovada_em: datetime | None = None
+    enviada_em: datetime | None = None
+    diagnostico_agendado_em: date | None = None
+    link_whatsapp: str | None = None
+    """Abre a conversa com o texto pronto. O envio no WhatsApp é da pessoa."""
+
+
+class AbordagemNova(BaseModel):
+    """Uma conta entra na fila. Pelo grupo que já existe, ou pelo nome — aí o
+    grupo nasce como prospect, como na conversão de lead."""
+
+    grupo_id: int | None = None
+    grupo_nome: str | None = Field(default=None, max_length=200)
+    mes: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+    quem_apresenta: str | None = Field(default=None, max_length=120)
+    canal: CanalDeAbordagem = CanalDeAbordagem.EMAIL
+    destinatario: str | None = Field(default=None, max_length=200)
+    contexto: str | None = None
+
+
+class AbordagemEdicao(BaseModel):
+    """O que a tela pode mudar. Tudo opcional: só o que vier é alterado."""
+
+    quem_apresenta: str | None = Field(default=None, max_length=120)
+    canal: CanalDeAbordagem | None = None
+    destinatario: str | None = Field(default=None, max_length=200)
+    assunto: str | None = Field(default=None, max_length=300)
+    mensagem: str | None = None
+    contexto: str | None = None
+    diagnostico_agendado_em: date | None = None
+
+
+class PedidoDeVersao(BaseModel):
+    instrucao: str = Field(min_length=3, max_length=1000)
+
+
+class Aprovacao(BaseModel):
+    aprovador: str = Field(default="EL", max_length=10)
+    """Sem login até o E1: quem aprova é quem está na máquina — Eduardo."""
+
+
+class ResumoDasAbordagens(BaseModel):
+    mes: str
+    na_fila: int
+    abordadas: int
+    diagnosticos: int
+    aguardando_aprovacao: int
+    custo_usd: Decimal | None = None
+    """Soma do custo estimado das execuções do agente para as contas do mês.
+    Nulo quando nenhuma execução tem custo conhecido."""
+    custo_parcial: bool = False
+    """Há execução de modelo sem preço na tabela: a soma está incompleta."""

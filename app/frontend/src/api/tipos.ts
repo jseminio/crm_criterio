@@ -258,3 +258,57 @@ export interface Ocorrencia {
   campo: string | null;
   texto: string;
 }
+
+/** Agente SDR (26/09/2026): a fila de abordagens das contas âncora. */
+export interface AbordagemResumo {
+  id: number;
+  grupo_id: number;
+  grupo_nome: string;
+  mes: string;
+  quem_apresenta: string | null;
+  canal: "E-mail" | "WhatsApp";
+  situacao: string;
+  proximo_passo: string;
+  atualizado_em: string;
+}
+
+export interface Conferencia {
+  regra: string;
+  ok: boolean;
+  texto: string;
+}
+
+export interface FichaDaConta {
+  historico: string;
+  pesquisa: { fato: string; fonte: string }[];
+  quem_decide: string | null;
+  modelo: string;
+  criado_em: string;
+}
+
+export interface AbordagemDetalhe extends AbordagemResumo {
+  contexto: string | null;
+  destinatario: string | null;
+  assunto: string | null;
+  mensagem: string | null;
+  versao: number;
+  erro: string | null;
+  ficha: FichaDaConta | null;
+  conferencias: Conferencia[];
+  pode_aprovar: boolean;
+  aprovada_por: string | null;
+  aprovada_em: string | null;
+  enviada_em: string | null;
+  diagnostico_agendado_em: string | null;
+  link_whatsapp: string | null;
+}
+
+export interface ResumoDasAbordagens {
+  mes: string;
+  na_fila: number;
+  abordadas: number;
+  diagnosticos: number;
+  aguardando_aprovacao: number;
+  custo_usd: string | null;
+  custo_parcial: boolean;
+}

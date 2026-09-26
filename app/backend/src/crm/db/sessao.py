@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 __all__ = [
     "url_do_banco",
+    "ler_ambiente",
     "criar_engine",
     "criar_fabrica_de_sessao",
     "sessao",
@@ -67,6 +68,15 @@ def _ambiente(arquivo: Path | None = None) -> dict[str, str]:
     valores = dict(_todas_do_arquivo(arquivo))
     valores.update(os.environ)
     return valores
+
+
+def ler_ambiente() -> dict[str, str]:
+    """As variáveis do processo e do `.env` do backend, o processo vencendo.
+
+    Para os outros módulos lerem a própria configuração (agente SDR, envio)
+    do mesmo `.env`, sem cada um reimplementar a leitura.
+    """
+    return _ambiente()
 
 
 def _todas_do_arquivo(arquivo: Path | None = None) -> dict[str, str]:

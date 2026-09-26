@@ -27,11 +27,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from crm.db.base import Base, CarimboMixin, coluna_lista
 from crm.domain.listas import (
+    CanalDeAbordagem,
     LinhaServico,
     MotivoRecusa,
     Origem,
     PapelContato,
     Situacao,
+    SituacaoAbordagem,
     SituacaoContrato,
     SituacaoEmpresa,
     SituacaoGrupo,
@@ -48,6 +50,9 @@ __all__ = [
     "Lead",
     "Oportunidade",
     "Contrato",
+    "FichaDeConta",
+    "Abordagem",
+    "ExecucaoDoAgente",
     "ExecucaoDeCarga",
     "OcorrenciaDeCarga",
 ]
@@ -434,6 +439,121 @@ class Contrato(CarimboMixin, Base):
 
     def __repr__(self) -> str:
         return f"<Contrato {self.id} grupo={self.grupo_id} {self.situacao.value}>"
+
+
+#: JSON genérico, JSONB no PostgreSQL — mesma razão de `Oportunidade.campos_do_crm`.
+_JSON = sa.JSON().with_variant(JSONB(), "postgresql")
+
+
+class FichaDeConta(CarimboMixin, Base):
+    """O que o agente SDR sabe de uma conta antes do primeiro contato.
+
+    **Nunca é sobrescrita**: cada preparo grava uma ficha nova, e a abordagem
+    aponta a que usou. Assim dá para ver depois em que o rascunho se baseou.
+    """
+
+    __tablename__ = "ficha_de_conta"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    grupo_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("grupo_economico.id"), nullable=False, index=True
+    )
+    historico: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    """O resumo do que a Critério já fez com a conta, do CRM e do contexto
+    informado na abordagem."""
+    pesquisa: Mapped[list[dict]] = mapped_column(
+        _JSON, nullable=False, default=list, server_default=sa.text("'[]'")
+    )
+    """Fatos públicos, cada um `{"fato": ..., "fonte": url}`. Fato sem fonte
+    não entra — é a regra que a conferência cobra antes da aprovação."""
+    quem_decide: Mapped[str | None] = mapped_column(sa.String(300))
+    modelo: Mapped[str] = mapped_column(sa.String(60), nullable=False)
+
+
+class Abordagem(CarimboMixin, Base):
+    """O primeiro contato com uma conta âncora: ficha, rascunho e aprovação.
+
+    Plano de go-to-market de 26/09/2026. O agente SDR prepara; **só Eduardo
+    aprova**, e só a aprovação dispara o envio. O agente não tem ferramenta de
+    envio — a separação é do código, não de uma instrução ao modelo.
+    """
+
+    __tablename__ = "abordagem"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    grupo_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("grupo_economico.id"), nullable=False, index=True
+    )
+    mes: Mapped[str] = mapped_column(sa.String(7), nullable=False, index=True)
+    """Mês de abordagem do plano, `AAAA-MM`."""
+    quem_apresenta: Mapped[str | None] = mapped_column(sa.String(120))
+    """Quem abre a conversa. Sem ele a abordagem fica bloqueada: o plano manda
+    o primeiro contato vir de quem trouxe a conta."""
+    contexto: Mapped[str | None] = mapped_column(sa.Text)
+    """O histórico que não está no CRM (propostas de antes de 2026, conversas),
+    escrito por uma pessoa. Entra na ficha como fato da Critério."""
+
+    canal: Mapped[CanalDeAbordagem] = mapped_column(
+        coluna_lista(CanalDeAbordagem), nullable=False, default=CanalDeAbordagem.EMAIL
+    )
+    destinatario: Mapped[str | None] = mapped_column(sa.String(200))
+    """E-mail ou telefone, conforme o canal."""
+    assunto: Mapped[str | None] = mapped_column(sa.String(300))
+    mensagem: Mapped[str | None] = mapped_column(sa.Text)
+    versao: Mapped[int] = mapped_column(
+        sa.SmallInteger, nullable=False, default=0, server_default=sa.text("0")
+    )
+
+    situacao: Mapped[SituacaoAbordagem] = mapped_column(
+        coluna_lista(SituacaoAbordagem),
+        nullable=False,
+        default=SituacaoAbordagem.A_PREPARAR,
+        index=True,
+    )
+    erro: Mapped[str | None] = mapped_column(sa.Text)
+
+    ficha_id: Mapped[int | None] = mapped_column(sa.ForeignKey("ficha_de_conta.id"))
+
+    aprovada_por: Mapped[str | None] = mapped_column(sa.String(10))
+    aprovada_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    enviada_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    """Carimbados pelo **servidor**, nunca pelo navegador — mesma regra de
+    `Oportunidade.porte_definido_em`."""
+    diagnostico_agendado_em: Mapped[date | None] = mapped_column(sa.Date)
+
+    grupo: Mapped[GrupoEconomico] = relationship()
+    ficha: Mapped[FichaDeConta | None] = relationship()
+
+    def __repr__(self) -> str:
+        return f"<Abordagem {self.id} grupo={self.grupo_id} {self.situacao.value}>"
+
+
+class ExecucaoDoAgente(Base):
+    """Uma chamada do agente SDR: quanto usou, quanto custou, se deu certo.
+
+    Imutável, como `ExecucaoDeCarga`: é o registro do custo do agente, e custo
+    que muda depois de anotado deixa de ser prova do que se gastou.
+    """
+
+    __tablename__ = "execucao_do_agente"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    abordagem_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("abordagem.id"), nullable=False, index=True
+    )
+    iniciada_em: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, index=True
+    )
+    terminada_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    modelo: Mapped[str] = mapped_column(sa.String(60), nullable=False)
+    tokens_entrada: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    tokens_saida: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    buscas_web: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    custo_usd: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 4))
+    """Estimado pela tabela de preços do código. Nulo para modelo sem preço
+    conhecido — nunca zero, que pareceria "saiu de graça"."""
+    deu_certo: Mapped[bool] = mapped_column(sa.Boolean, nullable=False)
+    erro: Mapped[str | None] = mapped_column(sa.Text)
 
 
 class ExecucaoDeCarga(Base):

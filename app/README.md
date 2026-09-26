@@ -9,17 +9,19 @@ tela, sem depender da planilha ou de um lead; desde 23/09/2026, a régua de
 porte por volume (sugestão, nunca decisão), a captura de complexidade e
 risco técnico, o começo do E5 (*os números aparecem*): ciclo médio de
 vendas, cobertura do processo e dependência de canal — e o começo da
-**Etapa 2** (*fechar o ciclo*): a oportunidade aceita vira contrato.
+**Etapa 2** (*fechar o ciclo*): a oportunidade aceita vira contrato. Desde
+26/09/2026, o **agente SDR** do go-to-market: pesquisa a conta, monta a ficha
+e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo.
 
 ## Estado
 
 | | |
 |---|---|
-| O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil e seis telas |
-| Testes | **296** no backend, **113** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library |
-| Banco | PostgreSQL 18.6 local, seis tabelas (`contrato` desde 23/09/2026), migração aplicada. Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
-| API | 20 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
-| Telas | Funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe), contratos (novo, 23/09/2026) e conferência da carga. React com TypeScript, em `../frontend` |
+| O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil, agente SDR e sete telas |
+| Testes | **368** no backend, **131** nas telas (26/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Banco | PostgreSQL 18.6 local, onze tabelas (`ficha_de_conta`, `abordagem` e `execucao_do_agente` desde 26/09/2026 — migração `8673eda1df27`, **ainda não aplicada nesta máquina**: rode `alembic upgrade head`). Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
+| API | 33 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
+| Telas | Funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe), contratos (23/09/2026), abordagens do agente SDR (26/09/2026) e conferência da carga. React com TypeScript, em `../frontend` |
 | Fora do ar | Nuvem, login, backup automático (E1); documento da proposta, ficha de volumetria completa (E4); ticket médio, MRR e os seis indicadores de cobertura que exigem implantação/entrevista/classificação (E5); Clicksign, evento de contrato, renovação, saldo de horas de conforto, Implantação (Etapa 2) |
 
 ## Como rodar
@@ -669,6 +671,90 @@ expansão), renovação automática, saldo de horas de conforto, e Implantação
 esta última porque os documentos recomendam esperar a aprovação de
 `MP-SC-01`, uma dependência externa ao projeto.
 
+## O agente SDR (26/09/2026)
+
+Decisão de Eduardo no go-to-market de R$ 250 mil de MRR até jun/27: o SDR é um
+agente de IA. Fase 1 aprovada: **pesquisa, ficha e rascunho**; canais e-mail
+(Microsoft 365) e WhatsApp; **toda mensagem aprovada por Eduardo**. Amostra da
+tela aprovada em chat antes da construção.
+
+### O que ele faz
+
+1. A conta entra na fila de um mês (`POST /api/abordagens` ou o script
+   `backend/scripts/importar_abordagens.py`, a partir de um CSV **fora do
+   repositório**). Sem "quem apresenta", a conta aparece **Bloqueada** — a
+   abordagem de uma conta âncora sempre tem um padrinho.
+2. "Preparar a ficha" chama o Claude (`crm/agente/sdr.py`) em segundo plano. Ele
+   lê o histórico da conta no CRM, busca na web (até 8 buscas) e registra, pela
+   ferramenta `registrar_preparo`: o que a Critério já fez com a conta, fatos
+   públicos **cada um com a fonte**, quem decide, assunto e mensagem.
+3. O rascunho fica **Aguardando aprovação**. Eduardo edita à vontade, pede outra
+   versão com uma instrução, ou descarta.
+4. **Aprovar** só passa se as conferências passarem (`crm/domain/abordagem.py`):
+   sem preço, sem destino marcado "não contatar", fato só com fonte,
+   destinatário válido, nenhum `[campo]` por preencher, quem apresenta definido.
+   E-mail sai na hora pelo Microsoft Graph; WhatsApp vira um link `wa.me` com o
+   texto pronto — a pessoa envia e marca como enviada.
+
+### Por que o agente não envia
+
+O agente **não tem ferramenta de envio**. O único caminho até o cliente é a
+rota de aprovação, que confere tudo de novo no servidor, com a linha travada
+(`with_for_update`). Se o envio falha, a abordagem continua como estava (502) e
+nada é marcado como enviado.
+
+### Situações
+
+`A preparar` → `Pesquisando` → `Aguardando aprovação` → (`Aprovada`, só
+WhatsApp) → `Enviada`. Laterais: `Erro` (volta a preparar), `Descartada`.
+`Bloqueada` não é gravada: é `A preparar` sem quem apresenta, calculada na hora.
+A mesma conta não entra duas vezes na fila do mesmo mês, salvo se a anterior foi
+descartada.
+
+### Rotas
+
+`GET /api/abordagens` (filtros `mes`, `situacao`), `GET /api/abordagens/resumo`,
+`POST /api/abordagens`, `GET` e `PATCH /api/abordagens/{id}`, e as ações
+`preparar`, `nova-versao`, `aprovar`, `marcar-enviada` e `descartar`, todas
+`POST /api/abordagens/{id}/<ação>`.
+
+### Configuração
+
+No `backend/.env` (modelo em `.env.example`, sem valores):
+
+| Variável | Para quê |
+|---|---|
+| `ANTHROPIC_API_KEY` | Obrigatória para preparar. Sem ela, a abordagem vai para `Erro` explicando |
+| `CRM_AGENTE_MODELO` | Opcional; padrão `claude-opus-5` |
+| `CRM_M365_TENANT_ID`, `CRM_M365_CLIENT_ID`, `CRM_M365_CLIENT_SECRET` | Aplicativo no Entra ID com a permissão de aplicativo `Mail.Send` e consentimento de administrador |
+| `CRM_M365_REMETENTE` | A caixa que envia (ex.: a de Eduardo) |
+
+Sem as variáveis do M365, aprovar por e-mail recusa (409) e diz o que falta; o
+WhatsApp funciona sem nada disso. O `.env` é relido a cada uso: não precisa
+reiniciar a API depois de preencher.
+
+### Custo
+
+Cada preparo grava uma linha em `execucao_do_agente` (tokens, buscas, custo
+estimado em US$). O resumo do mês soma e avisa quando parte do custo não pôde
+ser estimada. É **estimativa**: a fatura da Anthropic é a fonte da verdade.
+
+### O que sai da máquina (LGPD)
+
+Para a API da Anthropic vão: o nome da conta, o histórico de propostas no CRM
+(serviço, situação, mês, preço mensal e motivo de recusa), o contexto digitado,
+e **nome e cargo** dos contatos. **E-mail e telefone não vão**: o destinatário
+fica só no CRM. Isso precisa de uma decisão formal de Eduardo sobre base legal
+(legítimo interesse, B2B) antes do uso com contas reais.
+
+### Uma lição do PostgreSQL
+
+A tarefa em segundo plano do FastAPI roda **antes** da sessão da requisição
+fechar. No SQLite dos testes (uma conexão só) ela via a mudança; no PostgreSQL,
+não — a conta ficava presa em "Pesquisando". `preparar` e `nova-versao`
+confirmam a transação (`_confirmar_antes_de_agendar`) antes de agendar o
+preparo. Achado só porque o fluxo inteiro rodou num PostgreSQL de verdade.
+
 ## Lacunas da verificação automática da plataforma
 
 A varredura de vazamento lê **o disco, não o índice do git**, e só abre arquivos
@@ -743,7 +829,7 @@ build` já usa `tsc -b` corretamente; o risco era só nas checagens manuais.
 
 ## Testes das telas
 
-82 testes com **Vitest** e **Testing Library**, em `frontend/src/**/*.test.{ts,tsx}`:
+131 testes com **Vitest** e **Testing Library**, em `frontend/src/**/*.test.{ts,tsx}`:
 
 ```bash
 cd frontend && npx vitest run

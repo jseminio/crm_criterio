@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
 from crm.api.app import criar_app
-from crm.db.modelos import ClassificacaoDoGrupo, Contrato, GrupoEconomico
+from crm.db.modelos import ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico
 from crm.domain import classificacao as regra
 from crm.domain.listas import SituacaoContrato, SituacaoGrupo
 
@@ -87,3 +87,18 @@ def test_na_mesma_referencia_a_revisao_maior_vence(cliente, sessao: Session):
     sessao.commit()
     itens = cliente.get("/api/carteira/classificacao").json()["itens"]
     assert len(itens) == 1 and itens[0]["classe"] == "A"
+
+
+def test_traz_as_empresas_do_grupo_com_a_mensalidade(cliente, sessao: Session):
+    n = regra.Notas(receita=3, rentabilidade=3, complexidade=3, disciplina=3, risco=3, cross_sell=3, adimplencia=3, semaforo=1, churn=2)
+    a = GrupoEconomico(nome="Alfa", situacao=SituacaoGrupo.CLIENTE)
+    sessao.add(a); sessao.flush()
+    e1 = Empresa(grupo_id=a.id, razao_social="Alfa Comércio Ltda", cnpj="11222333000181")
+    e2 = Empresa(grupo_id=a.id, razao_social="Alfa Serviços SA")
+    sessao.add_all([e1, e2]); sessao.flush()
+    sessao.add(Contrato(grupo_id=a.id, empresa_id=e1.id, situacao=SituacaoContrato.ATIVO, preco_mensal=Decimal("700")))
+    _snap(sessao, a, date(2026, 7, 31), "700", n)
+    sessao.commit()
+    emp = cliente.get("/api/carteira/classificacao").json()["itens"][0]["empresas"]
+    assert [e["razao_social"] for e in emp] == ["Alfa Comércio Ltda", "Alfa Serviços SA"]
+    assert Decimal(emp[0]["mensalidade"]) == Decimal("700") and emp[1]["mensalidade"] is None

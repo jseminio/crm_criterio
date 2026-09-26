@@ -4,11 +4,11 @@
  * carteira e são recalculados no CRM. Estado nunca só por cor: classe, alerta e cobrança têm texto.
  */
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { api } from "../api/cliente";
 import type { ClassificacaoDaCarteira } from "../api/tipos";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
-import { data, dinheiro } from "../formato";
+import { cnpj, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
 
 const decimais = (v: string, n: number) =>
@@ -17,6 +17,34 @@ const um = (v: string) => decimais(v, 2);
 const um1 = (v: string) => decimais(v, 1);
 const ALERTA: Record<string, string> = { "⚠": "⚠ Risco de churn", "⚑": "⚑ Saída a organizar" };
 const PRIORIDADE = ["Cobrança", "Reter já", "Reter / vigiar", "Saída organizada", "Sem urgência"];
+
+const LEGENDA_DOS_EIXOS: { nome: string; quando: string; significa: string }[] = [
+  {
+    nome: "Cobrança — sem tratamento preferencial",
+    quando: "Adimplência ≤ 2 ($$$). Vence qualquer outro eixo.",
+    significa: "Conversa de cobrança (renegociação, corte). Enquanto não pagar, o cliente não recebe tratamento preferencial, mesmo sendo A ou B.",
+  },
+  {
+    nome: "Reter já (crítico)",
+    quando: "Classe A com alerta de churn ⚠ (churn ≥ 4).",
+    significa: "Há muito a salvar: conversa de retenção imediata (sponsor, diagnóstico, plano).",
+  },
+  {
+    nome: "Reter / vigiar",
+    quando: "Classe B com alerta de churn ⚠ (churn ≥ 4).",
+    significa: "Risco de saída em cliente que vale segurar: acompanhar de perto e conduzir a retenção.",
+  },
+  {
+    nome: "Saída organizada",
+    quando: "Classe C com alerta ⚑ (churn ≥ 4).",
+    significa: "Churn alto aqui não é emergência: preparar uma saída ordenada, sem gastar esforço de retenção.",
+  },
+  {
+    nome: "Sem urgência de churn",
+    quando: "Nenhum dos casos acima.",
+    significa: "Nenhuma ação extra agora; segue a rotina e a revisão mensal do ISC.",
+  },
+];
 
 const rank = (eixo: string) => {
   const i = PRIORIDADE.findIndex((p) => eixo.startsWith(p));
@@ -69,6 +97,13 @@ function Componente({ nome, valor, legenda, cor }: { nome: string; valor: string
 export function Carteira() {
   const { dados, carregando, erro, recarregar } = usarDados<ClassificacaoDaCarteira>(() => api.classificacaoDaCarteira(), []);
   const [eixo, definirEixo] = useState("");
+  const [abertos, definirAbertos] = useState<Set<number>>(new Set());
+  const alternar = (id: number) =>
+    definirAbertos((antes) => {
+      const novo = new Set(antes);
+      if (!novo.delete(id)) novo.add(id);
+      return novo;
+    });
 
   if (carregando && !dados) return <Carregando rotulo="Carregando a classificação" />;
   if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
@@ -130,6 +165,20 @@ export function Carteira() {
         </label>
       </div>
 
+      <details className="carteira-legenda-eixos" open>
+        <summary>Legenda do eixo de ação</summary>
+        <p className="numero-nota">Ordem de precedência: vale o primeiro eixo que se aplica ao grupo.</p>
+        <ol>
+          {LEGENDA_DOS_EIXOS.map((e) => (
+            <li key={e.nome}>
+              <strong>{e.nome}</strong>
+              <span>{e.quando}</span>
+              <span>{e.significa}</span>
+            </li>
+          ))}
+        </ol>
+      </details>
+
       {itens.length === 0 ? (
         <VazioPorFiltro aoLimpar={() => definirEixo("")} />
       ) : (
@@ -146,25 +195,51 @@ export function Carteira() {
             </tr>
           </thead>
           <tbody>
-            {itens.map((i) => (
-              <tr key={i.grupo_id}>
-                <td className="carteira-grupo">
-                  ▸ {i.grupo_nome}
-                  {i.sem_contrato_ativo && <span className="numero-nota"> · sem contrato ativo hoje</span>}
-                </td>
-                <td className="tabela-numero">{dinheiro(i.receita_mensal)}</td>
-                <td className="tabela-numero">{um(i.score)}</td>
-                <td className="carteira-classe">{i.classe_efetiva}{i.em_cobranca ? " · $$$ cobrança" : ""}</td>
-                <td>{i.alerta_de_churn ? ALERTA[i.alerta_de_churn] ?? i.alerta_de_churn : "—"}</td>
-                <td className="tabela-numero">{i.churn ?? "—"}</td>
-                <td>{i.eixo_de_acao}</td>
-              </tr>
-            ))}
+            {itens.map((i) => {
+              const aberto = abertos.has(i.grupo_id);
+              return (
+                <Fragment key={i.grupo_id}>
+                  <tr>
+                    <td className="carteira-grupo">
+                      {i.empresas.length > 0 ? (
+                        <button
+                          type="button"
+                          className="carteira-mais"
+                          aria-expanded={aberto}
+                          aria-label={`${aberto ? "Ocultar" : "Mostrar"} as empresas de ${i.grupo_nome}`}
+                          onClick={() => alternar(i.grupo_id)}
+                        >
+                          {aberto ? "−" : "+"}
+                        </button>
+                      ) : (
+                        <span className="carteira-mais-vazio" aria-hidden="true" />
+                      )}
+                      ▸ {i.grupo_nome}
+                      {i.sem_contrato_ativo && <span className="numero-nota"> · sem contrato ativo hoje</span>}
+                    </td>
+                    <td className="tabela-numero">{dinheiro(i.receita_mensal)}</td>
+                    <td className="tabela-numero">{um(i.score)}</td>
+                    <td className="carteira-classe">{i.classe_efetiva}{i.em_cobranca ? " · $$$ cobrança" : ""}</td>
+                    <td>{i.alerta_de_churn ? ALERTA[i.alerta_de_churn] ?? i.alerta_de_churn : "—"}</td>
+                    <td className="tabela-numero">{i.churn ?? "—"}</td>
+                    <td>{i.eixo_de_acao}</td>
+                  </tr>
+                  {aberto &&
+                    i.empresas.map((e) => (
+                      <tr key={`e${e.id}`} className="carteira-empresa">
+                        <td>• {e.razao_social}{e.cnpj ? <span className="numero-nota"> · {cnpj(e.cnpj)}</span> : null}</td>
+                        <td className="tabela-numero">{e.mensalidade !== null ? dinheiro(e.mensalidade) : "—"}</td>
+                        <td colSpan={5} />
+                      </tr>
+                    ))}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       )}
           <p className="carteira-legenda">
-        ▸ grupo (consolidado) · classe efetiva = letra + semáforo · ⚠ risco de churn em A/B · ⚑ saída a organizar em C ·
+        ▸ grupo (consolidado) · + mostra as empresas do grupo · • empresa (CNPJ) · classe efetiva = letra + semáforo · ⚠ risco de churn em A/B · ⚑ saída a organizar em C ·
         $$$ adimplência ≤ 2 trava a classe, sem rebaixar
       </p>
       <details className="isc-como">

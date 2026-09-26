@@ -13,7 +13,11 @@ vi.mock("../api/cliente", async () => {
 const item = (o: Partial<ItemDaCarteira> = {}): ItemDaCarteira => ({
   grupo_id: 1, grupo_nome: "Alfa", receita_mensal: "1000.00", score: "3.5270", classe: "B", classe_efetiva: "B3 (TRAVADO)",
   alerta_de_churn: "⚠", em_cobranca: true, eixo_de_acao: "Cobrança — sem tratamento preferencial", semaforo: 3, churn: 4,
-  sem_contrato_ativo: false, ...o,
+  sem_contrato_ativo: false,
+  empresas: [
+    { id: 10, razao_social: "Alfa Comércio Ltda", cnpj: "11222333000181", mensalidade: "700.00" },
+    { id: 11, razao_social: "Alfa Serviços SA", cnpj: null, mensalidade: null },
+  ], ...o,
 });
 const resposta = (o: Partial<ClassificacaoDaCarteira> = {}): ClassificacaoDaCarteira => ({
   referencia: "2026-07-31", versao_dos_parametros: "v1",
@@ -62,6 +66,40 @@ describe("Carteira", () => {
     render(<Carteira />);
     expect(await screen.findByText("Como é calculado")).toBeInTheDocument();
     expect(screen.getByText(/Classe × 33% \+ Semáforo × 33% \+ Churn × 34%/)).toBeInTheDocument();
+  });
+
+  it("as empresas do grupo ficam ocultas e abrem no +", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira />);
+    await screen.findByText(/▸ Alfa/);
+    expect(screen.queryByText(/Alfa Comércio Ltda/)).toBeNull();
+    const botao = screen.getByRole("button", { name: "Mostrar as empresas de Alfa" });
+    expect(botao).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(botao);
+    expect(screen.getByText(/Alfa Comércio Ltda/)).toBeInTheDocument();
+    expect(screen.getByText(/11\.222\.333\/0001-81/)).toBeInTheDocument();
+    expect(screen.getByText("R$ 700,00")).toBeInTheDocument();
+    const aberto = screen.getByRole("button", { name: "Ocultar as empresas de Alfa" });
+    expect(aberto).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(aberto);
+    expect(screen.queryByText(/Alfa Comércio Ltda/)).toBeNull();
+  });
+
+  it("grupo sem empresas não tem o +", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({ itens: [item({ empresas: [] })] }));
+    render(<Carteira />);
+    await screen.findByText(/▸ Alfa/);
+    expect(screen.queryByRole("button", { name: /empresas de Alfa/ })).toBeNull();
+  });
+
+  it("traz a legenda do eixo de ação, com os cinco eixos e o que cada um significa", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira />);
+    const legenda = (await screen.findByText("Legenda do eixo de ação")).closest("details")!;
+    for (const nome of ["Cobrança — sem tratamento preferencial", "Reter já (crítico)", "Reter / vigiar", "Saída organizada", "Sem urgência de churn"])
+      expect(legenda).toHaveTextContent(nome);
+    expect(legenda).toHaveTextContent(/Adimplência ≤ 2/);
+    expect(legenda).toHaveTextContent(/vale o primeiro eixo que se aplica/);
   });
 
   it("marca o grupo sem contrato ativo", async () => {

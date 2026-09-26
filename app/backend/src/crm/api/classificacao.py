@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from crm.db.modelos import ClassificacaoDoGrupo, Contrato, GrupoEconomico
+from crm.db.modelos import ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico
 from crm.domain import classificacao as regra
 from crm.domain.listas import SituacaoContrato
 
@@ -29,6 +29,14 @@ AVISO_RECALCULADA = (
     "A rentabilidade foi recalculada no CRM com a disciplina invertida (6 − disciplina), corrigindo o defeito 7.2 "
     "da planilha (decisão de 26/09/2026). As demais notas vêm da planilha de saúde da carteira."
 )
+
+
+class EmpresaDoGrupo(BaseModel):
+    id: int
+    razao_social: str
+    cnpj: str | None
+    mensalidade: Decimal | None
+    """Preço mensal dos contratos ativos e suspensos da empresa; `None` se não há contrato ligado a ela."""
 
 
 class ItemDaCarteira(BaseModel):
@@ -44,6 +52,7 @@ class ItemDaCarteira(BaseModel):
     semaforo: int
     churn: int | None
     sem_contrato_ativo: bool
+    empresas: list[EmpresaDoGrupo] = []
     """O grupo não tem contrato ativo hoje (ex.: baixado depois da referência)."""
 
 
@@ -91,11 +100,27 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         ativos = set(sessao.scalars(
             sa.select(Contrato.grupo_id).where(Contrato.situacao.in_([SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO]))
         ))
+        mensal = {
+            e: v for e, v in sessao.execute(
+                sa.select(Contrato.empresa_id, sa.func.sum(Contrato.preco_mensal))
+                .where(Contrato.empresa_id.is_not(None),
+                       Contrato.situacao.in_([SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO]))
+                .group_by(Contrato.empresa_id)
+            )
+        }
+        empresas: dict[int, list[EmpresaDoGrupo]] = {}
+        for e in sessao.scalars(
+            sa.select(Empresa).where(Empresa.grupo_id.in_(vistos)).order_by(Empresa.razao_social)
+        ):
+            empresas.setdefault(e.grupo_id, []).append(
+                EmpresaDoGrupo(id=e.id, razao_social=e.razao_social, cnpj=e.cnpj, mensalidade=mensal.get(e.id))
+            )
         itens = [
             ItemDaCarteira(
                 grupo_id=c.grupo_id, grupo_nome=nome, receita_mensal=c.receita_mensal, score=c.score, classe=c.classe,
                 classe_efetiva=c.classe_efetiva, alerta_de_churn=c.alerta_de_churn, em_cobranca=c.em_cobranca,
                 eixo_de_acao=c.eixo_de_acao, semaforo=c.semaforo, churn=c.churn, sem_contrato_ativo=c.grupo_id not in ativos,
+                empresas=empresas.get(c.grupo_id, []),
             )
             for c, nome in linhas
         ]

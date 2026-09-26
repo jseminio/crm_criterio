@@ -535,6 +535,13 @@ export interface FusaoFeita {
   pode_desfazer: boolean;
 }
 
+export interface EmpresaDoGrupo {
+  id: number;
+  razao_social: string;
+  cnpj: string | null;
+  mensalidade: string | null;
+}
+
 export interface ItemDaCarteira {
   grupo_id: number;
   grupo_nome: string;
@@ -548,6 +555,7 @@ export interface ItemDaCarteira {
   semaforo: number;
   churn: number | null;
   sem_contrato_ativo: boolean;
+  empresas: EmpresaDoGrupo[];
 }
 
 export interface IscDaCarteira {

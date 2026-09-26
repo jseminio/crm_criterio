@@ -25,8 +25,10 @@ Abre em `http://localhost:5173`. O Vite encaminha `/api` para a API em
 
 Os tokens vêm do **PAD-002**, aprovado por Eduardo em 19/09/2026, e estão em
 `src/tokens.css`. As cores da marca são exatas do manual e **nunca
-reajustadas**. Se esta folha e o artefato do design system divergirem, vale o
-artefato — a nota do padrão é explícita nisso.
+reajustadas**. Desde 23/09/2026, quando o CRM se separou do vortexOS, **esta
+folha é a fonte da verdade**: se ela e o artefato do design system divergirem,
+vale a folha. A nota do PAD-002 no vault do vortexOS fica como registro da
+decisão e não é mais consultada.
 
 As regras do PAD-002 que aparecem no código:
 

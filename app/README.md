@@ -698,10 +698,12 @@ Duas tabelas no funil, abaixo dos números, ambas **seguindo os mesmos filtros d
   otimista, com o contrato atípico à parte. **Hipóteses de trabalho, não meta.**
 
 Regra dos cenários (`crm/domain/recortes.py`), estatística e não escolha manual:
-**atípico** = recorrente acima de 3 × a mediana; **conservador** = mediana; **base** = média
-sem atípicos; **otimista** = terceiro quartil sem atípicos; o atípico entra pelo menor, médio e
-maior observados. Na tela, "clientes novos" e "1 atípico a cada … clientes" são editáveis (padrão
-20 e 20) e **não gravam nada**. Menos de 4 contratos recorrentes: "não calculável".
+**atípico** = recorrente acima de 3 × a mediana; **conservador** = mediana sem atípicos;
+**base** = média sem atípicos; **otimista** = terceiro quartil sem atípicos; o atípico entra
+pelo menor, médio e maior observados. **Trava** (26/09/2026): o conservador nunca passa do base
+e o otimista nunca fica abaixo dele — mediana e quartil não têm ordem garantida com a média
+(em 100, 1.000, 1.000, 1.000 a mediana é 1.000 e a média, 775). Na tela, "clientes novos" e
+"1 atípico a cada … clientes" são editáveis (padrão 20 e 20) e **não gravam nada**. Menos de 4 contratos recorrentes: "não calculável".
 
 Com o período filtrado por **data de colocação de 2026**: 19 contratos, 2 atípicos, comum de
 R$ 2.450 / R$ 2.956,42 / R$ 3.500 e atípico de R$ 15.000 / R$ 27.500 / R$ 40.000 — os números

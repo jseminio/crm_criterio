@@ -7,8 +7,12 @@ Os cenários de ticket saem de uma regra estatística, não de escolha manual de
 tirar da conta (pedido de Eduardo, 25/09/2026):
 
 - **atípico** = contrato recorrente acima de **3 × a mediana**;
-- **comum** — *conservador* = mediana de todos; *base* = média dos que não são
-  atípicos; *otimista* = terceiro quartil dos que não são atípicos;
+- **comum** — *conservador* = mediana dos que não são atípicos; *base* = média dos
+  que não são atípicos; *otimista* = terceiro quartil dos que não são atípicos;
+- **trava** — *conservador* nunca passa do *base* e *otimista* nunca fica abaixo dele.
+  Mediana e quartil não têm ordem garantida com a média: em 100, 1.000, 1.000, 1.000 a
+  mediana (1.000) passa da média (775). Sem a trava, o cenário "conservador" sairia
+  maior que o "base" (decisão de Eduardo, 26/09/2026);
 - **atípico** — o menor, a média e o maior observados.
 
 São **hipóteses de trabalho**, não meta. Com poucos contratos, o número mexe muito.
@@ -119,14 +123,15 @@ def cenarios_de_ticket(oportunidades: Iterable[_Oportunidade]) -> CenariosDeTick
     comuns = [m for m in mensais if m <= limite]
     atipicos = [m for m in mensais if m > limite]
     media_comum = sum(comuns, ZERO) / len(comuns)
+    mediana_comum = Decimal(median(comuns))
     q3 = Decimal(quantiles(comuns, n=4, method="inclusive")[2]) if len(comuns) >= 2 else comuns[0]
     return CenariosDeTicket(
         contratos=len(mensais),
         atipicos=len(atipicos),
         limite_do_atipico=limite.quantize(CENTAVOS),
-        conservador=mediana.quantize(CENTAVOS),
+        conservador=min(mediana_comum, media_comum).quantize(CENTAVOS),
         base=media_comum.quantize(CENTAVOS),
-        otimista=q3.quantize(CENTAVOS),
+        otimista=max(q3, media_comum).quantize(CENTAVOS),
         atipico_minimo=min(atipicos) if atipicos else None,
         atipico_medio=(sum(atipicos, ZERO) / len(atipicos)).quantize(CENTAVOS) if atipicos else None,
         atipico_maximo=max(atipicos) if atipicos else None,

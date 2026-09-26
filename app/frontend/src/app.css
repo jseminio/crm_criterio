@@ -321,11 +321,60 @@
 .fusao-linha { display: flex; justify-content: space-between; align-items: center; gap: var(--e3); flex-wrap: wrap;
   background: var(--surface-card); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e2) var(--e3); font-size: 13px; }
 
-/* Carteira (classificação e ISC) */
-.carteira { display: grid; gap: var(--e3); margin-bottom: var(--e4); }
-.carteira-topo { display: flex; gap: var(--e4); flex-wrap: wrap; align-items: flex-start; }
-.carteira-componentes { display: flex; gap: var(--e4); flex-wrap: wrap; font-size: 13px; }
+/* Carteira (classificação e ISC): estilo dos decks de Classificação da Carteira, só nesta tela.
+   Cambria e Calibri, com fallback para as fontes do CRM onde não existirem. */
+.carteira {
+  --isc-marino: #1e2761; --isc-hero: #0f1838; --isc-ouro: #c89b3c; --isc-gelo: #cadcfc; --isc-cinza: #5a6480;
+  --isc-cinza-2: #8a93a8; --isc-painel: #f2f4f8; --isc-linha: #e2e6ef; --isc-crit: #c0392b; --isc-aten: #b8860b; --isc-saud: #2e7d5b;
+  --isc-titulo: Cambria, "Source Serif 4", Georgia, serif;
+  --isc-corpo: Calibri, Carlito, "Segoe UI", var(--fonte-ui);
+  display: grid; gap: var(--e3); margin-bottom: var(--e4); font-family: var(--isc-corpo); color: var(--isc-cinza);
+}
+.carteira .recado { background: var(--isc-painel); border: 0; border-left: 3px solid var(--isc-ouro); }
+.isc-chips { display: flex; gap: var(--e3); justify-content: flex-end; flex-wrap: wrap; }
+.isc-chip { background: var(--isc-painel); border-radius: 8px; padding: 6px 14px; text-align: center; }
+.isc-chip b { display: block; font: 700 17px var(--isc-titulo); color: var(--isc-marino); }
+.isc-chip small { font-size: 11px; }
+.isc-hero { background: var(--isc-hero); border-radius: var(--raio-lg); padding: var(--e6) var(--e8); color: #fff;
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr); gap: var(--e5); align-items: center; }
+.isc-hero p { margin: 0; color: var(--isc-gelo); font-size: 13px; }
+.isc-hero .isc-ref { color: #8b95b0; font-size: 11px; margin-top: var(--e3); }
+.isc-rotulo { color: var(--isc-ouro); font-weight: 700; font-size: 12px; letter-spacing: .14em; }
+.isc-titulo { font: 700 54px/1 var(--isc-titulo); margin: var(--e1) 0; }
+.isc-medidor { position: relative; display: grid; justify-items: center; }
+.isc-medidor svg { width: 400px; max-width: 100%; }
+.isc-arco { fill: none; stroke-width: 18; }
+.isc-arco-critica { stroke: var(--isc-crit); } .isc-arco-atencao { stroke: var(--isc-aten); } .isc-arco-saudavel { stroke: var(--isc-saud); }
+.isc-ponteiro { fill: var(--isc-ouro); }
+.isc-centro { position: absolute; top: 34%; text-align: center; }
+.isc-centro b { font: 700 42px/1 var(--isc-titulo); }
+.isc-centro small { display: block; color: #8b95b0; font-size: 12px; }
+.isc-zona { font-weight: 700; font-size: 12px; letter-spacing: .1em; color: #e0a92b; }
+.isc-faixas { display: flex; justify-content: space-between; width: 400px; max-width: 100%; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; }
+.isc-faixas span:nth-child(1) { color: #e06a5a; } .isc-faixas span:nth-child(2) { color: #e0a92b; } .isc-faixas span:nth-child(3) { color: #4cc296; }
+.isc-componentes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e4); }
+.isc-componente { background: var(--isc-painel); border-radius: var(--raio-md); padding: var(--e4) var(--e5); }
+.isc-componente h4 { margin: 0; font: 700 12px var(--isc-corpo); color: var(--isc-marino); letter-spacing: .06em; text-transform: uppercase; }
+.isc-numero { font: 700 30px/1.25 var(--isc-titulo); color: var(--isc-marino); }
+.isc-numero small { font: 400 11px var(--isc-corpo); color: var(--isc-cinza); }
+.isc-trilho { height: 8px; border-radius: 5px; background: var(--isc-linha); overflow: hidden; }
+.isc-trilho div { height: 100%; }
+.isc-componente p { margin: 6px 0 0; font-size: 11.5px; }
 .carteira-filtro { display: flex; gap: var(--e2); align-items: end; flex-wrap: wrap; }
+.carteira .tabela { font-size: 12.5px; }
+.carteira .tabela th { background: var(--isc-painel); color: var(--isc-marino); font: 700 10.5px var(--isc-corpo);
+  letter-spacing: .06em; text-transform: uppercase; border-bottom: 2px solid var(--isc-marino); }
+.carteira .tabela td { border-bottom: 1px solid var(--isc-linha); }
+.carteira-grupo { font-weight: 700; color: var(--isc-marino); }
+.carteira-classe { font-weight: 700; color: var(--isc-marino); }
+.carteira-legenda { font-size: 11px; color: var(--isc-cinza-2); margin: 0; }
+.isc-como { background: var(--isc-painel); border-radius: var(--raio-md); padding: var(--e3) var(--e5); font-size: 12.5px; }
+.isc-como summary { cursor: pointer; font-weight: 700; color: var(--isc-marino); }
+.isc-como p { margin: var(--e2) 0 0; }
+@media (max-width: 800px) {
+  .isc-hero { grid-template-columns: 1fr; padding: var(--e5); }
+  .isc-componentes { grid-template-columns: 1fr; }
+}
 
 /* Movimento reduzido (26/09/2026). Fica no FIM do arquivo e vale para todo
    elemento, para cobrir também a transição e a animação que alguém criar

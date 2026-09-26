@@ -32,10 +32,11 @@ describe("Carteira", () => {
   it("mostra o ISC com a zona escrita, os avisos e a distribuição", async () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
     render(<Carteira />);
-    expect(await screen.findByText("53,65")).toBeInTheDocument();
-    expect(screen.getByText(/Zona atenção/)).toBeInTheDocument();
+    expect(await screen.findByText("53,7")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /ISC 53,7 de 100, zona atenção/ })).toBeInTheDocument();
     expect(screen.getByText(/rentabilidade vem da planilha/)).toBeInTheDocument();
-    expect(screen.getByText(/B: 1 · C: 1/)).toBeInTheDocument();
+    expect(screen.getByText(/B 1 · C 1, ponderado por receita/)).toBeInTheDocument();
+    expect(screen.getByText("ZONA DE ATENÇÃO")).toBeInTheDocument();
   });
 
   it("estado nunca só por cor: cobrança e alerta têm texto, e a cobrança vem primeiro", async () => {
@@ -50,10 +51,17 @@ describe("Carteira", () => {
   it("filtra por eixo e oferece limpar quando nada passa", async () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
     render(<Carteira />);
-    await screen.findByText("Alfa");
+    await screen.findByText(/▸ Alfa/);
     await userEvent.selectOptions(screen.getByLabelText("Eixo de ação"), "Sem urgência de churn");
-    expect(screen.queryByText("Alfa")).toBeNull();
-    expect(screen.getByText("Beta")).toBeInTheDocument();
+    expect(screen.queryByText(/▸ Alfa/)).toBeNull();
+    expect(screen.getByText(/▸ Beta/)).toBeInTheDocument();
+  });
+
+  it("explica como o ISC é calculado, recolhido por padrão", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira />);
+    expect(await screen.findByText("Como é calculado")).toBeInTheDocument();
+    expect(screen.getByText(/Classe × 33% \+ Semáforo × 33% \+ Churn × 34%/)).toBeInTheDocument();
   });
 
   it("marca o grupo sem contrato ativo", async () => {

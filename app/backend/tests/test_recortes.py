@@ -69,6 +69,39 @@ class TestCenarios:
         c = cenarios_de_ticket([aceita(v) for v in (1000, 1100, 1200, 1300)])
         assert c.atipicos == 0 and c.atipico_medio is None
 
+    def test_conservador_e_a_mediana_sem_os_atipicos(self):
+        # mediana de todos = 300; sem o atípico (5000): 100, 200, 300, 900 -> mediana 250
+        c = cenarios_de_ticket([aceita(v) for v in (100, 200, 300, 900, 5000)])
+        assert c.atipicos == 1
+        assert (c.conservador, c.base) == (D("250.00"), D("375.00"))
+
+    def test_conservador_nunca_passa_do_base(self):
+        """Regressão: com 100, 1.000, 1.000, 1.000 (+ o atípico 10.000) a mediana
+        (1.000) passava da média (775) e o conservador saía maior que o base."""
+        c = cenarios_de_ticket([aceita(v) for v in (100, 1000, 1000, 1000, 10000)])
+        assert c.base == D("775.00")
+        assert c.conservador == D("775.00")
+
+    def test_otimista_nunca_fica_abaixo_do_base(self):
+        # 1, 1, 1, 1, 3: nada é atípico (limite 3); terceiro quartil 1, média 1,40
+        c = cenarios_de_ticket([aceita(v) for v in (1, 1, 1, 1, 3)])
+        assert c.atipicos == 0
+        assert (c.conservador, c.base, c.otimista) == (D("1.00"), D("1.40"), D("1.40"))
+
+    @pytest.mark.parametrize(
+        "valores",
+        [
+            (100, 1000, 1000, 1000, 10000),
+            (1, 1000, 1000, 1000, 1000, 1000),
+            (1, 1, 1, 1, 3),
+            (1000, 1100, 1200, 1300),
+            DEZENOVE,
+        ],
+    )
+    def test_os_tres_cenarios_ficam_sempre_em_ordem(self, valores):
+        c = cenarios_de_ticket([aceita(v) for v in valores])
+        assert c.conservador <= c.base <= c.otimista
+
     def test_poucos_contratos_nao_geram_cenario(self):
         assert cenarios_de_ticket([aceita(1000), aceita(2000), aceita(3000)]) is None
 

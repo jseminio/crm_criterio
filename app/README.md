@@ -1032,6 +1032,17 @@ não — a conta ficava presa em "Pesquisando". `preparar` e `nova-versao`
 confirmam a transação (`_confirmar_antes_de_agendar`) antes de agendar o
 preparo. Achado só porque o fluxo inteiro rodou num PostgreSQL de verdade.
 
+## Classificação da carteira (Etapa 3, 26/09/2026)
+
+Tela **Carteira** (somente leitura): ISC, componentes, distribuição por classe e, por grupo, classe efetiva, Score, alerta de churn e eixo de ação.
+
+- **Regra** em `backend/src/crm/domain/classificacao.py`, parâmetros versionados (`2026-07-planilha-v1`). Score = 0,20 receita + 0,25 rentabilidade + 0,12 cross-sell + 0,12×(6−complexidade) + 0,09 disciplina + 0,07×(6−risco) + 0,15 adimplência. Classe por corte fixo (A ≥ 3,95; B ≥ 3,35; senão C) mais o sufixo do semáforo. Adimplência ≤ 2 marca "(TRAVADO)" e `$$$` sem rebaixar. O churn é campo próprio (na planilha estava escondido na fórmula).
+- **Carga**: `backend/scripts/importar_classificacao.py <classificacao.xlsx> <rentabilidade.xlsx>` roda em ensaio por padrão. Liga cada unidade ao grupo do CRM pelo CNPJ (seguindo as fusões), recalcula tudo e compara com a planilha; qualquer divergência bloqueia a gravação. `--aplicar` faz backup antes e grava um snapshot por (grupo, referência), idempotente.
+- **Conferência de 31/07/2026**: 31 unidades, ISC 53,65 (zona de atenção), igual ao da planilha; receita R$ 226.341,20.
+- **Notas de grupo são decimais** (média das empresas), por isso as colunas são `Numeric(4,2)`.
+- **Pendente**: a nota de rentabilidade vem da planilha, sem recálculo (defeito 7.2, atrito/disciplina possivelmente invertido). A tela avisa. Grupo sem contrato ativo hoje (ex.: Tabor) continua no snapshot da referência e é marcado.
+- Rota: `GET /api/carteira/classificacao`.
+
 ## Lacunas da verificação automática da plataforma
 
 A varredura de vazamento lê **o disco, não o índice do git**, e só abre arquivos

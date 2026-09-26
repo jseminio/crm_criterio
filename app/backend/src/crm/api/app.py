@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from crm.api import esquemas as e
 from crm.api.abordagens import Servicos, roteador_de_abordagens, servicos_reais
 from crm.api.backup import roteador as roteador_de_backup
+from crm.api.classificacao import roteador as roteador_de_carteira
 from crm.api.contatos import roteador as roteador_de_contatos
 from crm.api.contatos import roteador_de_empresas
 from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
@@ -129,6 +130,7 @@ def criar_app(
         roteador_de_abordagens(obter_sessao, lambda: _fabrica, servicos or servicos_reais)
     )
     api.include_router(roteador_de_contatos(obter_sessao))
+    api.include_router(roteador_de_carteira(obter_sessao))
     api.include_router(roteador_de_empresas(obter_sessao))
     return api
 

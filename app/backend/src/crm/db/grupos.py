@@ -14,10 +14,15 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from crm.db.modelos import Empresa, GrupoEconomico, Oportunidade
+from crm.db.base import agora
+from crm.db.modelos import Contrato, Empresa, FusaoDeGrupos, GrupoEconomico, Oportunidade, PessoaContato
 from crm.domain.listas import SituacaoGrupo
 
-__all__ = ["fundir_grupos", "FusaoInvalida", "ResultadoDaFusao"]
+__all__ = ["fundir_grupos", "desfazer_fusao", "FusaoInvalida", "ResultadoDaFusao"]
+
+#: As tabelas que a fusão move do absorvido para o principal, e a coluna que aponta o grupo.
+#: (Ficha de conta e abordagem do agente SDR ainda não são movidas: têm regra própria.)
+_MOVIDOS = ((Empresa, "empresa"), (Oportunidade, "oportunidade"), (PessoaContato, "pessoa_contato"), (Contrato, "contrato"))
 
 
 class FusaoInvalida(ValueError):
@@ -34,6 +39,8 @@ class ResultadoDaFusao:
         self.empresas = empresas
         self.oportunidades = oportunidades
         self.contatos = contatos
+        self.fusao_id: int | None = None
+        """O registro que permite desfazer."""
 
     @property
     def texto(self) -> str:
@@ -76,22 +83,15 @@ def fundir_grupos(
     # absorvido era, e daqui a três linhas ele já não será mais isso.
     absorvido_era = absorvido.situacao
 
-    empresas = sessao.execute(
-        sa.update(Empresa)
-        .where(Empresa.grupo_id == absorvido.id)
-        .values(grupo_id=principal.id)
-    ).rowcount
-    oportunidades = sessao.execute(
-        sa.update(Oportunidade)
-        .where(Oportunidade.grupo_id == absorvido.id)
-        .values(grupo_id=principal.id)
-    ).rowcount
-    contatos = sessao.execute(
-        sa.text(
-            "UPDATE pessoa_contato SET grupo_id = :novo WHERE grupo_id = :velho"
-        ),
-        {"novo": principal.id, "velho": absorvido.id},
-    ).rowcount
+    # Guarda os ids **antes** de mover: é o que permite desfazer devolvendo exatamente estes itens.
+    movidos: dict[str, list[int]] = {}
+    for modelo, chave in _MOVIDOS:
+        ids = list(sessao.scalars(sa.select(modelo.id).where(modelo.grupo_id == absorvido.id)))
+        movidos[chave] = ids
+        if ids:
+            sessao.execute(sa.update(modelo).where(modelo.id.in_(ids)).values(grupo_id=principal.id))
+    empresas, oportunidades, contatos = (len(movidos[k]) for k in ("empresa", "oportunidade", "pessoa_contato"))
+    principal_situacao_antes, principal_entrada_antes = principal.situacao, principal.data_entrada
 
     absorvido.fundido_em_id = principal.id
     absorvido.situacao = SituacaoGrupo.FUNDIDO
@@ -109,5 +109,49 @@ def fundir_grupos(
     ):
         principal.data_entrada = absorvido.data_entrada
 
+    registro = FusaoDeGrupos(
+        principal_id=principal.id, absorvido_id=absorvido.id, movidos=movidos,
+        absorvido_situacao_antes=absorvido_era.value,
+        principal_situacao_antes=principal_situacao_antes.value, principal_situacao_depois=principal.situacao.value,
+        principal_data_entrada_antes=principal_entrada_antes, principal_data_entrada_depois=principal.data_entrada,
+    )
+    sessao.add(registro)
     sessao.flush()
-    return ResultadoDaFusao(principal, absorvido, empresas, oportunidades, contatos)
+    resultado = ResultadoDaFusao(principal, absorvido, empresas, oportunidades, contatos)
+    resultado.fusao_id = registro.id
+    return resultado
+
+
+def desfazer_fusao(sessao: Session, fusao: FusaoDeGrupos) -> FusaoDeGrupos:
+    """Devolve ao grupo absorvido exatamente o que a fusão tirou dele, e o reabre.
+
+    - Recusa fusão já desfeita.
+    - Move de volta **por id**: o que foi criado no principal depois da fusão fica onde está, e o
+      que uma fusão posterior levou para outro grupo também volta (pelo id, esteja onde estiver).
+    - Reabre o absorvido com a situação que ele tinha.
+    - Restaura o principal (situação e data de entrada) **só se ainda estiverem como a fusão os
+      deixou**: se alguém os mudou depois, a mudança de propósito é respeitada.
+    """
+    if fusao.desfeita_em is not None:
+        raise FusaoInvalida("esta fusão já foi desfeita")
+    absorvido = sessao.get(GrupoEconomico, fusao.absorvido_id)
+    principal = sessao.get(GrupoEconomico, fusao.principal_id)
+    if absorvido is None or principal is None:
+        raise FusaoInvalida("um dos grupos da fusão não existe mais")
+    if absorvido.fundido_em_id != principal.id:
+        raise FusaoInvalida("o grupo absorvido não está mais fundido neste principal")
+
+    for modelo, chave in _MOVIDOS:
+        ids = (fusao.movidos or {}).get(chave, [])
+        if ids:
+            sessao.execute(sa.update(modelo).where(modelo.id.in_(ids)).values(grupo_id=absorvido.id))
+
+    absorvido.fundido_em_id = None
+    absorvido.situacao = SituacaoGrupo(fusao.absorvido_situacao_antes)
+    if principal.situacao.value == fusao.principal_situacao_depois:
+        principal.situacao = SituacaoGrupo(fusao.principal_situacao_antes)
+    if principal.data_entrada == fusao.principal_data_entrada_depois:
+        principal.data_entrada = fusao.principal_data_entrada_antes
+    fusao.desfeita_em = agora()
+    sessao.flush()
+    return fusao

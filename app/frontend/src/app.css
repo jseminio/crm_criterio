@@ -316,6 +316,11 @@
 .contato-item { display: grid; gap: var(--e1); border-left: 3px solid var(--borda-forte); padding: var(--e1) var(--e3); font-size: 13px; justify-items: start; }
 .contato-form { display: grid; gap: var(--e2); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e3); }
 
+/* Fusões feitas */
+.fusoes { list-style: none; margin: var(--e2) 0 0; padding: 0; display: grid; gap: var(--e2); }
+.fusao-linha { display: flex; justify-content: space-between; align-items: center; gap: var(--e3); flex-wrap: wrap;
+  background: var(--surface-card); border: 1px solid var(--borda); border-radius: 8px; padding: var(--e2) var(--e3); font-size: 13px; }
+
 /* Movimento reduzido (26/09/2026). Fica no FIM do arquivo e vale para todo
    elemento, para cobrir também a transição e a animação que alguém criar
    depois — uma regra por componente já deixou a coluna do kanban de fora.

@@ -57,6 +57,7 @@ __all__ = [
     "Abordagem",
     "ExecucaoDoAgente",
     "EventoDeContrato",
+    "FusaoDeGrupos",
     "HistoricoDePreco",
     "ExecucaoDeCarga",
     "OcorrenciaDeCarga",
@@ -413,6 +414,36 @@ class Oportunidade(CarimboMixin, Base):
 
     def __repr__(self) -> str:
         return f"<Oportunidade {self.id} {self.nome!r} {self.situacao.value}>"
+
+
+class FusaoDeGrupos(Base):
+    """O registro de uma fusão de grupos, para poder **desfazê-la** (pedido de Eduardo, 26/09/2026).
+
+    Guarda, por id, tudo que a fusão moveu do grupo absorvido para o principal, e o estado do
+    principal antes e depois. Desfazer devolve exatamente esses itens: o que foi criado no
+    principal depois da fusão fica onde está. **Imutável, exceto por `desfeita_em`**, que só vai
+    de nulo para uma data (uma fusão não é desfeita duas vezes).
+    """
+
+    __tablename__ = "fusao_de_grupos"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    principal_id: Mapped[int] = mapped_column(sa.ForeignKey("grupo_economico.id"), nullable=False, index=True)
+    absorvido_id: Mapped[int] = mapped_column(sa.ForeignKey("grupo_economico.id"), nullable=False, index=True)
+    feita_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+    desfeita_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    reconstruida: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False, server_default=sa.false())
+    """Registro refeito depois, a partir de um backup, para fusões feitas antes de o registro existir."""
+
+    movidos: Mapped[dict] = mapped_column(
+        sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=dict, server_default=sa.text("'{}'")
+    )
+    """{"empresa": [ids], "oportunidade": [ids], "pessoa_contato": [ids], "contrato": [ids]}"""
+    absorvido_situacao_antes: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    principal_situacao_antes: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    principal_situacao_depois: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    principal_data_entrada_antes: Mapped[date | None] = mapped_column(sa.Date)
+    principal_data_entrada_depois: Mapped[date | None] = mapped_column(sa.Date)
 
 
 class HistoricoDePreco(Base):

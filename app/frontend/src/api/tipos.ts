@@ -516,3 +516,21 @@ export interface PaginaDeContatos<T> {
   total: number;
   itens: T[];
 }
+
+/** Uma fusão de grupos que foi feita, com o que ela moveu, para poder ser desfeita. */
+export interface FusaoFeita {
+  id: number;
+  principal_id: number;
+  principal_nome: string;
+  absorvido_id: number;
+  absorvido_nome: string;
+  feita_em: string;
+  desfeita_em: string | null;
+  /** Registro refeito a partir de um backup: a fusão é anterior ao registro. */
+  reconstruida: boolean;
+  empresas: number;
+  oportunidades: number;
+  contatos: number;
+  contratos: number;
+  pode_desfazer: boolean;
+}

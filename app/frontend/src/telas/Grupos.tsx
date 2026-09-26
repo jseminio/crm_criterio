@@ -13,6 +13,7 @@ import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { usarDados } from "../usarDados";
 import { DetalheDoGrupo } from "./DetalheDoGrupo";
+import { FusoesFeitas } from "./FusoesFeitas";
 import { SugestoesDeFusao } from "./SugestoesDeFusao";
 
 function Fusao({
@@ -130,6 +131,7 @@ export function Grupos({ listas }: { listas: Listas | null }) {
   const [busca, definirBusca] = useState("");
   const [aberto, definirAberto] = useState<GrupoResumo | null>(null);
   const [fundindo, definirFundindo] = useState<GrupoResumo | null>(null);
+  const [versao, definirVersao] = useState(0);
 
   const { dados, carregando, erro, recarregar } = usarDados<Pagina<GrupoResumo>>(
     () => api.grupos({ busca: busca || undefined }),
@@ -164,7 +166,9 @@ export function Grupos({ listas }: { listas: Listas | null }) {
         </div>
       )}
 
-      <SugestoesDeFusao aoJuntar={recarregar} />
+      <SugestoesDeFusao aoJuntar={() => { recarregar(); definirVersao((v) => v + 1); }} versao={versao} />
+
+      <FusoesFeitas versao={versao} aoMudar={() => { recarregar(); definirVersao((v) => v + 1); }} />
 
       {carregando && <Carregando rotulo="Carregando os grupos" />}
       {erro && !carregando && <Erro mensagem={erro} aoTentarDeNovo={recarregar} />}

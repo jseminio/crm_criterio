@@ -151,6 +151,25 @@ class AgendaResposta(Base):
     itens: list[ItemDaAgendaResposta]
 
 
+class FusaoFeita(Base):
+    """Uma fusão que foi feita, com o que ela moveu, para poder ser desfeita."""
+
+    id: int
+    principal_id: int
+    principal_nome: str
+    absorvido_id: int
+    absorvido_nome: str
+    feita_em: datetime
+    desfeita_em: datetime | None = None
+    reconstruida: bool = False
+    """Registro refeito a partir de um backup (a fusão é anterior ao registro)."""
+    empresas: int
+    oportunidades: int
+    contatos: int
+    contratos: int
+    pode_desfazer: bool
+
+
 class SugestaoDeFusao(Base):
     """Um bloco de grupos que parecem ser o mesmo cliente. Só sugestão."""
 

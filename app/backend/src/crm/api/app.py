@@ -33,11 +33,12 @@ from crm.api.contatos import roteador as roteador_de_contatos
 from crm.api.contatos import roteador_de_empresas
 from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
 from crm.db.base import agora
-from crm.db.grupos import FusaoInvalida, fundir_grupos
+from crm.db.grupos import FusaoInvalida, desfazer_fusao, fundir_grupos
 from crm.db.modelos import (
     Contrato,
     Empresa,
     EventoDeContrato,
+    FusaoDeGrupos,
     HistoricoDePreco,
     ExecucaoDeCarga,
     GrupoEconomico,
@@ -304,6 +305,46 @@ def _registrar(api: FastAPI) -> None:
             )
             for s in [*por_nome, *do_cliente]
         ]
+
+    def _fusao_feita(f: FusaoDeGrupos, nomes: dict[int, str], absorvidos: dict[int, GrupoEconomico]) -> e.FusaoFeita:
+        m = f.movidos or {}
+        a = absorvidos.get(f.absorvido_id)
+        return e.FusaoFeita(
+            id=f.id, principal_id=f.principal_id, principal_nome=nomes.get(f.principal_id, "?"),
+            absorvido_id=f.absorvido_id, absorvido_nome=nomes.get(f.absorvido_id, "?"),
+            feita_em=f.feita_em, desfeita_em=f.desfeita_em, reconstruida=f.reconstruida,
+            empresas=len(m.get("empresa", [])), oportunidades=len(m.get("oportunidade", [])),
+            contatos=len(m.get("pessoa_contato", [])), contratos=len(m.get("contrato", [])),
+            pode_desfazer=f.desfeita_em is None and a is not None and a.fundido_em_id == f.principal_id,
+        )
+
+    @api.get("/api/grupos/fusoes", response_model=list[e.FusaoFeita], tags=["grupos"])
+    def listar_fusoes(
+        sessao: Session = Depends(obter_sessao),
+        incluir_desfeitas: bool = False,
+        limite: int = Query(default=100, le=500),
+    ) -> list[e.FusaoFeita]:
+        """As fusões feitas, da mais recente para a mais antiga, para poderem ser desfeitas."""
+        consulta = sa.select(FusaoDeGrupos).order_by(FusaoDeGrupos.id.desc()).limit(limite)
+        if not incluir_desfeitas:
+            consulta = consulta.where(FusaoDeGrupos.desfeita_em.is_(None))
+        fusoes = list(sessao.scalars(consulta))
+        ids = {i for f in fusoes for i in (f.principal_id, f.absorvido_id)}
+        grupos = {g.id: g for g in sessao.scalars(sa.select(GrupoEconomico).where(GrupoEconomico.id.in_(ids)))} if ids else {}
+        return [_fusao_feita(f, {i: g.nome for i, g in grupos.items()}, grupos) for f in fusoes]
+
+    @api.post("/api/grupos/fusoes/{fusao_id}/desfazer", response_model=e.FusaoFeita, tags=["grupos"])
+    def desfazer(fusao_id: int, sessao: Session = Depends(obter_sessao)) -> e.FusaoFeita:
+        """Desfaz a fusão: devolve ao grupo absorvido o que foi movido e o reabre."""
+        f = sessao.get(FusaoDeGrupos, fusao_id)
+        if f is None:
+            raise HTTPException(404, "fusão não encontrada")
+        try:
+            desfazer_fusao(sessao, f)
+        except FusaoInvalida as erro:
+            raise HTTPException(409, str(erro)) from erro
+        grupos = {g.id: g for g in sessao.scalars(sa.select(GrupoEconomico).where(GrupoEconomico.id.in_([f.principal_id, f.absorvido_id])))}
+        return _fusao_feita(f, {i: g.nome for i, g in grupos.items()}, grupos)
 
     @api.post("/api/grupos/{grupo_id}/fundir", response_model=e.GrupoResumo, tags=["grupos"])
     def fundir(

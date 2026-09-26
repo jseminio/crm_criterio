@@ -544,6 +544,21 @@ como interpolação, e a senha chega codificada para endereço, cheia de `%23` e
 `%40`. Passá-la por ali derrubava a migração com `invalid interpolation syntax`
 — erro que não menciona senha nem URL, e custa caro para diagnosticar.
 
+**Desfazer a fusão (26/09/2026, precaução pedida por Eduardo).** Toda fusão agora grava um registro
+(`fusao_de_grupos`) com os **ids** do que ela moveu (empresas, propostas, contatos e **contratos**) e o
+estado anterior do principal. Na tela **Grupos**, o painel "Fusões feitas" lista as fusões com o botão
+**Desfazer**, em dois passos. Desfazer devolve ao absorvido **exatamente** esses itens e o reabre, com a
+situação que ele tinha; o que foi criado no principal depois **fica onde está**; e situação/data de
+entrada do principal só voltam se ninguém as tiver mudado depois. Uma fusão não se desfaz duas vezes.
+`POST /api/grupos/fusoes/{id}/desfazer`, `GET /api/grupos/fusoes`.
+
+- **Antes a fusão não movia os contratos** (só empresas, propostas e contatos). Era um risco latente:
+  agora move e devolve. Ficha de conta e abordagem do agente SDR **ainda não** são movidas.
+- **As 38 fusões já feitas** em 26/09/2026 tiveram o registro **reconstruído do backup** de antes do lote
+  (`scripts/reconstruir_fusoes.py`, marcado "registro refeito do backup"). Prova: desfazer as 38 numa
+  transação devolveu **0** itens e **0** grupos diferentes do backup, e a transação foi descartada.
+  As 3 fusões anteriores ao lote não têm registro: só o backup as desfaz.
+
 **Prospect que já é cliente (26/09/2026).** Depois da carga da carteira, `sugerir_clientes` cruza cada
 prospect com os clientes pelo **nome das empresas** de cada grupo (a carteira usa o grupo econômico e a
 razão social; as propostas usam o nome que o comercial digitou, como "ASM retomada… - 3AW" para o "Grupo

@@ -5,6 +5,7 @@ import type {
   AbordagemResumo,
   Agenda,
   EnderecoDeContato,
+  FusaoFeita,
   EntidadeDeContato,
   PaginaDeContatos,
   PessoaComOrigem,
@@ -218,6 +219,10 @@ export const api = {
     pedir<Pagina<GrupoResumo>>(comParametros("/api/grupos", { limite: 500, ...filtros })),
 
   sugestoesDeFusao: () => pedir<SugestaoDeFusao[]>("/api/grupos/sugestoes-de-fusao"),
+
+  fusoesFeitas: () => pedir<FusaoFeita[]>("/api/grupos/fusoes"),
+
+  desfazerFusao: (id: number) => pedir<FusaoFeita>(`/api/grupos/fusoes/${id}/desfazer`, { method: "POST" }),
 
   fundirGrupos: (principalId: number, absorvidoId: number) =>
     pedir<GrupoResumo>(`/api/grupos/${principalId}/fundir`, {

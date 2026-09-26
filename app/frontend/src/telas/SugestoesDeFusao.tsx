@@ -110,8 +110,8 @@ function Bloco({
   );
 }
 
-export function SugestoesDeFusao({ aoJuntar }: { aoJuntar: () => void }) {
-  const { dados, recarregar } = usarDados<SugestaoDeFusao[]>(() => api.sugestoesDeFusao(), []);
+export function SugestoesDeFusao({ aoJuntar, versao = 0 }: { aoJuntar: () => void; versao?: number }) {
+  const { dados, recarregar } = usarDados<SugestaoDeFusao[]>(() => api.sugestoesDeFusao(), [versao]);
   const [ignoradasAgora, definirIgnoradasAgora] = useState<string[]>([]);
   const [aviso, definirAviso] = useState<string | null>(null);
   const ignoradas = [...lerIgnoradas(), ...ignoradasAgora];

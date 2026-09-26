@@ -91,7 +91,8 @@ export function CenariosDeTicket({ filtros }: { filtros: EstadoDosFiltros }) {
         {dinheiro(dados.limite_do_atipico)} (3 × a mediana): {dados.atipicos} contrato
         {dados.atipicos === 1 ? "" : "s"}
         {dados.atipicos > 0 && ` (${dinheiro(dados.atipico_minimo)} a ${dinheiro(dados.atipico_maximo)})`}.
-        Conservador = mediana; base = média sem atípicos; otimista = terceiro quartil sem atípicos.
+        Conservador = mediana sem atípicos; base = média sem atípicos; otimista = terceiro quartil
+        sem atípicos. O conservador nunca passa do base, e o otimista nunca fica abaixo dele.
         Não considera cancelamento nem o tempo até faturar. Com poucos contratos, o número mexe muito.
       </p>
     </section>

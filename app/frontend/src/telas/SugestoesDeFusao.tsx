@@ -4,6 +4,8 @@
  * (regra 2: ação que mexe em muitos registros pede confirmação) — e nada é
  * apagado: o grupo absorvido continua no banco, marcado como fundido.
  * "Não é o mesmo cliente" some com a sugestão neste navegador; nada é gravado.
+ * Se o navegador não deixar guardar (janela anônima, dados bloqueados), ela some
+ * só até recarregar a página.
  */
 
 import { useState } from "react";
@@ -15,25 +17,41 @@ const CHAVE = "crm.fusoes-ignoradas";
 
 function lerIgnoradas(): string[] {
   try {
-    return JSON.parse(localStorage.getItem(CHAVE) ?? "[]");
+    const lidas: unknown = JSON.parse(localStorage.getItem(CHAVE) ?? "[]");
+    return Array.isArray(lidas) ? lidas.filter((c): c is string => typeof c === "string") : [];
   } catch {
     return [];
   }
 }
 
+function guardarIgnorada(chave: string) {
+  try {
+    localStorage.setItem(CHAVE, JSON.stringify([...lerIgnoradas(), chave]));
+  } catch {
+    // Sem armazenamento: a tela ainda esconde a sugestão, só não lembra depois.
+  }
+}
+
 const chaveDe = (s: SugestaoDeFusao) => s.grupos.map((g) => g.id).sort((a, b) => a - b).join("-");
 
-function Bloco({ sugestao, aoResolver }: { sugestao: SugestaoDeFusao; aoResolver: () => void }) {
+function Bloco({
+  sugestao,
+  aoIgnorar,
+  aoJuntar,
+}: {
+  sugestao: SugestaoDeFusao;
+  aoIgnorar: () => void;
+  /** `falha` é `null` quando tudo foi juntado. */
+  aoJuntar: (falha: string | null) => void;
+}) {
   const [principalId, definirPrincipalId] = useState(sugestao.principal_id);
   const [confirmando, definirConfirmando] = useState(false);
   const [juntando, definirJuntando] = useState(false);
-  const [erro, definirErro] = useState<string | null>(null);
   const principal = sugestao.grupos.find((g) => g.id === principalId)!;
   const outros = sugestao.grupos.filter((g) => g.id !== principalId);
 
   const juntar = async () => {
     definirJuntando(true);
-    definirErro(null);
     const falhas: string[] = [];
     for (const g of outros) {
       try {
@@ -44,8 +62,9 @@ function Bloco({ sugestao, aoResolver }: { sugestao: SugestaoDeFusao; aoResolver
     }
     definirJuntando(false);
     definirConfirmando(false);
-    if (falhas.length) definirErro(`Alguns não foram juntados — ${falhas.join("; ")}`);
-    aoResolver();
+    // O aviso sobe para o painel: a lista recarrega, a sugestão muda de grupos
+    // (ou some) e este bloco é desmontado — um aviso guardado aqui sumiria junto.
+    aoJuntar(falhas.length ? `Alguns não foram juntados — ${falhas.join("; ")}` : null);
   };
 
   return (
@@ -73,12 +92,8 @@ function Bloco({ sugestao, aoResolver }: { sugestao: SugestaoDeFusao; aoResolver
           </label>
         ))}
       </fieldset>
-      {erro && <p role="alert" className="estado-texto">{erro}</p>}
       <div className="sugestao-acoes">
-        <button type="button" className="botao botao-secundario" onClick={() => {
-          localStorage.setItem(CHAVE, JSON.stringify([...lerIgnoradas(), chaveDe(sugestao)]));
-          aoResolver();
-        }}>
+        <button type="button" className="botao botao-secundario" onClick={aoIgnorar}>
           Não é o mesmo cliente
         </button>
         {confirmando ? (
@@ -97,33 +112,46 @@ function Bloco({ sugestao, aoResolver }: { sugestao: SugestaoDeFusao; aoResolver
 
 export function SugestoesDeFusao({ aoJuntar }: { aoJuntar: () => void }) {
   const { dados, recarregar } = usarDados<SugestaoDeFusao[]>(() => api.sugestoesDeFusao(), []);
-  const [, forcar] = useState(0);
-  const ignoradas = lerIgnoradas();
+  const [ignoradasAgora, definirIgnoradasAgora] = useState<string[]>([]);
+  const [aviso, definirAviso] = useState<string | null>(null);
+  const ignoradas = [...lerIgnoradas(), ...ignoradasAgora];
   const visiveis = (dados ?? []).filter((s) => !ignoradas.includes(chaveDe(s)));
-  if (visiveis.length === 0) return null;
+  if (visiveis.length === 0 && !aviso) return null;
 
   return (
     <section className="recado" aria-label="Sugestões de fusão">
-      <h3 className="numero-rotulo">
-        {visiveis.length} sugestõe{visiveis.length === 1 ? "" : "s"} de grupos que parecem ser o mesmo cliente
-      </h3>
-      <p className="numero-nota">
-        É só uma sugestão pelo nome. Nada é juntado sem o seu clique, e nada é apagado: o grupo
-        absorvido continua no banco, marcado como fundido.
-      </p>
-      <ul className="sugestoes">
-        {visiveis.map((s) => (
-          <Bloco
-            key={chaveDe(s)}
-            sugestao={s}
-            aoResolver={() => {
-              forcar((n) => n + 1);
-              recarregar();
-              aoJuntar();
-            }}
-          />
-        ))}
-      </ul>
+      {visiveis.length > 0 && (
+        <>
+          <h3 className="numero-rotulo">
+            {visiveis.length} {visiveis.length === 1 ? "sugestão" : "sugestões"} de grupos que parecem
+            ser o mesmo cliente
+          </h3>
+          <p className="numero-nota">
+            É só uma sugestão pelo nome. Nada é juntado sem o seu clique, e nada é apagado: o grupo
+            absorvido continua no banco, marcado como fundido.
+          </p>
+        </>
+      )}
+      {aviso && <p role="alert" className="estado-texto">{aviso}</p>}
+      {visiveis.length > 0 && (
+        <ul className="sugestoes">
+          {visiveis.map((s) => (
+            <Bloco
+              key={chaveDe(s)}
+              sugestao={s}
+              aoIgnorar={() => {
+                guardarIgnorada(chaveDe(s));
+                definirIgnoradasAgora((atuais) => [...atuais, chaveDe(s)]);
+              }}
+              aoJuntar={(falha) => {
+                definirAviso(falha);
+                recarregar();
+                aoJuntar();
+              }}
+            />
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

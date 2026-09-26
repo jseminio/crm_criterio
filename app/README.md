@@ -264,12 +264,17 @@ em dois passos, pelo `POST /api/grupos/{id}/fundir` de sempre. Regras em
 
 - **alta:** a *chave* do nome é a mesma (sem acento, sem caixa, sem o que está entre
   parênteses e sem o que vem depois de " - ");
-- **média:** um nome contém o outro e o menor tem duas palavras ou mais;
+- **média:** um nome contém o outro e o menor tem duas palavras ou mais. Cada sugestão
+  média é **um par** de nomes, nunca uma corrente: "João Silva" e "Silva Santos" estão
+  ambos dentro de "João Silva Santos" e viram dois pares, não um bloco de três (corrigido
+  em 26/09/2026 — antes as ligações se encadeavam e um clique fundia clientes diferentes);
 - **fora de propósito:** nome de uma palavra só dentro de outro ("Aeskins" e "Horas
   adicionais Aeskins") e nomes só parecidos na escrita ("BRA" e "BRAP") — falso positivo demais.
 
-Com os dados de 25/09/2026: 19 sugestões entre os 138 grupos. "Não é o mesmo cliente" some
-com a sugestão **só neste navegador** (não grava no banco).
+Com os dados de 25/09/2026: 19 sugestões entre os 138 grupos (contagem anterior à
+correção dos pares; pode mudar). "Não é o mesmo cliente" some com a sugestão **só neste
+navegador** (não grava no banco); se o navegador bloquear o armazenamento, ela some só até
+recarregar a página. Quando uma junção falha em parte, o aviso fica no topo do painel.
 
 ### Credenciais
 

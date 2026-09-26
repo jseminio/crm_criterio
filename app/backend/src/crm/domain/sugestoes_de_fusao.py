@@ -10,7 +10,10 @@ Dois níveis de confiança, escolhidos por serem os que os dados reais sustentam
 - **alta** — a *chave* do nome é a mesma. Chave = nome sem acento e sem caixa, sem o
   que vem entre parênteses e sem o que vem depois de " - ".
 - **média** — a chave de um contém a do outro, e a menor tem **duas palavras ou mais**
-  ("Andréa Curcio" dentro de "BPO Contábil Andréa Curcio").
+  ("Andréa Curcio" dentro de "BPO Contábil Andréa Curcio"). Cada sugestão média é
+  **um par** de nomes, nunca uma corrente: "joao silva" e "silva santos" estão ambos
+  dentro de "joao silva santos", mas isso não diz nada um sobre o outro. Encadear as
+  ligações juntaria clientes diferentes num bloco só — e um clique fundiria todos.
 
 **Ficou de fora de propósito:** nome de uma palavra só dentro de outro maior
 ("Aeskins" e "Horas adicionais Aeskins"), e nomes só parecidos na escrita
@@ -21,7 +24,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Iterable, Protocol
 
 __all__ = ["chave_do_nome", "sugerir", "Sugestao"]
@@ -53,38 +56,28 @@ def chave_do_nome(nome: str) -> str:
     return " ".join(t for t in s.split() if t not in _PALAVRAS_VAZIAS)
 
 
-@dataclass
-class _Uniao:
-    pai: dict[int, int] = field(default_factory=dict)
-
-    def achar(self, x: int) -> int:
-        self.pai.setdefault(x, x)
-        while self.pai[x] != x:
-            self.pai[x] = self.pai[self.pai[x]]
-            x = self.pai[x]
-        return x
-
-    def unir(self, a: int, b: int) -> None:
-        self.pai[self.achar(a)] = self.achar(b)
+def _sugestao(confianca: str, motivo: str, ids: list[int], por_id: dict[int, _Grupo]) -> Sugestao:
+    principal = max(ids, key=lambda i: (por_id[i].quantas_oportunidades, -i))
+    return Sugestao(confianca=confianca, motivo=motivo, ids=sorted(ids), principal_id=principal)
 
 
 def sugerir(grupos: Iterable[_Grupo]) -> list[Sugestao]:
-    lista = [g for g in grupos]
-    chaves = {g.id: chave_do_nome(g.nome) for g in lista}
-    por_id = {g.id: g for g in lista}
-    uniao = _Uniao()
-    ligacoes_medias: set[int] = set()
-
-    # alta: mesma chave
+    por_id = {g.id: g for g in grupos}
     por_chave: dict[str, list[int]] = {}
-    for gid, chave in chaves.items():
+    for gid, g in por_id.items():
+        chave = chave_do_nome(g.nome)
         if chave:
             por_chave.setdefault(chave, []).append(gid)
-    for ids in por_chave.values():
-        for outro in ids[1:]:
-            uniao.unir(ids[0], outro)
 
-    # média: uma chave contém a outra e a menor tem 2+ palavras
+    sugestoes: list[Sugestao] = []
+
+    # alta: mesma chave
+    for chave, ids in por_chave.items():
+        if len(ids) >= 2:
+            sugestoes.append(_sugestao("alta", f"Mesmo nome de cliente: “{chave}”.", ids, por_id))
+
+    # média: um par em que uma chave contém a outra e a menor tem 2+ palavras.
+    # Par, e não união: "a ⊂ c" e "b ⊂ c" não fazem de "a" e "b" o mesmo cliente.
     distintas = sorted(por_chave, key=lambda c: len(c.split()))
     for i, menor in enumerate(distintas):
         palavras = set(menor.split())
@@ -92,31 +85,14 @@ def sugerir(grupos: Iterable[_Grupo]) -> list[Sugestao]:
             continue
         for maior in distintas[i + 1:]:
             if palavras < set(maior.split()):
-                uniao.unir(por_chave[menor][0], por_chave[maior][0])
-                ligacoes_medias.update(por_chave[menor] + por_chave[maior])
+                sugestoes.append(
+                    _sugestao(
+                        "média",
+                        f"Um nome contém o outro: {menor} ⊂ {maior}.",
+                        por_chave[menor] + por_chave[maior],
+                        por_id,
+                    )
+                )
 
-    blocos: dict[int, list[int]] = {}
-    for gid in chaves:
-        if chaves[gid]:
-            blocos.setdefault(uniao.achar(gid), []).append(gid)
-
-    sugestoes: list[Sugestao] = []
-    for ids in blocos.values():
-        if len(ids) < 2:
-            continue
-        mesmas = len({chaves[i] for i in ids}) == 1
-        principal = max(ids, key=lambda i: (por_id[i].quantas_oportunidades, -i))
-        sugestoes.append(
-            Sugestao(
-                confianca="alta" if mesmas else "média",
-                motivo=(
-                    f"Mesmo nome de cliente: “{chaves[ids[0]]}”."
-                    if mesmas
-                    else "Um nome contém o outro: " + " ⊂ ".join(sorted({chaves[i] for i in ids}, key=len)) + "."
-                ),
-                ids=sorted(ids),
-                principal_id=principal,
-            )
-        )
-    sugestoes.sort(key=lambda s: (s.confianca != "alta", -len(s.ids), s.ids[0]))
+    sugestoes.sort(key=lambda s: (s.confianca != "alta", -len(s.ids), s.ids))
     return sugestoes

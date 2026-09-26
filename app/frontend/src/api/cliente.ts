@@ -195,6 +195,12 @@ export const api = {
 
   contrato: (id: number) => pedir<ContratoDetalhe>(`/api/contratos/${id}`),
 
+  registrarEventoDeContrato: (id: number, evento: Record<string, unknown>) =>
+    pedir<ContratoDetalhe>(`/api/contratos/${id}/eventos`, {
+      method: "POST",
+      body: JSON.stringify(evento),
+    }),
+
   editarContrato: (id: number, mudancas: Record<string, unknown>) =>
     pedir<ContratoDetalhe>(`/api/contratos/${id}`, {
       method: "PATCH",

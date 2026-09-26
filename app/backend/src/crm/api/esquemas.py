@@ -23,6 +23,7 @@ from crm.domain.listas import (
     SituacaoLead,
     Temperatura,
     TipoCanal,
+    TipoDeEventoDeContrato,
     TipoDeOcorrencia,
 )
 
@@ -340,9 +341,42 @@ class ContratoResumo(Base):
     signatario: str | None = None
 
 
+class EventoDeContratoResposta(Base):
+    """Um fato do contrato, guardado com o antes e o depois. Só cresce."""
+
+    id: int
+    tipo: TipoDeEventoDeContrato
+    data_do_evento: date
+    registrado_em: datetime
+    descricao: str | None = None
+    preco_mensal_anterior: Decimal | None = None
+    preco_mensal_novo: Decimal | None = None
+    preco_anual_anterior: Decimal | None = None
+    preco_anual_novo: Decimal | None = None
+    escopo_anterior: str | None = None
+    escopo_novo: str | None = None
+    data_fim_anterior: date | None = None
+    data_fim_nova: date | None = None
+
+
 class ContratoDetalhe(ContratoResumo):
     documento_assinado: str | None = None
     observacao: str | None = None
+    eventos: list[EventoDeContratoResposta] = []
+    """Mais recente primeiro."""
+
+
+class EventoDeContratoNovo(BaseModel):
+    """Registra um evento. O que cada tipo exige está em `crm.domain.eventos_de_contrato`."""
+
+    tipo: TipoDeEventoDeContrato
+    data_do_evento: date | None = None
+    """Sem data, vale hoje (data do servidor)."""
+    descricao: str | None = Field(default=None, max_length=500)
+    escopo_novo: str | None = Field(default=None, max_length=200)
+    preco_mensal_novo: Decimal | None = None
+    preco_anual_novo: Decimal | None = None
+    data_fim_nova: date | None = None
 
 
 class ContratoEdicao(BaseModel):

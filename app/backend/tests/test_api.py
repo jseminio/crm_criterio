@@ -509,7 +509,9 @@ class TestContratos:
         assert corpo["situacao"] == "Aguardando assinatura"
         assert corpo["escopo"] == "BPO Financeiro"
         assert corpo["preco_mensal"] == "8000.00"
-        assert corpo["data_inicio"] == "2026-06-01"
+        # A vigência começa na assinatura (decisão de 25/09/2026), não no aceite:
+        # o contrato nasce sem data de início.
+        assert corpo["data_inicio"] is None
 
     def test_ajustes_no_corpo_sobrepoem_o_que_vem_da_oportunidade(
         self, cliente: TestClient, carteira
@@ -564,7 +566,9 @@ class TestContratos:
         ).json()
 
         editado = cliente.patch(
-            f"/api/contratos/{criado['id']}", json={"situacao": "Ativo"}
+            f"/api/contratos/{criado['id']}",
+            # A vigência começa na assinatura: sem a data, não ativa (ver TestEventosDeContrato).
+            json={"situacao": "Ativo", "data_inicio": "2026-06-01"},
         ).json()
 
         assert editado["situacao"] == "Ativo"
@@ -938,3 +942,81 @@ class TestAgenda:
         todos = cliente.get("/api/agenda").json()["itens"]
         so_el = cliente.get("/api/agenda", params={"captador": "EL"}).json()["itens"]
         assert 0 < len(so_el) <= len(todos) and all(i["captador"] == "EL" for i in so_el)
+
+
+class TestEventosDeContrato:
+    def _contrato_ativo(self, cliente, carteira, **extra):
+        r = cliente.post(f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={})
+        cid = r.json()["id"]
+        ativo = cliente.patch(f"/api/contratos/{cid}", json={"situacao": "Ativo", "data_inicio": "2026-03-01", "data_fim": "2027-03-01", **extra})
+        assert ativo.status_code == 200
+        return cid
+
+    def test_nao_ativa_sem_data_de_assinatura(self, cliente, carteira):
+        cid = cliente.post(f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={}).json()["id"]
+        r = cliente.patch(f"/api/contratos/{cid}", json={"situacao": "Ativo"})
+        assert r.status_code == 422 and "assinatura" in r.json()["detail"]
+
+    def test_evento_antes_da_assinatura_e_409(self, cliente, carteira):
+        cid = cliente.post(f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={}).json()["id"]
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Reajuste", "preco_mensal_novo": "9000"})
+        assert r.status_code == 409
+
+    def test_reajuste_guarda_antes_e_depois_e_muda_o_contrato(self, cliente, carteira):
+        cid = self._contrato_ativo(cliente, carteira)
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Reajuste", "preco_mensal_novo": "8800.00", "descricao": "IPCA", "data_do_evento": "2026-09-01"})
+        assert r.status_code == 201
+        c = r.json()
+        assert c["preco_mensal"] == "8800.00"
+        ev = c["eventos"][0]
+        assert (ev["tipo"], ev["preco_mensal_anterior"], ev["preco_mensal_novo"], ev["descricao"]) == ("Reajuste", "8000.00", "8800.00", "IPCA")
+
+    def test_depois_de_assinado_o_preco_so_muda_por_evento(self, cliente, carteira):
+        cid = self._contrato_ativo(cliente, carteira)
+        r = cliente.patch(f"/api/contratos/{cid}", json={"preco_mensal": "1.00"})
+        assert r.status_code == 422 and "evento" in r.json()["detail"]
+        # o rascunho inteiro com o mesmo preço não é mudança
+        assert cliente.patch(f"/api/contratos/{cid}", json={"preco_mensal": "8000.00", "observacao": "ok"}).status_code == 200
+
+    def test_renovacao_estende_o_fim_e_o_fim_nao_muda_por_patch(self, cliente, carteira):
+        cid = self._contrato_ativo(cliente, carteira)
+        assert cliente.patch(f"/api/contratos/{cid}", json={"data_fim": "2030-01-01"}).status_code == 422
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Renovação", "data_fim_nova": "2028-03-01"})
+        assert r.status_code == 201 and r.json()["data_fim"] == "2028-03-01"
+        assert r.json()["eventos"][0]["data_fim_anterior"] == "2027-03-01"
+
+    def test_encerramento_exige_motivo_e_fecha_o_contrato(self, cliente, carteira):
+        cid = self._contrato_ativo(cliente, carteira)
+        assert cliente.patch(f"/api/contratos/{cid}", json={"situacao": "Encerrado"}).status_code == 422
+        assert cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento"}).status_code == 422
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento", "descricao": "migrou de contador", "data_do_evento": "2026-09-20"})
+        assert r.status_code == 201
+        assert (r.json()["situacao"], r.json()["data_fim"]) == ("Encerrado", "2026-09-20")
+        # encerrado não recebe mais nada
+        assert cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Aditivo", "descricao": "x y z"}).status_code == 409
+
+    def test_expansao_nao_reduz(self, cliente, carteira):
+        cid = self._contrato_ativo(cliente, carteira)
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Expansão", "preco_mensal_novo": "100"})
+        assert r.status_code == 422 and "Contração" in r.json()["detail"]
+
+    def test_eventos_acumulam_do_mais_recente_e_nao_ha_rota_para_editar_ou_apagar(self, cliente, carteira):
+        cid = self._contrato_ativo(cliente, carteira)
+        cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Reajuste", "preco_mensal_novo": "8500"})
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Expansão", "preco_mensal_novo": "9500"})
+        assert [x["preco_mensal_novo"] for x in r.json()["eventos"]] == ["9500.00", "8500.00"]
+        eid = r.json()["eventos"][0]["id"]
+        assert cliente.delete(f"/api/contratos/{cid}/eventos/{eid}").status_code == 404
+        assert cliente.patch(f"/api/contratos/{cid}/eventos/{eid}", json={}).status_code == 404
+
+    def test_contrato_ativo_com_fim_aparece_na_agenda_como_vencimento(self, cliente, carteira):
+        cid = self._contrato_ativo(cliente, carteira)
+        a = cliente.get("/api/agenda", params={"hoje": "2027-03-08"}).json()
+        item = next(i for i in a["itens"] if i["tipo"] == "contrato" and i["id"] == cid)
+        assert (item["balde"], item["dias_de_atraso"]) == ("atrasada", 7)
+        assert "renovação" in item["proxima_acao"]
+
+    def test_contrato_sem_fim_nao_entra_na_agenda(self, cliente, carteira):
+        r = cliente.post(f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={})
+        cliente.patch(f"/api/contratos/{r.json()['id']}", json={"situacao": "Ativo", "data_inicio": "2026-03-01"})
+        assert all(i["tipo"] != "contrato" for i in cliente.get("/api/agenda").json()["itens"])

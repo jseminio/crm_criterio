@@ -110,7 +110,11 @@ export default function App() {
         </header>
 
         <main className="area">
-          {tela === "agenda" && <Agenda listas={listas} aoAbrirLeads={() => definirTela("leads")} />}
+          {tela === "agenda" && <Agenda
+              listas={listas}
+              aoAbrirLeads={() => definirTela("leads")}
+              aoAbrirContratos={() => definirTela("contratos")}
+            />}
           {tela === "funil" && <Funil listas={listas} />}
           {tela === "lista" && <Lista listas={listas} />}
           {tela === "leads" && <Leads listas={listas} />}

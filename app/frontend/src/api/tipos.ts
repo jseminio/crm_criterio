@@ -261,9 +261,28 @@ export interface ContratoResumo {
   signatario: string | null;
 }
 
+/** Um fato do contrato depois de assinado, com o antes e o depois. Só cresce. */
+export interface EventoDeContrato {
+  id: number;
+  tipo: "Aditivo" | "Reajuste" | "Expansão" | "Contração" | "Renovação" | "Encerramento";
+  data_do_evento: string;
+  registrado_em: string;
+  descricao: string | null;
+  preco_mensal_anterior: string | null;
+  preco_mensal_novo: string | null;
+  preco_anual_anterior: string | null;
+  preco_anual_novo: string | null;
+  escopo_anterior: string | null;
+  escopo_novo: string | null;
+  data_fim_anterior: string | null;
+  data_fim_nova: string | null;
+}
+
 export interface ContratoDetalhe extends ContratoResumo {
   documento_assinado: string | null;
   observacao: string | null;
+  /** Mais recente primeiro. */
+  eventos: EventoDeContrato[];
 }
 
 export interface Ocorrencia {
@@ -315,7 +334,7 @@ export interface CenariosDeTicket {
 export type BaldeDaAgenda = "atrasada" | "hoje" | "proximos_7_dias" | "depois" | "sem_data" | "sem_acao";
 
 export interface ItemDaAgenda {
-  tipo: "oportunidade" | "lead";
+  tipo: "oportunidade" | "lead" | "contrato";
   id: number;
   titulo: string;
   subtitulo: string | null;

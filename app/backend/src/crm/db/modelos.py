@@ -38,6 +38,7 @@ from crm.domain.listas import (
     SituacaoLead,
     Temperatura,
     TipoCanal,
+    TipoDeEventoDeContrato,
     TipoDeOcorrencia,
 )
 
@@ -48,6 +49,7 @@ __all__ = [
     "Lead",
     "Oportunidade",
     "Contrato",
+    "EventoDeContrato",
     "HistoricoDePreco",
     "ExecucaoDeCarga",
     "OcorrenciaDeCarga",
@@ -482,9 +484,50 @@ class Contrato(CarimboMixin, Base):
 
     grupo: Mapped[GrupoEconomico] = relationship(back_populates="contratos")
     oportunidade: Mapped["Oportunidade | None"] = relationship()
+    eventos: Mapped[list["EventoDeContrato"]] = relationship(
+        back_populates="contrato", order_by="EventoDeContrato.id.desc()"
+    )
 
     def __repr__(self) -> str:
         return f"<Contrato {self.id} grupo={self.grupo_id} {self.situacao.value}>"
+
+
+class EventoDeContrato(Base):
+    """Algo que aconteceu com o contrato depois de assinado: aditivo, reajuste,
+    expansão, contração, renovação ou encerramento.
+
+    Guarda o **antes e o depois** do que o evento mudou. **Imutável** (não herda o
+    carimbo de alteração): errou, registra outro evento — o histórico não se
+    reescreve. Ainda não registra *quem* (sem login; entra com o E1).
+    Regras em `crm.domain.eventos_de_contrato`.
+    """
+
+    __tablename__ = "evento_de_contrato"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contrato_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("contrato.id"), nullable=False, index=True
+    )
+    tipo: Mapped[TipoDeEventoDeContrato] = mapped_column(
+        coluna_lista(TipoDeEventoDeContrato), nullable=False, index=True
+    )
+    data_do_evento: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    registrado_em: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), default=agora, nullable=False
+    )
+    descricao: Mapped[str | None] = mapped_column(sa.String(500))
+    """No encerramento, é o **motivo**."""
+
+    preco_mensal_anterior: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_mensal_novo: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_anual_anterior: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_anual_novo: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    escopo_anterior: Mapped[str | None] = mapped_column(sa.String(200))
+    escopo_novo: Mapped[str | None] = mapped_column(sa.String(200))
+    data_fim_anterior: Mapped[date | None] = mapped_column(sa.Date)
+    data_fim_nova: Mapped[date | None] = mapped_column(sa.Date)
+
+    contrato: Mapped[Contrato] = relationship(back_populates="eventos")
 
 
 class ExecucaoDeCarga(Base):

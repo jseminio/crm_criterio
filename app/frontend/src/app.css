@@ -253,3 +253,7 @@
 .agenda-acao { display: grid; grid-template-columns: minmax(0, 1fr) 140px auto; gap: var(--e2); align-items: center; }
 .agenda-acao .estado-texto { grid-column: 1 / -1; }
 @media (max-width: 720px) { .agenda-linha { grid-template-columns: 1fr; } .agenda-acao { grid-template-columns: 1fr; } }
+
+/* Eventos de contrato */
+.eventos { list-style: none; margin: 0 0 var(--e3); padding: 0; display: grid; gap: var(--e2); }
+.evento { border-left: 3px solid var(--borda-forte); padding: var(--e1) var(--e3); font-size: 13px; }

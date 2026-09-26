@@ -15,7 +15,9 @@ Baldes, na ordem em que pedem atenção:
 6. **sem_acao** — em aberto e sem próxima ação. Não é falha de ninguém: é onde a
    cobertura do processo sobe.
 
-Só entra o que está **em aberto**: oportunidade não decidida e lead ainda no funil.
+Só entra o que está **em aberto**: oportunidade não decidida, lead ainda no funil e
+**contrato em vigor com data de fim** — o vencimento é a hora de decidir a renovação
+(a data usada é a do fim, sem prazo de aviso inventado).
 Lembrete aqui é **tela**, não notificação: a API do WhatsApp segue pendente.
 """
 
@@ -44,7 +46,7 @@ class _Aberto(Protocol):
 
 @dataclass(frozen=True)
 class ItemDaAgenda:
-    tipo: str  # "oportunidade" | "lead"
+    tipo: str  # "oportunidade" | "lead" | "contrato"
     id: int
     titulo: str
     subtitulo: str | None
@@ -77,6 +79,7 @@ def montar(
     oportunidades: Iterable[tuple[object, str | None]],
     leads: Iterable[object],
     hoje: date,
+    contratos: Iterable[tuple[object, str | None]] = (),
 ) -> list[ItemDaAgenda]:
     """`oportunidades` é uma lista de (oportunidade em aberto, nome do grupo).
 
@@ -118,6 +121,28 @@ def montar(
                 proxima_acao_em=l.proxima_acao_em,
                 balde=balde,
                 dias_de_atraso=(hoje - l.proxima_acao_em).days if balde == "atrasada" else 0,
+                dias_desde_o_envio=None,
+            )
+        )
+
+    for c, grupo in contratos:
+        if c.data_fim is None:
+            continue
+        balde = _balde("Vencimento do contrato", c.data_fim, hoje)
+        itens.append(
+            ItemDaAgenda(
+                tipo="contrato",
+                id=c.id,
+                titulo=grupo or f"Contrato {c.id}",
+                subtitulo=c.escopo,
+                situacao=c.situacao.value,
+                temperatura=None,
+                captador=None,
+                valor_anual=c.preco_anual,
+                proxima_acao="Vencimento do contrato: decidir a renovação",
+                proxima_acao_em=c.data_fim,
+                balde=balde,
+                dias_de_atraso=(hoje - c.data_fim).days if balde == "atrasada" else 0,
                 dias_desde_o_envio=None,
             )
         )

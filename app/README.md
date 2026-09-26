@@ -36,6 +36,39 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Etapa 2 — eventos de contrato (26/09/2026)
+
+**Decisão de Eduardo: a vigência do contrato começa na assinatura.** Por isso:
+
+- `data_inicio` do contrato é a **data da assinatura**, e o contrato nasce **sem ela** (antes
+  partia da data do aceite — decisão de 23/09/2026 **revista**). Sem a data, **não vira Ativo**.
+- Só contrato **Ativo ou Suspenso** recebe evento; antes da assinatura (409) ou depois de
+  encerrado (409), não. Evento não pode ser anterior à assinatura.
+- **Depois de assinado, preço e data de fim só mudam por evento** (o `PATCH` recusa com 422); e
+  **encerrar só por evento com motivo**. O rascunho inteiro com os mesmos valores não conta como mudança.
+
+`POST /api/contratos/{id}/eventos` valida, grava o evento **com o antes e o depois** e aplica o
+efeito no contrato, tudo na mesma transação (`crm/domain/eventos_de_contrato.py`):
+
+| Tipo | Exige | Efeito |
+|---|---|---|
+| Aditivo | descrição | opcionalmente novo escopo e/ou preço |
+| Reajuste | novo preço | novo preço, para cima ou para baixo |
+| Expansão | novo preço, não menor | novo preço |
+| Contração | novo preço, não maior | novo preço |
+| Renovação | nova data de fim, depois da atual | nova data de fim |
+| Encerramento | **motivo** | situação Encerrado; fim = data do evento |
+
+Cada evento é **imutável**: não há rota para editar nem apagar; errou, registra outro. Ainda não
+registra **quem** (sem login, E1). A tela de Contratos mostra os eventos e registra em dois passos.
+
+**Renovação na agenda:** contrato Ativo com data de fim entra na fila como "Vencimento do
+contrato" (a data usada é a do fim, **sem prazo de aviso inventado**).
+
+**Fora, por decisão pendente:** categoria de motivo de encerramento (hoje é texto livre; a análise
+de saída/churn vai querer uma lista), alçadas de aditivo (presumidas no `anexo-tecnico.md`), NRR,
+Clicksign e implantação.
+
 ## Etapa 2 — agenda de follow-up (25/09/2026)
 
 `GET /api/agenda` e a tela **Agenda** montam a fila do que pede uma próxima ação, por urgência

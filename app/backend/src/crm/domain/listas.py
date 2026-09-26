@@ -161,6 +161,22 @@ class Origem(Enum):
     'Carga 2026' (não veio da planilha) nem 'CRM' (não nasceu digitada aqui)."""
 
 
+class TipoDeEventoDeContrato(Enum):
+    """O que aconteceu com um contrato depois de assinado — Etapa 2.
+
+    Cada evento é um fato **imutável**: corrigir um erro é registrar outro evento,
+    nunca reescrever o anterior. É o que sustenta, depois, expansão, contração e
+    encerramento com motivo (insumos de NRR e churn).
+    """
+
+    ADITIVO = "Aditivo"
+    REAJUSTE = "Reajuste"
+    EXPANSAO = "Expansão"
+    CONTRACAO = "Contração"
+    RENOVACAO = "Renovação"
+    ENCERRAMENTO = "Encerramento"
+
+
 class OrigemDoDado(Enum):
     """De onde veio um dado da ficha de volumetria — E4.
 

@@ -70,7 +70,7 @@ function Linha({
         </button>
         {item.subtitulo && <span className="numero-nota">{item.subtitulo}</span>}
         <span className="agenda-etiquetas">
-          <Etiqueta texto={item.tipo === "lead" ? "Lead" : item.situacao} tipo="neutra" />
+          <Etiqueta texto={item.tipo === "lead" ? "Lead" : item.tipo === "contrato" ? "Contrato" : item.situacao} tipo="neutra" />
           <Etiqueta texto={item.temperatura} tipo="temperatura" />
           {item.captador && <Etiqueta texto={item.captador} tipo="neutra" />}
         </span>
@@ -105,14 +105,27 @@ function Linha({
         </div>
       ) : (
         <div className="agenda-acao">
-          <span className="numero-nota">{item.proxima_acao ? `${item.proxima_acao} · ${data(item.proxima_acao_em)}` : "Defina a próxima ação na tela Leads."}</span>
+          <span className="numero-nota">
+            {item.proxima_acao
+              ? `${item.proxima_acao} · ${data(item.proxima_acao_em)}`
+              : "Defina a próxima ação na tela Leads."}
+            {item.tipo === "contrato" && " · abra em Contratos para renovar."}
+          </span>
         </div>
       )}
     </li>
   );
 }
 
-export function Agenda({ listas, aoAbrirLeads }: { listas: Listas | null; aoAbrirLeads: () => void }) {
+export function Agenda({
+  listas,
+  aoAbrirLeads,
+  aoAbrirContratos = () => {},
+}: {
+  listas: Listas | null;
+  aoAbrirLeads: () => void;
+  aoAbrirContratos?: () => void;
+}) {
   const [balde, definirBalde] = useState<BaldeDaAgenda | null>(null);
   const [aberta, definirAberta] = useState<number | null>(null);
   const { dados, carregando, erro, recarregar } = usarDados<DadosDaAgenda>(() => api.agenda(), []);
@@ -154,7 +167,9 @@ export function Agenda({ listas, aoAbrirLeads }: { listas: Listas | null; aoAbri
             <Linha
               key={`${item.tipo}-${item.id}`}
               item={item}
-              aoAbrir={() => (item.tipo === "lead" ? aoAbrirLeads() : definirAberta(item.id))}
+              aoAbrir={() =>
+                item.tipo === "lead" ? aoAbrirLeads() : item.tipo === "contrato" ? aoAbrirContratos() : definirAberta(item.id)
+              }
               aoSalvar={recarregar}
             />
           ))}

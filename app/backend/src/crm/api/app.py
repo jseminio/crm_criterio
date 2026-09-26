@@ -32,6 +32,7 @@ from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, fundir_grupos
 from crm.db.modelos import (
     Contrato,
+    EventoDeContrato,
     HistoricoDePreco,
     ExecucaoDeCarga,
     GrupoEconomico,
@@ -43,6 +44,7 @@ from crm.db.sessao import criar_engine, criar_fabrica_de_sessao, url_do_banco
 from crm.domain import indicadores as regras_de_indicadores
 from crm.domain.sugestoes_de_fusao import sugerir as sugerir_fusoes
 from crm.domain import agenda as regras_da_agenda
+from crm.domain import eventos_de_contrato as regras_de_eventos
 from crm.domain import recortes as regras_de_recortes
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
@@ -57,6 +59,7 @@ from crm.domain.listas import (
     SituacaoLead,
     Temperatura,
     TipoCanal,
+    TipoDeEventoDeContrato,
     TipoDeOcorrencia,
 )
 from crm.domain.listas import _CAPTADORES  # noqa: PLC2701 — única fonte da lista
@@ -537,7 +540,17 @@ def _registrar(api: FastAPI) -> None:
         if captador:
             consulta_de_leads = consulta_de_leads.where(Lead.captador.in_(captador))
         leads = list(sessao.scalars(consulta_de_leads))
-        itens = regras_da_agenda.montar(oportunidades=em_aberto, leads=leads, hoje=dia)
+        # Contrato em vigor com data de fim: o vencimento é a hora de decidir a renovação.
+        # Sem `captador`: contrato não tem captador, e o filtro é "só as minhas".
+        em_vigor = [] if captador else [
+            (c, c.grupo.nome)
+            for c in sessao.scalars(
+                sa.select(Contrato).where(
+                    Contrato.situacao == SituacaoContrato.ATIVO, Contrato.data_fim.is_not(None)
+                )
+            )
+        ]
+        itens = regras_da_agenda.montar(oportunidades=em_aberto, leads=leads, hoje=dia, contratos=em_vigor)
         contagens = {b: 0 for b in regras_da_agenda.BALDES}
         for i in itens:
             contagens[i.balde] += 1
@@ -731,7 +744,9 @@ def _registrar(api: FastAPI) -> None:
             escopo=corpo.escopo or oportunidade.servico,
             preco_mensal=corpo.preco_mensal or oportunidade.preco_mensal,
             preco_anual=corpo.preco_anual or oportunidade.preco_anual,
-            data_inicio=corpo.data_inicio or oportunidade.data_aceite,
+            # A vigência começa na assinatura (decisão de 25/09/2026): o contrato
+            # nasce sem data de início; quem assina é que a preenche.
+            data_inicio=corpo.data_inicio,
             signatario=corpo.signatario,
             situacao=SituacaoContrato.AGUARDANDO_ASSINATURA,
         )
@@ -791,9 +806,85 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(404, "contrato não encontrado")
 
         mudancas = corpo.model_dump(exclude_unset=True)
+
+        # Depois de assinado, preço, fim e encerramento só mudam por evento: é o
+        # que deixa o antes e o depois registrados. A tela manda o rascunho inteiro,
+        # então só conta como mudança o que de fato difere do valor atual.
+        assinado = contrato.situacao in (SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO)
+        if assinado:
+            for campo, evento in (("preco_mensal", "Reajuste, Expansão ou Contração"),
+                                  ("preco_anual", "Reajuste, Expansão ou Contração")):
+                if campo in mudancas and mudancas[campo] != getattr(contrato, campo):
+                    raise HTTPException(422, f"contrato assinado: para mudar o preço, registre um evento ({evento})")
+            if "data_fim" in mudancas and contrato.data_fim is not None and mudancas["data_fim"] != contrato.data_fim:
+                raise HTTPException(422, "contrato assinado: para mudar a data de fim, registre uma Renovação")
+        if mudancas.get("situacao") is SituacaoContrato.ENCERRADO and contrato.situacao is not SituacaoContrato.ENCERRADO:
+            raise HTTPException(422, "para encerrar, registre um evento de Encerramento com o motivo")
+
         for campo, valor in mudancas.items():
             setattr(contrato, campo, valor)
+        # A vigência começa na assinatura: sem a data, o contrato não vira Ativo.
+        if (
+            "situacao" in mudancas
+            and contrato.situacao is SituacaoContrato.ATIVO
+            and contrato.data_inicio is None
+        ):
+            raise HTTPException(422, "para ativar o contrato, informe a data da assinatura (início da vigência)")
         sessao.flush()
+        return _detalhe_de_contrato(contrato, contrato.grupo.nome)
+
+    @api.post(
+        "/api/contratos/{contrato_id}/eventos",
+        response_model=e.ContratoDetalhe,
+        status_code=201,
+        tags=["contratos"],
+    )
+    def registrar_evento_de_contrato(
+        contrato_id: int,
+        corpo: e.EventoDeContratoNovo,
+        sessao: Session = Depends(obter_sessao),
+    ) -> e.ContratoDetalhe:
+        """Registra um aditivo, reajuste, expansão, contração, renovação ou
+        encerramento. Valida, grava o evento com o antes e o depois e aplica o
+        efeito no contrato — tudo na mesma transação. Não há rota para editar
+        nem apagar um evento: errou, registra outro."""
+        contrato = sessao.get(Contrato, contrato_id)
+        if contrato is None:
+            raise HTTPException(404, "contrato não encontrado")
+        pedido = regras_de_eventos.Pedido(
+            tipo=corpo.tipo,
+            data_do_evento=corpo.data_do_evento or date.today(),
+            descricao=(corpo.descricao or "").strip() or None,
+            escopo_novo=corpo.escopo_novo,
+            preco_mensal_novo=corpo.preco_mensal_novo,
+            preco_anual_novo=corpo.preco_anual_novo,
+            data_fim_nova=corpo.data_fim_nova,
+        )
+        try:
+            efeito = regras_de_eventos.efeito_do_evento(contrato, pedido)
+        except regras_de_eventos.ErroDeEvento as erro:
+            raise HTTPException(erro.status, str(erro)) from erro
+
+        sessao.add(
+            EventoDeContrato(
+                contrato_id=contrato.id,
+                tipo=pedido.tipo,
+                data_do_evento=pedido.data_do_evento,
+                descricao=pedido.descricao,
+                preco_mensal_anterior=contrato.preco_mensal,
+                preco_mensal_novo=efeito.get("preco_mensal"),
+                preco_anual_anterior=contrato.preco_anual,
+                preco_anual_novo=efeito.get("preco_anual"),
+                escopo_anterior=contrato.escopo,
+                escopo_novo=efeito.get("escopo"),
+                data_fim_anterior=contrato.data_fim,
+                data_fim_nova=efeito.get("data_fim") if pedido.tipo is not TipoDeEventoDeContrato.ENCERRAMENTO else pedido.data_do_evento,
+            )
+        )
+        for campo, valor in efeito.items():
+            setattr(contrato, campo, valor)
+        sessao.flush()
+        sessao.refresh(contrato)
         return _detalhe_de_contrato(contrato, contrato.grupo.nome)
 
     # ------------------------------------------------------------- conferência

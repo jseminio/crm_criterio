@@ -900,3 +900,17 @@ class TestSugestoesDeFusao:
         sessao.add_all([a, b]); sessao.flush()
         cliente.post(f"/api/grupos/{a.id}/fundir", json={"absorvido_id": b.id})
         assert cliente.get("/api/grupos/sugestoes-de-fusao").json() == []
+class TestRecortesECenarios:
+    def test_recortes_por_servico_seguem_os_filtros(self, cliente, carteira):
+        r = cliente.get("/api/indicadores/recortes", params={"dimensao": "servico"})
+        assert r.status_code == 200
+        linhas = {l["chave"]: l for l in r.json()}
+        assert linhas["BPO Contábil"]["propostas"] >= 1
+        assert all(set(l) >= {"conversao", "ticket_medio", "mediana"} for l in linhas.values())
+
+    def test_dimensao_invalida_e_422(self, cliente):
+        assert cliente.get("/api/indicadores/recortes", params={"dimensao": "cor"}).status_code == 422
+
+    def test_cenarios_sem_base_devolve_null(self, cliente, carteira):
+        r = cliente.get("/api/indicadores/cenarios-de-ticket")
+        assert r.status_code == 200 and r.json() is None

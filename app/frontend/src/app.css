@@ -236,3 +236,8 @@
 .sugestao-grupos { border: 0; padding: 0; margin: 0 0 var(--e2); display: grid; gap: var(--e1); }
 .sugestao-opcao { font-size: 13px; }
 .sugestao-acoes { display: flex; gap: var(--e2); justify-content: flex-end; }
+/* Recortes e cenários do funil */
+.recortes, .cenarios { margin-top: var(--e4); overflow-x: auto; }
+.recortes .tabela, .cenarios .tabela { min-width: 560px; }
+.recortes-topo { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--e3); margin-bottom: var(--e3); }
+.cenarios-entradas { display: flex; gap: var(--e4); margin-bottom: var(--e3); flex-wrap: wrap; }

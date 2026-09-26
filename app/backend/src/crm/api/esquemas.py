@@ -410,6 +410,33 @@ class TicketRecorrenteResposta(Base):
     calculavel: bool
 
 
+class LinhaDeRecorteResposta(Base):
+    chave: str
+    propostas: int
+    em_aberto: int
+    aceitas: int
+    decididas: int
+    conversao: Decimal | None
+    recorrentes: int
+    valor_mensal: Decimal
+    ticket_medio: Decimal | None
+    mediana: Decimal | None
+
+
+class CenariosDeTicketResposta(Base):
+    """Hipóteses de trabalho, não meta. Ver `crm.domain.recortes`."""
+
+    contratos: int
+    atipicos: int
+    limite_do_atipico: Decimal
+    conservador: Decimal
+    base: Decimal
+    otimista: Decimal
+    atipico_minimo: Decimal | None
+    atipico_medio: Decimal | None
+    atipico_maximo: Decimal | None
+
+
 class IndicadoresResposta(Base):
     em_aberto: RecorteResposta
     aceitas: RecorteResposta

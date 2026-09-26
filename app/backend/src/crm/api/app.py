@@ -41,6 +41,7 @@ from crm.db.modelos import (
 from crm.db.sessao import criar_engine, criar_fabrica_de_sessao, url_do_banco
 from crm.domain import indicadores as regras_de_indicadores
 from crm.domain.sugestoes_de_fusao import sugerir as sugerir_fusoes
+from crm.domain import recortes as regras_de_recortes
 from crm.domain import porte as regras_de_porte
 from crm.domain.listas import (
     LinhaServico,
@@ -500,6 +501,60 @@ def _registrar(api: FastAPI) -> None:
                 resultado.ticket_recorrente
             ),
         )
+
+    def _filtradas(
+        sessao: Session,
+        captador, tipo_canal, temperatura, busca, data_tipo, data_de, data_ate, servico,
+    ) -> list[Oportunidade]:
+        consulta = _consulta_de_oportunidades(
+            None, captador, tipo_canal, temperatura, None, busca,
+            data_tipo, data_de, data_ate, servico,
+        )
+        return [linha[0] for linha in sessao.execute(consulta).all()]
+
+    @api.get(
+        "/api/indicadores/recortes",
+        response_model=list[e.LinhaDeRecorteResposta],
+        tags=["funil"],
+    )
+    def recortes(
+        dimensao: Literal["servico", "tipo_canal", "captador"],
+        sessao: Session = Depends(obter_sessao),
+        captador: list[str] | None = Query(default=None),
+        tipo_canal: list[TipoCanal] | None = Query(default=None),
+        temperatura: list[Temperatura] | None = Query(default=None),
+        busca: str | None = None,
+        data_tipo: Literal["colocacao", "aceite"] | None = None,
+        data_de: date | None = None,
+        data_ate: date | None = None,
+        servico: list[str] | None = Query(default=None),
+    ) -> list[e.LinhaDeRecorteResposta]:
+        """Propostas, conversão e ticket por serviço, canal ou captador, com os
+        mesmos filtros do funil."""
+        itens = _filtradas(sessao, captador, tipo_canal, temperatura, busca, data_tipo, data_de, data_ate, servico)
+        return [e.LinhaDeRecorteResposta.model_validate(l) for l in regras_de_recortes.recortar(itens, dimensao)]
+
+    @api.get(
+        "/api/indicadores/cenarios-de-ticket",
+        response_model=e.CenariosDeTicketResposta | None,
+        tags=["funil"],
+    )
+    def cenarios_de_ticket(
+        sessao: Session = Depends(obter_sessao),
+        captador: list[str] | None = Query(default=None),
+        tipo_canal: list[TipoCanal] | None = Query(default=None),
+        temperatura: list[Temperatura] | None = Query(default=None),
+        busca: str | None = None,
+        data_tipo: Literal["colocacao", "aceite"] | None = None,
+        data_de: date | None = None,
+        data_ate: date | None = None,
+        servico: list[str] | None = Query(default=None),
+    ) -> e.CenariosDeTicketResposta | None:
+        """Ticket conservador, base e otimista dos contratos recorrentes, com o
+        atípico à parte. `null` quando há menos de 4 contratos: sem base."""
+        itens = _filtradas(sessao, captador, tipo_canal, temperatura, busca, data_tipo, data_de, data_ate, servico)
+        c = regras_de_recortes.cenarios_de_ticket(itens)
+        return e.CenariosDeTicketResposta.model_validate(c) if c else None
 
     @api.get(
         "/api/oportunidades/{oportunidade_id}",

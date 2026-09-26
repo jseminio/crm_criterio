@@ -267,3 +267,32 @@ export interface SugestaoDeFusao {
   principal_id: number;
   grupos: GrupoResumo[];
 }
+
+export type DimensaoDeRecorte = "servico" | "tipo_canal" | "captador";
+
+/** Um corte do funil por serviço, canal ou captador. */
+export interface LinhaDeRecorte {
+  chave: string;
+  propostas: number;
+  em_aberto: number;
+  aceitas: number;
+  decididas: number;
+  conversao: string | null;
+  recorrentes: number;
+  valor_mensal: string;
+  ticket_medio: string | null;
+  mediana: string | null;
+}
+
+/** Hipóteses de trabalho, não meta. Atípico = acima de 3 × a mediana. */
+export interface CenariosDeTicket {
+  contratos: number;
+  atipicos: number;
+  limite_do_atipico: string;
+  conservador: string;
+  base: string;
+  otimista: string;
+  atipico_minimo: string | null;
+  atipico_medio: string | null;
+  atipico_maximo: string | null;
+}

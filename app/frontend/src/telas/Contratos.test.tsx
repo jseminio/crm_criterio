@@ -7,7 +7,13 @@ import { Contratos } from "./Contratos";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { contratos: vi.fn(), contrato: vi.fn(), editarContrato: vi.fn(), registrarEventoDeContrato: vi.fn() } };
+  return {
+    ...real,
+    api: {
+      contratos: vi.fn(), contrato: vi.fn(), editarContrato: vi.fn(), registrarEventoDeContrato: vi.fn(),
+      mrr: vi.fn().mockResolvedValue(null),
+    },
+  };
 });
 
 const resumo = (o: Partial<ContratoResumo> = {}): ContratoResumo => ({

@@ -36,6 +36,31 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## MRR dos contratos registrados (26/09/2026)
+
+`GET /api/mrr` e o painel no topo de **Contratos** (`crm/domain/mrr.py`). Sem parâmetros, vale o
+mês corrente até hoje; `de`/`ate` mudam o período (não passa de hoje).
+
+**⚠️ É parcial, e a tela e a API dizem isso sempre** (`cobertura_completa: false`). O KPI oficial
+de MRR é a receita da **carteira inteira** (R$ 226.341 em 19/09/2026, em planilha fora do CRM);
+aqui só entram os contratos registrados no CRM, e a carteira anterior ainda não foi carregada
+(Etapa 3). Por isso o número **não é comparado com a meta de R$ 400 mil** nem com o alerta de
+R$ 200 mil: seria um "atingimento" enganoso. Hoje há **0 contratos**, então o MRR é R$ 0,00.
+
+- **MRR atual** = preço mensal dos contratos **Ativos**. **Suspenso** aparece à parte. Contrato sem
+  preço mensal (só anual) **fica de fora** e é contado: não se inventa "anual ÷ 12".
+- **Movimento do período:** novos (pelo preço da assinatura) · expansão · reajuste · contração
+  (qualquer queda de preço) · **churn separado por quem decidiu**: cliente (churn de fato) e
+  Critério (saída organizada). A conta fecha: início + novos + expansão + reajuste − contração −
+  churn = fim.
+- **NRR** e **GRR** contam só contratos que já existiam no início do período. Sem MRR no início,
+  **não são calculáveis** (nunca 0%).
+- MRR em qualquer data = MRR atual − o movimento líquido desde então.
+
+**Fora:** comparação com a meta, MRR da carteira anterior (Etapa 3), e a inadimplência (o KPI oficial
+conta receita contratada, e 41% dela estava travada por inadimplência em 19/09/2026: o MRR pode estar
+saudável enquanto o caixa não entra).
+
 ## Etapa 2 — eventos de contrato (26/09/2026)
 
 **Decisão de Eduardo: a vigência do contrato começa na assinatura.** Por isso:

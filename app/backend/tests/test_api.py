@@ -1048,3 +1048,40 @@ class TestEventosDeContrato:
         r = cliente.post(f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={})
         cliente.patch(f"/api/contratos/{r.json()['id']}", json={"situacao": "Ativo", "data_inicio": "2026-03-01"})
         assert all(i["tipo"] != "contrato" for i in cliente.get("/api/agenda").json()["itens"])
+
+
+class TestMrr:
+    def _ativo(self, cliente, carteira, inicio="2026-09-03", fim=None):
+        cid = cliente.post(f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={}).json()["id"]
+        body = {"situacao": "Ativo", "data_inicio": inicio}
+        if fim:
+            body["data_fim"] = fim
+        assert cliente.patch(f"/api/contratos/{cid}", json=body).status_code == 200
+        return cid
+
+    def test_sem_contrato_e_zero_e_avisa_que_e_parcial(self, cliente):
+        r = cliente.get("/api/mrr", params={"hoje": "2026-09-25"})
+        assert r.status_code == 200
+        c = r.json()
+        assert c["atual"]["valor"] == "0.00" and c["contratos_registrados"] == 0
+        assert c["cobertura_completa"] is False and "parcial" in c["aviso"]
+        assert c["movimento"]["nrr"] is None  # sem MRR no início, não há o que medir
+
+    def test_contrato_novo_no_periodo_entra_como_novo(self, cliente, carteira):
+        self._ativo(cliente, carteira)
+        c = cliente.get("/api/mrr", params={"hoje": "2026-09-25"}).json()
+        assert c["atual"]["valor"] == "8000.00"
+        assert (c["movimento"]["mrr_inicio"], c["movimento"]["novo"], c["movimento"]["mrr_fim"]) == ("0.00", "8000.00", "8000.00")
+
+    def test_reajuste_e_churn_aparecem_no_movimento(self, cliente, carteira):
+        cid = self._ativo(cliente, carteira, inicio="2026-03-01")
+        cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Reajuste", "preco_mensal_novo": "8800", "data_do_evento": "2026-09-05"})
+        cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento", "iniciativa": "Cliente",
+                                                            "motivo_categoria": "Preço", "data_do_evento": "2026-09-15"})
+        m = cliente.get("/api/mrr", params={"hoje": "2026-09-25", "de": "2026-09-01"}).json()["movimento"]
+        assert (m["mrr_inicio"], m["reajuste"], m["churn_cliente"], m["mrr_fim"]) == ("8000.00", "800.00", "8800.00", "0.00")
+        assert m["nrr"] == "0.0"
+
+    def test_periodo_no_futuro_ou_invertido_e_422(self, cliente):
+        assert cliente.get("/api/mrr", params={"hoje": "2026-09-25", "ate": "2026-12-01"}).status_code == 422
+        assert cliente.get("/api/mrr", params={"hoje": "2026-09-25", "de": "2026-09-20", "ate": "2026-09-10"}).status_code == 422

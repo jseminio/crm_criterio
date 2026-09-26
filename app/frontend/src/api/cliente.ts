@@ -2,6 +2,7 @@
 
 import type {
   Agenda,
+  Mrr,
   CenariosDeTicket,
   ColunaDoFunil,
   DimensaoDeRecorte,
@@ -115,6 +116,8 @@ export const api = {
       arquivo,
       substituir ? { "X-Confirmacao": "SUBSTITUIR" } : {},
     ),
+
+  mrr: (de?: string) => pedir<Mrr>(comParametros("/api/mrr", { de })),
 
   agenda: (captador?: string[]) =>
     pedir<Agenda>(comParametros("/api/agenda", { captador })),

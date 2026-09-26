@@ -361,3 +361,37 @@ export interface Agenda {
   contagens: Record<BaldeDaAgenda, number>;
   itens: ItemDaAgenda[];
 }
+
+export interface MrrAtual {
+  valor: string;
+  contratos: number;
+  suspenso_valor: string;
+  suspenso_contratos: number;
+  sem_preco_mensal: number;
+}
+
+export interface MovimentoDeMrr {
+  de: string;
+  ate: string;
+  mrr_inicio: string;
+  novo: string;
+  expansao: string;
+  reajuste: string;
+  contracao: string;
+  churn_cliente: string;
+  churn_criterio: string;
+  churn: string;
+  mrr_fim: string;
+  variacao: string;
+  nrr: string | null;
+  grr: string | null;
+}
+
+/** MRR dos contratos registrados no CRM. Parcial: a carteira anterior não está aqui. */
+export interface Mrr {
+  atual: MrrAtual;
+  movimento: MovimentoDeMrr;
+  contratos_registrados: number;
+  cobertura_completa: boolean;
+  aviso: string;
+}

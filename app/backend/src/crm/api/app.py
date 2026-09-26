@@ -45,6 +45,7 @@ from crm.domain import indicadores as regras_de_indicadores
 from crm.domain.sugestoes_de_fusao import sugerir as sugerir_fusoes
 from crm.domain import agenda as regras_da_agenda
 from crm.domain import eventos_de_contrato as regras_de_eventos
+from crm.domain import mrr as regras_de_mrr
 from crm.domain import recortes as regras_de_recortes
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
@@ -522,6 +523,45 @@ def _registrar(api: FastAPI) -> None:
             data_tipo, data_de, data_ate, servico,
         )
         return [linha[0] for linha in sessao.execute(consulta).all()]
+
+    @api.get("/api/mrr", response_model=e.MrrResposta, tags=["contratos"])
+    def mrr(
+        sessao: Session = Depends(obter_sessao),
+        de: date | None = None,
+        ate: date | None = None,
+        hoje: date | None = None,
+    ) -> e.MrrResposta:
+        """MRR dos contratos registrados no CRM e o que o moveu no período.
+
+        Sem `de`/`ate`, vale o mês corrente até hoje. `hoje` existe para teste.
+        **Parcial**: a carteira anterior ao CRM não está aqui (Etapa 3). Ver
+        `crm.domain.mrr`.
+        """
+        dia = hoje or date.today()
+        fim = ate or dia
+        inicio = de or fim.replace(day=1)
+        if fim > dia:
+            raise HTTPException(422, "só há MRR até hoje")
+        if inicio > fim:
+            raise HTTPException(422, "o início do período não pode ser depois do fim")
+        contratos = list(sessao.scalars(sa.select(Contrato)))
+        mov = regras_de_mrr.movimento(contratos, inicio, fim, dia)
+        return e.MrrResposta(
+            atual=e.MrrAtualResposta.model_validate(regras_de_mrr.mrr_atual(contratos)),
+            movimento=e.MovimentoDeMrrResposta(
+                de=mov.de, ate=mov.ate, mrr_inicio=mov.mrr_inicio, novo=mov.novo,
+                expansao=mov.expansao, reajuste=mov.reajuste, contracao=mov.contracao,
+                churn_cliente=mov.churn_cliente, churn_criterio=mov.churn_criterio,
+                churn=mov.churn, mrr_fim=mov.mrr_fim, variacao=mov.variacao,
+                nrr=mov.nrr, grr=mov.grr,
+            ),
+            contratos_registrados=len(contratos),
+            cobertura_completa=False,
+            aviso=(
+                "Só entram os contratos registrados no CRM. A carteira anterior ao CRM ainda "
+                "não foi carregada (Etapa 3): este MRR é parcial e não se compara com a meta."
+            ),
+        )
 
     @api.get("/api/agenda", response_model=e.AgendaResposta, tags=["follow-up"])
     def agenda(

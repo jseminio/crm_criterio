@@ -76,6 +76,43 @@ class GrupoResumo(Base):
     quantas_oportunidades: int = 0
 
 
+class MrrAtualResposta(Base):
+    valor: Decimal
+    contratos: int
+    suspenso_valor: Decimal
+    suspenso_contratos: int
+    sem_preco_mensal: int
+
+
+class MovimentoDeMrrResposta(Base):
+    de: date
+    ate: date
+    mrr_inicio: Decimal
+    novo: Decimal
+    expansao: Decimal
+    reajuste: Decimal
+    contracao: Decimal
+    churn_cliente: Decimal
+    churn_criterio: Decimal
+    churn: Decimal
+    mrr_fim: Decimal
+    variacao: Decimal
+    nrr: Decimal | None
+    grr: Decimal | None
+
+
+class MrrResposta(Base):
+    """O MRR dos **contratos registrados no CRM** — parcial enquanto a carteira anterior
+    não estiver carregada. `cobertura_completa` fica sempre `False` por enquanto: é o
+    aviso de que este número não se compara com a meta de R$ 400 mil."""
+
+    atual: MrrAtualResposta
+    movimento: MovimentoDeMrrResposta
+    contratos_registrados: int
+    cobertura_completa: bool
+    aviso: str
+
+
 class ItemDaAgendaResposta(Base):
     tipo: str
     id: int

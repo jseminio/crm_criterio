@@ -13,6 +13,7 @@ import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/
 import { data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
 import { EventosDeContrato } from "./EventosDeContrato";
+import { Receita } from "./Receita";
 
 const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "Encerrado"];
 
@@ -252,6 +253,8 @@ export function Contratos({ listas }: { listas: Listas | null }) {
 
   return (
     <>
+      <Receita />
+
       <div className="filtros">
         <div className="campo">
           <label className="campo-rotulo" htmlFor="ct-situacao">

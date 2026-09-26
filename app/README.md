@@ -86,7 +86,7 @@ cd backend
 - Ensaio de 26/09/2026: 58 empresas, 58 contratos, 31 grupos (7 reaproveitados, 24 novos), R$ 227.462,65
   por mês, nenhum erro (58 CNPJs válidos). 14 escopos "verificar contrato" ficam em branco.
 
-**Reconciliação dos totais (26/09/2026).** O R$ 226.341 oficial é a linha TOTAL da aba de
+**Reconciliação dos totais (26/09/2026) — resolvida.** O R$ 226.341 oficial é a linha TOTAL da aba de
 Faturamento e bate com a soma das 31 unidades da aba "Margem por Grupo". O CRM (aba "4. Clientes", por
 empresa) difere em **+R$ 1.121,45**, e toda a diferença vem de **4 unidades** (duas a mais, duas a
 menos), cuja decisão de qual valor vale é de Eduardo. O ticket médio de 23/09 (R$ 229.641,20) é o oficial
@@ -160,10 +160,11 @@ Critério): quem registra decide.
 **Correção (26/09/2026).** Sétimo tipo de evento, para corrigir um valor **lançado errado** (por
 exemplo, na carga inicial): exige novo preço **e o motivo**, guarda o antes e o depois, mas **não é
 movimento comercial**: não conta como expansão, contração nem reajuste no MRR, e o MRR do início do
-período já é o valor corrigido. Foi usado para levar 4 contratos ao valor oficial de 19/09/2026 (R$ 226.341,20):
+período já é o valor corrigido. Foi usado para levar 7 contratos ao valor oficial de 19/09/2026 (R$ 226.341,20):
 sem esse tipo, corrigir apareceria como R$ 5.300 de contração e R$ 1.578,54 de expansão que nunca
-aconteceram no negócio. Depois das correções o MRR do CRM ficou em R$ 223.741,19; **resta uma unidade
-(um grupo de três empresas, R$ 2.600,01) para chegar ao oficial**.
+aconteceram no negócio. Com o grupo de três empresas (R$ 27.930,00 no oficial, dividido igualmente, R$ 9.310,00 cada, porque a
+planilha não traz a divisão), **o MRR do CRM fechou em R$ 226.341,20, igual ao oficial de 19/09/2026**, com
+movimento zero no mês (7 eventos de correção, 4 unidades).
 
 **Motivo de encerramento (26/09/2026).** O encerramento exige a **categoria do motivo**, de uma
 lista de nove itens (`MotivoDeEncerramento`): Preço · Insatisfação com o serviço · Migrou para

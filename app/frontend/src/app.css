@@ -330,7 +330,7 @@
   --isc-corpo: Calibri, Carlito, "Segoe UI", var(--fonte-ui);
   display: grid; gap: var(--e3); margin-bottom: var(--e4); font-family: var(--isc-corpo); color: var(--isc-cinza);
 }
-.carteira .recado { background: var(--isc-painel); border: 0; border-left: 3px solid var(--isc-ouro); }
+.carteira-notas { margin: 0; padding: 0 0 0 var(--e4); font-size: 11px; color: var(--isc-cinza-2); display: grid; gap: 2px; }
 .isc-chips { display: flex; gap: var(--e3); justify-content: flex-end; flex-wrap: wrap; }
 .isc-chip { background: var(--isc-painel); border-radius: 8px; padding: 6px 14px; text-align: center; }
 .isc-chip b { display: block; font: 700 17px var(--isc-titulo); color: var(--isc-marino); }

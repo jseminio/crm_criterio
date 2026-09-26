@@ -124,10 +124,6 @@ export function Carteira() {
 
   return (
     <section className="carteira" aria-label="Classificação da carteira">
-      {dados.avisos.map((a) => (
-        <div key={a} className="recado" role="note">{a}</div>
-      ))}
-
       <div className="isc-chips">
         <div className="isc-chip"><b>{dados.itens.length}</b><small>grupos</small></div>
         <div className="isc-chip"><b>{dinheiro(dados.itens.reduce((t, i) => t + Number(i.receita_mensal), 0))}</b><small>receita/mês</small></div>
@@ -242,6 +238,9 @@ export function Carteira() {
         ▸ grupo (consolidado) · + mostra as empresas do grupo · • empresa (CNPJ) · classe efetiva = letra + semáforo · ⚠ risco de churn em A/B · ⚑ saída a organizar em C ·
         $$$ adimplência ≤ 2 trava a classe, sem rebaixar
       </p>
+      <ul className="carteira-notas" aria-label="Observações sobre estes números">
+        {dados.avisos.map((a) => <li key={a}>{a}</li>)}
+      </ul>
       <details className="isc-como">
         <summary>Como é calculado</summary>
         <p>

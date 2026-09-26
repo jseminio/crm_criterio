@@ -113,6 +113,25 @@ Conferir a carga contra uma planilha real — **lê e mostra, não grava nada**:
 ~/.venvs/criterio-crm/bin/python scripts/conferir_carga.py "/caminho/Relatório Performance Comercial 2026.xlsx"
 ```
 
+
+### Backup automático diário
+
+```bash
+cd backend/scripts/agendamento
+./instalar.sh            # agenda para todo dia às 12:00 (launchd, no macOS)
+./instalar.sh remover    # desliga; os arquivos são mantidos
+launchctl kickstart gui/$(id -u)/com.criterio.crm.backup    # roda agora
+```
+
+Grava `~/Backups-CRM/crm-auto-AAAAMMDD-HHMMSS.zip`, **confere o arquivo** e mantém os
+últimos 14 automáticos. A retenção só apaga `crm-auto-*.zip` — nunca um backup manual nem
+o `antes-de-importar-*` — e só depois de um backup novo e conferido. Se o Mac estiver
+dormindo às 12:00, roda ao acordar. Falha (banco fora do ar, arquivo que não confere)
+sai no `backup.log` e numa notificação do macOS; o log não guarda dado de cliente.
+
+**O que este backup não é:** não sai da máquina. Se o disco falhar, ele vai junto. Copiar
+`~/Backups-CRM` para fora (nuvem cifrada, disco externo) continua pendente e faz parte do E1.
+
 ## Desenho
 
 ```

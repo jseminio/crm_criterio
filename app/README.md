@@ -38,6 +38,15 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Detalhe da oportunidade: abas no topo (27/09/2026)
+
+O painel de uma oportunidade tinha "Volumetria e porte" e "Histórico de preço" empilhados abaixo do
+cadastro, tomando a primeira visão. Agora o topo do painel tem três abas — **Cadastro**, **Volumetria e
+porte** e **Histórico de preço** (com a contagem de mudanças de preço) — e o **Salvar alterações** fica
+fixo no rodapé, fora das abas: salva o que estiver no rascunho, qualquer que seja a aba aberta. "Vem da
+planilha" (captador, origem, linha da planilha) ficou dentro da aba Cadastro, por ser parte do cadastro
+da oportunidade.
+
 ## Funil: indicadores compactos (26/09/2026)
 
 Os sete indicadores do topo do Funil passaram a **cartões compactos e coloridos**, numa só linha, para o kanban aparecer já na primeira visão. Cada cartão mostra rótulo, número e uma linha de apoio; a **explicação** (definição e ressalvas, como "não é o MRR da carteira") abre numa **janela ao redor do indicador** ao passar o mouse ou ao focar com Tab. As cores vêm do design base "Critério CRM" (chart-1/4/5/6 e status ganho, atenção e perdido, com fundo suave); a taxa de conversão muda de tom conforme o estado e traz a etiqueta escrita, e o indicador não calculável mostra "Não calculável", nunca zero. **Recortes do funil** e **Cenários de ticket** ficam recolhidos por padrão e só buscam os dados quando abertos.

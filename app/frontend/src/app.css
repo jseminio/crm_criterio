@@ -260,6 +260,8 @@
 .aba:hover { color: var(--texto-forte); }
 .aba[aria-selected="true"] { color: var(--texto-forte); border-bottom-color: var(--azul-noturno); }
 .aba-contagem { font-variant-numeric: tabular-nums; color: var(--texto-fraco); margin-left: var(--e1); }
+.detalhe-abas-de-apoio { margin-top: var(--e2); }
+.detalhe-abas-de-apoio .abas { margin-bottom: var(--e3); }
 .botao[aria-pressed="true"] { background: var(--surface-brand); color: var(--branco); border-color: var(--surface-brand); }
 
 /* ------------------------------------------------------ abordagens (SDR) */

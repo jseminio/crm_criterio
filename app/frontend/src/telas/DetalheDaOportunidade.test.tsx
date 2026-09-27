@@ -95,6 +95,12 @@ async function abrir(dados: OportunidadeDetalhe, aoSalvar = vi.fn()) {
   return aoSalvar;
 }
 
+async function abrirVolumetria(dados: OportunidadeDetalhe, aoSalvar = vi.fn()) {
+  const salvar = await abrir(dados, aoSalvar);
+  await userEvent.click(screen.getByRole("tab", { name: /volumetria e porte/i }));
+  return salvar;
+}
+
 describe("DetalheDaOportunidade", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -215,13 +221,13 @@ describe("Volumetria e porte — a régua sugere, nunca decide (E4, 23/09/2026)"
   beforeEach(() => vi.clearAllMocks());
 
   it("sem direcionador nenhum preenchido, mostra que não dá para calcular", async () => {
-    await abrir(oportunidade());
+    await abrirVolumetria(oportunidade());
 
     expect(screen.getByText(/não calculável — nenhum direcionador preenchido/i)).toBeInTheDocument();
   });
 
   it("com sugestão calculável, mostra o porte e a pontuação — sem confirmar nada sozinha", async () => {
-    await abrir(
+    await abrirVolumetria(
       oportunidade({
         sugestao_de_porte: {
           calculavel: true,
@@ -241,7 +247,7 @@ describe("Volumetria e porte — a régua sugere, nunca decide (E4, 23/09/2026)"
   });
 
   it("o botão 'usar sugestão' copia o porte sugerido para o campo de confirmação", async () => {
-    await abrir(
+    await abrirVolumetria(
       oportunidade({
         sugestao_de_porte: {
           calculavel: true,
@@ -260,7 +266,7 @@ describe("Volumetria e porte — a régua sugere, nunca decide (E4, 23/09/2026)"
 
   it("digitar um direcionador e salvar manda o número, e vazio manda null", async () => {
     vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
-    await abrir(oportunidade());
+    await abrirVolumetria(oportunidade());
 
     await userEvent.type(screen.getByLabelText("Empregados CLT"), "180");
     await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
@@ -273,7 +279,7 @@ describe("Volumetria e porte — a régua sugere, nunca decide (E4, 23/09/2026)"
 
   it("desmarcar 'auditada' manda false explícito, não null", async () => {
     vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
-    await abrir(oportunidade({ e_auditada: true }));
+    await abrirVolumetria(oportunidade({ e_auditada: true }));
 
     // Já vem marcado; desmarca e salva sem mudar mais nada.
     await userEvent.click(screen.getByRole("checkbox", { name: /empresa auditada/i }));
@@ -285,7 +291,7 @@ describe("Volumetria e porte — a régua sugere, nunca decide (E4, 23/09/2026)"
   });
 
   it("porte confirmado mostra quem e quando, vindo do servidor", async () => {
-    await abrir(
+    await abrirVolumetria(
       oportunidade({
         porte: "Grande",
         porte_definido_por: "EL",
@@ -301,14 +307,19 @@ describe("Volumetria e porte — a régua sugere, nunca decide (E4, 23/09/2026)"
 describe("Histórico de preço e origem da volumetria (E4, 25/09/2026)", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  async function abrirHistorico(o: Parameters<typeof oportunidade>[0] = {}) {
+    await abrir(oportunidade(o));
+    await userEvent.click(screen.getByRole("tab", { name: /histórico de preço/i }));
+  }
+
   it("sem mudança de preço, diz que o preço ainda não mudou", async () => {
-    await abrir(oportunidade());
+    await abrirHistorico();
     expect(screen.getByText(/o preço ainda não mudou/i)).toBeInTheDocument();
   });
 
   it("mostra o histórico com antes, depois, motivo e origem", async () => {
-    await abrir(
-      oportunidade({
+    await abrirHistorico(
+      {
         historico_de_preco: [
           {
             id: 1, registrado_em: "2026-09-25T15:00:00+00:00", origem: "CRM", motivo: "reajuste anual",
@@ -316,7 +327,7 @@ describe("Histórico de preço e origem da volumetria (E4, 25/09/2026)", () => {
             preco_anual_anterior: "58500.00", preco_anual_novo: "65000.00",
           },
         ],
-      }),
+      },
     );
     expect(screen.getByText(/reajuste anual/)).toBeInTheDocument();
     expect(screen.getByText(/4\.500,00.*→.*5\.000,00/)).toBeInTheDocument();
@@ -344,14 +355,14 @@ describe("Histórico de preço e origem da volumetria (E4, 25/09/2026)", () => {
   });
 
   it("a origem só pode ser escolhida para direcionador preenchido", async () => {
-    await abrir(oportunidade({ documentos_fiscais_mes: 100 }));
+    await abrirVolumetria(oportunidade({ documentos_fiscais_mes: 100 }));
     expect(screen.getByLabelText("Origem de Documentos fiscais/mês")).toBeEnabled();
     expect(screen.getByLabelText("Origem de Pagamentos/mês")).toBeDisabled();
   });
 
   it("envia a origem como um mapa só dos campos preenchidos", async () => {
     vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
-    await abrir(oportunidade({ documentos_fiscais_mes: 100, origem_da_volumetria: { documentos_fiscais_mes: "Entrevista" } }));
+    await abrirVolumetria(oportunidade({ documentos_fiscais_mes: 100, origem_da_volumetria: { documentos_fiscais_mes: "Entrevista" } }));
     expect(screen.getByLabelText("Origem de Documentos fiscais/mês")).toHaveValue("Entrevista");
     await userEvent.selectOptions(screen.getByLabelText("Origem de Documentos fiscais/mês"), "Questionário");
     await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));

@@ -38,6 +38,34 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Carteira: revisão mensal do ISC e evolução (27/09/2026)
+
+Uma barra de uma linha só, acima do painel do ISC: "Registrar revisão do mês" (exige nome de quem
+revisa) congela o ISC, os três componentes e o retrato de hoje como o placar do mês civil corrente —
+`RevisaoDaCarteira`, imutável nos números. **Uma por mês**: uma segunda tentativa no mesmo mês é
+recusada (409), apontando quem já registrou. "Ver histórico de revisões" abre um painel com o
+**gráfico de evolução do ISC** (as três zonas de fundo, como no medidor) e uma tabela; cada linha tem
+"Editar mês", que só corrige o **rótulo** (nunca os números congelados) — é assim que se corrige uma
+revisão feita no dia errado, ou se rotula uma revisão antiga (ex.: a leitura de 31/07/2026 foi
+registrada depois e rotulada para julho). Rotas: `GET/POST /api/carteira/revisoes`,
+`PATCH /api/carteira/revisoes/{id}/mes`.
+
+## Carteira: retrato geral e análise escrita pela IA (27/09/2026)
+
+Acima do painel do ISC, uma faixa com o "retrato da carteira": unidades, receita mensal recorrente e
+quanto está travado por inadimplência (percentual e contagem de grupos). Os dois chips de travados são
+clicáveis e filtram a tabela pelo eixo "Cobrança — sem tratamento preferencial" — o mesmo conjunto,
+sem filtro novo. Números vem de `crm.domain.classificacao.retrato()` (puro, testado), expostos em
+`GET /api/carteira/classificacao` no campo `retrato`.
+
+Abaixo da faixa, uma caixa **"Análise da IA"**: um parágrafo curto (Sonnet, sem busca na web) que só
+descreve os números já calculados — zona do ISC, componente que mais pesa, inadimplência, distribuição
+por classe — e nunca decide nem sugere ação. Não gera sozinha a cada visita: o botão "Gerar análise"
+(exige nome de quem gera, sem login ainda) chama `POST /api/carteira/analise`; o resultado fica gravado
+(`AnaliseDaCarteira`, imutável) e é o que `GET /api/carteira/analise` devolve até a próxima geração.
+Custo estimado por geração: uma fração de centavo (poucos tokens, sem ferramenta). `crm.agente.erros`
+reúne a mensagem de falha da Anthropic, usada também pelo agente SDR.
+
 ## Funil: indicadores compactos (26/09/2026)
 
 Os sete indicadores do topo do Funil passaram a **cartões compactos e coloridos**, numa só linha, para o kanban aparecer já na primeira visão. Cada cartão mostra rótulo, número e uma linha de apoio; a **explicação** (definição e ressalvas, como "não é o MRR da carteira") abre numa **janela ao redor do indicador** ao passar o mouse ou ao focar com Tab. As cores vêm do design base "Critério CRM" (chart-1/4/5/6 e status ganho, atenção e perdido, com fundo suave); a taxa de conversão muda de tom conforme o estado e traz a etiqueta escrita, e o indicador não calculável mostra "Não calculável", nunca zero. **Recortes do funil** e **Cenários de ticket** ficam recolhidos por padrão e só buscam os dados quando abertos.

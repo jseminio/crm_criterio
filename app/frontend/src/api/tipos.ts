@@ -569,11 +569,46 @@ export interface IscDaCarteira {
   fora_do_isc: number;
 }
 
+export interface RetratoDaCarteira {
+  unidades: number;
+  receita_total: string;
+  grupos_travados: number;
+  receita_travada: string;
+  percentual_travado: string;
+}
+
 export interface ClassificacaoDaCarteira {
   referencia: string | null;
   versao_dos_parametros: string | null;
   isc: IscDaCarteira | null;
+  retrato: RetratoDaCarteira | null;
   por_classe: Record<string, number>;
   itens: ItemDaCarteira[];
   avisos: string[];
+}
+
+export interface AnaliseDaCarteira {
+  texto: string;
+  gerada_em: string;
+  gerada_por: string;
+  modelo: string;
+  custo_usd: string | null;
+}
+
+export interface RevisaoDaCarteira {
+  id: number;
+  mes_de_referencia: string;
+  registrada_em: string;
+  registrada_por: string;
+  isc_valor: string;
+  isc_zona: string;
+  componente_classe: string;
+  componente_semaforo: string;
+  componente_churn: string;
+  grupos: number;
+  receita_total: string;
+  grupos_travados: number;
+  receita_travada: string;
+  percentual_travado: string;
+  baseado_em_referencia: string;
 }

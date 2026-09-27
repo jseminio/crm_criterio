@@ -12,6 +12,8 @@ import type {
   PessoaDeContato,
   TipoDeContato,
   Mrr,
+  AnaliseDaCarteira,
+  RevisaoDaCarteira,
   ClassificacaoDaCarteira,
   CenariosDeTicket,
   ColunaDoFunil,
@@ -152,6 +154,14 @@ export const api = {
     }),
 
   classificacaoDaCarteira: () => pedir<ClassificacaoDaCarteira>("/api/carteira/classificacao"),
+  analiseDaCarteira: () => pedir<AnaliseDaCarteira | null>("/api/carteira/analise"),
+  gerarAnaliseDaCarteira: (autor: string) =>
+    pedir<AnaliseDaCarteira>("/api/carteira/analise", { method: "POST", body: JSON.stringify({ autor }) }),
+  revisoesDaCarteira: () => pedir<RevisaoDaCarteira[]>("/api/carteira/revisoes"),
+  registrarRevisaoDaCarteira: (autor: string) =>
+    pedir<RevisaoDaCarteira>("/api/carteira/revisoes", { method: "POST", body: JSON.stringify({ autor }) }),
+  editarMesDaRevisao: (id: number, mes: string) =>
+    pedir<RevisaoDaCarteira>(`/api/carteira/revisoes/${id}/mes`, { method: "PATCH", body: JSON.stringify({ mes }) }),
   mrr: (de?: string) => pedir<Mrr>(comParametros("/api/mrr", { de })),
 
   agenda: (captador?: string[]) =>

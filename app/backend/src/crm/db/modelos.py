@@ -62,6 +62,8 @@ __all__ = [
     "HistoricoDePreco",
     "ExecucaoDeCarga",
     "OcorrenciaDeCarga",
+    "AnaliseDaCarteira",
+    "RevisaoDaCarteira",
 ]
 
 #: Dinheiro é guardado em centavos exatos.
@@ -824,3 +826,57 @@ class OcorrenciaDeCarga(Base):
     texto: Mapped[str] = mapped_column(sa.Text, nullable=False)
 
     execucao: Mapped[ExecucaoDeCarga] = relationship(back_populates="ocorrencias")
+
+
+class AnaliseDaCarteira(Base):
+    """Um parágrafo escrito pela IA descrevendo a carteira — Etapa 3 (27/09/2026).
+
+    Só descreve os números já calculados (ISC, componentes, retrato, travados); nunca decide nada e
+    nunca aparece sozinha sem alguém pedir ("Gerar análise"). Imutável: uma nova geração cria uma
+    linha nova, a anterior fica no histórico."""
+
+    __tablename__ = "analise_da_carteira"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    gerada_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False, index=True)
+    gerada_por: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    texto: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    modelo: Mapped[str] = mapped_column(sa.String(60), nullable=False)
+    tokens_entrada: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    tokens_saida: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    custo_usd: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 4))
+    """Estimado pela tabela de preços do código. Nulo para modelo sem preço conhecido."""
+
+
+
+class RevisaoDaCarteira(Base):
+    """A revisão mensal do ISC — ritual da seção 6 do modelo de classificação (27/09/2026).
+
+    Congela o ISC, os três componentes e o retrato da carteira (grupos, receita, travados) do momento
+    em que alguém clica "Registrar revisão". Não recalcula nada sozinha: é o placar do mês, depois de
+    quem revisa atualizar as notas que precisar. Uma por mês civil. `mes_de_referencia` pode ser
+    corrigido depois (rótulo), mas os números congelados nunca mudam."""
+
+    __tablename__ = "revisao_da_carteira"
+    __table_args__ = (sa.UniqueConstraint("mes_de_referencia", name="uq_revisao_carteira_mes"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mes_de_referencia: Mapped[date] = mapped_column(sa.Date, nullable=False, index=True)
+    """O primeiro dia do mês civil a que esta revisão se refere — editável, é só o rótulo."""
+    registrada_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+    registrada_por: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+
+    isc_valor: Mapped[Decimal] = mapped_column(sa.Numeric(8, 4), nullable=False)
+    isc_zona: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    componente_classe: Mapped[Decimal] = mapped_column(sa.Numeric(8, 4), nullable=False)
+    componente_semaforo: Mapped[Decimal] = mapped_column(sa.Numeric(8, 4), nullable=False)
+    componente_churn: Mapped[Decimal] = mapped_column(sa.Numeric(8, 4), nullable=False)
+
+    grupos: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    receita_total: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    grupos_travados: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    receita_travada: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    percentual_travado: Mapped[Decimal] = mapped_column(sa.Numeric(6, 2), nullable=False)
+
+    baseado_em_referencia: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    """A referência mais recente das classificações usadas para montar este retrato."""

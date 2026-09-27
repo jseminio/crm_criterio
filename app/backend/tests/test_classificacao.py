@@ -7,7 +7,8 @@ from decimal import Decimal as D
 import pytest
 
 from crm.domain.classificacao import (
-    PARAMETROS, Notas, Unidade, alerta_de_churn, classe, classe_efetiva, cobranca, eixo_de_acao, isc, score,
+    PARAMETROS, GrupoDoRetrato, Notas, Unidade, alerta_de_churn, classe, classe_efetiva, cobranca, eixo_de_acao,
+    isc, retrato, score,
 )
 
 
@@ -106,3 +107,24 @@ class TestIsc:
 
     def test_sem_nenhum_completo_nao_calcula_nem_devolve_zero(self):
         assert isc([]) is None and isc([self.u(1000, "A", 1, None)]) is None
+
+
+class TestRetrato:
+    def test_agrega_receita_e_travados(self):
+        r = retrato([
+            GrupoDoRetrato("Alfa", D("1000"), True),
+            GrupoDoRetrato("Beta", D("500"), False),
+            GrupoDoRetrato("Gama", D("500"), True),
+        ])
+        assert r.unidades == 3
+        assert r.receita_total == D("2000")
+        assert r.grupos_travados == 2
+        assert r.receita_travada == D("1500")
+        assert r.percentual_travado == D("75.00")
+
+    def test_sem_grupos_e_none(self):
+        assert retrato([]) is None
+
+    def test_sem_nenhum_travado(self):
+        r = retrato([GrupoDoRetrato("Alfa", D("1000"), False)])
+        assert r.grupos_travados == 0 and r.percentual_travado == D("0.00")

@@ -7,6 +7,7 @@ da carga (`crm.domain.classificacao`), nunca copiado da planilha. A nota de rent
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Callable, Iterator
@@ -16,7 +17,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from crm.db.modelos import ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico
+from crm.agente.analise_da_carteira import (
+    MODELO_PADRAO,
+    ClienteDaApi,
+    DadosDaCarteira,
+    GrupoTravado,
+    escrever_analise,
+)
+from crm.agente.config import ler_configuracao
+from crm.agente.erros import mensagem_de_falha
+from crm.agente.sdr import AgenteFalhou, Uso
+from crm.db.modelos import AnaliseDaCarteira, ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico, RevisaoDaCarteira
 from crm.db.base import agora
 from crm.domain import classificacao as regra
 from crm.domain.listas import SituacaoContrato
@@ -85,10 +96,19 @@ class IscResposta(BaseModel):
     fora_do_isc: int
 
 
+class RetratoResposta(BaseModel):
+    unidades: int
+    receita_total: Decimal
+    grupos_travados: int
+    receita_travada: Decimal
+    percentual_travado: Decimal
+
+
 class ClassificacaoDaCarteira(BaseModel):
     referencia: date | None
     versao_dos_parametros: str | None
     isc: IscResposta | None
+    retrato: RetratoResposta | None
     por_classe: dict[str, int]
     itens: list[ItemDaCarteira]
     avisos: list[str]
@@ -126,6 +146,70 @@ class ResultadoDaEdicao(BaseModel):
     avisos: list[str]
 
 
+class AnaliseResposta(BaseModel):
+    texto: str
+    gerada_em: datetime
+    gerada_por: str
+    modelo: str
+    custo_usd: Decimal | None
+
+
+class GerarAnalise(BaseModel):
+    autor: str = Field(min_length=2, max_length=120)
+
+
+@dataclass
+class ServicosDeAnalise:
+    """O que a rota de análise usa de fora do banco — o teste troca por um cliente falso."""
+
+    cliente: Callable[[], ClienteDaApi]
+    modelo: str = MODELO_PADRAO
+
+
+def servicos_de_analise_reais() -> ServicosDeAnalise:
+    """Lidos do `.env` a cada uso, como o agente SDR. O modelo é sempre o Sonnet (mais barato):
+    a análise só descreve números já calculados, não pesquisa nem precisa do modelo do SDR."""
+    config = ler_configuracao()
+
+    def cliente() -> ClienteDaApi:
+        if not config.chave:
+            raise AgenteFalhou(
+                "A chave da API da Anthropic não está no .env (ANTHROPIC_API_KEY). "
+                "Coloque a chave e tente de novo; nada foi gerado."
+            )
+        import anthropic
+
+        return anthropic.Anthropic(api_key=config.chave)
+
+    return ServicosDeAnalise(cliente=cliente)
+
+
+class RegistrarRevisao(BaseModel):
+    autor: str = Field(min_length=2, max_length=120)
+
+
+class EditarMesDaRevisao(BaseModel):
+    mes: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$", description="AAAA-MM")
+
+
+class RevisaoResposta(BaseModel):
+    id: int
+    mes_de_referencia: date
+    registrada_em: datetime
+    registrada_por: str
+    isc_valor: Decimal
+    isc_zona: str
+    componente_classe: Decimal
+    componente_semaforo: Decimal
+    componente_churn: Decimal
+    grupos: int
+    receita_total: Decimal
+    grupos_travados: int
+    receita_travada: Decimal
+    percentual_travado: Decimal
+    baseado_em_referencia: date
+
+
 class LeituraDoHistorico(BaseModel):
     id: int
     referencia: date
@@ -140,7 +224,10 @@ class LeituraDoHistorico(BaseModel):
     notas: NotasDoGrupo
 
 
-def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
+def roteador(
+    obter_sessao: Callable[[], Iterator[Session]],
+    servicos_de_analise: Callable[[], ServicosDeAnalise] = servicos_de_analise_reais,
+) -> APIRouter:
     r = APIRouter(prefix="/api/carteira", tags=["carteira"])
 
     @r.get("/classificacao", response_model=ClassificacaoDaCarteira)
@@ -159,8 +246,8 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
                 linhas.append((c, nome))
         linhas.sort(key=lambda x: x[0].receita_mensal, reverse=True)
         if not linhas:
-            return ClassificacaoDaCarteira(referencia=None, versao_dos_parametros=None, isc=None, por_classe={},
-                                           itens=[], avisos=[])
+            return ClassificacaoDaCarteira(referencia=None, versao_dos_parametros=None, isc=None, retrato=None,
+                                           por_classe={}, itens=[], avisos=[])
         ativos = set(sessao.scalars(
             sa.select(Contrato.grupo_id).where(Contrato.situacao.in_([SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO]))
         ))
@@ -189,6 +276,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
             for c, nome in linhas
         ]
         calculado = regra.isc(regra.Unidade(c.receita_mensal, c.classe, c.semaforo, c.churn) for c, _ in linhas)
+        retrato = regra.retrato(regra.GrupoDoRetrato(nome, c.receita_mensal, c.em_cobranca) for c, nome in linhas)
         por_classe: dict[str, int] = {}
         for i in itens:
             por_classe[i.classe] = por_classe.get(i.classe, 0) + 1
@@ -213,6 +301,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         return ClassificacaoDaCarteira(
             referencia=max(c.referencia for c, _ in linhas), versao_dos_parametros=primeira.versao_dos_parametros,
             isc=IscResposta(**{k: getattr(calculado, k) for k in IscResposta.model_fields}) if calculado else None,
+            retrato=RetratoResposta(**{k: getattr(retrato, k) for k in RetratoResposta.model_fields}) if retrato else None,
             por_classe=dict(sorted(por_classe.items())), itens=itens, avisos=avisos,
         )
 
@@ -288,5 +377,112 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
             )
             for c in linhas
         ]
+
+    def _analise_resposta(a: AnaliseDaCarteira) -> AnaliseResposta:
+        return AnaliseResposta(texto=a.texto, gerada_em=a.gerada_em, gerada_por=a.gerada_por, modelo=a.modelo,
+                               custo_usd=a.custo_usd)
+
+    @r.get("/analise", response_model=AnaliseResposta | None)
+    def analise(sessao: Session = Depends(obter_sessao)) -> AnaliseResposta | None:
+        a = sessao.scalars(
+            sa.select(AnaliseDaCarteira).order_by(AnaliseDaCarteira.gerada_em.desc()).limit(1)
+        ).first()
+        return _analise_resposta(a) if a else None
+
+    @r.post("/analise", response_model=AnaliseResposta, status_code=201)
+    def gerar_analise(corpo: GerarAnalise, sessao: Session = Depends(obter_sessao)) -> AnaliseResposta:
+        """Escreve uma leitura nova da carteira com a IA. Nunca decide nada — só descreve os números
+        já calculados. Cada chamada custa uma fração de centavo (Sonnet, sem busca na web)."""
+        atual = classificacao(sessao)
+        if atual.isc is None or atual.retrato is None:
+            raise HTTPException(409, "ainda não há classificação carregada para descrever")
+        dados = DadosDaCarteira(
+            isc_valor=atual.isc.valor, isc_zona=atual.isc.zona, componente_classe=atual.isc.componente_classe,
+            componente_semaforo=atual.isc.componente_semaforo, componente_churn=atual.isc.componente_churn,
+            unidades=atual.retrato.unidades, receita_total=atual.retrato.receita_total,
+            grupos_travados=[GrupoTravado(i.grupo_nome, i.receita_mensal) for i in atual.itens if i.em_cobranca],
+            receita_travada=atual.retrato.receita_travada, percentual_travado=atual.retrato.percentual_travado,
+            por_classe=atual.por_classe,
+        )
+        servicos = servicos_de_analise()
+        uso = Uso(servicos.modelo)
+        try:
+            texto = escrever_analise(servicos.cliente(), servicos.modelo, dados, uso)
+        except Exception as falha:
+            raise HTTPException(502, mensagem_de_falha(falha)) from falha
+        linha = AnaliseDaCarteira(
+            gerada_por=corpo.autor.strip(), texto=texto, modelo=servicos.modelo,
+            tokens_entrada=uso.tokens_entrada, tokens_saida=uso.tokens_saida, custo_usd=uso.custo_usd,
+        )
+        sessao.add(linha)
+        sessao.commit()
+        return _analise_resposta(linha)
+
+    def _revisao_resposta(v: RevisaoDaCarteira) -> RevisaoResposta:
+        return RevisaoResposta(
+            id=v.id, mes_de_referencia=v.mes_de_referencia, registrada_em=v.registrada_em,
+            registrada_por=v.registrada_por, isc_valor=v.isc_valor, isc_zona=v.isc_zona,
+            componente_classe=v.componente_classe, componente_semaforo=v.componente_semaforo,
+            componente_churn=v.componente_churn, grupos=v.grupos, receita_total=v.receita_total,
+            grupos_travados=v.grupos_travados, receita_travada=v.receita_travada,
+            percentual_travado=v.percentual_travado, baseado_em_referencia=v.baseado_em_referencia,
+        )
+
+    @r.get("/revisoes", response_model=list[RevisaoResposta])
+    def revisoes(sessao: Session = Depends(obter_sessao)) -> list[RevisaoResposta]:
+        linhas = sessao.scalars(
+            sa.select(RevisaoDaCarteira).order_by(RevisaoDaCarteira.mes_de_referencia)
+        ).all()
+        return [_revisao_resposta(v) for v in linhas]
+
+    @r.post("/revisoes", response_model=RevisaoResposta, status_code=201)
+    def registrar_revisao(corpo: RegistrarRevisao, sessao: Session = Depends(obter_sessao)) -> RevisaoResposta:
+        """Congela o ISC e o retrato de agora como a revisão do mês civil corrente.
+
+        Uma por mês: já existindo uma para este mês, recusa (o mês certo a editar é a data dela,
+        não uma segunda linha). Não recalcula nada — é o placar de hoje, depois de quem revisa
+        atualizar as notas que precisar."""
+        atual = classificacao(sessao)
+        if atual.isc is None or atual.retrato is None:
+            raise HTTPException(409, "ainda não há classificação carregada para revisar")
+        mes = date(agora().year, agora().month, 1)
+        existente = sessao.scalar(sa.select(RevisaoDaCarteira).where(RevisaoDaCarteira.mes_de_referencia == mes))
+        if existente is not None:
+            raise HTTPException(
+                409, f"já existe uma revisão para {mes.strftime('%m/%Y')}, registrada por "
+                     f"{existente.registrada_por}. Para corrigir o mês de uma revisão, edite a data dela."
+            )
+        linha = RevisaoDaCarteira(
+            mes_de_referencia=mes, registrada_por=corpo.autor.strip(), isc_valor=atual.isc.valor,
+            isc_zona=atual.isc.zona, componente_classe=atual.isc.componente_classe,
+            componente_semaforo=atual.isc.componente_semaforo, componente_churn=atual.isc.componente_churn,
+            grupos=atual.retrato.unidades, receita_total=atual.retrato.receita_total,
+            grupos_travados=atual.retrato.grupos_travados, receita_travada=atual.retrato.receita_travada,
+            percentual_travado=atual.retrato.percentual_travado, baseado_em_referencia=atual.referencia,
+        )
+        sessao.add(linha)
+        sessao.commit()
+        return _revisao_resposta(linha)
+
+    @r.patch("/revisoes/{revisao_id}/mes", response_model=RevisaoResposta)
+    def editar_mes_da_revisao(
+        revisao_id: int, corpo: EditarMesDaRevisao, sessao: Session = Depends(obter_sessao)
+    ) -> RevisaoResposta:
+        """Corrige só o rótulo (o mês a que a revisão se refere) — os números congelados não mudam."""
+        linha = sessao.get(RevisaoDaCarteira, revisao_id)
+        if linha is None:
+            raise HTTPException(404, "revisão não encontrada")
+        ano, mes_num = (int(x) for x in corpo.mes.split("-"))
+        novo_mes = date(ano, mes_num, 1)
+        conflito = sessao.scalar(
+            sa.select(RevisaoDaCarteira).where(
+                RevisaoDaCarteira.mes_de_referencia == novo_mes, RevisaoDaCarteira.id != revisao_id
+            )
+        )
+        if conflito is not None:
+            raise HTTPException(409, f"já existe uma revisão para {novo_mes.strftime('%m/%Y')}")
+        linha.mes_de_referencia = novo_mes
+        sessao.commit()
+        return _revisao_resposta(linha)
 
     return r

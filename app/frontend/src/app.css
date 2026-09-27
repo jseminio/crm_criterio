@@ -366,10 +366,51 @@
 }
 .carteira-remissao { font: 400 10px var(--isc-corpo); letter-spacing: 0; text-transform: none; color: var(--isc-cinza-2); margin-left: var(--e1); }
 .carteira-notas { margin: 0; padding: 0 0 0 var(--e4); font-size: 11px; color: var(--isc-cinza-2); display: grid; gap: 2px; }
-.isc-chips { display: flex; gap: var(--e3); justify-content: flex-end; flex-wrap: wrap; }
-.isc-chip { background: var(--isc-painel); border-radius: 8px; padding: 6px 14px; text-align: center; }
-.isc-chip b { display: block; font: 700 17px var(--isc-titulo); color: var(--isc-marino); }
-.isc-chip small { font-size: 11px; }
+.retrato-faixa { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e2); }
+.retrato-chip { background: var(--isc-painel); border-radius: 8px; padding: var(--e2) var(--e3); text-align: center;
+  border: 0; font-family: inherit; }
+.retrato-chip b { display: block; font: 700 22px var(--isc-titulo); color: var(--isc-marino); }
+.retrato-chip small { font-size: 10.5px; color: var(--isc-cinza); }
+.retrato-chip-trav { cursor: pointer; }
+.retrato-chip-trav b { color: var(--isc-crit); }
+.retrato-chip-trav:hover { background: #fce9e7; }
+.retrato-chip-trav:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+@media (max-width: 720px) { .retrato-faixa { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.ia-analise { background: #efe9fa; border-radius: var(--raio-md); padding: var(--e3) var(--e4); font-size: 12.5px; line-height: 1.5; }
+.ia-analise-cab { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--e2); margin-bottom: var(--e2); }
+.ia-analise-titulo { font: 700 11px var(--isc-corpo); letter-spacing: .06em; text-transform: uppercase; color: #3f2c6b; }
+.ia-analise-acao { display: flex; align-items: center; gap: var(--e2); }
+.ia-analise-acao .campo-rotulo { margin: 0; font-size: 10.5px; color: #7a6a9c; }
+.ia-analise-autor { width: 160px; padding: 4px 8px; font-size: 12px; }
+.ia-analise-botao { font: 600 11px var(--isc-corpo); border: 1px solid #6a4fb3; background: #fff; color: #6a4fb3;
+  border-radius: 6px; padding: 4px 12px; cursor: pointer; white-space: nowrap; }
+.ia-analise-botao:disabled { opacity: .5; cursor: default; }
+.ia-analise p { margin: 0 0 var(--e1); color: #3f2c6b; }
+.ia-analise-meta { font-size: 10.5px; color: #7a6a9c; }
+.ia-analise-erro { color: var(--isc-crit); font-weight: 700; }
+
+.revisao-barra { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--e2);
+  font-family: var(--isc-corpo); font-size: 12.5px; color: var(--isc-cinza); }
+.revisao-status { margin: 0; }
+.revisao-acoes { display: flex; align-items: center; gap: var(--e2); flex-wrap: wrap; }
+.revisao-autor { width: 160px; padding: 4px 8px; font-size: 12px; }
+.revisao-historico-link { background: none; border: 0; color: var(--isc-marino); font: 600 12px var(--isc-corpo);
+  text-decoration: underline; cursor: pointer; padding: 0; white-space: nowrap; }
+.revisao-editar-link { background: none; border: 0; color: var(--isc-marino); font: 600 10.5px var(--isc-corpo);
+  text-decoration: underline; cursor: pointer; padding: 0; margin-left: var(--e1); }
+.revisao-editar-mes { display: inline-flex; align-items: center; gap: var(--e1); }
+.revisao-editar-mes input { padding: 2px 6px; font-size: 12px; }
+.revisao-grafico { width: 100%; height: 180px; }
+.revisao-faixa { opacity: .6; }
+.revisao-faixa-saudavel { fill: #e2f3ed; }
+.revisao-faixa-atencao { fill: #fdf3e2; }
+.revisao-faixa-critica { fill: #fce9e7; }
+.revisao-linha { fill: none; stroke: var(--isc-marino); stroke-width: 2.5; }
+.revisao-ponto { fill: var(--isc-marino); }
+.revisao-rotulo-valor { font-size: 10px; fill: var(--isc-marino); font-weight: 700; }
+.revisao-rotulo-eixo { font-size: 9.5px; fill: var(--isc-cinza-2); }
+.revisao-tabela { margin-top: var(--e3); font-size: 12px; }
 .isc-hero { background: var(--isc-hero); border-radius: var(--raio-lg); padding: var(--e6) var(--e8); color: #fff;
   display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr); gap: var(--e5); align-items: center; }
 .isc-hero p { margin: 0; color: var(--isc-gelo); font-size: 13px; }

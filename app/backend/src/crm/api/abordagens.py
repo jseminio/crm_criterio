@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from crm.agente.config import ler_configuracao
 from crm.agente.envio import EnvioFalhou, enviar_email
+from crm.agente.erros import mensagem_de_falha as _mensagem_de_falha
 from crm.agente.sdr import AgenteFalhou, AgenteSDR, ContextoDaConta, Uso
 from crm.api import esquemas as e
 from crm.db.abordagens import ContaNaoInformada, GrupoNaoEncontrado, JaNaFila, enfileirar
@@ -70,25 +71,6 @@ def servicos_reais() -> Servicos:
             enviar_email(email, **campos)
 
     return Servicos(agente=agente, enviar_email=envio)
-
-
-def _mensagem_de_falha(falha: Exception) -> str:
-    """Explica a falha da API sem expor chave, corpo de requisição ou dado."""
-    if isinstance(falha, AgenteFalhou):
-        return str(falha)
-    try:
-        import anthropic
-    except ImportError:  # pragma: no cover — o pacote é dependência
-        return f"Falha inesperada no agente ({type(falha).__name__})."
-    if isinstance(falha, anthropic.AuthenticationError):
-        return "A Anthropic recusou a chave da API. Confira ANTHROPIC_API_KEY no .env."
-    if isinstance(falha, anthropic.RateLimitError):
-        return "O limite de uso da API foi atingido. Tente de novo em alguns minutos."
-    if isinstance(falha, anthropic.APIConnectionError):
-        return "Não consegui falar com a Anthropic. A máquina está na internet?"
-    if isinstance(falha, anthropic.APIStatusError):
-        return f"A API da Anthropic respondeu com erro {falha.status_code}. Tente de novo."
-    return f"Falha inesperada no agente ({type(falha).__name__})."
 
 
 def _bloqueados(sessao: Session) -> set[str]:

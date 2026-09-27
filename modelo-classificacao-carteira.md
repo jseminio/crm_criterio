@@ -228,7 +228,10 @@ impostos.
 2. **Definir a escala 1–5 de cada nota humana.** As planilhas trazem as réguas
    de receita e rentabilidade, mas **não o que é nota 3 em disciplina, risco
    técnico ou cross-sell**. Sem isso, quem avalia não tem régua — e a área
-   técnica assume essa tarefa mensalmente.
+   técnica assume essa tarefa mensalmente. **Complexidade, disciplina e risco
+   técnico têm proposta de régua em `escala-das-notas-humanas.md`
+   (27/09/2026) — pendente de validação de Eduardo. Cross-sell continua sem
+   régua.**
 3. **Definir o critério do semáforo operacional** (1, 2 ou 3).
 4. **Definir a escala de churn** (1 a 5), hoje inexistente como campo.
 5. **Decidir sobre a assimetria** entre corte fixo de classe e percentil de

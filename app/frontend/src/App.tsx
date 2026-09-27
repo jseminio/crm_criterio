@@ -143,7 +143,7 @@ export default function App() {
           {tela === "funil" && <Funil listas={listas} />}
           {tela === "grupos" && <Grupos listas={listas} />}
           {tela === "contratos" && <Contratos listas={listas} />}
-          {tela === "carteira" && <Carteira />}
+          {tela === "carteira" && <Carteira listas={listas} />}
           {tela === "abordagens" && <Abordagens />}
           {tela === "sdr" && <Sdr listas={listas} />}
           {tela === "conferencia" && <Conferencia />}

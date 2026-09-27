@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
@@ -60,6 +60,8 @@ def test_usa_o_snapshot_mais_recente_e_calcula_o_isc(cliente, sessao: Session):
     beta = next(i for i in r["itens"] if i["grupo_nome"] == "Beta")
     assert beta["classe"] == "C" and beta["sem_contrato_ativo"] is True
     assert r["por_classe"] == {"A": 1, "C": 1}
+    faixa_a = next(f for f in r["distribuicao_por_classe"] if f["classe"] == "A")
+    assert faixa_a == {"classe": "A", "minimo": 15, "maximo": 20, "unidades": 1, "percentual": "50.0", "dentro_da_meta": False}
     # metade da receita com tudo no máximo (100) e metade com tudo no mínimo (classe C=20, semáforo 0, churn 0)
     assert Decimal(r["isc"]["componente_classe"]) == Decimal("60")
     assert Decimal(r["isc"]["valor"]) == Decimal("53.30") and r["isc"]["zona"] == "atenção"
@@ -169,6 +171,101 @@ def test_grupo_fundido_ou_sem_classificacao_e_recusado(cliente, sessao: Session)
     assert cliente.post(f"/api/carteira/grupos/{a.id}/notas", json={**AUTOR, "churn": 2}).status_code == 409
     assert cliente.post(f"/api/carteira/grupos/{f.id}/notas", json={**AUTOR, "churn": 2}).status_code == 409
     assert cliente.post("/api/carteira/grupos/99999/notas", json={**AUTOR, "churn": 2}).status_code == 404
+
+
+def test_sugestao_de_porte_calcula_sem_gravar(cliente, sessao: Session):
+    g = _grupo_classificado(sessao)
+    r = cliente.post("/api/carteira/porte/sugestao", json={"cnpjs_no_escopo": 1})
+    assert r.status_code == 200
+    corpo = r.json()
+    assert corpo == {"calculavel": True, "pontuacao": "0.00", "porte": "Micro", "horas_base": 5, "direcionadores_aplicados": 1}
+    # nada foi gravado: o grupo continua sem porte confirmado
+    assert cliente.get("/api/carteira/classificacao").json()["itens"][0]["grupo_id"] == g.id
+
+
+def test_sugestao_de_porte_sem_direcionador_algum_nao_calcula(cliente):
+    r = cliente.post("/api/carteira/porte/sugestao", json={})
+    assert r.json() == {"calculavel": False, "pontuacao": None, "porte": None, "horas_base": None, "direcionadores_aplicados": 0}
+
+
+def test_editar_porte_grava_a_volumetria_e_o_porte_confirmado(cliente, sessao: Session):
+    g = _grupo_classificado(sessao)
+    r = cliente.post(f"/api/carteira/grupos/{g.id}/porte", json={
+        "autor": "Eduardo Luiz", "cnpjs_no_escopo": 1, "tem_consolidacao_de_grupo": True, "porte": "Micro",
+    })
+    assert r.status_code == 200, r.text
+    corpo = r.json()
+    assert corpo["cnpjs_no_escopo"] == 1 and corpo["tem_consolidacao_de_grupo"] is True
+    assert corpo["porte"] == "Micro" and corpo["porte_definido_por"] == "Eduardo Luiz"
+    assert corpo["porte_definido_em"] is not None
+
+
+def test_classificacao_expoe_o_porte_ja_salvo_do_grupo(cliente, sessao: Session):
+    # A tela de avaliação precisa pré-preencher com o que já foi salvo — sem isso, reavaliar um
+    # único direcionador pareceria apagar os outros (mesmo o backend preservando).
+    g = _grupo_classificado(sessao)
+    r = cliente.get("/api/carteira/classificacao").json()
+    vazio = r["itens"][0]["porte"]
+    assert vazio == {
+        "documentos_fiscais_mes": None, "lancamentos_contabeis_mes": None, "pagamentos_mes": None,
+        "contas_bancarias": None, "conciliacoes_cartao_mes": None, "empregados_clt": None,
+        "admissoes_desligamentos_mes": None, "cnpjs_no_escopo": None, "tomadores_de_servico": None,
+        "servicos_contratados_alem_do_primeiro": 0, "tem_consolidacao_de_grupo": False, "e_auditada": False,
+        "porte": None, "porte_definido_por": None, "porte_definido_em": None,
+    }
+
+    cliente.post(f"/api/carteira/grupos/{g.id}/porte", json={
+        "autor": "Eduardo Luiz", "cnpjs_no_escopo": 4, "empregados_clt": 30, "porte": "Médio",
+    })
+    depois = cliente.get("/api/carteira/classificacao").json()["itens"][0]["porte"]
+    assert depois["cnpjs_no_escopo"] == 4 and depois["empregados_clt"] == 30
+    assert depois["porte"] == "Médio" and depois["porte_definido_por"] == "Eduardo Luiz"
+
+
+def test_editar_porte_so_carimba_definido_por_quando_o_porte_muda(cliente, sessao: Session):
+    g = _grupo_classificado(sessao)
+    primeiro = cliente.post(f"/api/carteira/grupos/{g.id}/porte", json={
+        "autor": "Eduardo Luiz", "cnpjs_no_escopo": 1, "porte": "Micro",
+    }).json()
+    # edita só a volumetria, sem tocar no porte: o carimbo não deve mudar
+    segundo = cliente.post(f"/api/carteira/grupos/{g.id}/porte", json={
+        "autor": "Outra Pessoa", "cnpjs_no_escopo": 2,
+    }).json()
+    assert segundo["cnpjs_no_escopo"] == 2 and segundo["porte"] == "Micro"
+    assert segundo["porte_definido_por"] == "Eduardo Luiz"
+    # Comparado sem fuso: o SQLite de teste não preserva tzinfo ao reler do banco (limitação do
+    # dialeto, não do código) — o primeiro vem do objeto recém-atribuído, ainda com o "Z".
+    sem_fuso = lambda s: datetime.fromisoformat(s).replace(tzinfo=None)  # noqa: E731
+    assert sem_fuso(segundo["porte_definido_em"]) == sem_fuso(primeiro["porte_definido_em"])
+
+
+def test_editar_porte_nao_exige_classificacao_carregada(cliente, sessao: Session):
+    # Diferente de /notas: porte não depende de a carteira já ter sido carregada.
+    g = GrupoEconomico(nome="Sem classificação", situacao=SituacaoGrupo.PROSPECT)
+    sessao.add(g); sessao.commit()
+    r = cliente.post(f"/api/carteira/grupos/{g.id}/porte", json={"autor": "Eduardo Luiz", "documentos_fiscais_mes": 100})
+    assert r.status_code == 200, r.text
+    assert r.json()["documentos_fiscais_mes"] == 100
+
+
+def test_editar_porte_preserva_direcionador_nao_enviado_na_segunda_edicao(cliente, sessao: Session):
+    g = _grupo_classificado(sessao)
+    cliente.post(f"/api/carteira/grupos/{g.id}/porte", json={
+        "autor": "Eduardo Luiz", "cnpjs_no_escopo": 4, "empregados_clt": 30,
+    })
+    # reavalia só um direcionador — os outros, ausentes do corpo, não podem virar None
+    r = cliente.post(f"/api/carteira/grupos/{g.id}/porte", json={"autor": "Eduardo Luiz", "cnpjs_no_escopo": 5})
+    corpo = r.json()
+    assert corpo["cnpjs_no_escopo"] == 5
+    assert corpo["empregados_clt"] == 30
+
+
+def test_editar_porte_de_grupo_fundido_ou_inexistente_e_recusado(cliente, sessao: Session):
+    a = GrupoEconomico(nome="Sem", situacao=SituacaoGrupo.CLIENTE)
+    f = GrupoEconomico(nome="Fund", situacao=SituacaoGrupo.FUNDIDO)
+    sessao.add_all([a, f]); sessao.flush(); f.fundido_em_id = a.id; sessao.commit()
+    assert cliente.post(f"/api/carteira/grupos/{f.id}/porte", json={"autor": "Eduardo Luiz", "porte": "Micro"}).status_code == 409
+    assert cliente.post("/api/carteira/grupos/99999/porte", json={"autor": "Eduardo Luiz", "porte": "Micro"}).status_code == 404
 
 
 def test_retrato_traz_o_quadro_geral_com_travados(cliente, sessao: Session):

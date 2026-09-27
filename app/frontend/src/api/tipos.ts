@@ -567,6 +567,7 @@ export interface ItemDaCarteira {
   churn: number | null;
   sem_contrato_ativo: boolean;
   empresas: EmpresaDoGrupo[];
+  porte: PorteDoGrupo;
 }
 
 export interface IscDaCarteira {
@@ -588,12 +589,82 @@ export interface RetratoDaCarteira {
   percentual_travado: string;
 }
 
+export interface FaixaDeClasse {
+  classe: string;
+  minimo: number;
+  maximo: number;
+  unidades: number;
+  percentual: string;
+  dentro_da_meta: boolean;
+}
+
+/** Os nove direcionadores da régua de porte. `null` = "não se aplica ao escopo contratado" —
+ * fora da média, nunca zero (ver `direcionadoresDePorte.ts`). */
+export interface DirecionadoresDePorte {
+  documentos_fiscais_mes: number | null;
+  lancamentos_contabeis_mes: number | null;
+  pagamentos_mes: number | null;
+  contas_bancarias: number | null;
+  conciliacoes_cartao_mes: number | null;
+  empregados_clt: number | null;
+  admissoes_desligamentos_mes: number | null;
+  cnpjs_no_escopo: number | null;
+  tomadores_de_servico: number | null;
+}
+
+export interface VolumetriaEntrada extends Partial<DirecionadoresDePorte> {
+  servicos_contratados_alem_do_primeiro?: number;
+  tem_consolidacao_de_grupo?: boolean;
+  e_auditada?: boolean;
+}
+
+export interface SugestaoDePorte {
+  calculavel: boolean;
+  pontuacao: string | null;
+  porte: string | null;
+  horas_base: number | null;
+  direcionadores_aplicados: number;
+}
+
+export interface EdicaoDePorte extends VolumetriaEntrada {
+  autor: string;
+  porte?: string;
+}
+
+export interface PorteDoGrupo extends DirecionadoresDePorte {
+  servicos_contratados_alem_do_primeiro: number;
+  tem_consolidacao_de_grupo: boolean;
+  e_auditada: boolean;
+  porte: string | null;
+  porte_definido_por: string | null;
+  porte_definido_em: string | null;
+}
+
+export interface EdicaoDeNotas {
+  autor: string;
+  motivo: string;
+  complexidade?: number;
+  disciplina?: number;
+  risco?: number;
+  cross_sell?: number;
+  adimplencia?: number;
+  semaforo?: number;
+  churn?: number;
+}
+
+export interface ResultadoDaEdicao {
+  item: ItemDaCarteira;
+  isc: IscDaCarteira | null;
+  avisos: string[];
+}
+
 export interface ClassificacaoDaCarteira {
   referencia: string | null;
   versao_dos_parametros: string | null;
   isc: IscDaCarteira | null;
   retrato: RetratoDaCarteira | null;
   por_classe: Record<string, number>;
+  distribuicao_por_classe: FaixaDeClasse[];
   itens: ItemDaCarteira[];
   avisos: string[];
 }

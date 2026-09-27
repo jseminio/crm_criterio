@@ -30,6 +30,7 @@ from crm.agente.sdr import AgenteFalhou, Uso
 from crm.db.modelos import AnaliseDaCarteira, ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico, RevisaoDaCarteira
 from crm.db.base import agora
 from crm.domain import classificacao as regra
+from crm.domain import porte as regras_de_porte
 from crm.domain.listas import SituacaoContrato
 
 AVISO_DA_PLANILHA = (
@@ -67,6 +68,48 @@ class NotasDoGrupo(BaseModel):
     registrado_em: datetime
 
 
+class VolumetriaEntrada(BaseModel):
+    """Os nove direcionadores da régua de porte, mais os três ajustes. Mesmos campos de
+    `crm.domain.porte.Volumetria` — ver lá para o que cada um significa."""
+
+    documentos_fiscais_mes: int | None = Field(default=None, ge=0)
+    lancamentos_contabeis_mes: int | None = Field(default=None, ge=0)
+    pagamentos_mes: int | None = Field(default=None, ge=0)
+    contas_bancarias: int | None = Field(default=None, ge=0)
+    conciliacoes_cartao_mes: int | None = Field(default=None, ge=0)
+    empregados_clt: int | None = Field(default=None, ge=0)
+    admissoes_desligamentos_mes: int | None = Field(default=None, ge=0)
+    cnpjs_no_escopo: int | None = Field(default=None, ge=0)
+    tomadores_de_servico: int | None = Field(default=None, ge=0)
+    servicos_contratados_alem_do_primeiro: int = Field(default=0, ge=0)
+    tem_consolidacao_de_grupo: bool = False
+    e_auditada: bool = False
+
+
+class SugestaoDePorteResposta(BaseModel):
+    """O que a régua sugere — nunca o que decide. Ver `crm.domain.porte`."""
+
+    calculavel: bool
+    pontuacao: Decimal | None
+    porte: str | None
+    horas_base: int | None
+    direcionadores_aplicados: int
+
+
+class EdicaoDePorte(VolumetriaEntrada):
+    autor: str = Field(min_length=2, max_length=120)
+    porte: str | None = Field(default=None, max_length=20)
+    """Confirma ou sobrepõe a sugestão da régua. Quando vier preenchido e diferente do porte
+    atual, o servidor carimba `porte_definido_por`/`porte_definido_em` — instante do servidor,
+    não do navegador, porque é este par que vira material pra recalibrar a régua depois."""
+
+
+class PorteDoGrupo(VolumetriaEntrada):
+    porte: str | None
+    porte_definido_por: str | None
+    porte_definido_em: datetime | None
+
+
 class ItemDaCarteira(BaseModel):
     grupo_id: int
     grupo_nome: str
@@ -80,9 +123,10 @@ class ItemDaCarteira(BaseModel):
     semaforo: int
     churn: int | None
     sem_contrato_ativo: bool
+    """O grupo não tem contrato ativo hoje (ex.: baixado depois da referência)."""
     empresas: list[EmpresaDoGrupo] = []
     notas: NotasDoGrupo
-    """O grupo não tem contrato ativo hoje (ex.: baixado depois da referência)."""
+    porte: PorteDoGrupo
 
 
 class IscResposta(BaseModel):
@@ -104,12 +148,22 @@ class RetratoResposta(BaseModel):
     percentual_travado: Decimal
 
 
+class FaixaDeClasseResposta(BaseModel):
+    classe: str
+    minimo: int
+    maximo: int
+    unidades: int
+    percentual: Decimal
+    dentro_da_meta: bool
+
+
 class ClassificacaoDaCarteira(BaseModel):
     referencia: date | None
     versao_dos_parametros: str | None
     isc: IscResposta | None
     retrato: RetratoResposta | None
     por_classe: dict[str, int]
+    distribuicao_por_classe: list[FaixaDeClasseResposta]
     itens: list[ItemDaCarteira]
     avisos: list[str]
 
@@ -120,6 +174,28 @@ def _notas(c: ClassificacaoDoGrupo) -> NotasDoGrupo:
         risco=c.risco_tecnico, cross_sell=c.cross_sell, adimplencia=c.adimplencia, semaforo=c.semaforo, churn=c.churn,
         rentabilidade_da_planilha=c.rentabilidade_da_planilha, atribuido_por=c.atribuido_por, motivo=c.motivo,
         registrado_em=c.registrado_em,
+    )
+
+
+def _porte(g: GrupoEconomico) -> PorteDoGrupo:
+    return PorteDoGrupo(
+        documentos_fiscais_mes=g.documentos_fiscais_mes, lancamentos_contabeis_mes=g.lancamentos_contabeis_mes,
+        pagamentos_mes=g.pagamentos_mes, contas_bancarias=g.contas_bancarias,
+        conciliacoes_cartao_mes=g.conciliacoes_cartao_mes, empregados_clt=g.empregados_clt,
+        admissoes_desligamentos_mes=g.admissoes_desligamentos_mes, cnpjs_no_escopo=g.cnpjs_no_escopo,
+        tomadores_de_servico=g.tomadores_de_servico,
+        servicos_contratados_alem_do_primeiro=g.servicos_contratados_alem_do_primeiro,
+        tem_consolidacao_de_grupo=g.tem_consolidacao_de_grupo, e_auditada=g.e_auditada,
+        porte=g.porte, porte_definido_por=g.porte_definido_por, porte_definido_em=g.porte_definido_em,
+    )
+
+
+def _sugestao_de_porte(volumetria: regras_de_porte.Volumetria) -> SugestaoDePorteResposta:
+    sugestao = regras_de_porte.sugerir_porte(volumetria)
+    return SugestaoDePorteResposta(
+        calculavel=sugestao.calculavel, pontuacao=sugestao.pontuacao,
+        porte=sugestao.porte.value if sugestao.porte else None,
+        horas_base=sugestao.horas_base, direcionadores_aplicados=sugestao.direcionadores_aplicados,
     )
 
 
@@ -247,7 +323,7 @@ def roteador(
         linhas.sort(key=lambda x: x[0].receita_mensal, reverse=True)
         if not linhas:
             return ClassificacaoDaCarteira(referencia=None, versao_dos_parametros=None, isc=None, retrato=None,
-                                           por_classe={}, itens=[], avisos=[])
+                                           por_classe={}, distribuicao_por_classe=[], itens=[], avisos=[])
         ativos = set(sessao.scalars(
             sa.select(Contrato.grupo_id).where(Contrato.situacao.in_([SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO]))
         ))
@@ -266,12 +342,15 @@ def roteador(
             empresas.setdefault(e.grupo_id, []).append(
                 EmpresaDoGrupo(id=e.id, razao_social=e.razao_social, cnpj=e.cnpj, mensalidade=mensal.get(e.id))
             )
+        # Porte não é parte da classificação (não entra no Score, mora no grupo — ver `_porte`),
+        # mas a tela de avaliação precisa do que já está salvo pra não sobrescrever com branco.
+        grupos_por_id = {g.id: g for g in sessao.scalars(sa.select(GrupoEconomico).where(GrupoEconomico.id.in_(vistos)))}
         itens = [
             ItemDaCarteira(
                 grupo_id=c.grupo_id, grupo_nome=nome, receita_mensal=c.receita_mensal, score=c.score, classe=c.classe,
                 classe_efetiva=c.classe_efetiva, alerta_de_churn=c.alerta_de_churn, em_cobranca=c.em_cobranca,
                 eixo_de_acao=c.eixo_de_acao, semaforo=c.semaforo, churn=c.churn, sem_contrato_ativo=c.grupo_id not in ativos,
-                empresas=empresas.get(c.grupo_id, []), notas=_notas(c),
+                empresas=empresas.get(c.grupo_id, []), notas=_notas(c), porte=_porte(grupos_por_id[c.grupo_id]),
             )
             for c, nome in linhas
         ]
@@ -298,11 +377,15 @@ def roteador(
         if calculado and calculado.fora_do_isc:
             avisos.append(f"{calculado.fora_do_isc} grupo(s) sem nota de churn ficaram fora do ISC.")
         primeira = linhas[0][0]
+        distribuicao = [
+            FaixaDeClasseResposta(**{k: getattr(f, k) for k in FaixaDeClasseResposta.model_fields})
+            for f in regra.distribuicao_por_classe(por_classe)
+        ]
         return ClassificacaoDaCarteira(
             referencia=max(c.referencia for c, _ in linhas), versao_dos_parametros=primeira.versao_dos_parametros,
             isc=IscResposta(**{k: getattr(calculado, k) for k in IscResposta.model_fields}) if calculado else None,
             retrato=RetratoResposta(**{k: getattr(retrato, k) for k in RetratoResposta.model_fields}) if retrato else None,
-            por_classe=dict(sorted(por_classe.items())), itens=itens, avisos=avisos,
+            por_classe=dict(sorted(por_classe.items())), distribuicao_por_classe=distribuicao, itens=itens, avisos=avisos,
         )
 
     def _ultima(sessao: Session, grupo_id: int) -> ClassificacaoDoGrupo | None:
@@ -362,6 +445,37 @@ def roteador(
         atual = classificacao(sessao)
         item = next(i for i in atual.itens if i.grupo_id == grupo_id)
         return ResultadoDaEdicao(item=item, isc=atual.isc, avisos=avisos)
+
+    @r.post("/porte/sugestao", response_model=SugestaoDePorteResposta)
+    def sugestao_de_porte(corpo: VolumetriaEntrada) -> SugestaoDePorteResposta:
+        """Calcula sem gravar nada — a mesma régua que já roda pra oportunidade
+        (`crm.domain.porte`), agora servindo a carteira também."""
+        return _sugestao_de_porte(regras_de_porte.Volumetria(**corpo.model_dump()))
+
+    @r.post("/grupos/{grupo_id}/porte", response_model=PorteDoGrupo)
+    def editar_porte(grupo_id: int, corpo: EdicaoDePorte, sessao: Session = Depends(obter_sessao)) -> PorteDoGrupo:
+        """Grava a volumetria e o porte confirmado **no grupo**, não numa nova revisão da
+        classificação: porte não entra no Score, então não há por que duplicá-lo a cada revisão
+        mensal (ver `crm.db.modelos.GrupoEconomico.porte`).
+
+        Só o que **vier no corpo** muda — direcionador ausente preserva o valor já salvo, não vira
+        `None`. Sem isso, reavaliar só um direcionador (ex.: recontar CNPJs no aniversário do
+        contrato) apagaria os outros oito silenciosamente."""
+        grupo = sessao.get(GrupoEconomico, grupo_id)
+        if grupo is None:
+            raise HTTPException(404, "grupo não encontrado")
+        if grupo.fundido_em_id is not None:
+            raise HTTPException(409, "grupo fundido em outro: edite o grupo que ficou")
+        porte_mudou = corpo.porte is not None and grupo.porte != corpo.porte
+        for campo, valor in corpo.model_dump(exclude={"autor", "porte"}, exclude_unset=True).items():
+            setattr(grupo, campo, valor)
+        if corpo.porte is not None:
+            grupo.porte = corpo.porte
+        if porte_mudou:
+            grupo.porte_definido_por = corpo.autor.strip()
+            grupo.porte_definido_em = agora()
+        sessao.commit()
+        return _porte(grupo)
 
     @r.get("/grupos/{grupo_id}/historico", response_model=list[LeituraDoHistorico])
     def historico(grupo_id: int, sessao: Session = Depends(obter_sessao)) -> list[LeituraDoHistorico]:

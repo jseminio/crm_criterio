@@ -188,3 +188,68 @@ def test_retrato_traz_o_quadro_geral_com_travados(cliente, sessao: Session):
 
 def test_retrato_e_none_sem_classificacao(cliente):
     assert cliente.get("/api/carteira/classificacao").json()["retrato"] is None
+
+
+class TestRevisaoMensal:
+    def _grupo_classificado_hoje(self, sessao: Session, receita="1000") -> GrupoEconomico:
+        n = regra.Notas(receita=3, rentabilidade=3, complexidade=3, disciplina=3, risco=3, cross_sell=3, adimplencia=5, semaforo=1, churn=1)
+        g = GrupoEconomico(nome="Alfa", situacao=SituacaoGrupo.CLIENTE)
+        sessao.add(g); sessao.flush()
+        _snap(sessao, g, date(2026, 7, 31), receita, n)
+        sessao.commit()
+        return g
+
+    def test_sem_revisao_a_lista_vem_vazia(self, cliente):
+        assert cliente.get("/api/carteira/revisoes").json() == []
+
+    def test_registra_a_revisao_do_mes_atual_com_os_numeros_de_hoje(self, cliente, sessao: Session):
+        self._grupo_classificado_hoje(sessao)
+        hoje = date.today()
+        r = cliente.post("/api/carteira/revisoes", json={"autor": "Eduardo Luiz"})
+        assert r.status_code == 201, r.text
+        corpo = r.json()
+        assert corpo["mes_de_referencia"] == f"{hoje.year:04d}-{hoje.month:02d}-01"
+        assert corpo["registrada_por"] == "Eduardo Luiz"
+        assert corpo["grupos"] == 1 and Decimal(corpo["receita_total"]) == Decimal("1000")
+        listado = cliente.get("/api/carteira/revisoes").json()
+        assert len(listado) == 1 and listado[0]["id"] == corpo["id"] and listado[0]["registrada_por"] == "Eduardo Luiz"
+
+    def test_uma_por_mes_recusa_a_segunda(self, cliente, sessao: Session):
+        self._grupo_classificado_hoje(sessao)
+        cliente.post("/api/carteira/revisoes", json={"autor": "Eduardo Luiz"})
+        r = cliente.post("/api/carteira/revisoes", json={"autor": "Outra Pessoa"})
+        assert r.status_code == 409
+        assert "Eduardo Luiz" in r.json()["detail"]
+        assert len(cliente.get("/api/carteira/revisoes").json()) == 1
+
+    def test_editar_o_mes_corrige_so_o_rotulo(self, cliente, sessao: Session):
+        self._grupo_classificado_hoje(sessao)
+        criada = cliente.post("/api/carteira/revisoes", json={"autor": "Eduardo Luiz"}).json()
+        r = cliente.patch(f"/api/carteira/revisoes/{criada['id']}/mes", json={"mes": "2026-07"})
+        assert r.status_code == 200, r.text
+        corpo = r.json()
+        assert corpo["mes_de_referencia"] == "2026-07-01"
+        assert Decimal(corpo["isc_valor"]) == Decimal(criada["isc_valor"])  # números congelados não mudam
+
+    def test_editar_para_um_mes_ja_usado_e_recusado(self, cliente, sessao: Session):
+        self._grupo_classificado_hoje(sessao)
+        primeira = cliente.post("/api/carteira/revisoes", json={"autor": "Eduardo Luiz"}).json()
+        cliente.patch(f"/api/carteira/revisoes/{primeira['id']}/mes", json={"mes": "2026-07"})
+        g2 = GrupoEconomico(nome="Beta", situacao=SituacaoGrupo.CLIENTE)
+        sessao.add(g2); sessao.flush()
+        n = regra.Notas(receita=3, rentabilidade=3, complexidade=3, disciplina=3, risco=3, cross_sell=3, adimplencia=5, semaforo=1, churn=1)
+        _snap(sessao, g2, date(2026, 7, 31), "500", n)
+        sessao.commit()
+        segunda = cliente.post("/api/carteira/revisoes", json={"autor": "Eduardo Luiz"}).json()
+        r = cliente.patch(f"/api/carteira/revisoes/{segunda['id']}/mes", json={"mes": "2026-07"})
+        assert r.status_code == 409
+
+    def test_mes_invalido_e_recusado(self, cliente, sessao: Session):
+        self._grupo_classificado_hoje(sessao)
+        criada = cliente.post("/api/carteira/revisoes", json={"autor": "Eduardo Luiz"}).json()
+        assert cliente.patch(f"/api/carteira/revisoes/{criada['id']}/mes", json={"mes": "2026-13"}).status_code == 422
+        assert cliente.patch(f"/api/carteira/revisoes/{criada['id']}/mes", json={"mes": "26-07"}).status_code == 422
+        assert cliente.patch("/api/carteira/revisoes/99999/mes", json={"mes": "2026-07"}).status_code == 404
+
+    def test_sem_classificacao_e_recusado(self, cliente):
+        assert cliente.post("/api/carteira/revisoes", json={"autor": "Eduardo Luiz"}).status_code == 409

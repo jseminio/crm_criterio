@@ -594,3 +594,21 @@ export interface AnaliseDaCarteira {
   modelo: string;
   custo_usd: string | null;
 }
+
+export interface RevisaoDaCarteira {
+  id: number;
+  mes_de_referencia: string;
+  registrada_em: string;
+  registrada_por: string;
+  isc_valor: string;
+  isc_zona: string;
+  componente_classe: string;
+  componente_semaforo: string;
+  componente_churn: string;
+  grupos: number;
+  receita_total: string;
+  grupos_travados: number;
+  receita_travada: string;
+  percentual_travado: string;
+  baseado_em_referencia: string;
+}

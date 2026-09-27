@@ -10,6 +10,7 @@ import type { AnaliseDaCarteira, ClassificacaoDaCarteira } from "../api/tipos";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
+import { RevisaoMensal } from "./RevisaoMensal";
 
 const decimais = (v: string, n: number) =>
   Number(v).toLocaleString("pt-BR", { minimumFractionDigits: n, maximumFractionDigits: n });
@@ -190,6 +191,7 @@ export function Carteira() {
       )}
 
       <AnaliseDaIA />
+      <RevisaoMensal />
 
       {isc && (
         <>

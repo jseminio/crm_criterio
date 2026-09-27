@@ -27,7 +27,7 @@ from crm.agente.analise_da_carteira import (
 from crm.agente.config import ler_configuracao
 from crm.agente.erros import mensagem_de_falha
 from crm.agente.sdr import AgenteFalhou, Uso
-from crm.db.modelos import AnaliseDaCarteira, ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico
+from crm.db.modelos import AnaliseDaCarteira, ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico, RevisaoDaCarteira
 from crm.db.base import agora
 from crm.domain import classificacao as regra
 from crm.domain.listas import SituacaoContrato
@@ -182,6 +182,32 @@ def servicos_de_analise_reais() -> ServicosDeAnalise:
         return anthropic.Anthropic(api_key=config.chave)
 
     return ServicosDeAnalise(cliente=cliente)
+
+
+class RegistrarRevisao(BaseModel):
+    autor: str = Field(min_length=2, max_length=120)
+
+
+class EditarMesDaRevisao(BaseModel):
+    mes: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$", description="AAAA-MM")
+
+
+class RevisaoResposta(BaseModel):
+    id: int
+    mes_de_referencia: date
+    registrada_em: datetime
+    registrada_por: str
+    isc_valor: Decimal
+    isc_zona: str
+    componente_classe: Decimal
+    componente_semaforo: Decimal
+    componente_churn: Decimal
+    grupos: int
+    receita_total: Decimal
+    grupos_travados: int
+    receita_travada: Decimal
+    percentual_travado: Decimal
+    baseado_em_referencia: date
 
 
 class LeituraDoHistorico(BaseModel):
@@ -391,5 +417,72 @@ def roteador(
         sessao.add(linha)
         sessao.commit()
         return _analise_resposta(linha)
+
+    def _revisao_resposta(v: RevisaoDaCarteira) -> RevisaoResposta:
+        return RevisaoResposta(
+            id=v.id, mes_de_referencia=v.mes_de_referencia, registrada_em=v.registrada_em,
+            registrada_por=v.registrada_por, isc_valor=v.isc_valor, isc_zona=v.isc_zona,
+            componente_classe=v.componente_classe, componente_semaforo=v.componente_semaforo,
+            componente_churn=v.componente_churn, grupos=v.grupos, receita_total=v.receita_total,
+            grupos_travados=v.grupos_travados, receita_travada=v.receita_travada,
+            percentual_travado=v.percentual_travado, baseado_em_referencia=v.baseado_em_referencia,
+        )
+
+    @r.get("/revisoes", response_model=list[RevisaoResposta])
+    def revisoes(sessao: Session = Depends(obter_sessao)) -> list[RevisaoResposta]:
+        linhas = sessao.scalars(
+            sa.select(RevisaoDaCarteira).order_by(RevisaoDaCarteira.mes_de_referencia)
+        ).all()
+        return [_revisao_resposta(v) for v in linhas]
+
+    @r.post("/revisoes", response_model=RevisaoResposta, status_code=201)
+    def registrar_revisao(corpo: RegistrarRevisao, sessao: Session = Depends(obter_sessao)) -> RevisaoResposta:
+        """Congela o ISC e o retrato de agora como a revisão do mês civil corrente.
+
+        Uma por mês: já existindo uma para este mês, recusa (o mês certo a editar é a data dela,
+        não uma segunda linha). Não recalcula nada — é o placar de hoje, depois de quem revisa
+        atualizar as notas que precisar."""
+        atual = classificacao(sessao)
+        if atual.isc is None or atual.retrato is None:
+            raise HTTPException(409, "ainda não há classificação carregada para revisar")
+        mes = date(agora().year, agora().month, 1)
+        existente = sessao.scalar(sa.select(RevisaoDaCarteira).where(RevisaoDaCarteira.mes_de_referencia == mes))
+        if existente is not None:
+            raise HTTPException(
+                409, f"já existe uma revisão para {mes.strftime('%m/%Y')}, registrada por "
+                     f"{existente.registrada_por}. Para corrigir o mês de uma revisão, edite a data dela."
+            )
+        linha = RevisaoDaCarteira(
+            mes_de_referencia=mes, registrada_por=corpo.autor.strip(), isc_valor=atual.isc.valor,
+            isc_zona=atual.isc.zona, componente_classe=atual.isc.componente_classe,
+            componente_semaforo=atual.isc.componente_semaforo, componente_churn=atual.isc.componente_churn,
+            grupos=atual.retrato.unidades, receita_total=atual.retrato.receita_total,
+            grupos_travados=atual.retrato.grupos_travados, receita_travada=atual.retrato.receita_travada,
+            percentual_travado=atual.retrato.percentual_travado, baseado_em_referencia=atual.referencia,
+        )
+        sessao.add(linha)
+        sessao.commit()
+        return _revisao_resposta(linha)
+
+    @r.patch("/revisoes/{revisao_id}/mes", response_model=RevisaoResposta)
+    def editar_mes_da_revisao(
+        revisao_id: int, corpo: EditarMesDaRevisao, sessao: Session = Depends(obter_sessao)
+    ) -> RevisaoResposta:
+        """Corrige só o rótulo (o mês a que a revisão se refere) — os números congelados não mudam."""
+        linha = sessao.get(RevisaoDaCarteira, revisao_id)
+        if linha is None:
+            raise HTTPException(404, "revisão não encontrada")
+        ano, mes_num = (int(x) for x in corpo.mes.split("-"))
+        novo_mes = date(ano, mes_num, 1)
+        conflito = sessao.scalar(
+            sa.select(RevisaoDaCarteira).where(
+                RevisaoDaCarteira.mes_de_referencia == novo_mes, RevisaoDaCarteira.id != revisao_id
+            )
+        )
+        if conflito is not None:
+            raise HTTPException(409, f"já existe uma revisão para {novo_mes.strftime('%m/%Y')}")
+        linha.mes_de_referencia = novo_mes
+        sessao.commit()
+        return _revisao_resposta(linha)
 
     return r

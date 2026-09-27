@@ -13,6 +13,9 @@ vi.mock("../api/cliente", async () => {
       classificacaoDaCarteira: vi.fn(),
       analiseDaCarteira: vi.fn().mockResolvedValue(null),
       gerarAnaliseDaCarteira: vi.fn(),
+      revisoesDaCarteira: vi.fn().mockResolvedValue([]),
+      registrarRevisaoDaCarteira: vi.fn(),
+      editarMesDaRevisao: vi.fn(),
     },
   };
 });

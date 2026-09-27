@@ -38,6 +38,18 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Carteira: revisão mensal do ISC e evolução (27/09/2026)
+
+Uma barra de uma linha só, acima do painel do ISC: "Registrar revisão do mês" (exige nome de quem
+revisa) congela o ISC, os três componentes e o retrato de hoje como o placar do mês civil corrente —
+`RevisaoDaCarteira`, imutável nos números. **Uma por mês**: uma segunda tentativa no mesmo mês é
+recusada (409), apontando quem já registrou. "Ver histórico de revisões" abre um painel com o
+**gráfico de evolução do ISC** (as três zonas de fundo, como no medidor) e uma tabela; cada linha tem
+"Editar mês", que só corrige o **rótulo** (nunca os números congelados) — é assim que se corrige uma
+revisão feita no dia errado, ou se rotula uma revisão antiga (ex.: a leitura de 31/07/2026 foi
+registrada depois e rotulada para julho). Rotas: `GET/POST /api/carteira/revisoes`,
+`PATCH /api/carteira/revisoes/{id}/mes`.
+
 ## Carteira: retrato geral e análise escrita pela IA (27/09/2026)
 
 Acima do painel do ISC, uma faixa com o "retrato da carteira": unidades, receita mensal recorrente e

@@ -22,6 +22,14 @@ vi.mock("../api/cliente", async () => {
       editarLead: vi.fn(),
       converterLead: vi.fn(),
       conversasDoLead: vi.fn().mockResolvedValue([]),
+      servicos: vi.fn().mockResolvedValue([
+        { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
+          para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],
+          fora_do_perfil: ["MEI"], transbordo: "Comercial · BPO (C1)", nomes_antigos: ["BPO Contábil"], rascunho: true },
+        { nome: "Auditoria", nome_por_extenso: null, linha: "C2", recorrente: false,
+          para_quem: "Auditoria das demonstrações.", perguntas: [{ texto: "Exercício a auditar", direcionador: null }],
+          fora_do_perfil: [], transbordo: "Consultoria (C2)", nomes_antigos: [], rascunho: true },
+      ]),
     },
   };
 });
@@ -296,13 +304,15 @@ describe("conversão em oportunidade", () => {
 
     expect(screen.getByLabelText(/grupo econômico/i)).toHaveValue("Gama Ltda");
 
-    await userEvent.type(screen.getByLabelText(/serviço/i), "BPO Contábil");
+    await userEvent.click(screen.getByRole("button", { name: /^Serviço/ }));
+    await userEvent.click(await screen.findByRole("option", { name: "Auditoria" }));
+    await userEvent.click(screen.getByRole("button", { name: "Usar este serviço" }));
     await userEvent.click(screen.getByRole("button", { name: /converter em oportunidade/i }));
 
     await waitFor(() => expect(api.converterLead).toHaveBeenCalledOnce());
     const [id, dados] = vi.mocked(api.converterLead).mock.calls[0];
     expect(id).toBe(1);
-    expect(dados).toEqual({ nome_do_grupo: "Gama Ltda", servico: "BPO Contábil" });
+    expect(dados).toEqual({ nome_do_grupo: "Gama Ltda", servico: "Auditoria" });
   });
 
   it("sem empresa informada, usa o nome do próprio lead", async () => {

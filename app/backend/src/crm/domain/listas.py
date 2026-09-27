@@ -386,17 +386,20 @@ class Temperatura(Enum):
 
 
 class LinhaServico(Enum):
-    """C1 e C2, como a planilha registra."""
+    """C1 e C2, como a planilha registra.
+
+    Regra de Eduardo em 27/09/2026: **C1 é recorrente, C2 não é recorrente**.
+    A linha sai do serviço (`crm.domain.servicos`), no passado e daqui para
+    frente. Antes disso, C1 era descrito como "BPO contábil, fiscal e DP" e C2
+    como "consultorias em geral".
+    """
 
     C1 = "C1"
     C2 = "C2"
 
     @property
     def descricao(self) -> str:
-        return {
-            LinhaServico.C1: "BPO contábil, fiscal e departamento pessoal",
-            LinhaServico.C2: "Consultorias em geral",
-        }[self]
+        return {LinhaServico.C1: "Recorrente", LinhaServico.C2: "Não recorrente"}[self]
 
 
 class MotivoRecusa(Enum):

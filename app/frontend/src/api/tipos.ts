@@ -760,3 +760,16 @@ export interface PainelDoSdr {
   } | null;
 }
 
+/** Um serviço do catálogo (`GET /api/servicos`). Sem preço, de propósito. */
+export interface ServicoDoCatalogo {
+  nome: string;
+  nome_por_extenso: string | null;
+  linha: "C1" | "C2";
+  recorrente: boolean;
+  para_quem: string;
+  perguntas: { texto: string; direcionador: string | null }[];
+  fora_do_perfil: string[];
+  transbordo: string;
+  nomes_antigos: string[];
+  rascunho: boolean;
+}

@@ -59,6 +59,7 @@ from crm.domain import mrr as regras_de_mrr
 from crm.domain import recortes as regras_de_recortes
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
+from crm.domain.servicos import CATALOGO as CATALOGO_DE_SERVICOS, linha_do_servico
 from crm.domain.listas import (
     ORIGEM_DA_MUDANCA_NO_CRM,
     IniciativaDoEncerramento,
@@ -225,6 +226,25 @@ def _registrar(api: FastAPI) -> None:
             servicos=list(servicos),
             motivos_de_descarte=_valores(MotivoDeDescarte),
         )
+
+    @api.get("/api/servicos", response_model=list[e.ServicoDoCatalogo], tags=["listas"])
+    def catalogo_de_servicos() -> list[e.ServicoDoCatalogo]:
+        """O catálogo do pop-up de serviços e do roteiro do SDR de IA. Sem preço."""
+        return [
+            e.ServicoDoCatalogo(
+                nome=s.nome,
+                nome_por_extenso=s.nome_por_extenso,
+                linha=s.linha,
+                recorrente=s.linha is LinhaServico.C1,
+                para_quem=s.para_quem,
+                perguntas=[e.PerguntaDoCatalogo(texto=p.texto, direcionador=p.direcionador) for p in s.perguntas],
+                fora_do_perfil=list(s.fora_do_perfil),
+                transbordo=s.transbordo,
+                nomes_antigos=list(s.nomes_antigos),
+                rascunho=s.rascunho,
+            )
+            for s in CATALOGO_DE_SERVICOS
+        ]
 
     # ------------------------------------------------------------------ grupos
     @api.get("/api/grupos", response_model=e.Pagina[e.GrupoResumo], tags=["grupos"])
@@ -495,6 +515,7 @@ def _registrar(api: FastAPI) -> None:
             nome=corpo.nome,
             servico=corpo.servico,
             tipo_servico=corpo.tipo_servico,
+            linha_servico=linha_do_servico(corpo.servico),
             situacao=Situacao.ENVIAR_PROPOSTA,
             temperatura=corpo.temperatura,
             tipo_canal=corpo.tipo_canal,
@@ -793,6 +814,13 @@ def _registrar(api: FastAPI) -> None:
 
         for campo, valor in mudancas.items():
             setattr(oportunidade, campo, valor)
+        # A linha acompanha o serviço (C1 recorrente, C2 não recorrente).
+        # Serviço fora do catálogo não mexe na linha que já estava.
+        if "servico" in mudancas:
+            nova_linha = linha_do_servico(oportunidade.servico)
+            if nova_linha is not None and nova_linha is not oportunidade.linha_servico:
+                oportunidade.linha_servico = nova_linha
+                editados.add("linha_servico")
         # Histórico de preço: só quando o valor mudou de fato (a tela manda o
         # rascunho inteiro a cada salvar). Guarda antes e depois; nada é apagado.
         preco_depois = (oportunidade.preco_mensal, oportunidade.preco_anual)
@@ -1282,6 +1310,7 @@ def _registrar(api: FastAPI) -> None:
             nome=corpo.nome or lead.nome,
             servico=corpo.servico,
             tipo_servico=corpo.tipo_servico,
+            linha_servico=linha_do_servico(corpo.servico),
             situacao=Situacao.ENVIAR_PROPOSTA,
             temperatura=lead.temperatura,
             tipo_canal=lead.tipo_canal,

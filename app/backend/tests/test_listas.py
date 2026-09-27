@@ -116,8 +116,8 @@ class TestLinhaServico:
         assert normalizar_linha_servico("C2 ").valor is LinhaServico.C2
 
     def test_a_descricao_diz_o_que_cada_linha_reune(self):
-        assert "contábil" in LinhaServico.C1.descricao
-        assert "Consultoria" in LinhaServico.C2.descricao
+        assert LinhaServico.C1.descricao == "Recorrente"
+        assert LinhaServico.C2.descricao == "Não recorrente"
 
 
 class TestMotivoRecusa:

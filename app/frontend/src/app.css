@@ -594,6 +594,58 @@
   .sdr-barra-nome { grid-column: 1 / -1; }
 }
 
+/* ------------------------------------------------------ catálogo de serviços */
+/* Amostra aprovada por Eduardo em 27/09/2026. Abre por cima do painel lateral
+   (z-index acima dos 40/41 da cortina e do painel). Modal é um dos três lugares
+   onde o PAD-002 permite sombra. */
+.escolha-servico { display: flex; align-items: center; justify-content: space-between; gap: var(--e2); width: 100%;
+  text-align: left; cursor: pointer; border: 1px solid var(--borda-forte); background: var(--surface-card);
+  border-radius: var(--raio-sm); padding: var(--e2) var(--e3); min-height: 40px; }
+.escolha-servico:hover { background: var(--surface-sunken); }
+.escolha-servico-vazia { color: var(--texto-fraco); }
+.escolha-servico-seta { color: var(--texto-medio); font-size: 12px; white-space: nowrap; }
+.catalogo-cortina { position: fixed; inset: 0; z-index: 60; background: rgba(11,14,23,.45);
+  display: flex; align-items: center; justify-content: center; padding: var(--e4); }
+.catalogo { background: var(--surface-card); border-radius: var(--raio-lg); box-shadow: var(--sombra-painel);
+  width: min(920px, 100%); max-height: calc(100vh - 32px);
+  display: flex; flex-direction: column; overflow: hidden; }
+.catalogo-cab { padding: var(--e5) var(--e5) var(--e3); display: flex; justify-content: space-between; gap: var(--e3);
+  border-bottom: 1px solid var(--borda); }
+.catalogo-cab h2 { font-size: 20px; }
+.catalogo-cab p { margin: var(--e1) 0 0; font-size: 13px; color: var(--texto-medio); }
+.catalogo-corpo { display: grid; grid-template-columns: minmax(240px, 300px) 1fr; min-height: 0; flex: 1; }
+.catalogo-lista { border-right: 1px solid var(--borda); overflow: auto; padding: var(--e3); display: flex;
+  flex-direction: column; gap: var(--e3); background: var(--surface-page); }
+.catalogo-grupo h3 { font-family: var(--fonte-ui); margin: 0 0 var(--e1); }
+.catalogo-grupo ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.catalogo-item { width: 100%; appearance: none; text-align: left; border: 1px solid transparent; background: transparent;
+  border-radius: var(--raio-sm); padding: var(--e2) var(--e3); cursor: pointer; font-weight: 500; font-size: 13px; }
+.catalogo-item:hover { background: var(--surface-card); border-color: var(--borda); }
+.catalogo-item[aria-selected="true"] { background: var(--surface-card); border-color: var(--andamento);
+  box-shadow: inset 3px 0 0 var(--andamento); }
+.catalogo-detalhe { overflow: auto; padding: var(--e5); display: flex; flex-direction: column; gap: var(--e4); }
+.catalogo-titulo-servico { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center; }
+.catalogo-titulo-servico h3 { font-size: 22px; width: 100%; }
+.catalogo-para-quem { margin: 0; max-width: 62ch; }
+.catalogo-rascunho { font-size: 11px; color: var(--espera); background: var(--espera-suave); border-radius: 4px;
+  padding: 1px 6px; margin-left: var(--e2); white-space: nowrap; }
+.catalogo-bloco { display: flex; flex-direction: column; gap: var(--e2); }
+.catalogo-bloco h4 { margin: 0; font-size: 13px; font-weight: 600; }
+.catalogo-bloco ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.catalogo-bloco p { margin: 0; font-size: 13px; }
+.catalogo-regua { font-size: 11px; color: var(--andamento); background: var(--andamento-suave); border-radius: 4px;
+  padding: 0 6px; margin-left: var(--e1); white-space: nowrap; }
+.catalogo-duas { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e4); }
+.catalogo-rodape { padding: var(--e4) var(--e5); border-top: 1px solid var(--borda); display: flex;
+  justify-content: space-between; align-items: center; gap: var(--e3); flex-wrap: wrap; }
+.catalogo-rodape p { margin: 0; font-size: 12px; color: var(--texto-medio); }
+.catalogo-rodape div { display: flex; gap: var(--e2); }
+@media (max-width: 760px) {
+  .catalogo-corpo { grid-template-columns: 1fr; }
+  .catalogo-lista { border-right: 0; border-bottom: 1px solid var(--borda); max-height: 240px; }
+  .catalogo-duas { grid-template-columns: 1fr; }
+}
+
 /* Movimento reduzido (26/09/2026). Fica no FIM do arquivo e vale para todo
    elemento, para cobrir também a transição e a animação que alguém criar
    depois — uma regra por componente já deixou a coluna do kanban de fora.

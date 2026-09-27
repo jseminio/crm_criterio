@@ -59,7 +59,7 @@ from crm.domain import mrr as regras_de_mrr
 from crm.domain import recortes as regras_de_recortes
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
-from crm.domain.servicos import CATALOGO as CATALOGO_DE_SERVICOS, linha_do_servico
+from crm.domain.servicos import CATALOGO as CATALOGO_DE_SERVICOS, OUTRO, linha_do_servico, problema_na_descricao
 from crm.domain.listas import (
     ORIGEM_DA_MUDANCA_NO_CRM,
     IniciativaDoEncerramento,
@@ -245,6 +245,25 @@ def _registrar(api: FastAPI) -> None:
             )
             for s in CATALOGO_DE_SERVICOS
         ]
+
+    @api.get("/api/servicos/pedidos", response_model=list[e.PedidoDeServicoNovo], tags=["listas"])
+    def pedidos_de_servico_novo(sessao: Session = Depends(obter_sessao)) -> list[e.PedidoDeServicoNovo]:
+        """Todo "Outro" registrado, o mais recente primeiro — para decidir o que
+        entra no catálogo."""
+        pedidos = [
+            e.PedidoDeServicoNovo(
+                onde="Oportunidade", id=o.id, nome=o.nome, descricao=o.servico_descricao or "",
+                registrado_em=o.criado_em,
+            )
+            for o in sessao.scalars(sa.select(Oportunidade).where(Oportunidade.servico == OUTRO))
+        ] + [
+            e.PedidoDeServicoNovo(
+                onde="Lead", id=l.id, nome=l.nome, descricao=l.interesse_descricao or "",
+                registrado_em=l.criado_em,
+            )
+            for l in sessao.scalars(sa.select(Lead).where(Lead.interesse == OUTRO))
+        ]
+        return sorted(pedidos, key=lambda p: p.registrado_em, reverse=True)
 
     # ------------------------------------------------------------------ grupos
     @api.get("/api/grupos", response_model=e.Pagina[e.GrupoResumo], tags=["grupos"])
@@ -491,6 +510,9 @@ def _registrar(api: FastAPI) -> None:
         O grupo existente é reaproveitado pelo nome; se não houver, nasce um
         novo — mesmo padrão de `converter_lead`.
         """
+        problema = problema_na_descricao(corpo.servico, corpo.servico_descricao)
+        if problema:
+            raise HTTPException(422, problema)
         if corpo.grupo_id is not None:
             grupo = sessao.get(GrupoEconomico, corpo.grupo_id)
             if grupo is None:
@@ -515,6 +537,7 @@ def _registrar(api: FastAPI) -> None:
             nome=corpo.nome,
             servico=corpo.servico,
             tipo_servico=corpo.tipo_servico,
+            servico_descricao=(corpo.servico_descricao or "").strip() or None,
             linha_servico=linha_do_servico(corpo.servico),
             situacao=Situacao.ENVIAR_PROPOSTA,
             temperatura=corpo.temperatura,
@@ -816,6 +839,15 @@ def _registrar(api: FastAPI) -> None:
             setattr(oportunidade, campo, valor)
         # A linha acompanha o serviço (C1 recorrente, C2 não recorrente).
         # Serviço fora do catálogo não mexe na linha que já estava.
+        # "Outro" exige a descrição; os serviços do catálogo não levam. Trocar
+        # de "Outro" para um serviço do catálogo apaga a descrição antiga.
+        if "servico" in mudancas and oportunidade.servico != OUTRO and "servico_descricao" not in mudancas:
+            oportunidade.servico_descricao = None
+        if "servico" in mudancas or "servico_descricao" in mudancas:
+            oportunidade.servico_descricao = (oportunidade.servico_descricao or "").strip() or None
+            problema = problema_na_descricao(oportunidade.servico, oportunidade.servico_descricao)
+            if problema:
+                raise HTTPException(422, problema)
         if "servico" in mudancas:
             nova_linha = linha_do_servico(oportunidade.servico)
             if nova_linha is not None and nova_linha is not oportunidade.linha_servico:
@@ -1207,6 +1239,9 @@ def _registrar(api: FastAPI) -> None:
     @api.post("/api/leads", response_model=e.LeadResumo, status_code=201, tags=["leads"])
     def criar_lead(corpo: e.LeadNovo, sessao: Session = Depends(obter_sessao)) -> e.LeadResumo:
         """Cadastra um lead. É a porta de entrada que a planilha nunca teve."""
+        problema = problema_na_descricao(corpo.interesse, corpo.interesse_descricao)
+        if problema:
+            raise HTTPException(422, problema)
         lead = Lead(**corpo.model_dump(exclude_unset=True))
         sessao.add(lead)
         sessao.flush()
@@ -1262,6 +1297,14 @@ def _registrar(api: FastAPI) -> None:
         except regras_do_lead.RegraDoLead as problema:
             raise HTTPException(problema.status, str(problema)) from problema
 
+        if "interesse" in mudancas and lead.interesse != OUTRO and "interesse_descricao" not in mudancas:
+            lead.interesse_descricao = None
+        if "interesse" in mudancas or "interesse_descricao" in mudancas:
+            lead.interesse_descricao = (lead.interesse_descricao or "").strip() or None
+            problema = problema_na_descricao(lead.interesse, lead.interesse_descricao)
+            if problema:
+                raise HTTPException(422, problema)
+
         sessao.flush()
         return e.LeadResumo.model_validate(lead)
 
@@ -1291,6 +1334,9 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(
                 422, "só lead qualificado vira oportunidade: qualifique o lead, com o porte estimado, antes"
             )
+        problema = problema_na_descricao(corpo.servico, corpo.servico_descricao)
+        if problema:
+            raise HTTPException(422, problema)
 
         if corpo.grupo_id is not None:
             grupo = sessao.get(GrupoEconomico, corpo.grupo_id)
@@ -1310,6 +1356,7 @@ def _registrar(api: FastAPI) -> None:
             nome=corpo.nome or lead.nome,
             servico=corpo.servico,
             tipo_servico=corpo.tipo_servico,
+            servico_descricao=(corpo.servico_descricao or "").strip() or None,
             linha_servico=linha_do_servico(corpo.servico),
             situacao=Situacao.ENVIAR_PROPOSTA,
             temperatura=lead.temperatura,

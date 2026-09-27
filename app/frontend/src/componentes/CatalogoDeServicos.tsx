@@ -17,6 +17,17 @@ import { Carregando, Erro } from "./estados";
 
 const DESCRICAO_DA_LINHA: Record<string, string> = { C1: "Recorrente", C2: "Não recorrente" };
 
+/** O serviço fora do catálogo (27/09/2026). A linha fica "ainda não sei" até
+ * Eduardo decidir se o serviço entra no catálogo. O mesmo texto do servidor
+ * (`crm.domain.servicos.OUTRO`). */
+const OUTRO = "Outro";
+const DESCRICAO_MINIMA = 10;
+
+function resumo(texto: string, limite = 48): string {
+  const t = texto.trim();
+  return t.length > limite ? `${t.slice(0, limite)}…` : t;
+}
+
 function semAcento(texto: string): string {
   return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase("pt-BR");
 }
@@ -34,12 +45,15 @@ export function EscolhaDeServico({
   id,
   rotulo,
   valor,
+  descricao = "",
   aoEscolher,
 }: {
   id: string;
   rotulo: string;
   valor: string;
-  aoEscolher: (nome: string) => void;
+  /** Só quando `valor` é "Outro": o que o lead pediu. */
+  descricao?: string;
+  aoEscolher: (nome: string, descricao: string) => void;
 }) {
   const [aberto, definirAberto] = useState(false);
   const { dados } = usarDados<ServicoDoCatalogo[]>(() => api.servicos(), []);
@@ -66,9 +80,10 @@ export function EscolhaDeServico({
         onClick={() => definirAberto(true)}
       >
         <span id={`${id}-valor`} className={valor ? undefined : "escolha-servico-vazia"}>
-          {valor || "Escolha no catálogo"}{" "}
+          {valor === OUTRO ? `Outro: ${resumo(descricao)}` : valor || "Escolha no catálogo"}{" "}
           {doCatalogo && <EtiquetaDaLinha linha={doCatalogo.linha} />}
-          {valor && dados && !doCatalogo && (
+          {valor === OUTRO && <span className="etiqueta etiqueta-neutra">Linha: ainda não sei</span>}
+          {valor && valor !== OUTRO && dados && !doCatalogo && (
             <span className="etiqueta etiqueta-espera">fora do catálogo</span>
           )}
         </span>
@@ -77,9 +92,10 @@ export function EscolhaDeServico({
       {aberto && (
         <CatalogoDeServicos
           inicial={valor}
+          descricaoInicial={descricao}
           aoFechar={fechar}
-          aoEscolher={(nome) => {
-            aoEscolher(nome);
+          aoEscolher={(nome, texto) => {
+            aoEscolher(nome, texto);
             fechar();
           }}
         />
@@ -90,12 +106,14 @@ export function EscolhaDeServico({
 
 export function CatalogoDeServicos({
   inicial,
+  descricaoInicial = "",
   aoFechar,
   aoEscolher,
 }: {
   inicial?: string;
+  descricaoInicial?: string;
   aoFechar: () => void;
-  aoEscolher: (nome: string) => void;
+  aoEscolher: (nome: string, descricao: string) => void;
 }) {
   const { dados, carregando, erro, recarregar } = usarDados<ServicoDoCatalogo[]>(
     () => api.servicos(),
@@ -103,6 +121,7 @@ export function CatalogoDeServicos({
   );
   const [busca, definirBusca] = useState("");
   const [selecionado, definirSelecionado] = useState<string | null>(inicial || null);
+  const [descricao, definirDescricao] = useState(descricaoInicial);
   const campoDeBusca = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -116,7 +135,10 @@ export function CatalogoDeServicos({
   const achados = (dados ?? []).filter((s) =>
     semAcento(`${s.nome} ${s.nome_por_extenso ?? ""} ${s.nomes_antigos.join(" ")}`).includes(termo),
   );
-  const atual = dados?.find((s) => s.nome === selecionado) ?? achados[0] ?? null;
+  const outro = selecionado === OUTRO;
+  const atual = outro ? null : (dados?.find((s) => s.nome === selecionado) ?? achados[0] ?? null);
+  const descricaoOk = descricao.trim().length >= DESCRICAO_MINIMA;
+  const podeUsar = outro ? descricaoOk : atual !== null;
 
   return createPortal(
     <div className="catalogo-cortina" onClick={(e) => e.target === e.currentTarget && aoFechar()}>
@@ -148,7 +170,9 @@ export function CatalogoDeServicos({
             {erro && !carregando && <Erro mensagem={erro} aoTentarDeNovo={recarregar} />}
             {!carregando && !erro && dados && achados.length === 0 && (
               <div className="estado">
-                <p className="estado-texto">Nenhum serviço com esse nome.</p>
+                <p className="estado-texto">
+                  Nenhum serviço com esse nome. Se não existir, use "Outro serviço".
+                </p>
                 <button type="button" className="botao botao-secundario" onClick={() => definirBusca("")}>
                   Limpar a busca
                 </button>
@@ -171,7 +195,7 @@ export function CatalogoDeServicos({
                             type="button"
                             role="option"
                             className="catalogo-item"
-                            aria-selected={atual?.nome === s.nome}
+                            aria-selected={!outro && atual?.nome === s.nome}
                             onClick={() => definirSelecionado(s.nome)}
                           >
                             {s.nome}
@@ -182,10 +206,34 @@ export function CatalogoDeServicos({
                   </div>
                 );
               })}
+            {!carregando && !erro && dados && (
+              <div className="catalogo-grupo">
+                <h3>
+                  <span className="etiqueta etiqueta-neutra">Fora do catálogo</span>
+                </h3>
+                <ul role="listbox" aria-label="Fora do catálogo">
+                  <li>
+                    <button
+                      type="button"
+                      role="option"
+                      className="catalogo-item"
+                      aria-selected={outro}
+                      onClick={() => definirSelecionado(OUTRO)}
+                    >
+                      Outro serviço
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            )}
           </div>
 
           <div className="catalogo-detalhe" aria-live="polite">
-            {atual && <Roteiro servico={atual} />}
+            {outro ? (
+              <OutroServico descricao={descricao} aoMudar={definirDescricao} ok={descricaoOk} />
+            ) : (
+              atual && <Roteiro servico={atual} />
+            )}
           </div>
         </div>
 
@@ -198,16 +246,62 @@ export function CatalogoDeServicos({
             <button
               type="button"
               className="botao botao-primario"
-              disabled={!atual}
-              onClick={() => atual && aoEscolher(atual.nome)}
+              disabled={!podeUsar}
+              onClick={() =>
+                outro ? aoEscolher(OUTRO, descricao.trim()) : atual && aoEscolher(atual.nome, "")
+              }
             >
-              Usar este serviço
+              {outro ? "Usar outro serviço" : "Usar este serviço"}
             </button>
           </div>
         </div>
       </div>
     </div>,
     document.body,
+  );
+}
+
+function OutroServico({
+  descricao,
+  aoMudar,
+  ok,
+}: {
+  descricao: string;
+  aoMudar: (texto: string) => void;
+  ok: boolean;
+}) {
+  return (
+    <>
+      <div className="catalogo-titulo-servico">
+        <h3>Outro serviço</h3>
+        <span className="etiqueta etiqueta-neutra">Linha: ainda não sei</span>
+      </div>
+      <p className="catalogo-para-quem">
+        Para o que o lead pediu e não está na lista. Descreva o serviço como o lead falou.
+      </p>
+      <div className="campo-bloco">
+        <label className="campo-rotulo" htmlFor="catalogo-outro">
+          Descreva o serviço desejado
+        </label>
+        <textarea
+          id="catalogo-outro"
+          className="entrada"
+          rows={4}
+          value={descricao}
+          onChange={(e) => aoMudar(e.target.value)}
+        />
+        {!ok && <p className="campo-ajuda">Escreva ao menos {DESCRICAO_MINIMA} caracteres.</p>}
+      </div>
+      <div className="recado">
+        <strong>O que acontece depois.</strong> A proposta grava "Outro" como serviço e a descrição
+        num campo próprio, sem linha. Todo "Outro" entra na lista de pedidos de serviço novo, em
+        Configurações, para decidir se vira item do catálogo.
+      </div>
+      <div className="recado">
+        <strong>Sem roteiro da IA.</strong> Serviço fora do catálogo não tem perguntas prontas: o SDR
+        de IA passa a conversa para a equipe.
+      </div>
+    </>
   );
 }
 

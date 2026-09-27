@@ -66,6 +66,7 @@ export interface MudancaDePreco {
 export interface OportunidadeDetalhe extends OportunidadeResumo {
   canal: string | null;
   linha_servico: string | null;
+  servico_descricao?: string | null;
   data_aceite: string | null;
   motivo_recusa: string | null;
   motivo_recusa_original: string | null;
@@ -119,6 +120,7 @@ export interface LeadResumo {
   canal: string | null;
   captador: string | null;
   interesse: string | null;
+  interesse_descricao?: string | null;
   campanha: string | null;
   campanha_midia: string | null;
   proxima_acao: string | null;
@@ -772,4 +774,13 @@ export interface ServicoDoCatalogo {
   transbordo: string;
   nomes_antigos: string[];
   rascunho: boolean;
+}
+
+/** Um "Outro" registrado: o que o lead pediu fora do catálogo. */
+export interface PedidoDeServicoNovo {
+  onde: "Oportunidade" | "Lead";
+  id: number;
+  nome: string;
+  descricao: string;
+  registrado_em: string;
 }

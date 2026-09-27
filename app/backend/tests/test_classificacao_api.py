@@ -60,6 +60,8 @@ def test_usa_o_snapshot_mais_recente_e_calcula_o_isc(cliente, sessao: Session):
     beta = next(i for i in r["itens"] if i["grupo_nome"] == "Beta")
     assert beta["classe"] == "C" and beta["sem_contrato_ativo"] is True
     assert r["por_classe"] == {"A": 1, "C": 1}
+    faixa_a = next(f for f in r["distribuicao_por_classe"] if f["classe"] == "A")
+    assert faixa_a == {"classe": "A", "minimo": 15, "maximo": 20, "unidades": 1, "percentual": "50.0", "dentro_da_meta": False}
     # metade da receita com tudo no máximo (100) e metade com tudo no mínimo (classe C=20, semáforo 0, churn 0)
     assert Decimal(r["isc"]["componente_classe"]) == Decimal("60")
     assert Decimal(r["isc"]["valor"]) == Decimal("53.30") and r["isc"]["zona"] == "atenção"

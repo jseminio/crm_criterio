@@ -29,7 +29,13 @@ const classificacao = (o: Partial<ClassificacaoDaCarteira> = {}): ClassificacaoD
   referencia: "2026-07-31", versao_dos_parametros: "v1",
   isc: { valor: "53.65", zona: "atenção", componente_classe: "59.45", componente_semaforo: "42.33", componente_churn: "59.01", receita_total: "1000.00", grupos: 1, fora_do_isc: 0 },
   retrato: { unidades: 1, receita_total: "1000.00", grupos_travados: 0, receita_travada: "0.00", percentual_travado: "0.0" },
-  por_classe: { B: 1 }, itens: [item()], avisos: [], ...o,
+  por_classe: { B: 1 },
+  distribuicao_por_classe: [
+    { classe: "A", minimo: 15, maximo: 20, unidades: 0, percentual: "0.0", dentro_da_meta: false },
+    { classe: "B", minimo: 35, maximo: 40, unidades: 1, percentual: "100.0", dentro_da_meta: false },
+    { classe: "C", minimo: 40, maximo: 50, unidades: 0, percentual: "0.0", dentro_da_meta: false },
+  ],
+  itens: [item()], avisos: [], ...o,
 });
 const analise = (o: Partial<AnaliseDaCarteira> = {}): AnaliseDaCarteira => ({
   texto: "A carteira está na zona de atenção, puxada pela inadimplência.",

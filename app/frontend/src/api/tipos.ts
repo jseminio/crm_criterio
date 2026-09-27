@@ -577,12 +577,22 @@ export interface RetratoDaCarteira {
   percentual_travado: string;
 }
 
+export interface FaixaDeClasse {
+  classe: string;
+  minimo: number;
+  maximo: number;
+  unidades: number;
+  percentual: string;
+  dentro_da_meta: boolean;
+}
+
 export interface ClassificacaoDaCarteira {
   referencia: string | null;
   versao_dos_parametros: string | null;
   isc: IscDaCarteira | null;
   retrato: RetratoDaCarteira | null;
   por_classe: Record<string, number>;
+  distribuicao_por_classe: FaixaDeClasse[];
   itens: ItemDaCarteira[];
   avisos: string[];
 }

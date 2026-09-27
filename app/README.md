@@ -66,6 +66,14 @@ por classe — e nunca decide nem sugere ação. Não gera sozinha a cada visita
 Custo estimado por geração: uma fração de centavo (poucos tokens, sem ferramenta). `crm.agente.erros`
 reúne a mensagem de falha da Anthropic, usada também pelo agente SDR.
 
+## Carteira: distribuição por classe contra a meta (27/09/2026)
+
+Um quarto card, ao lado de Classe/Semáforo/Churn: para A, B e C, quantas unidades, que percentual da
+carteira e se está **dentro ou fora da meta declarada** (A 15–20% · B 35–40% · C 40–50%) — texto, não
+só cor, marca a diferença. Meta parametrizada e versionada como pesos e cortes do Score
+(`Parametros.meta_distribuicao_de_classe`), calculada por `crm.domain.classificacao.distribuicao_por_classe()`
+(pura, testada) e exposta em `GET /api/carteira/classificacao` no campo `distribuicao_por_classe`.
+
 ## Funil: indicadores compactos (26/09/2026)
 
 Os sete indicadores do topo do Funil passaram a **cartões compactos e coloridos**, numa só linha, para o kanban aparecer já na primeira visão. Cada cartão mostra rótulo, número e uma linha de apoio; a **explicação** (definição e ressalvas, como "não é o MRR da carteira") abre numa **janela ao redor do indicador** ao passar o mouse ou ao focar com Tab. As cores vêm do design base "Critério CRM" (chart-1/4/5/6 e status ganho, atenção e perdido, com fundo suave); a taxa de conversão muda de tom conforme o estado e traz a etiqueta escrita, e o indicador não calculável mostra "Não calculável", nunca zero. **Recortes do funil** e **Cenários de ticket** ficam recolhidos por padrão e só buscam os dados quando abertos.

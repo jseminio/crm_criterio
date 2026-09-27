@@ -34,6 +34,11 @@ const resposta = (o: Partial<ClassificacaoDaCarteira> = {}): ClassificacaoDaCart
   isc: { valor: "53.65", zona: "atenção", componente_classe: "59.45", componente_semaforo: "42.33", componente_churn: "59.01", receita_total: "2000.00", grupos: 2, fora_do_isc: 0 },
   retrato: { unidades: 2, receita_total: "6000.00", grupos_travados: 1, receita_travada: "1000.00", percentual_travado: "16.7" },
   por_classe: { B: 1, C: 1 },
+  distribuicao_por_classe: [
+    { classe: "A", minimo: 15, maximo: 20, unidades: 0, percentual: "0.0", dentro_da_meta: false },
+    { classe: "B", minimo: 35, maximo: 40, unidades: 1, percentual: "50.0", dentro_da_meta: false },
+    { classe: "C", minimo: 40, maximo: 50, unidades: 1, percentual: "50.0", dentro_da_meta: true },
+  ],
   itens: [
     item(),
     item({ grupo_id: 2, grupo_nome: "Beta", classe: "C", classe_efetiva: "C1", em_cobranca: false, alerta_de_churn: null, eixo_de_acao: "Sem urgência de churn", churn: 1, receita_mensal: "5000.00" }),
@@ -52,6 +57,18 @@ describe("Carteira", () => {
     expect(screen.getByText(/rentabilidade vem da planilha/)).toBeInTheDocument();
     expect(screen.getByText(/B 1 · C 1, ponderado por receita/)).toBeInTheDocument();
     expect(screen.getByText("ZONA DE ATENÇÃO")).toBeInTheDocument();
+  });
+
+  it("mostra a distribuição por classe contra a meta, com texto além da cor", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira />);
+    await screen.findByText("53,7");
+    expect(screen.getByText("Distribuição")).toBeInTheDocument();
+    expect(screen.getByText("0 · 0,0%")).toBeInTheDocument(); // A
+    expect(screen.getAllByText("1 · 50,0%")).toHaveLength(2); // B e C
+    // B está fora da meta (50% contra 35–40%), C está dentro (50% contra 40–50%): o texto, não só a cor, marca a diferença.
+    expect(screen.getByText("fora da meta (meta 35–40%)")).toBeInTheDocument();
+    expect(screen.getByText("dentro da meta (meta 40–50%)")).toBeInTheDocument();
   });
 
   it("estado nunca só por cor: cobrança e alerta têm texto, e a cobrança vem primeiro", async () => {

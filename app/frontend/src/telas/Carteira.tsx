@@ -6,7 +6,7 @@
 
 import { Fragment, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { AnaliseDaCarteira, ClassificacaoDaCarteira } from "../api/tipos";
+import type { AnaliseDaCarteira, ClassificacaoDaCarteira, FaixaDeClasse } from "../api/tipos";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
@@ -19,6 +19,7 @@ const um1 = (v: string) => decimais(v, 1);
 const ALERTA: Record<string, string> = { "⚠": "⚠ Risco de churn", "⚑": "⚑ Saída a organizar" };
 const PRIORIDADE = ["Cobrança", "Reter já", "Reter / vigiar", "Saída organizada", "Sem urgência"];
 const EIXO_COBRANCA = "Cobrança — sem tratamento preferencial";
+const COR_DA_CLASSE: Record<string, string> = { A: "#2e7d5b", B: "#2e5496", C: "#b8860b" };
 
 const LEGENDA_DOS_EIXOS: { nome: string; quando: string; significa: string }[] = [
   {
@@ -92,6 +93,28 @@ function Componente({ nome, valor, legenda, cor }: { nome: string; valor: string
       <div className="isc-numero">{um1(valor)} <small>/100</small></div>
       <div className="isc-trilho" aria-hidden="true"><div style={{ width: `${Math.min(100, Number(valor))}%`, background: cor }} /></div>
       <p>{legenda}</p>
+    </div>
+  );
+}
+
+function ComponenteDistribuicao({ faixas }: { faixas: FaixaDeClasse[] }) {
+  return (
+    <div className="isc-componente isc-componente-distribuicao">
+      <h4>Distribuição</h4>
+      {faixas.map((f) => (
+        <div key={f.classe} className="distribuicao-linha">
+          <div className="distribuicao-cab">
+            <b>{f.classe}</b>
+            <span>{f.unidades} · {um1(f.percentual)}%</span>
+          </div>
+          <div className="isc-trilho" aria-hidden="true">
+            <div style={{ width: `${Math.min(100, Number(f.percentual))}%`, background: COR_DA_CLASSE[f.classe] ?? "#666" }} />
+          </div>
+          <small className={f.dentro_da_meta ? "distribuicao-dentro" : "distribuicao-fora"}>
+            {f.dentro_da_meta ? "dentro da meta" : "fora da meta"} (meta {f.minimo}–{f.maximo}%)
+          </small>
+        </div>
+      ))}
     </div>
   );
 }
@@ -211,6 +234,7 @@ export function Carteira() {
               legenda={`${Object.entries(dados.por_classe).map(([c, n]) => `${c} ${n}`).join(" · ")}, ponderado por receita`} />
             <Componente nome="Semáforo" valor={isc.componente_semaforo} cor="#b8860b" legenda="Saúde operacional (pior = 3, melhor = 1)" />
             <Componente nome="Churn" valor={isc.componente_churn} cor="#2e7d5b" legenda="Risco de saída ponderado por receita" />
+            {dados.distribuicao_por_classe.length > 0 && <ComponenteDistribuicao faixas={dados.distribuicao_por_classe} />}
           </div>
         </>
       )}

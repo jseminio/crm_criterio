@@ -104,12 +104,22 @@ class RetratoResposta(BaseModel):
     percentual_travado: Decimal
 
 
+class FaixaDeClasseResposta(BaseModel):
+    classe: str
+    minimo: int
+    maximo: int
+    unidades: int
+    percentual: Decimal
+    dentro_da_meta: bool
+
+
 class ClassificacaoDaCarteira(BaseModel):
     referencia: date | None
     versao_dos_parametros: str | None
     isc: IscResposta | None
     retrato: RetratoResposta | None
     por_classe: dict[str, int]
+    distribuicao_por_classe: list[FaixaDeClasseResposta]
     itens: list[ItemDaCarteira]
     avisos: list[str]
 
@@ -247,7 +257,7 @@ def roteador(
         linhas.sort(key=lambda x: x[0].receita_mensal, reverse=True)
         if not linhas:
             return ClassificacaoDaCarteira(referencia=None, versao_dos_parametros=None, isc=None, retrato=None,
-                                           por_classe={}, itens=[], avisos=[])
+                                           por_classe={}, distribuicao_por_classe=[], itens=[], avisos=[])
         ativos = set(sessao.scalars(
             sa.select(Contrato.grupo_id).where(Contrato.situacao.in_([SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO]))
         ))
@@ -298,11 +308,15 @@ def roteador(
         if calculado and calculado.fora_do_isc:
             avisos.append(f"{calculado.fora_do_isc} grupo(s) sem nota de churn ficaram fora do ISC.")
         primeira = linhas[0][0]
+        distribuicao = [
+            FaixaDeClasseResposta(**{k: getattr(f, k) for k in FaixaDeClasseResposta.model_fields})
+            for f in regra.distribuicao_por_classe(por_classe)
+        ]
         return ClassificacaoDaCarteira(
             referencia=max(c.referencia for c, _ in linhas), versao_dos_parametros=primeira.versao_dos_parametros,
             isc=IscResposta(**{k: getattr(calculado, k) for k in IscResposta.model_fields}) if calculado else None,
             retrato=RetratoResposta(**{k: getattr(retrato, k) for k in RetratoResposta.model_fields}) if retrato else None,
-            por_classe=dict(sorted(por_classe.items())), itens=itens, avisos=avisos,
+            por_classe=dict(sorted(por_classe.items())), distribuicao_por_classe=distribuicao, itens=itens, avisos=avisos,
         )
 
     def _ultima(sessao: Session, grupo_id: int) -> ClassificacaoDoGrupo | None:

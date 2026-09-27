@@ -1,12 +1,16 @@
-/** A fila de leads — a porta de entrada que a planilha nunca teve. */
+/** A fila de leads — a porta de entrada que a planilha nunca teve.
+ *
+ * Desde 27/09/2026 mora dentro da tela do SDR de IA. Só o lead qualificado
+ * vira oportunidade: o funil continua medindo proposta, não contato.
+ */
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { LeadResumo, Listas, Pagina } from "../api/tipos";
+import type { ConversaDoSdr, LeadResumo, Listas, Pagina } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
-import { data, prazo } from "../formato";
+import { data, dataHora, prazo } from "../formato";
 import { usarDados } from "../usarDados";
 
 const CAMPOS_VAZIOS = {
@@ -264,7 +268,21 @@ function EdicaoDeLead({
     proxima_acao: lead.proxima_acao ?? "",
     proxima_acao_em: lead.proxima_acao_em ?? "",
     observacao: lead.observacao ?? "",
+    cnpj: lead.cnpj ?? "",
+    porte_estimado: lead.porte_estimado ?? "",
+    motivo_descarte: lead.motivo_descarte ?? "",
+    reuniao_marcada_para: paraCampoLocal(lead.reuniao_marcada_para),
   });
+  const [naoContatar, definirNaoContatar] = useState(Boolean(lead.nao_contatar));
+  const qualificando = !convertido && rascunho.situacao === "Qualificado";
+  const descartando = !convertido && rascunho.situacao === "Descartado";
+  // As mesmas exigências da API, ditas antes de salvar: qualificar pede o
+  // porte, descartar pede o motivo.
+  const falta = qualificando && !rascunho.porte_estimado
+    ? "Para qualificar, escolha o porte estimado."
+    : descartando && !rascunho.motivo_descarte
+      ? "Para descartar, escolha o motivo."
+      : null;
   const [erro, definirErro] = useState<string | null>(null);
   const [salvando, definirSalvando] = useState(false);
 
@@ -278,6 +296,13 @@ function EdicaoDeLead({
       const mudancas: Record<string, unknown> = Object.fromEntries(
         Object.entries(rascunho).map(([k, v]) => [k, v === "" ? null : v]),
       );
+      mudancas.reuniao_marcada_para = rascunho.reuniao_marcada_para
+        ? new Date(rascunho.reuniao_marcada_para).toISOString()
+        : null;
+      // O motivo só vai junto quando o lead fica descartado: a API recusa
+      // motivo em lead aberto.
+      if (!descartando) delete mudancas.motivo_descarte;
+      if (naoContatar !== Boolean(lead.nao_contatar)) mudancas.nao_contatar = naoContatar;
       // Lead convertido tem a situação decidida pela oportunidade: não a enviamos.
       if (convertido) delete mudancas.situacao;
       await api.editarLead(lead.id, mudancas);
@@ -308,7 +333,7 @@ function EdicaoDeLead({
             type="button"
             className="botao botao-primario"
             onClick={salvar}
-            disabled={salvando}
+            disabled={salvando || falta !== null}
           >
             {salvando ? "Salvando…" : "Salvar alterações"}
           </button>
@@ -348,6 +373,85 @@ function EdicaoDeLead({
             </select>
           )}
         </div>
+
+        {qualificando && (
+          <div className="formulario-duplo">
+            <div className="campo-bloco">
+              <label className="campo-rotulo" htmlFor="e-porte">
+                Porte estimado
+              </label>
+              <select
+                id="e-porte"
+                className="selecao"
+                value={rascunho.porte_estimado}
+                onChange={(e) => mudar("porte_estimado", e.target.value)}
+              >
+                <option value="">Escolha</option>
+                {listas?.portes.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="campo-bloco">
+              <label className="campo-rotulo" htmlFor="e-reuniao">
+                Reunião marcada para
+              </label>
+              <input
+                id="e-reuniao"
+                type="datetime-local"
+                className="entrada"
+                value={rascunho.reuniao_marcada_para}
+                onChange={(e) => mudar("reuniao_marcada_para", e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {descartando && (
+          <div className="campo-bloco">
+            <label className="campo-rotulo" htmlFor="e-motivo">
+              Motivo do descarte
+            </label>
+            <select
+              id="e-motivo"
+              className="selecao"
+              value={rascunho.motivo_descarte}
+              onChange={(e) => mudar("motivo_descarte", e.target.value)}
+            >
+              <option value="">Escolha</option>
+              {listas?.motivos_de_descarte?.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {falta && <p className="campo-ajuda">{falta}</p>}
+
+        <div className="campo-bloco">
+          <label className="campo-rotulo" htmlFor="e-cnpj">
+            CNPJ
+          </label>
+          <input
+            id="e-cnpj"
+            className="entrada"
+            value={rascunho.cnpj}
+            onChange={(e) => mudar("cnpj", e.target.value)}
+          />
+        </div>
+
+        <label className="campo-marcar">
+          <input
+            type="checkbox"
+            checked={naoContatar}
+            onChange={(e) => definirNaoContatar(e.target.checked)}
+          />{" "}
+          Pediu para não ser contatado. Nenhuma mensagem da IA ou da equipe sai para este lead.
+        </label>
 
         <div className="formulario-duplo">
           <div className="campo-bloco">
@@ -420,20 +524,94 @@ function EdicaoDeLead({
           />
         </div>
       </div>
+
+      <ConversasComAIA leadId={lead.id} />
     </PainelLateral>
   );
 }
 
+/** O `datetime-local` quer a hora local sem fuso; a API guarda em UTC. */
+function paraCampoLocal(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const momento = new Date(iso);
+  const local = new Date(momento.getTime() - momento.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+/** O que a IA e o lead disseram. Só leitura: quem registra é a integração do canal. */
+function ConversasComAIA({ leadId }: { leadId: number }) {
+  const { dados, carregando, erro, recarregar } = usarDados<ConversaDoSdr[]>(
+    () => api.conversasDoLead(leadId),
+    [leadId],
+  );
+
+  return (
+    <section className="sdr-conversas" aria-labelledby="t-conversas">
+      <h3 className="bloco-titulo" id="t-conversas">
+        Conversas com a IA
+      </h3>
+      {carregando && <Carregando rotulo="Carregando as conversas" />}
+      {erro && !carregando && <Erro mensagem={erro} aoTentarDeNovo={recarregar} />}
+      {!carregando && !erro && dados?.length === 0 && (
+        <p className="campo-ajuda">
+          Nenhuma conversa registrada. Elas aparecem aqui quando a integração do WhatsApp ou do
+          e-mail estiver ligada.
+        </p>
+      )}
+      {!carregando &&
+        !erro &&
+        dados?.map((conversa) => (
+          <div key={conversa.id} className="sdr-conversa">
+            <p className="sdr-conversa-topo">
+              {conversa.canal} · começou {dataHora(conversa.iniciada_em)}{" "}
+              {conversa.desfecho ? (
+                <Etiqueta texto={conversa.desfecho} tipo="neutra" />
+              ) : (
+                <span className="etiqueta etiqueta-andamento">Em andamento</span>
+              )}
+            </p>
+            <ol className="sdr-mensagens">
+              {conversa.mensagens.map((m) => (
+                <li
+                  key={m.id}
+                  className={`sdr-mensagem sdr-mensagem-${m.autor === "Lead" ? "lead" : "criterio"}`}
+                >
+                  <span className="sdr-mensagem-autor">
+                    {m.autor} · {dataHora(m.enviada_em)}
+                    {m.fallback && " · não entendeu"}
+                  </span>
+                  {m.texto}
+                </li>
+              ))}
+            </ol>
+          </div>
+        ))}
+    </section>
+  );
+}
+
+const ORIGENS = [
+  { valor: "", rotulo: "Todas as origens" },
+  { valor: "Tráfego pago", rotulo: "Tráfego pago" },
+  { valor: "Prospecção ativa", rotulo: "Leads frios (prospecção ativa)" },
+];
+
 export function Leads({ listas }: { listas: Listas | null }) {
   const [apenasAbertos, definirApenasAbertos] = useState(true);
   const [busca, definirBusca] = useState("");
+  const [origem, definirOrigem] = useState("");
   const [cadastrando, definirCadastrando] = useState(false);
   const [convertendo, definirConvertendo] = useState<LeadResumo | null>(null);
   const [editando, definirEditando] = useState<LeadResumo | null>(null);
 
   const { dados, carregando, erro, recarregar } = usarDados<Pagina<LeadResumo>>(
-    () => api.leads({ apenas_abertos: apenasAbertos, busca: busca || undefined }),
-    [apenasAbertos, busca],
+    () =>
+      api.leads({
+        apenas_abertos: apenasAbertos,
+        busca: busca || undefined,
+        tipo_canal: origem || undefined,
+      }),
+    [apenasAbertos, busca, origem],
   );
 
   // Uma ação primária por tela — regra 2 do PAD-002. Com a fila vazia, a ação
@@ -468,6 +646,23 @@ export function Leads({ listas }: { listas: Listas | null }) {
           >
             <option value="abertos">Só os abertos</option>
             <option value="todos">Todos</option>
+          </select>
+        </div>
+        <div className="campo">
+          <label className="campo-rotulo" htmlFor="l-origem">
+            Origem
+          </label>
+          <select
+            id="l-origem"
+            className="selecao"
+            value={origem}
+            onChange={(e) => definirOrigem(e.target.value)}
+          >
+            {ORIGENS.map((o) => (
+              <option key={o.valor} value={o.valor}>
+                {o.rotulo}
+              </option>
+            ))}
           </select>
         </div>
         {!filaVazia && (
@@ -509,6 +704,7 @@ export function Leads({ listas }: { listas: Listas | null }) {
               <th scope="col">Contato</th>
               <th scope="col">Empresa</th>
               <th scope="col">Situação</th>
+              <th scope="col">Qualificação</th>
               <th scope="col">Origem</th>
               <th scope="col">Captador</th>
               <th scope="col">Próxima ação</th>
@@ -523,7 +719,17 @@ export function Leads({ listas }: { listas: Listas | null }) {
                   <td>{lead.nome}</td>
                   <td>{lead.empresa_texto ?? "—"}</td>
                   <td>
-                    <Etiqueta texto={lead.situacao} />
+                    <Etiqueta texto={lead.situacao} />{" "}
+                    {lead.nao_contatar && (
+                      <span className="etiqueta etiqueta-perda">Não contatar</span>
+                    )}
+                  </td>
+                  <td className="sdr-qualificacao">
+                    {lead.porte_estimado ? `Porte ${lead.porte_estimado}` : ""}
+                    {lead.situacao === "Descartado" && lead.motivo_descarte}
+                    {lead.reuniao_marcada_para && (
+                      <span> · reunião {dataHora(lead.reuniao_marcada_para)}</span>
+                    )}
                   </td>
                   <td>
                     <Etiqueta texto={lead.tipo_canal} tipo="neutra" />{" "}
@@ -557,13 +763,19 @@ export function Leads({ listas }: { listas: Listas | null }) {
                       Abrir
                     </button>{" "}
                     {lead.convertido_em_id === null ? (
-                      <button
-                        type="button"
-                        className="botao botao-secundario"
-                        onClick={() => definirConvertendo(lead)}
-                      >
-                        Converter
-                      </button>
+                      lead.situacao === "Qualificado" ? (
+                        <button
+                          type="button"
+                          className="botao botao-secundario"
+                          onClick={() => definirConvertendo(lead)}
+                        >
+                          Converter
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 12, color: "var(--texto-medio)" }}>
+                          Qualifique para converter
+                        </span>
+                      )
                     ) : (
                       <span style={{ fontSize: 12, color: "var(--texto-medio)" }}>
                         Virou oportunidade

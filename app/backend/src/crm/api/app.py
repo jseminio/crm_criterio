@@ -32,9 +32,11 @@ from crm.api.backup import roteador as roteador_de_backup
 from crm.api.classificacao import ServicosDeAnalise, roteador as roteador_de_carteira, servicos_de_analise_reais
 from crm.api.contatos import roteador as roteador_de_contatos
 from crm.api.contatos import roteador_de_empresas
+from crm.api.sdr import roteador as roteador_do_sdr
 from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
 from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, desfazer_fusao, fundir_grupos
+from crm.db import leads as regras_do_lead
 from crm.db.modelos import (
     Contrato,
     Empresa,
@@ -61,6 +63,7 @@ from crm.domain.listas import (
     ORIGEM_DA_MUDANCA_NO_CRM,
     IniciativaDoEncerramento,
     LinhaServico,
+    MotivoDeDescarte,
     MotivoDeEncerramento,
     MotivoRecusa,
     Origem,
@@ -133,6 +136,7 @@ def criar_app(
     api.include_router(roteador_de_contatos(obter_sessao))
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
+    api.include_router(roteador_do_sdr(obter_sessao))
     return api
 
 
@@ -219,6 +223,7 @@ def _registrar(api: FastAPI) -> None:
             captadores=sorted(_CAPTADORES),
             portes=[p.value for p in regras_de_porte.Porte],
             servicos=list(servicos),
+            motivos_de_descarte=_valores(MotivoDeDescarte),
         )
 
     # ------------------------------------------------------------------ grupos
@@ -1138,6 +1143,7 @@ def _registrar(api: FastAPI) -> None:
     def listar_leads(
         sessao: Session = Depends(obter_sessao),
         situacao: list[SituacaoLead] | None = Query(default=None),
+        tipo_canal: list[TipoCanal] | None = Query(default=None),
         apenas_abertos: bool = False,
         busca: str | None = None,
         limite: int = Query(default=100, le=1000),
@@ -1146,6 +1152,8 @@ def _registrar(api: FastAPI) -> None:
         consulta = sa.select(Lead)
         if situacao:
             consulta = consulta.where(Lead.situacao.in_(situacao))
+        if tipo_canal:
+            consulta = consulta.where(Lead.tipo_canal.in_(tipo_canal))
         if apenas_abertos:
             consulta = consulta.where(
                 Lead.situacao.in_([s for s in SituacaoLead if s.aberto])
@@ -1197,8 +1205,35 @@ def _registrar(api: FastAPI) -> None:
         if lead.convertido_em_id is not None and "situacao" in mudancas:
             raise HTTPException(409, "este lead já virou oportunidade")
 
-        for campo, valor in mudancas.items():
-            setattr(lead, campo, valor)
+        situacao = mudancas.pop("situacao", None)
+        porte = mudancas.pop("porte_estimado", None)
+        motivo = mudancas.pop("motivo_descarte", None)
+        nao_contatar = mudancas.pop("nao_contatar", None)
+        try:
+            if porte is not None:
+                lead.porte_estimado = regras_do_lead.validar_porte(porte)
+            for campo, valor in mudancas.items():
+                setattr(lead, campo, valor)
+
+            if situacao is SituacaoLead.QUALIFICADO:
+                regras_do_lead.qualificar(lead)
+            elif situacao is SituacaoLead.DESCARTADO:
+                regras_do_lead.descartar(lead, motivo)
+            elif situacao is not None:
+                regras_do_lead.reabrir(lead, situacao)
+            elif motivo is not None:
+                # Trocar o motivo de um lead já descartado.
+                if lead.situacao is not SituacaoLead.DESCARTADO:
+                    raise regras_do_lead.RegraDoLead("o motivo de descarte só vale para lead descartado")
+                regras_do_lead.descartar(lead, motivo)
+
+            if nao_contatar is True:
+                regras_do_lead.marcar_nao_contatar(lead)
+            elif nao_contatar is False:
+                lead.nao_contatar, lead.nao_contatar_em = False, None
+        except regras_do_lead.RegraDoLead as problema:
+            raise HTTPException(problema.status, str(problema)) from problema
+
         sessao.flush()
         return e.LeadResumo.model_validate(lead)
 
@@ -1221,6 +1256,13 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(404, "lead não encontrado")
         if lead.convertido_em_id is not None:
             raise HTTPException(409, "este lead já virou oportunidade")
+        # Só o lead qualificado vira oportunidade (decisão de Eduardo em
+        # 27/09/2026): o funil e a conversão continuam medindo proposta, não
+        # contato. O trabalho de antes da qualificação fica no painel do SDR.
+        if lead.situacao is not SituacaoLead.QUALIFICADO:
+            raise HTTPException(
+                422, "só lead qualificado vira oportunidade: qualifique o lead, com o porte estimado, antes"
+            )
 
         if corpo.grupo_id is not None:
             grupo = sessao.get(GrupoEconomico, corpo.grupo_id)

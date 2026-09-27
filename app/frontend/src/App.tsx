@@ -14,6 +14,7 @@ import { Configuracoes } from "./telas/Configuracoes";
 import { Contratos } from "./telas/Contratos";
 import { Funil } from "./telas/Funil";
 import { Grupos } from "./telas/Grupos";
+import { Sdr } from "./telas/Sdr";
 import { usarDados } from "./usarDados";
 
 type Tela =
@@ -24,6 +25,7 @@ type Tela =
   | "contratos"
   | "carteira"
   | "abordagens"
+  | "sdr"
   | "conferencia"
   | "configuracoes";
 
@@ -69,6 +71,12 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     rotulo: "Abordagens",
     titulo: "Abordagens",
     descricao: "O agente SDR prepara a ficha e o rascunho. Nada sai sem a sua aprovação.",
+  },
+  {
+    chave: "sdr",
+    rotulo: "SDR da IA",
+    titulo: "Qualificação pela IA",
+    descricao: "Leads de tráfego pago e frios: quantos a IA qualificou, descartou ou passou para a equipe.",
   },
   {
     chave: "conferencia",
@@ -137,6 +145,7 @@ export default function App() {
           {tela === "contratos" && <Contratos listas={listas} />}
           {tela === "carteira" && <Carteira />}
           {tela === "abordagens" && <Abordagens />}
+          {tela === "sdr" && <Sdr listas={listas} />}
           {tela === "conferencia" && <Conferencia />}
           {tela === "configuracoes" && <Configuracoes />}
         </main>

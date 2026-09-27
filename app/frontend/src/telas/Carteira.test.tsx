@@ -76,6 +76,8 @@ describe("Carteira", () => {
     expect(screen.queryByText(/▸ Beta/)).toBeNull();
     // Sem isto o filtro aplica fora da tela: a pessoa clica e parece que nada aconteceu.
     expect(rolou).toHaveBeenCalled();
+    // Filtra pro grupo consolidado — não abre as empresas sozinho.
+    expect(screen.queryByText(/Alfa Comércio Ltda/)).toBeNull();
   });
 
   it("mostra os três semáforos com a contagem, e filtra a lista ao clicar", async () => {

@@ -176,9 +176,6 @@ export function Carteira() {
     // Sem isto, um semáforo ainda ligado de um clique anterior soma com este filtro (E, não OU)
     // e a lista pode ficar vazia mesmo tendo grupo inadimplente — parece que o clique não fez nada.
     definirSemaforoFiltro(null);
-    // Mostra de cara as empresas dos grupos inadimplentes — é a lista concreta que se quer ver,
-    // não só o grupo consolidado.
-    definirAbertos(new Set(dados?.itens.filter((i) => i.em_cobranca).map((i) => i.grupo_id) ?? []));
     irParaALista();
   };
 

@@ -254,6 +254,12 @@
   border-radius: var(--raio-sm); border: 1px solid transparent; }
 .conta-fecha { background: var(--ganho-suave); color: var(--ganho); border-color: var(--ganho); }
 .conta-nao-fecha { background: var(--perda-suave); color: var(--perda); border-color: var(--perda); font-weight: 600; }
+.visao-toggle { display: inline-flex; border: 1px solid var(--azul-noturno); border-radius: 8px; overflow: hidden; }
+.visao-botao { border: 0; background: var(--surface-card); color: var(--azul-noturno); font: 600 13px var(--fonte-ui);
+  padding: 7px 14px; cursor: pointer; }
+.visao-botao.visao-ativa { background: var(--azul-noturno); color: var(--branco); }
+.visao-botao:not(:last-child) { border-right: 1px solid var(--azul-noturno); }
+
 .abas { display: flex; gap: var(--e1); border-bottom: 1px solid var(--borda); }
 .aba { appearance: none; border: 0; background: transparent; cursor: pointer; font-weight: 500;
   padding: var(--e2) var(--e4); color: var(--texto-medio); border-bottom: 2px solid transparent; margin-bottom: -1px; }

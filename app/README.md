@@ -1208,6 +1208,18 @@ o teste seguinte — falha em cerca de 1 a cada 3 rodadas, sem padrão fixo.
 Teste instável é pior que teste lento: ensina a ignorar falha. `maxWorkers: 1`
 sozinho é suficiente; isolamento entre arquivos volta a ser o padrão.
 
+## Menu: Funil e Oportunidades viraram uma tela só (27/09/2026)
+
+Fusão pedida por Eduardo: as duas telas mostravam a mesma base (a oportunidade), só em formatos
+diferentes — Kanban (colunas por situação, sempre todas visíveis, com arrasto) e Grade (tabela plana,
+filtrável por uma situação de cada vez). Agora é **uma tela só ("Funil"), com um botão Kanban/Grade**
+na barra de filtros. O filtro "Situação" só aparece na Grade — no Kanban ele não faz sentido, porque
+todas as situações já ficam visíveis lado a lado. As duas visões usam a mesma busca (texto, captador,
+canal, serviço, temperatura, período) e o mesmo painel de detalhe; cada uma chama sua própria rota
+(`GET /api/funil` para o Kanban, `GET /api/oportunidades` para a Grade) só enquanto está em tela — a
+outra não busca nada. `Lista.tsx` foi removido (a lógica virou parte de `Funil.tsx`); o atalho da
+Agenda que abria a lista agora abre o Funil.
+
 ## Menu: Leads saiu do menu (27/09/2026)
 
 Decisão de Eduardo: "Nova oportunidade" (dentro de Oportunidades/Funil) já captura o mesmo que a tela

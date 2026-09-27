@@ -14,14 +14,12 @@ import { Configuracoes } from "./telas/Configuracoes";
 import { Contratos } from "./telas/Contratos";
 import { Funil } from "./telas/Funil";
 import { Grupos } from "./telas/Grupos";
-import { Lista } from "./telas/Lista";
 import { usarDados } from "./usarDados";
 
 type Tela =
   | "agenda"
   | "contatos"
   | "funil"
-  | "lista"
   | "grupos"
   | "contratos"
   | "carteira"
@@ -46,13 +44,7 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     chave: "funil",
     rotulo: "Funil",
     titulo: "Funil comercial",
-    descricao: "Arraste o olho pelas etapas; clique num cartão para mover a oportunidade.",
-  },
-  {
-    chave: "lista",
-    rotulo: "Oportunidades",
-    titulo: "Oportunidades",
-    descricao: "A mesma base do funil, em lista, para comparar e filtrar.",
+    descricao: "Kanban ou grade — arraste um cartão ou abra a linha para mover a oportunidade.",
   },
   {
     chave: "grupos",
@@ -136,12 +128,11 @@ export default function App() {
         <main className="area">
           {tela === "agenda" && <Agenda
               listas={listas}
-              aoAbrirLeads={() => definirTela("lista")}
+              aoAbrirLeads={() => definirTela("funil")}
               aoAbrirContratos={() => definirTela("contratos")}
             />}
           {tela === "contatos" && <Contatos listas={listas} />}
           {tela === "funil" && <Funil listas={listas} />}
-          {tela === "lista" && <Lista listas={listas} />}
           {tela === "grupos" && <Grupos listas={listas} />}
           {tela === "contratos" && <Contratos listas={listas} />}
           {tela === "carteira" && <Carteira />}

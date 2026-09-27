@@ -125,6 +125,14 @@ export interface LeadResumo {
   proxima_acao_em: string | null;
   observacao: string | null;
   convertido_em_id: number | null;
+  cnpj?: string | null;
+  porte_estimado?: string | null;
+  qualificado_em?: string | null;
+  descartado_em?: string | null;
+  motivo_descarte?: string | null;
+  reuniao_marcada_para?: string | null;
+  nao_contatar?: boolean;
+  criado_em?: string | null;
 }
 
 export interface Listas {
@@ -142,6 +150,7 @@ export interface Listas {
   captadores: string[];
   portes: string[];
   servicos: string[];
+  motivos_de_descarte?: string[];
 }
 
 export interface Recorte {
@@ -673,4 +682,156 @@ export interface RevisaoDaCarteira {
   receita_travada: string;
   percentual_travado: string;
   baseado_em_referencia: string;
+}
+
+// ------------------------------------------------------------ SDR de IA
+export interface MensagemDoSdr {
+  id: number;
+  autor: "Lead" | "IA" | "Equipe";
+  enviada_em: string;
+  texto: string;
+  intencao: string | null;
+  confianca: string | null;
+  fallback: boolean;
+  termo_nao_reconhecido: string | null;
+  tom: string | null;
+}
+
+export interface ConversaDoSdr {
+  id: number;
+  lead_id: number;
+  canal: string;
+  iniciada_em: string;
+  encerrada_em: string | null;
+  desfecho: string | null;
+  motivo_transbordo: string | null;
+  destino_transbordo: string | null;
+  atendida_em: string | null;
+  nota: number | null;
+  mensagens: MensagemDoSdr[];
+}
+
+export interface ParametrosDoSdr {
+  custo_hora_sdr: string | null;
+  minutos_por_conversa: number | null;
+  cotacao_dolar: string | null;
+  atualizado_por: string | null;
+  atualizado_em: string | null;
+}
+
+export interface InvestimentoEmMidia {
+  id: number;
+  mes: string;
+  canal: string;
+  valor: string;
+}
+
+/** Percentual com a conta à vista. `valor` é nulo quando não há denominador. */
+export interface Taxa {
+  numerador: number;
+  denominador: number;
+  valor: number | null;
+}
+
+export interface Contagem {
+  nome: string;
+  quantidade: number;
+}
+
+export interface IndicadorDoSdr {
+  valor: number | null;
+  avaliacao: string | null;
+  meta: string | null;
+}
+
+export interface LinhaDeOrigem {
+  origem: string;
+  leads: number;
+  responderam: Taxa;
+  qualificados: Taxa;
+  reunioes: number;
+  midia: string | null;
+  custo_por_lead: string | null;
+  custo_por_qualificado: string | null;
+  avaliacao_resposta: string | null;
+  avaliacao_qualificados: string | null;
+  avaliacao_custo: string | null;
+}
+
+export interface PainelDoSdr {
+  mes: string;
+  origem: string | null;
+  leads: number;
+  responderam: number;
+  com_desfecho: number;
+  em_andamento: number;
+  qualificados: number;
+  fora_do_perfil: number;
+  reunioes: number;
+  qualificados_sobre_leads: Taxa;
+  qualificados_sobre_responderam: Taxa;
+  qualificacao_concluida: Taxa;
+  transbordo: Taxa;
+  parou: Taxa;
+  reunioes_sobre_qualificados: Taxa;
+  indicador_qualificacao: IndicadorDoSdr;
+  indicador_transbordo: IndicadorDoSdr;
+  indicador_reuniao: IndicadorDoSdr;
+  tma_segundos: number | null;
+  primeira_resposta: IndicadorDoSdr;
+  csat: IndicadorDoSdr;
+  notas: number;
+  satisfeitos: Taxa;
+  por_origem: LinhaDeOrigem[];
+  interesses: Contagem[];
+  confianca: { media: number | null; respostas: number; faixas: Contagem[]; abaixo_de_0_6: Taxa };
+  falhas_por_resposta: Taxa;
+  falhas_por_conversa: Taxa;
+  indicador_falhas: IndicadorDoSdr;
+  termos: Contagem[];
+  funil: { nome: string; leads: number; saidas: Contagem[] }[];
+  gatilhos: Contagem[];
+  descartes: Contagem[];
+  tom: Contagem[];
+  portes: Contagem[];
+  destinos: {
+    destino: string;
+    transbordos: number;
+    atendidos: number;
+    espera_media_min: number | null;
+    avaliacao: string | null;
+  }[];
+  com_dados_da_empresa: number;
+  oportunidades: number;
+  custo_poupado: {
+    calculavel: boolean;
+    falta: string[];
+    conversas_concluidas: number;
+    custo_por_conversa: string | null;
+    bruto: string | null;
+    custo_ia: string | null;
+    liquido: string | null;
+    mensagens_sem_custo: number;
+  };
+  anterior: {
+    qualificados: number;
+    qualificacao_concluida: number | null;
+    transbordo: number | null;
+    tma_segundos: number | null;
+    csat: number | null;
+  } | null;
+}
+
+/** Um serviço do catálogo (`GET /api/servicos`). Sem preço, de propósito. */
+export interface ServicoDoCatalogo {
+  nome: string;
+  nome_por_extenso: string | null;
+  linha: "C1" | "C2";
+  recorrente: boolean;
+  para_quem: string;
+  perguntas: { texto: string; direcionador: string | null }[];
+  fora_do_perfil: string[];
+  transbordo: string;
+  nomes_antigos: string[];
+  rascunho: boolean;
 }

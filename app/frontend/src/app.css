@@ -486,6 +486,184 @@
   .hero-distribuicao-linhas { flex-direction: column; gap: var(--e3); }
 }
 
+/* ------------------------------------------------------------ SDR de IA */
+/* Amostra do painel aprovada por Eduardo em 27/09/2026. Barras e funil são
+   HTML com largura proporcional: o mesmo máximo para todas as barras de uma
+   lista, e o funil sempre contra os leads da primeira etapa. */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.tabela-rolagem { overflow-x: auto; }
+.sdr-abas { margin-bottom: var(--e4); }
+.sdr { display: flex; flex-direction: column; gap: var(--e5); }
+.sdr .filtros { margin-bottom: 0; }
+.sdr-secao { display: flex; flex-direction: column; gap: var(--e3); }
+.sdr-secao-topo { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--e2); }
+.sdr-secao-topo h2 { font-size: 18px; }
+.sdr-secao-topo p { margin: 0; color: var(--texto-medio); font-size: 13px; font-variant-numeric: tabular-nums; }
+.sdr-grade { display: grid; gap: var(--e3); }
+.sdr-grade-7-5 { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+.sdr-grade-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sdr-grade-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.sdr-coluna { display: flex; flex-direction: column; gap: var(--e3); min-width: 0; }
+.sdr-bloco { background: var(--surface-card); border: 1px solid var(--borda); border-radius: var(--raio-md);
+  padding: var(--e4); display: flex; flex-direction: column; gap: var(--e3); min-width: 0; }
+.sdr-bloco-titulo { font-family: var(--fonte-ui); font-size: 14px; font-weight: 600; margin: 0; }
+.sdr-bloco-sub { margin: 0; font-size: 12px; color: var(--texto-medio); }
+.sdr-bloco-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--e3); }
+.sdr-linha { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center; }
+.sdr-nota { margin: var(--e2) 0 0; font-size: 12px; color: var(--texto-medio); }
+.sdr-fraco { color: var(--texto-medio); font-size: 12px; }
+.sdr-sem-dado { margin: 0; font-size: 13px; color: var(--texto-medio); font-style: italic; }
+
+.sdr-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--e3); }
+.sdr-kpi { gap: var(--e2); }
+.sdr-kpi-principal { background: var(--surface-ai-soft); border-color: var(--azul-neve); }
+.sdr-kpi-rotulo { font-size: 12px; font-weight: 500; color: var(--texto-medio); }
+.sdr-kpi-valor { font-family: var(--fonte-titulo); font-size: 30px; font-weight: 600; line-height: 1.1;
+  font-variant-numeric: tabular-nums; }
+.sdr-kpi-valor small { font-family: var(--fonte-ui); font-size: 14px; font-weight: 500; color: var(--texto-medio); margin-left: 4px; }
+.sdr-apoio { font-size: 12px; color: var(--texto-medio); font-variant-numeric: tabular-nums; }
+.sdr-variacao { font-size: 12px; color: var(--texto-medio); font-variant-numeric: tabular-nums; }
+.sdr-variacao b { color: var(--texto-forte); font-weight: 600; }
+
+.sdr-barras { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e2); }
+.sdr-barra, .sdr-funil-etapa { display: grid; grid-template-columns: minmax(120px, 38%) minmax(0, 1fr) 88px;
+  gap: var(--e3); align-items: center; }
+.sdr-barra-nome { font-size: 13px; line-height: 1.3; }
+.sdr-barra-trilho { height: 14px; position: relative; }
+.sdr-barra-fill, .sdr-funil-fill { position: absolute; left: 0; top: 0; bottom: 0; min-width: 2px;
+  background: var(--andamento); border-radius: 0 4px 4px 0; }
+.sdr-barra-fraca { background: var(--azul-neve); }
+.sdr-barra-valor { font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.sdr-barra-valor span { color: var(--texto-medio); font-size: 12px; }
+
+.sdr-funil { list-style: none; margin: 0; padding: 0; }
+.sdr-funil-etapa { padding: 3px 0; }
+.sdr-funil-trilho { height: 26px; position: relative; }
+.sdr-funil-perda { margin: 0; padding: 2px 0 4px; font-size: 12px; color: var(--texto-medio); font-variant-numeric: tabular-nums; }
+.sdr-funil-perda::before { content: "↓ "; color: var(--texto-fraco); }
+.sdr-funil-perda b { color: var(--texto-forte); font-weight: 600; }
+
+.sdr-dupla { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); }
+.sdr-mini { background: var(--surface-sunken); border-radius: var(--raio-sm); padding: var(--e3);
+  display: flex; flex-direction: column; gap: 2px; }
+.sdr-mini b { font-family: var(--fonte-titulo); font-size: 24px; font-weight: 600; line-height: 1.15; }
+.sdr-mini span { font-size: 12px; color: var(--texto-medio); font-variant-numeric: tabular-nums; }
+
+.sdr-nuvem { list-style: none; margin: 0; padding: var(--e3); display: flex; flex-wrap: wrap; gap: var(--e2) var(--e3);
+  align-items: baseline; background: var(--surface-ai-soft); border-radius: var(--raio-sm); }
+.sdr-nuvem li { color: var(--andamento); font-weight: 600; line-height: 1.2; }
+.sdr-nuvem sup { font-size: 11px; color: var(--texto-medio); margin-left: 2px; font-weight: 500; }
+
+.sdr-empilhada { display: flex; gap: 2px; height: 22px; }
+.sdr-empilhada > div:first-child { border-radius: 4px 0 0 4px; }
+.sdr-empilhada > div:last-child { border-radius: 0 4px 4px 0; }
+.sdr-tom-positivo { background: var(--andamento); }
+.sdr-tom-neutro { background: var(--borda-forte); }
+.sdr-tom-negativo { background: var(--perda); }
+.sdr-legenda { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e2) var(--e4); font-size: 13px; }
+.sdr-legenda li { display: flex; align-items: center; gap: 6px; }
+.sdr-legenda i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.sdr-legenda b { font-variant-numeric: tabular-nums; }
+
+.sdr-tabela td, .sdr-tabela th { font-size: 13px; }
+.sdr-tabela .tabela-numero { text-align: right; font-variant-numeric: tabular-nums; }
+.sdr-kpi .etiqueta { white-space: normal; }
+.sdr-bloco > .botao { align-self: flex-start; }
+.sdr-linha-total td { font-weight: 600; }
+.sdr-barrinha { width: 30%; min-width: 80px; }
+.sdr-barrinha div { height: 8px; background: var(--andamento); border-radius: 0 4px 4px 0; }
+
+.sdr-conta { margin: 0; font-size: 12px; color: var(--texto-medio); background: var(--surface-sunken);
+  border-radius: var(--raio-sm); padding: var(--e2) var(--e3); line-height: 1.7; font-variant-numeric: tabular-nums; }
+.sdr-conta b { color: var(--texto-forte); font-weight: 600; white-space: nowrap; }
+.sdr-pendente { background: var(--surface-sunken); border: 1px dashed var(--borda-forte); border-radius: var(--raio-sm);
+  padding: var(--e3); display: flex; flex-direction: column; gap: var(--e1); }
+.sdr-pendente-estado { margin: 0; font-weight: 600; color: var(--espera); font-size: 13px; }
+
+.sdr-metodo { font-size: 13px; color: var(--texto-medio); }
+.sdr-metodo summary { cursor: pointer; font-weight: 600; color: var(--texto-forte); }
+.sdr-metodo dl { display: grid; grid-template-columns: minmax(160px, 240px) 1fr; gap: var(--e2) var(--e4); margin: var(--e3) 0 0; }
+.sdr-metodo dt { color: var(--texto-forte); font-weight: 500; }
+.sdr-metodo dd { margin: 0; }
+
+.sdr-qualificacao { font-size: 12px; color: var(--texto-medio); }
+.sdr-conversas { display: flex; flex-direction: column; gap: var(--e2); border-top: 1px solid var(--borda); padding-top: var(--e4); }
+.sdr-conversa-topo { margin: 0; font-size: 12px; color: var(--texto-medio); }
+.sdr-mensagens { list-style: none; margin: var(--e2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--e2); }
+.sdr-mensagem { font-size: 13px; padding: var(--e2) var(--e3); border-radius: var(--raio-sm); max-width: 90%;
+  display: flex; flex-direction: column; gap: 2px; }
+.sdr-mensagem-lead { background: var(--surface-sunken); align-self: flex-start; }
+.sdr-mensagem-criterio { background: var(--surface-ai-soft); align-self: flex-end; }
+.sdr-mensagem-autor { font-size: 11px; color: var(--texto-medio); }
+.campo-marcar { font-size: 13px; color: var(--texto-medio); display: flex; gap: var(--e2); align-items: flex-start; }
+
+@media (max-width: 1280px) {
+  .sdr-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sdr-kpis > :first-child { grid-column: 1 / -1; }
+  .sdr-grade-3 { grid-template-columns: 1fr 1fr; }
+  .sdr-grade-3 > :last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 900px) {
+  .sdr-grade-7-5, .sdr-grade-3, .sdr-grade-2 { grid-template-columns: 1fr; }
+  .sdr-metodo dl { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .sdr-barra, .sdr-funil-etapa { grid-template-columns: 1fr 76px; }
+  .sdr-barra-nome { grid-column: 1 / -1; }
+}
+
+/* ------------------------------------------------------ catálogo de serviços */
+/* Amostra aprovada por Eduardo em 27/09/2026. Abre por cima do painel lateral
+   (z-index acima dos 40/41 da cortina e do painel). Modal é um dos três lugares
+   onde o PAD-002 permite sombra. */
+.escolha-servico { display: flex; align-items: center; justify-content: space-between; gap: var(--e2); width: 100%;
+  text-align: left; cursor: pointer; border: 1px solid var(--borda-forte); background: var(--surface-card);
+  border-radius: var(--raio-sm); padding: var(--e2) var(--e3); min-height: 40px; }
+.escolha-servico:hover { background: var(--surface-sunken); }
+.escolha-servico-vazia { color: var(--texto-fraco); }
+.escolha-servico-seta { color: var(--texto-medio); font-size: 12px; white-space: nowrap; }
+.catalogo-cortina { position: fixed; inset: 0; z-index: 60; background: rgba(11,14,23,.45);
+  display: flex; align-items: center; justify-content: center; padding: var(--e4); }
+.catalogo { background: var(--surface-card); border-radius: var(--raio-lg); box-shadow: var(--sombra-painel);
+  width: min(920px, 100%); max-height: calc(100vh - 32px);
+  display: flex; flex-direction: column; overflow: hidden; }
+.catalogo-cab { padding: var(--e5) var(--e5) var(--e3); display: flex; justify-content: space-between; gap: var(--e3);
+  border-bottom: 1px solid var(--borda); }
+.catalogo-cab h2 { font-size: 20px; }
+.catalogo-cab p { margin: var(--e1) 0 0; font-size: 13px; color: var(--texto-medio); }
+.catalogo-corpo { display: grid; grid-template-columns: minmax(240px, 300px) 1fr; min-height: 0; flex: 1; }
+.catalogo-lista { border-right: 1px solid var(--borda); overflow: auto; padding: var(--e3); display: flex;
+  flex-direction: column; gap: var(--e3); background: var(--surface-page); }
+.catalogo-grupo h3 { font-family: var(--fonte-ui); margin: 0 0 var(--e1); }
+.catalogo-grupo ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.catalogo-item { width: 100%; appearance: none; text-align: left; border: 1px solid transparent; background: transparent;
+  border-radius: var(--raio-sm); padding: var(--e2) var(--e3); cursor: pointer; font-weight: 500; font-size: 13px; }
+.catalogo-item:hover { background: var(--surface-card); border-color: var(--borda); }
+.catalogo-item[aria-selected="true"] { background: var(--surface-card); border-color: var(--andamento);
+  box-shadow: inset 3px 0 0 var(--andamento); }
+.catalogo-detalhe { overflow: auto; padding: var(--e5); display: flex; flex-direction: column; gap: var(--e4); }
+.catalogo-titulo-servico { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center; }
+.catalogo-titulo-servico h3 { font-size: 22px; width: 100%; }
+.catalogo-para-quem { margin: 0; max-width: 62ch; }
+.catalogo-rascunho { font-size: 11px; color: var(--espera); background: var(--espera-suave); border-radius: 4px;
+  padding: 1px 6px; margin-left: var(--e2); white-space: nowrap; }
+.catalogo-bloco { display: flex; flex-direction: column; gap: var(--e2); }
+.catalogo-bloco h4 { margin: 0; font-size: 13px; font-weight: 600; }
+.catalogo-bloco ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.catalogo-bloco p { margin: 0; font-size: 13px; }
+.catalogo-regua { font-size: 11px; color: var(--andamento); background: var(--andamento-suave); border-radius: 4px;
+  padding: 0 6px; margin-left: var(--e1); white-space: nowrap; }
+.catalogo-duas { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e4); }
+.catalogo-rodape { padding: var(--e4) var(--e5); border-top: 1px solid var(--borda); display: flex;
+  justify-content: space-between; align-items: center; gap: var(--e3); flex-wrap: wrap; }
+.catalogo-rodape p { margin: 0; font-size: 12px; color: var(--texto-medio); }
+.catalogo-rodape div { display: flex; gap: var(--e2); }
+@media (max-width: 760px) {
+  .catalogo-corpo { grid-template-columns: 1fr; }
+  .catalogo-lista { border-right: 0; border-bottom: 1px solid var(--borda); max-height: 240px; }
+  .catalogo-duas { grid-template-columns: 1fr; }
+}
+
 /* Movimento reduzido (26/09/2026). Fica no FIM do arquivo e vale para todo
    elemento, para cobrir também a transição e a animação que alguém criar
    depois — uma regra por componente já deixou a coluna do kanban de fora.

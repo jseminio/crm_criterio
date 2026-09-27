@@ -89,9 +89,9 @@ class TestTipoCanal:
     def test_converte_os_canais_de_2026(self, bruto, esperado):
         assert normalizar_tipo_canal(bruto).valor is esperado
 
-    def test_trafego_pago_e_afiliados_existem_mas_nao_operam(self):
+    def test_trafego_pago_afiliados_e_prospeccao_existem_mas_nao_operam(self):
         fora = {c for c in TipoCanal if not c.em_operacao}
-        assert fora == {TipoCanal.TRAFEGO_PAGO, TipoCanal.AFILIADOS}
+        assert fora == {TipoCanal.TRAFEGO_PAGO, TipoCanal.AFILIADOS, TipoCanal.PROSPECCAO_ATIVA}
 
     def test_os_canais_de_2026_estao_todos_em_operacao(self):
         for bruto in ("Socio", "Parceiros", "Advogados", "Carteira", "Interno"):
@@ -116,8 +116,8 @@ class TestLinhaServico:
         assert normalizar_linha_servico("C2 ").valor is LinhaServico.C2
 
     def test_a_descricao_diz_o_que_cada_linha_reune(self):
-        assert "contábil" in LinhaServico.C1.descricao
-        assert "Consultoria" in LinhaServico.C2.descricao
+        assert LinhaServico.C1.descricao == "Recorrente"
+        assert LinhaServico.C2.descricao == "Não recorrente"
 
 
 class TestMotivoRecusa:

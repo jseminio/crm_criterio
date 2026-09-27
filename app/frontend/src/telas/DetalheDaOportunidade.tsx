@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { Listas, MudancaDePreco, OportunidadeDetalhe } from "../api/tipos";
+import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { DIRECIONADORES_DE_PORTE } from "../componentes/direcionadoresDePorte";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { PainelLateral } from "../componentes/PainelLateral";
@@ -461,18 +462,12 @@ export function DetalheDaOportunidade({
             </div>
 
             <div className="formulario-duplo">
-              <div className="campo-bloco">
-                <label className="campo-rotulo" htmlFor="d-servico">
-                  Serviço
-                </label>
-                <input
-                  id="d-servico"
-                  className="entrada"
-                  value={rascunho.servico}
-                  onChange={(e) => mudar("servico", e.target.value)}
-                  placeholder="BPO Contábil"
-                />
-              </div>
+              <EscolhaDeServico
+                id="d-servico"
+                rotulo="Serviço"
+                valor={rascunho.servico}
+                aoEscolher={(nome) => mudar("servico", nome)}
+              />
               <div className="campo-bloco">
                 <label className="campo-rotulo" htmlFor="d-tipo-servico">
                   Tipo de serviço

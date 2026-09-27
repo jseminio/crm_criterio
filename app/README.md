@@ -11,17 +11,20 @@ risco técnico, o começo do E5 (*os números aparecem*): ciclo médio de
 vendas, cobertura do processo e dependência de canal — e o começo da
 **Etapa 2** (*fechar o ciclo*): a oportunidade aceita vira contrato. Desde
 26/09/2026, o **agente SDR** do go-to-market: pesquisa a conta, monta a ficha
-e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo.
+e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
+27/09/2026, o **SDR de IA** que qualifica leads de tráfego pago e leads frios:
+a etapa de lead voltou, as conversas são registradas e o painel mede o
+resultado (ver "SDR de IA", abaixo).
 
 ## Estado
 
 | | |
 |---|---|
-| O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil, agente SDR e nove telas |
-| Testes | **554** no backend, **215** nas telas (26/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
-| Banco | PostgreSQL 18.6 local, treze tabelas (`ficha_de_conta`, `abordagem` e `execucao_do_agente` desde 26/09/2026 — migração `8673eda1df27`, **ainda não aplicada nesta máquina**: rode `alembic upgrade head`). Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
+| O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil, agente SDR, SDR de IA (registro e painel) e dez telas |
+| Testes | **767** no backend, **293** nas telas (27/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Banco | PostgreSQL 18.6 local, 21 tabelas (as quatro do SDR de IA desde 27/09/2026 — migração `562856af0eb8`, ainda não aplicada; `ficha_de_conta`, `abordagem` e `execucao_do_agente` desde 26/09/2026 — migração `8673eda1df27`, **ainda não aplicada nesta máquina**: rode `alembic upgrade head`). Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
 | API | 45 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
-| Telas | Agenda de follow-up, contatos, funil em kanban (com arrasto entre colunas), oportunidades em lista, leads, grupos econômicos (com detalhe), contratos (23/09/2026), abordagens do agente SDR (26/09/2026) e conferência da carga. React com TypeScript, em `../frontend` |
+| Telas | Agenda de follow-up, contatos, funil em kanban (com arrasto entre colunas), oportunidades em lista, grupos econômicos (com detalhe), contratos (23/09/2026), abordagens do agente SDR (26/09/2026), SDR da IA com painel, leads e custos (27/09/2026) e conferência da carga. React com TypeScript, em `../frontend` |
 | Fora do ar | Nuvem, login, backup automático (E1); documento da proposta, ficha de volumetria completa (E4); ticket médio, MRR e os seis indicadores de cobertura que exigem implantação/entrevista/classificação (E5); Clicksign, evento de contrato, renovação, saldo de horas de conforto, Implantação (Etapa 2) |
 
 ## Como rodar
@@ -37,6 +40,139 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > repositório só com código e documentos: nada de binário, cache ou artefato de
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
+
+## Catálogo de serviços e C1/C2 pelo serviço (27/09/2026)
+
+Amostra do pop-up aprovada por Eduardo, com os textos em rascunho. Lista de serviços
+e linhas confirmadas por ele no mesmo dia. **Regra nova: C1 é recorrente, C2 não é
+recorrente**, e a linha sai do serviço, no passado e daqui para frente.
+
+| Serviço | Linha |
+|---|---|
+| BPO Contábil, Fiscal e Dep. Pessoal · BPO Contábil e Fiscal · Dep. Pessoal · BPO Financeiro · Endereço Fiscal · Representante Legal | C1 (recorrente) |
+| Consultoria · Legalização Empresarial · Auditoria · FSCP (Finance Statement Closing Procedure) | C2 (não recorrente) |
+
+- **Fonte única:** `crm/domain/servicos.py`. `GET /api/servicos` entrega o catálogo à tela e,
+  quando existir a integração, ao SDR de IA. **Sem preço**, de propósito.
+- **O pop-up** (`CatalogoDeServicos.tsx`) substitui o campo de texto "Serviço" na Nova
+  oportunidade, no detalhe da oportunidade, na conversão do lead e no "Serviço de interesse"
+  da qualificação. Mostra o roteiro: o que perguntar (as perguntas da régua de porte vêm
+  marcadas), quando fica fora do perfil e para quem a IA passa a conversa.
+- **Textos em rascunho:** "para quem é", "fora do perfil" e "passa para" foram escritos por
+  mim e aprovados para construir; faltam revisar com Eduardo. Representante Legal está quase
+  vazio porque ninguém descreveu o serviço ainda.
+- **A linha acompanha o serviço:** criar, editar e converter gravam a linha do catálogo.
+  Editar o serviço protege a linha da recarga (`campos_do_crm`). Serviço fora do catálogo
+  não mexe na linha que já estava.
+- **Carga:** vale o serviço, não a coluna "Responsável". Quando discordam, vira aviso
+  ("vale o serviço") no relatório de conferência, sem bloquear. Serviço fora do catálogo
+  mantém a coluna.
+- **Nomes antigos da planilha** também são reconhecidos: "BPO Contábil" (C1, sem dizer se
+  tinha folha), "Legalização" (agora C2), "Representação".
+- **O passado:** `scripts/reclassificar_linha_por_servico.py` mostra, sem gravar, quantas
+  oportunidades mudam de linha e de quê para quê; `--aplicar` grava com backup antes, na
+  pasta `~/Backups-CRM`. **Ainda não rodado na máquina de Eduardo.**
+
+## SDR de IA: qualificação de leads (27/09/2026)
+
+Decisão de Eduardo: a IA de atendimento é o **SDR que qualifica os leads de
+tráfego pago e os leads frios**. Amostra do painel aprovada em chat no mesmo
+dia, com as metas. Construído em três partes, nesta ordem.
+
+**1. A etapa de lead voltou, dentro da tela "SDR da IA".** A tela tem três abas:
+Painel, Leads e Custos e mídia. A aba Leads é a antiga tela de leads, com o
+que a qualificação pede:
+
+- **Só lead qualificado vira oportunidade** (422 nos outros). O funil e a
+  conversão continuam medindo proposta; o trabalho de antes fica no painel do
+  SDR. "Nova oportunidade" no Funil não muda: continua para quem chega pelos
+  sócios.
+- **Qualificar exige o porte estimado** (régua de porte, com o que o lead
+  informou). É sugestão: o porte da oportunidade continua confirmado por uma
+  pessoa, com autor e data.
+- **Descartar exige o motivo**, de uma lista controlada
+  (`MotivoDeDescarte`). "Pediu para não ser contatado" marca o lead como
+  **não contatar**.
+- Voltar para Novo ou Em contato apaga a qualificação e o descarte de antes.
+  O "não contatar" não se desfaz sozinho.
+- Origem nova **"Prospecção ativa"** para o lead frio (`TipoCanal`). O lead de
+  tráfego pago usa "Tráfego pago" com o canal escrito ("Meta Ads").
+- Campos novos do lead: CNPJ, porte estimado, motivo de descarte, reunião
+  marcada, não contatar, e as datas de qualificação e descarte, carimbadas
+  pelo servidor.
+
+**2. O registro das conversas** (`crm/api/sdr.py`). Quem chama é a integração
+do canal, a cada mensagem. **Decisão de Eduardo: o SDR de IA envia sozinho**,
+sem aprovação por mensagem. As travas ficam no servidor:
+
+- nada sai da IA ou da equipe para lead "não contatar" (409); o lead ainda
+  pode escrever;
+- **mensagem da IA não fala de preço** (422; a mesma regra da abordagem,
+  `fala_de_preco`). Depois do transbordo, a equipe pode;
+- a IA não fala em conversa encerrada (409); uma conversa aberta por lead;
+- o horário de cada mensagem é o do servidor.
+
+Encerrar a conversa exige o desfecho: **Qualificado** (com porte),
+**Fora do perfil** (com motivo), **Passou para a equipe** (com motivo e
+destino) ou **Parou no meio**. Os dois primeiros mudam a situação do lead.
+A primeira mensagem da equipe depois do transbordo marca o fim da espera.
+A nota (CSAT, 1 a 5) vem depois de encerrar, uma vez só.
+
+⚠️ **A integração que conversa com o lead ainda não existe.** O WhatsApp está
+em preparação (modelo aprovado pela Meta, base legal para lead frio). Estas
+rotas são a porta por onde ela vai gravar; até lá o painel mostra só os leads
+cadastrados. As abordagens de contas âncora (tela Abordagens) **continuam**
+exigindo a aprovação de Eduardo: a decisão de 27/09 vale para o SDR de IA.
+
+As rotas do SDR confirmam a transação **antes** de responder. O `commit` de
+`obter_sessao` roda depois que a resposta sai; com chamadas em sequência
+(encerrar e logo dar nota), a segunda chegava antes da primeira estar gravada.
+O resto da API tem o mesmo comportamento e fica para outra demanda.
+
+**3. O painel** (`GET /api/sdr/painel?mes=AAAA-MM&origem=`), calculado em
+`crm/domain/sdr.py`, sem banco:
+
+- **Coorte do mês**: os leads que *chegaram* no mês (horário de Brasília) e
+  tudo o que aconteceu com eles. Por isso o funil fecha: cada lead está em uma
+  etapa, e o que sai de uma etapa é a soma dos motivos listados.
+- O desfecho do lead é o da conversa mais recente.
+- **Nada vira zero por falta de dado**: taxa sem denominador, CSAT sem nota e
+  custo sem parâmetro saem nulos, e a tela diz o que falta.
+- Falhas de compreensão por conversa contam só as conversas em que o lead
+  respondeu.
+- Filtros: mês e origem (tráfego pago ou leads frios). Os filtros de canal e
+  de serviço da amostra **não foram feitos**.
+
+**Metas aprovadas** (ponto de partida, rever depois de 60 dias ou 300 leads),
+em `crm.domain.sdr.METAS`:
+
+| Indicador | Meta | Alerta |
+|---|---|---|
+| 1ª resposta ao lead pago (mediana) | até 60 s | acima de 5 min |
+| Qualificação concluída pela IA | 70% ou mais | abaixo de 55% |
+| Transbordo | até 20% | acima de 30% |
+| Taxa de resposta | pago 60% · frio 8% | pago abaixo de 40% · frio abaixo de 3% |
+| Qualificados sobre leads | pago 20% · frio 3% | pago abaixo de 10% · frio abaixo de 1% |
+| Reunião marcada sobre qualificados | 60% ou mais | abaixo de 40% |
+| CSAT | 4,0 ou mais | abaixo de 3,5 |
+| Falhas de compreensão (conversas) | até 10% | acima de 15% |
+| Espera no transbordo | até 15 min | acima de 60 min |
+| Custo de mídia por qualificado | até R$ 300 | acima de R$ 450 |
+
+O tempo de qualificação não tem meta. O NPS ficou de fora: o lead ainda não é
+cliente.
+
+**Custos e mídia.** O custo poupado precisa de três valores, lançados na aba
+Custos e mídia (`/api/sdr/parametros`): custo da hora de SDR, minutos que um
+SDR levaria por conversa e cotação do dólar (o custo da IA é gravado em dólar
+por mensagem). O investimento em mídia é lançado à mão, por mês e canal
+(`/api/sdr/midia`), até existir integração com Meta Ads e Google Ads. O canal
+precisa ser escrito igual ao do lead.
+
+**Banco.** Migração `562856af0eb8`, só aditiva: colunas novas em `lead` e as
+tabelas `conversa_do_sdr`, `mensagem_do_sdr`, `parametros_do_sdr` e
+`investimento_em_midia`. Testada ida e volta num PostgreSQL 16 de rascunho;
+**ainda não aplicada nesta máquina**: rode `alembic upgrade head`.
 
 ## Carteira: revisão mensal do ISC e evolução (27/09/2026)
 
@@ -1251,6 +1387,9 @@ outra não busca nada. `Lista.tsx` foi removido (a lógica virou parte de `Funil
 Agenda que abria a lista agora abre o Funil.
 
 ## Menu: Leads saiu do menu (27/09/2026)
+
+> **Atualização do mesmo dia:** a fila de leads voltou como aba da tela "SDR da
+> IA", onde o lead é qualificado antes de virar oportunidade. Ver "SDR de IA".
 
 Decisão de Eduardo: "Nova oportunidade" (dentro de Oportunidades/Funil) já captura o mesmo que a tela
 Leads — nome, canal, captador, temperatura — e nasce direto como proposta, sem passar por um estágio

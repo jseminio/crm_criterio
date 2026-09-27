@@ -391,6 +391,15 @@ class TestVolumetriaEPorte:
         assert oportunidade.porte_definido_em is None
 
 
+def _qualificado(cliente: TestClient, carteira) -> TestClient:
+    """Só lead qualificado vira oportunidade (27/09/2026)."""
+    resposta = cliente.patch(
+        f"/api/leads/{carteira['lead']}", json={"situacao": "Qualificado", "porte_estimado": "Médio"}
+    )
+    assert resposta.status_code == 200, resposta.text
+    return cliente
+
+
 class TestLeads:
     def test_cadastra_com_o_minimo(self, cliente: TestClient):
         """Exigir mais faria a pessoa inventar dado para conseguir salvar."""
@@ -411,7 +420,10 @@ class TestLeads:
         assert (resposta["tipo_canal"], resposta["canal"]) == ("Parceiros", "Renê Dutra")
 
     def test_filtra_os_abertos(self, cliente: TestClient, carteira):
-        cliente.patch(f"/api/leads/{carteira['lead']}", json={"situacao": "Descartado"})
+        cliente.patch(
+            f"/api/leads/{carteira['lead']}",
+            json={"situacao": "Descartado", "motivo_descarte": "Porte abaixo do mínimo"},
+        )
 
         assert cliente.get("/api/leads", params={"apenas_abertos": True}).json()["total"] == 0
 
@@ -435,7 +447,7 @@ class TestEdicaoDeLead:
         assert "conversão" in resposta.json()["detail"]
 
     def test_lead_convertido_nao_muda_de_situacao(self, cliente: TestClient, carteira):
-        cliente.post(f"/api/leads/{carteira['lead']}/converter", json={})
+        _qualificado(cliente, carteira).post(f"/api/leads/{carteira['lead']}/converter", json={})
 
         resposta = cliente.patch(
             f"/api/leads/{carteira['lead']}", json={"situacao": "Descartado"}
@@ -447,7 +459,7 @@ class TestEdicaoDeLead:
         self, cliente: TestClient, carteira
     ):
         """A trava é sobre a situação, não sobre o lead inteiro."""
-        cliente.post(f"/api/leads/{carteira['lead']}/converter", json={})
+        _qualificado(cliente, carteira).post(f"/api/leads/{carteira['lead']}/converter", json={})
 
         resposta = cliente.patch(
             f"/api/leads/{carteira['lead']}", json={"observacao": "Fechou por indicação"}
@@ -458,7 +470,7 @@ class TestEdicaoDeLead:
 
 class TestConversao:
     def test_vira_oportunidade_num_grupo_existente(self, cliente: TestClient, carteira):
-        resposta = cliente.post(
+        resposta = _qualificado(cliente, carteira).post(
             f"/api/leads/{carteira['lead']}/converter",
             json={"grupo_id": carteira["alfa"], "servico": "BPO Financeiro"},
         )
@@ -468,27 +480,27 @@ class TestConversao:
         assert resposta.json()["situacao"] == "Enviar proposta"
 
     def test_cria_o_grupo_quando_nao_existe(self, cliente: TestClient, carteira):
-        resposta = cliente.post(f"/api/leads/{carteira['lead']}/converter", json={}).json()
+        resposta = _qualificado(cliente, carteira).post(f"/api/leads/{carteira['lead']}/converter", json={}).json()
 
         assert resposta["grupo_nome"] == "Gama Ltda"
 
     def test_a_origem_viaja_com_o_lead(self, cliente: TestClient, carteira):
         """Sem isso o indicador de canal mede só a entrada, não o que fecha."""
-        resposta = cliente.post(f"/api/leads/{carteira['lead']}/converter", json={}).json()
+        resposta = _qualificado(cliente, carteira).post(f"/api/leads/{carteira['lead']}/converter", json={}).json()
 
         assert resposta["tipo_canal"] == "Sócios"
         assert resposta["canal"] == "Indicação"
         assert resposta["captador"] == "TC"
 
     def test_o_lead_fica_marcado_como_convertido(self, cliente: TestClient, carteira):
-        cliente.post(f"/api/leads/{carteira['lead']}/converter", json={})
+        _qualificado(cliente, carteira).post(f"/api/leads/{carteira['lead']}/converter", json={})
 
         leads = cliente.get("/api/leads").json()["itens"]
         assert leads[0]["situacao"] == "Convertido"
         assert leads[0]["convertido_em_id"] is not None
 
     def test_nao_converte_duas_vezes(self, cliente: TestClient, carteira):
-        cliente.post(f"/api/leads/{carteira['lead']}/converter", json={})
+        _qualificado(cliente, carteira).post(f"/api/leads/{carteira['lead']}/converter", json={})
 
         segunda = cliente.post(f"/api/leads/{carteira['lead']}/converter", json={})
 

@@ -27,8 +27,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from crm.db.base import Base, CarimboMixin, agora, coluna_lista
 from crm.domain.listas import (
+    AutorDaMensagem,
     CanalDeAbordagem,
+    DesfechoDaConversa,
+    DestinoDoTransbordo,
     LinhaServico,
+    MotivoDeDescarte,
+    MotivoDeTransbordo,
+    Tom,
     MotivoRecusa,
     Origem,
     PapelContato,
@@ -64,6 +70,10 @@ __all__ = [
     "OcorrenciaDeCarga",
     "AnaliseDaCarteira",
     "RevisaoDaCarteira",
+    "ConversaDoSdr",
+    "MensagemDoSdr",
+    "ParametrosDoSdr",
+    "InvestimentoEmMidia",
 ]
 
 #: Dinheiro é guardado em centavos exatos.
@@ -285,6 +295,29 @@ class Lead(CarimboMixin, Base):
         sa.ForeignKey("oportunidade.id"), index=True
     )
     convertido_em: Mapped["Oportunidade | None"] = relationship(back_populates="lead")
+
+    # --- Qualificação (SDR de IA, 27/09/2026) -------------------------------
+    cnpj: Mapped[str | None] = mapped_column(sa.String(18))
+    porte_estimado: Mapped[str | None] = mapped_column(sa.String(20))
+    """Sugestão da régua de porte com o que o lead informou. **Não é o porte da
+    oportunidade**: esse continua sendo confirmado por uma pessoa, com autor e
+    data (`Oportunidade.porte_definido_por`)."""
+    qualificado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    descartado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    motivo_descarte: Mapped[MotivoDeDescarte | None] = mapped_column(
+        coluna_lista(MotivoDeDescarte, 60)
+    )
+    reuniao_marcada_para: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    nao_contatar: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default=sa.false()
+    )
+    """Pedido de não ser contatado. Nenhuma mensagem da IA ou da equipe é
+    registrada para este lead depois disso — a rota recusa."""
+    nao_contatar_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+    conversas: Mapped[list["ConversaDoSdr"]] = relationship(
+        back_populates="lead", order_by="ConversaDoSdr.id"
+    )
 
     def __repr__(self) -> str:
         return f"<Lead {self.id} {self.nome!r} {self.situacao.value}>"
@@ -911,3 +944,128 @@ class RevisaoDaCarteira(Base):
 
     baseado_em_referencia: Mapped[date] = mapped_column(sa.Date, nullable=False)
     """A referência mais recente das classificações usadas para montar este retrato."""
+
+
+class ConversaDoSdr(CarimboMixin, Base):
+    """Uma conversa do SDR de IA com um lead — é o que alimenta o painel.
+
+    Registrada pela integração do canal (WhatsApp ou e-mail) a cada mensagem.
+    Decisão de Eduardo em 27/09/2026: o SDR de IA **envia sozinho**, sem
+    aprovação por mensagem. As travas continuam no servidor: sem preço, nada
+    para quem pediu para não ser contatado.
+    """
+
+    __tablename__ = "conversa_do_sdr"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lead_id: Mapped[int] = mapped_column(sa.ForeignKey("lead.id"), nullable=False, index=True)
+    canal: Mapped[CanalDeAbordagem] = mapped_column(coluna_lista(CanalDeAbordagem), nullable=False)
+    iniciada_em: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, default=agora, index=True
+    )
+    encerrada_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    desfecho: Mapped[DesfechoDaConversa | None] = mapped_column(coluna_lista(DesfechoDaConversa))
+    """Nulo enquanto a conversa está em andamento."""
+
+    motivo_transbordo: Mapped[MotivoDeTransbordo | None] = mapped_column(
+        coluna_lista(MotivoDeTransbordo, 60)
+    )
+    destino_transbordo: Mapped[DestinoDoTransbordo | None] = mapped_column(
+        coluna_lista(DestinoDoTransbordo, 60)
+    )
+    atendida_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    """Primeira mensagem da equipe depois do transbordo. Carimbada pelo servidor
+    ao registrar essa mensagem — é o fim da espera do lead."""
+
+    nota: Mapped[int | None] = mapped_column(sa.SmallInteger)
+    """CSAT de 1 a 5, dado pelo lead ao fim da conversa."""
+
+    lead: Mapped[Lead] = relationship(back_populates="conversas")
+    mensagens: Mapped[list["MensagemDoSdr"]] = relationship(
+        back_populates="conversa", order_by="MensagemDoSdr.id"
+    )
+
+    __table_args__ = (
+        sa.CheckConstraint("nota IS NULL OR nota BETWEEN 1 AND 5", name="nota_de_1_a_5"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ConversaDoSdr {self.id} lead={self.lead_id}>"
+
+
+class MensagemDoSdr(Base):
+    """Uma mensagem da conversa. Imutável: o registro do que foi dito."""
+
+    __tablename__ = "mensagem_do_sdr"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversa_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("conversa_do_sdr.id"), nullable=False, index=True
+    )
+    autor: Mapped[AutorDaMensagem] = mapped_column(coluna_lista(AutorDaMensagem), nullable=False)
+    enviada_em: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, default=agora
+    )
+    texto: Mapped[str] = mapped_column(sa.Text, nullable=False)
+
+    # Só nas mensagens da IA.
+    intencao: Mapped[str | None] = mapped_column(sa.String(120))
+    """O assunto que a IA reconheceu na mensagem do lead que ela respondeu."""
+    confianca: Mapped[Decimal | None] = mapped_column(sa.Numeric(3, 2))
+    """Certeza do modelo na intenção, de 0 a 1."""
+    fallback: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default=sa.false()
+    )
+    """A IA respondeu "não entendi" ou caiu na intenção padrão de erro."""
+    termo_nao_reconhecido: Mapped[str | None] = mapped_column(sa.String(120))
+    custo_usd: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 4))
+
+    # Só nas mensagens do lead.
+    tom: Mapped[Tom | None] = mapped_column(coluna_lista(Tom))
+
+    conversa: Mapped[ConversaDoSdr] = relationship(back_populates="mensagens")
+
+    __table_args__ = (
+        sa.CheckConstraint(
+            "confianca IS NULL OR confianca BETWEEN 0 AND 1", name="confianca_de_0_a_1"
+        ),
+    )
+
+
+class ParametrosDoSdr(CarimboMixin, Base):
+    """Os valores do cálculo de custo poupado. Uma linha só.
+
+    Sem eles o painel não inventa: mostra o custo poupado como "falta definir".
+    """
+
+    __tablename__ = "parametros_do_sdr"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    custo_hora_sdr: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    """Quanto custa uma hora de um SDR humano: salário × encargos ÷ horas."""
+    minutos_por_conversa: Mapped[int | None] = mapped_column(sa.SmallInteger)
+    """Quanto um SDR humano levaria para fazer a mesma qualificação."""
+    cotacao_dolar: Mapped[Decimal | None] = mapped_column(sa.Numeric(8, 4))
+    """Converte o custo da IA, medido em dólar, para reais."""
+    atualizado_por: Mapped[str | None] = mapped_column(sa.String(10))
+
+
+class InvestimentoEmMidia(CarimboMixin, Base):
+    """Quanto se investiu em mídia num mês, por canal de tráfego pago.
+
+    Digitado à mão até existir integração com Meta Ads e Google Ads.
+    """
+
+    __tablename__ = "investimento_em_midia"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mes: Mapped[str] = mapped_column(sa.String(7), nullable=False, index=True)
+    """`AAAA-MM`."""
+    canal: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    """O mesmo texto de `Lead.canal` nos leads de tráfego pago ("Meta Ads")."""
+    valor: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+
+    __table_args__ = (
+        sa.UniqueConstraint("mes", "canal", name="uq_investimento_mes_canal"),
+        sa.CheckConstraint("valor >= 0", name="valor_nao_negativo"),
+    )

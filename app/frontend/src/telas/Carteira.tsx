@@ -4,7 +4,7 @@
  * carteira e são recalculados no CRM. Estado nunca só por cor: classe, alerta e cobrança têm texto.
  */
 
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { AnaliseDaCarteira, ClassificacaoDaCarteira } from "../api/tipos";
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
@@ -162,11 +162,17 @@ export function Carteira() {
       return novo;
     });
 
+  const listaRef = useRef<HTMLDivElement>(null);
+  // Entre o chip e a lista tem ISC, análise da IA e revisão mensal — sem isto o filtro aplica,
+  // mas o resultado fica fora da tela e parece que o clique não fez nada.
+  const irParaALista = () => listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
   const filtrarInadimplentes = () => {
     definirEixo(EIXO_COBRANCA);
     // Mostra de cara as empresas dos grupos inadimplentes — é a lista concreta que se quer ver,
     // não só o grupo consolidado.
     definirAbertos(new Set(dados?.itens.filter((i) => i.em_cobranca).map((i) => i.grupo_id) ?? []));
+    irParaALista();
   };
 
   if (carregando && !dados) return <Carregando rotulo="Carregando a classificação" />;
@@ -186,7 +192,10 @@ export function Carteira() {
     .sort((a, b) => rank(a.eixo_de_acao) - rank(b.eixo_de_acao) || Number(b.receita_mensal) - Number(a.receita_mensal));
   const porSemaforo = { 1: 0, 2: 0, 3: 0 } as Record<number, number>;
   for (const i of dados.itens) porSemaforo[i.semaforo] = (porSemaforo[i.semaforo] ?? 0) + 1;
-  const alternarSemaforo = (s: number) => definirSemaforoFiltro((atual) => (atual === s ? null : s));
+  const alternarSemaforo = (s: number) => {
+    definirSemaforoFiltro((atual) => (atual === s ? null : s));
+    irParaALista();
+  };
   const itens = ordenar(itensDoEixo, ordenacao, {
     grupo: (i) => i.grupo_nome,
     receita: (i) => Number(i.receita_mensal),
@@ -263,7 +272,7 @@ export function Carteira() {
         </>
       )}
 
-      <div className="carteira-filtro">
+      <div className="carteira-filtro" ref={listaRef}>
         <label className="campo">
           <span className="campo-rotulo">Eixo de ação</span>
           <select className="selecao" value={eixo} onChange={(e) => definirEixo(e.target.value)}>

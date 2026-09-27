@@ -70,9 +70,12 @@ describe("Carteira", () => {
     expect(screen.getByText("unidades (grupos + individuais)").previousElementSibling).toHaveTextContent("2");
     const chipTravado = screen.getByRole("button", { name: /grupos inadimplentes, 16,7% da receita travada/ });
     expect(chipTravado).toHaveTextContent("1"); // grupos_travados
+    const rolou = vi.spyOn(Element.prototype, "scrollIntoView");
     await userEvent.click(chipTravado);
     expect(screen.getByLabelText("Eixo de ação")).toHaveValue("Cobrança — sem tratamento preferencial");
     expect(screen.queryByText(/▸ Beta/)).toBeNull();
+    // Sem isto o filtro aplica fora da tela: a pessoa clica e parece que nada aconteceu.
+    expect(rolou).toHaveBeenCalled();
   });
 
   it("mostra os três semáforos com a contagem, e filtra a lista ao clicar", async () => {
@@ -85,10 +88,13 @@ describe("Carteira", () => {
     expect(botao3).toHaveTextContent("2"); // Alfa e Beta são semáforo 3
     expect(screen.getByRole("button", { name: /^Semáforo 1/ })).toHaveTextContent("0");
 
+    const rolou = vi.spyOn(Element.prototype, "scrollIntoView");
     await userEvent.click(botao3);
     expect(botao3).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText(/▸ Alfa/)).toBeInTheDocument();
     expect(screen.getByText(/▸ Beta/)).toBeInTheDocument();
+    // Mesma correção do chip de inadimplentes: leva até a lista, não só filtra.
+    expect(rolou).toHaveBeenCalled();
 
     // clicar de novo no mesmo semáforo desliga o filtro
     await userEvent.click(botao3);

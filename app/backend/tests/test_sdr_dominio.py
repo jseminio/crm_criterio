@@ -199,11 +199,13 @@ class TestCompreensao:
 
     def test_falhas_por_resposta_e_por_conversa(self):
         leads = [
-            lead(conversa(msg(A.IA, fallback=True), msg(A.IA), msg(A.IA))),
-            lead(conversa(msg(A.IA), msg(A.IA), msg(A.IA))),
+            lead(conversa(msg(A.LEAD), msg(A.IA, fallback=True), msg(A.IA), msg(A.IA))),
+            lead(conversa(msg(A.LEAD), msg(A.IA), msg(A.IA), msg(A.IA))),
+            lead(conversa(msg(A.IA))),  # nunca respondeu: fora da conta por conversa
         ]
         resultado = painel(leads)
-        assert (resultado.falhas_por_resposta.numerador, resultado.falhas_por_resposta.denominador) == (1, 6)
+        assert (resultado.falhas_por_resposta.numerador, resultado.falhas_por_resposta.denominador) == (1, 7)
+        assert (resultado.falhas_por_conversa.numerador, resultado.falhas_por_conversa.denominador) == (1, 2)
         assert resultado.falhas_por_conversa.valor == 50.0
         assert resultado.indicador_falhas.avaliacao == "Em alerta"
 

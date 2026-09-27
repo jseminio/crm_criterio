@@ -41,6 +41,18 @@ __all__ = ["roteador"]
 _SO_DA_IA = ("intencao", "confianca", "termo_nao_reconhecido", "custo_usd")
 
 
+def _confirmar(sessao: Session) -> None:
+    """Confirma antes de responder.
+
+    O `commit` de `obter_sessao` roda depois que a resposta sai (é assim que o
+    FastAPI trata dependência com `yield`). A integração do canal dispara uma
+    chamada logo depois da outra — encerrar e, em seguida, dar nota — e a
+    segunda chegava antes da primeira estar gravada (409 "a conversa não
+    terminou"). Achado em 27/09/2026 ao alimentar o painel pelo próprio fluxo.
+    """
+    sessao.commit()
+
+
 def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
     r = APIRouter(prefix="/api/sdr", tags=["sdr"])
 
@@ -70,6 +82,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         conversa = ConversaDoSdr(lead_id=lead.id, canal=corpo.canal, iniciada_em=agora())
         sessao.add(conversa)
         sessao.flush()
+        _confirmar(sessao)
         return e.ConversaResposta.model_validate(conversa)
 
     @r.get("/leads/{lead_id}/conversas", response_model=list[e.ConversaResposta])
@@ -126,6 +139,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         ):
             conversa.atendida_em = momento
         sessao.flush()
+        _confirmar(sessao)
         return e.MensagemResposta.model_validate(mensagem)
 
     @r.post("/conversas/{conversa_id}/encerrar", response_model=e.ConversaResposta)
@@ -166,6 +180,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         conversa.motivo_transbordo = corpo.motivo_transbordo
         conversa.destino_transbordo = corpo.destino_transbordo
         sessao.flush()
+        _confirmar(sessao)
         return e.ConversaResposta.model_validate(conversa)
 
     @r.post("/conversas/{conversa_id}/nota", response_model=e.ConversaResposta)
@@ -177,6 +192,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
             raise HTTPException(409, "esta conversa já tem nota")
         conversa.nota = corpo.nota
         sessao.flush()
+        _confirmar(sessao)
         return e.ConversaResposta.model_validate(conversa)
 
     # ----------------------------------------------------- custos e mídia
@@ -197,6 +213,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         for campo, valor in corpo.model_dump().items():
             setattr(atual, campo, valor)
         sessao.flush()
+        _confirmar(sessao)
         return e.ParametrosDoSdrResposta.model_validate(atual)
 
     @r.get("/midia", response_model=list[e.InvestimentoResposta])
@@ -224,6 +241,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         else:
             atual.valor = corpo.valor
         sessao.flush()
+        _confirmar(sessao)
         return e.InvestimentoResposta.model_validate(atual)
 
     # ------------------------------------------------------------- painel

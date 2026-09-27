@@ -84,7 +84,7 @@ METAS: dict[str, Meta] = {
     "resposta_frio": Meta(8, 3, True, "meta de 8%"),
     "qualificados_pago": Meta(20, 10, True, "meta de 20%"),
     "qualificados_frio": Meta(3, 1, True, "meta de 3%"),
-    "reuniao": Meta(60, 40, True, "meta de 60%"),
+    "reuniao": Meta(60, 40, True, "meta de 60% com reunião"),
     "csat": Meta(4.0, 3.5, True, "alvo de 4,0"),
     "falhas": Meta(10, 15, False, "limite de 10%"),
     "espera": Meta(15, 60, False, "alvo de 15 min"),
@@ -612,10 +612,13 @@ def calcular_painel(
     notas = [c.nota for c in conversas if c.nota is not None]
     csat = sum(notas) / len(notas) if notas else None
 
-    conversas_com_mensagem = [c for c in conversas if c.mensagens]
+    # Só conversa em que o lead respondeu: sem resposta não há o que entender.
+    conversas_com_resposta = [
+        c for c in conversas if any(m.autor is AutorDaMensagem.LEAD for m in c.mensagens)
+    ]
     falhas_por_conversa = Taxa.de(
-        sum(1 for c in conversas_com_mensagem if any(m.fallback for m in c.mensagens)),
-        len(conversas_com_mensagem),
+        sum(1 for c in conversas_com_resposta if any(m.fallback for m in c.mensagens)),
+        len(conversas_com_resposta),
     )
 
     taxa_concluida = Taxa.de(veredito, len(com_desfecho))

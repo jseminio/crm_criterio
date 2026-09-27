@@ -62,6 +62,7 @@ __all__ = [
     "HistoricoDePreco",
     "ExecucaoDeCarga",
     "OcorrenciaDeCarga",
+    "AnaliseDaCarteira",
 ]
 
 #: Dinheiro é guardado em centavos exatos.
@@ -824,3 +825,24 @@ class OcorrenciaDeCarga(Base):
     texto: Mapped[str] = mapped_column(sa.Text, nullable=False)
 
     execucao: Mapped[ExecucaoDeCarga] = relationship(back_populates="ocorrencias")
+
+
+class AnaliseDaCarteira(Base):
+    """Um parágrafo escrito pela IA descrevendo a carteira — Etapa 3 (27/09/2026).
+
+    Só descreve os números já calculados (ISC, componentes, retrato, travados); nunca decide nada e
+    nunca aparece sozinha sem alguém pedir ("Gerar análise"). Imutável: uma nova geração cria uma
+    linha nova, a anterior fica no histórico."""
+
+    __tablename__ = "analise_da_carteira"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    gerada_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False, index=True)
+    gerada_por: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    texto: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    modelo: Mapped[str] = mapped_column(sa.String(60), nullable=False)
+    tokens_entrada: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    tokens_saida: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    custo_usd: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 4))
+    """Estimado pela tabela de preços do código. Nulo para modelo sem preço conhecido."""
+

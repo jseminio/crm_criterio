@@ -7,7 +7,14 @@ import { Carteira } from "./Carteira";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { classificacaoDaCarteira: vi.fn() } };
+  return {
+    ...real,
+    api: {
+      classificacaoDaCarteira: vi.fn(),
+      analiseDaCarteira: vi.fn().mockResolvedValue(null),
+      gerarAnaliseDaCarteira: vi.fn(),
+    },
+  };
 });
 
 const item = (o: Partial<ItemDaCarteira> = {}): ItemDaCarteira => ({
@@ -22,6 +29,7 @@ const item = (o: Partial<ItemDaCarteira> = {}): ItemDaCarteira => ({
 const resposta = (o: Partial<ClassificacaoDaCarteira> = {}): ClassificacaoDaCarteira => ({
   referencia: "2026-07-31", versao_dos_parametros: "v1",
   isc: { valor: "53.65", zona: "atenção", componente_classe: "59.45", componente_semaforo: "42.33", componente_churn: "59.01", receita_total: "2000.00", grupos: 2, fora_do_isc: 0 },
+  retrato: { unidades: 2, receita_total: "6000.00", grupos_travados: 1, receita_travada: "1000.00", percentual_travado: "16.7" },
   por_classe: { B: 1, C: 1 },
   itens: [
     item(),
@@ -50,6 +58,18 @@ describe("Carteira", () => {
     expect(screen.getByText("⚠ Risco de churn")).toBeInTheDocument();
     const linhas = screen.getAllByRole("row");
     expect(linhas[1]).toHaveTextContent("Alfa");
+  });
+
+  it("mostra o retrato da carteira e filtra ao clicar nos chips travados", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira />);
+    await screen.findByText(/▸ Alfa/);
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("16,7%")).toBeInTheDocument();
+    expect(screen.getByText("1", { selector: "b" })).toBeInTheDocument();
+    await userEvent.click(screen.getByText("16,7%").closest("button")!);
+    expect(screen.getByLabelText("Eixo de ação")).toHaveValue("Cobrança — sem tratamento preferencial");
+    expect(screen.queryByText(/▸ Beta/)).toBeNull();
   });
 
   it("filtra por eixo e oferece limpar quando nada passa", async () => {

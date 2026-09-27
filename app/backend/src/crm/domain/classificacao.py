@@ -24,6 +24,7 @@ from typing import Iterable
 __all__ = [
     "Parametros", "PARAMETROS", "Notas", "Isc", "Unidade",
     "score", "classe", "classe_efetiva", "cobranca", "alerta_de_churn", "eixo_de_acao", "isc",
+    "GrupoDoRetrato", "Retrato", "retrato",
 ]
 
 D = Decimal
@@ -195,3 +196,39 @@ def isc(unidades: Iterable[Unidade], p: Parametros = PARAMETROS) -> Isc | None:
     valor = c_classe * p.peso_isc_classe + c_sem * p.peso_isc_semaforo + c_churn * p.peso_isc_churn
     zona = "crítica" if valor < p.zona_critica_ate else ("atenção" if valor < p.meta_do_isc else "saudável")
     return Isc(valor, c_classe, c_sem, c_churn, total, len(completas), len(todas) - len(completas), zona)
+
+
+@dataclass(frozen=True)
+class GrupoDoRetrato:
+    """O que o retrato da carteira precisa de cada grupo: nome, receita e se está travado."""
+
+    nome: str
+    receita: Decimal
+    em_cobranca: bool
+
+
+@dataclass(frozen=True)
+class Retrato:
+    """O quadro geral da carteira: unidades, receita e quanto está travado por inadimplência."""
+
+    unidades: int
+    receita_total: Decimal
+    grupos_travados: int
+    receita_travada: Decimal
+    percentual_travado: Decimal
+    """0 a 100, com duas casas."""
+
+
+def retrato(grupos: Iterable[GrupoDoRetrato]) -> Retrato | None:
+    """`None` sem nenhum grupo — nada a retratar."""
+    lista = list(grupos)
+    if not lista:
+        return None
+    receita_total = sum((g.receita for g in lista), D(0))
+    travados = [g for g in lista if g.em_cobranca]
+    receita_travada = sum((g.receita for g in travados), D(0))
+    percentual = (receita_travada / receita_total * 100).quantize(D("0.01")) if receita_total else D("0.00")
+    return Retrato(
+        unidades=len(lista), receita_total=receita_total, grupos_travados=len(travados),
+        receita_travada=receita_travada, percentual_travado=percentual,
+    )

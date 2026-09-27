@@ -169,3 +169,22 @@ def test_grupo_fundido_ou_sem_classificacao_e_recusado(cliente, sessao: Session)
     assert cliente.post(f"/api/carteira/grupos/{a.id}/notas", json={**AUTOR, "churn": 2}).status_code == 409
     assert cliente.post(f"/api/carteira/grupos/{f.id}/notas", json={**AUTOR, "churn": 2}).status_code == 409
     assert cliente.post("/api/carteira/grupos/99999/notas", json={**AUTOR, "churn": 2}).status_code == 404
+
+
+def test_retrato_traz_o_quadro_geral_com_travados(cliente, sessao: Session):
+    bom = regra.Notas(receita=5, rentabilidade=5, complexidade=1, disciplina=5, risco=1, cross_sell=5, adimplencia=5, semaforo=1, churn=1)
+    ruim = regra.Notas(receita=1, rentabilidade=1, complexidade=5, disciplina=1, risco=5, cross_sell=1, adimplencia=1, semaforo=3, churn=5)
+    a = GrupoEconomico(nome="Alfa", situacao=SituacaoGrupo.CLIENTE)
+    b = GrupoEconomico(nome="Beta", situacao=SituacaoGrupo.CLIENTE)
+    sessao.add_all([a, b]); sessao.flush()
+    _snap(sessao, a, date(2026, 7, 31), "3000", bom)
+    _snap(sessao, b, date(2026, 7, 31), "1000", ruim)
+    sessao.commit()
+    r = cliente.get("/api/carteira/classificacao").json()["retrato"]
+    assert r["unidades"] == 2 and Decimal(r["receita_total"]) == Decimal("4000")
+    assert r["grupos_travados"] == 1 and Decimal(r["receita_travada"]) == Decimal("1000")
+    assert Decimal(r["percentual_travado"]) == Decimal("25.00")
+
+
+def test_retrato_e_none_sem_classificacao(cliente):
+    assert cliente.get("/api/carteira/classificacao").json()["retrato"] is None

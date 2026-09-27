@@ -5,8 +5,8 @@
  */
 
 import { Fragment, useState } from "react";
-import { api } from "../api/cliente";
-import type { ClassificacaoDaCarteira } from "../api/tipos";
+import { api, ErroDaApi } from "../api/cliente";
+import type { AnaliseDaCarteira, ClassificacaoDaCarteira } from "../api/tipos";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
@@ -17,6 +17,7 @@ const um = (v: string) => decimais(v, 2);
 const um1 = (v: string) => decimais(v, 1);
 const ALERTA: Record<string, string> = { "⚠": "⚠ Risco de churn", "⚑": "⚑ Saída a organizar" };
 const PRIORIDADE = ["Cobrança", "Reter já", "Reter / vigiar", "Saída organizada", "Sem urgência"];
+const EIXO_COBRANCA = "Cobrança — sem tratamento preferencial";
 
 const LEGENDA_DOS_EIXOS: { nome: string; quando: string; significa: string }[] = [
   {
@@ -94,6 +95,57 @@ function Componente({ nome, valor, legenda, cor }: { nome: string; valor: string
   );
 }
 
+function AnaliseDaIA() {
+  const { dados, carregando, erro, recarregar } = usarDados<AnaliseDaCarteira | null>(
+    () => api.analiseDaCarteira(), [],
+  );
+  const [autor, definirAutor] = useState("");
+  const [gerando, definirGerando] = useState(false);
+  const [erroDeGeracao, definirErroDeGeracao] = useState<string | null>(null);
+
+  const gerar = async () => {
+    definirGerando(true);
+    definirErroDeGeracao(null);
+    try {
+      await api.gerarAnaliseDaCarteira(autor.trim());
+      recarregar();
+    } catch (falha) {
+      definirErroDeGeracao(falha instanceof ErroDaApi ? falha.message : "Falha ao gerar a análise.");
+    } finally {
+      definirGerando(false);
+    }
+  };
+
+  return (
+    <section className="ia-analise" aria-label="Análise da IA sobre a carteira">
+      <div className="ia-analise-cab">
+        <span className="ia-analise-titulo">Análise da IA · situação de hoje</span>
+        <span className="ia-analise-acao">
+          <label className="campo-rotulo" htmlFor="ia-autor">Quem está gerando</label>
+          <input id="ia-autor" className="entrada ia-analise-autor" value={autor}
+            onChange={(e) => definirAutor(e.target.value)} placeholder="Eduardo Luiz" />
+          <button type="button" className="ia-analise-botao" disabled={gerando || autor.trim().length < 2} onClick={gerar}>
+            {gerando ? "Gerando…" : dados ? "Gerar de novo" : "Gerar análise"}
+          </button>
+        </span>
+      </div>
+      {carregando && !dados && <p className="numero-nota">Carregando…</p>}
+      {erro && <p className="numero-nota">{erro}</p>}
+      {erroDeGeracao && <p role="alert" className="ia-analise-erro">{erroDeGeracao}</p>}
+      {dados ? (
+        <>
+          <p>{dados.texto}</p>
+          <p className="ia-analise-meta">
+            Gerada em {new Date(dados.gerada_em).toLocaleString("pt-BR")} por {dados.gerada_por}
+          </p>
+        </>
+      ) : (
+        !carregando && <p className="numero-nota">Nenhuma análise gerada ainda. Informe seu nome e clique em &quot;Gerar análise&quot;.</p>
+      )}
+    </section>
+  );
+}
+
 export function Carteira() {
   const { dados, carregando, erro, recarregar } = usarDados<ClassificacaoDaCarteira>(() => api.classificacaoDaCarteira(), []);
   const [eixo, definirEixo] = useState("");
@@ -124,10 +176,20 @@ export function Carteira() {
 
   return (
     <section className="carteira" aria-label="Classificação da carteira">
-      <div className="isc-chips">
-        <div className="isc-chip"><b>{dados.itens.length}</b><small>grupos</small></div>
-        <div className="isc-chip"><b>{dinheiro(dados.itens.reduce((t, i) => t + Number(i.receita_mensal), 0))}</b><small>receita/mês</small></div>
-      </div>
+      {dados.retrato && (
+        <div className="retrato-faixa">
+          <div className="retrato-chip"><b>{dados.retrato.unidades}</b><small>unidades (grupos + individuais)</small></div>
+          <div className="retrato-chip"><b>{dinheiro(dados.retrato.receita_total)}</b><small>receita mensal recorrente</small></div>
+          <button type="button" className="retrato-chip retrato-chip-trav" onClick={() => definirEixo(EIXO_COBRANCA)}>
+            <b>{um1(dados.retrato.percentual_travado)}%</b><small>da receita travada por inadimplência (clique para filtrar)</small>
+          </button>
+          <button type="button" className="retrato-chip retrato-chip-trav" onClick={() => definirEixo(EIXO_COBRANCA)}>
+            <b>{dados.retrato.grupos_travados}</b><small>grupos travados (clique para filtrar)</small>
+          </button>
+        </div>
+      )}
+
+      <AnaliseDaIA />
 
       {isc && (
         <>

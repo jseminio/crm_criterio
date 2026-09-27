@@ -6,7 +6,8 @@
 
 import { Fragment, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { AnaliseDaCarteira, ClassificacaoDaCarteira } from "../api/tipos";
+import type { AnaliseDaCarteira, ClassificacaoDaCarteira, FaixaDeClasse, ItemDaCarteira, Listas } from "../api/tipos";
+import { AvaliacaoDeNotas } from "../componentes/AvaliacaoDeNotas";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
@@ -19,6 +20,7 @@ const um1 = (v: string) => decimais(v, 1);
 const ALERTA: Record<string, string> = { "⚠": "⚠ Risco de churn", "⚑": "⚑ Saída a organizar" };
 const PRIORIDADE = ["Cobrança", "Reter já", "Reter / vigiar", "Saída organizada", "Sem urgência"];
 const EIXO_COBRANCA = "Cobrança — sem tratamento preferencial";
+const COR_DA_CLASSE: Record<string, string> = { A: "#2e7d5b", B: "#2e5496", C: "#b8860b" };
 
 const LEGENDA_DOS_EIXOS: { nome: string; quando: string; significa: string }[] = [
   {
@@ -96,6 +98,30 @@ function Componente({ nome, valor, legenda, cor }: { nome: string; valor: string
   );
 }
 
+function DistribuicaoNoHero({ faixas }: { faixas: FaixaDeClasse[] }) {
+  return (
+    <div className="hero-distribuicao">
+      <div className="isc-rotulo">DISTRIBUIÇÃO</div>
+      <div className="hero-distribuicao-linhas">
+        {faixas.map((f) => (
+          <div key={f.classe} className="distribuicao-linha distribuicao-linha-hero">
+            <div className="distribuicao-cab">
+              <b>{f.classe}</b>
+              <span>{f.unidades} · {um1(f.percentual)}%</span>
+            </div>
+            <div className="isc-trilho isc-trilho-hero" aria-hidden="true">
+              <div style={{ width: `${Math.min(100, Number(f.percentual))}%`, background: COR_DA_CLASSE[f.classe] ?? "#666" }} />
+            </div>
+            <small className={f.dentro_da_meta ? "distribuicao-dentro-hero" : "distribuicao-fora-hero"}>
+              {f.dentro_da_meta ? "dentro da meta" : "fora da meta"} (meta {f.minimo}–{f.maximo}%)
+            </small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AnaliseDaIA() {
   const { dados, carregando, erro, recarregar } = usarDados<AnaliseDaCarteira | null>(
     () => api.analiseDaCarteira(), [],
@@ -147,9 +173,10 @@ function AnaliseDaIA() {
   );
 }
 
-export function Carteira() {
+export function Carteira({ listas }: { listas: Listas | null }) {
   const { dados, carregando, erro, recarregar } = usarDados<ClassificacaoDaCarteira>(() => api.classificacaoDaCarteira(), []);
   const [eixo, definirEixo] = useState("");
+  const [avaliando, definirAvaliando] = useState<ItemDaCarteira | null>(null);
   const [abertos, definirAbertos] = useState<Set<number>>(new Set());
   const alternar = (id: number) =>
     definirAbertos((antes) => {
@@ -204,6 +231,7 @@ export function Carteira() {
               <p className="isc-ref">Referência {data(dados.referencia)} · parâmetros {dados.versao_dos_parametros}</p>
             </div>
             <Medidor valor={isc.valor} zona={isc.zona} />
+            {dados.distribuicao_por_classe.length > 0 && <DistribuicaoNoHero faixas={dados.distribuicao_por_classe} />}
           </section>
 
           <div className="isc-componentes">
@@ -239,6 +267,7 @@ export function Carteira() {
               <th>Alerta</th>
               <th className="tabela-numero">Churn</th>
               <th>Eixo de ação <span className="carteira-remissao">Legenda do Eixo de Ação no rodapé</span></th>
+              <th scope="col" />
             </tr>
           </thead>
           <tbody>
@@ -270,13 +299,22 @@ export function Carteira() {
                     <td>{i.alerta_de_churn ? ALERTA[i.alerta_de_churn] ?? i.alerta_de_churn : "—"}</td>
                     <td className="tabela-numero">{i.churn ?? "—"}</td>
                     <td>{i.eixo_de_acao}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="botao botao-secundario"
+                        onClick={() => definirAvaliando(i)}
+                      >
+                        Avaliar
+                      </button>
+                    </td>
                   </tr>
                   {aberto &&
                     i.empresas.map((e) => (
                       <tr key={`e${e.id}`} className="carteira-empresa">
                         <td>• {e.razao_social}{e.cnpj ? <span className="numero-nota"> · {cnpj(e.cnpj)}</span> : null}</td>
                         <td className="tabela-numero">{e.mensalidade !== null ? dinheiro(e.mensalidade) : "—"}</td>
-                        <td colSpan={5} />
+                        <td colSpan={6} />
                       </tr>
                     ))}
                 </Fragment>
@@ -311,6 +349,18 @@ export function Carteira() {
           Revisão mensal nos primeiros 6 a 12 meses; depois, trimestral.
         </p>
       </details>
+
+      {avaliando && (
+        <AvaliacaoDeNotas
+          key={avaliando.grupo_id}
+          grupoId={avaliando.grupo_id}
+          grupoNome={avaliando.grupo_nome}
+          porteAtual={avaliando.porte}
+          portes={listas?.portes ?? []}
+          aoFechar={() => definirAvaliando(null)}
+          aoSalvar={() => { definirAvaliando(null); recarregar(); }}
+        />
+      )}
     </section>
   );
 }

@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ErroDaApi } from "../api/cliente";
-import type { AnaliseDaCarteira, ClassificacaoDaCarteira, ItemDaCarteira } from "../api/tipos";
+import type { AnaliseDaCarteira, ClassificacaoDaCarteira, ItemDaCarteira, PorteDoGrupo } from "../api/tipos";
 import { Carteira } from "./Carteira";
 
 vi.mock("../api/cliente", async () => {
@@ -20,16 +20,29 @@ vi.mock("../api/cliente", async () => {
   };
 });
 
+const PORTE_VAZIO: PorteDoGrupo = {
+  documentos_fiscais_mes: null, lancamentos_contabeis_mes: null, pagamentos_mes: null,
+  contas_bancarias: null, conciliacoes_cartao_mes: null, empregados_clt: null,
+  admissoes_desligamentos_mes: null, cnpjs_no_escopo: null, tomadores_de_servico: null,
+  servicos_contratados_alem_do_primeiro: 0, tem_consolidacao_de_grupo: false, e_auditada: false,
+  porte: null, porte_definido_por: null, porte_definido_em: null,
+};
 const item = (o: Partial<ItemDaCarteira> = {}): ItemDaCarteira => ({
   grupo_id: 1, grupo_nome: "Alfa", receita_mensal: "1000.00", score: "3.00", classe: "B", classe_efetiva: "B1",
   alerta_de_churn: null, em_cobranca: false, eixo_de_acao: "Sem urgência de churn", semaforo: 1, churn: 1,
-  sem_contrato_ativo: false, empresas: [], ...o,
+  sem_contrato_ativo: false, empresas: [], porte: PORTE_VAZIO, ...o,
 });
 const classificacao = (o: Partial<ClassificacaoDaCarteira> = {}): ClassificacaoDaCarteira => ({
   referencia: "2026-07-31", versao_dos_parametros: "v1",
   isc: { valor: "53.65", zona: "atenção", componente_classe: "59.45", componente_semaforo: "42.33", componente_churn: "59.01", receita_total: "1000.00", grupos: 1, fora_do_isc: 0 },
   retrato: { unidades: 1, receita_total: "1000.00", grupos_travados: 0, receita_travada: "0.00", percentual_travado: "0.0" },
-  por_classe: { B: 1 }, itens: [item()], avisos: [], ...o,
+  por_classe: { B: 1 },
+  distribuicao_por_classe: [
+    { classe: "A", minimo: 15, maximo: 20, unidades: 0, percentual: "0.0", dentro_da_meta: false },
+    { classe: "B", minimo: 35, maximo: 40, unidades: 1, percentual: "100.0", dentro_da_meta: false },
+    { classe: "C", minimo: 40, maximo: 50, unidades: 0, percentual: "0.0", dentro_da_meta: false },
+  ],
+  itens: [item()], avisos: [], ...o,
 });
 const analise = (o: Partial<AnaliseDaCarteira> = {}): AnaliseDaCarteira => ({
   texto: "A carteira está na zona de atenção, puxada pela inadimplência.",
@@ -38,7 +51,7 @@ const analise = (o: Partial<AnaliseDaCarteira> = {}): AnaliseDaCarteira => ({
 
 async function abrir() {
   vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(classificacao());
-  render(<Carteira />);
+  render(<Carteira listas={null} />);
   await screen.findByText(/▸ Alfa/);
 }
 

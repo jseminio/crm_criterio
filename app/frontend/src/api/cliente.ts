@@ -15,6 +15,12 @@ import type {
   AnaliseDaCarteira,
   RevisaoDaCarteira,
   ClassificacaoDaCarteira,
+  EdicaoDeNotas,
+  EdicaoDePorte,
+  PorteDoGrupo,
+  ResultadoDaEdicao,
+  SugestaoDePorte,
+  VolumetriaEntrada,
   CenariosDeTicket,
   ColunaDoFunil,
   ConversaDoSdr,
@@ -168,6 +174,12 @@ export const api = {
     pedir<RevisaoDaCarteira>("/api/carteira/revisoes", { method: "POST", body: JSON.stringify({ autor }) }),
   editarMesDaRevisao: (id: number, mes: string) =>
     pedir<RevisaoDaCarteira>(`/api/carteira/revisoes/${id}/mes`, { method: "PATCH", body: JSON.stringify({ mes }) }),
+  editarNotasDaCarteira: (grupoId: number, corpo: EdicaoDeNotas) =>
+    pedir<ResultadoDaEdicao>(`/api/carteira/grupos/${grupoId}/notas`, { method: "POST", body: JSON.stringify(corpo) }),
+  sugestaoDePorte: (corpo: VolumetriaEntrada) =>
+    pedir<SugestaoDePorte>("/api/carteira/porte/sugestao", { method: "POST", body: JSON.stringify(corpo) }),
+  editarPorte: (grupoId: number, corpo: EdicaoDePorte) =>
+    pedir<PorteDoGrupo>(`/api/carteira/grupos/${grupoId}/porte`, { method: "POST", body: JSON.stringify(corpo) }),
   mrr: (de?: string) => pedir<Mrr>(comParametros("/api/mrr", { de })),
 
   agenda: (captador?: string[]) =>

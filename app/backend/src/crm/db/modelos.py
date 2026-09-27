@@ -100,6 +100,37 @@ class GrupoEconomico(CarimboMixin, Base):
     )
     observacao: Mapped[str | None] = mapped_column(sa.Text)
 
+    documentos_fiscais_mes: Mapped[int | None] = mapped_column(sa.Integer)
+    lancamentos_contabeis_mes: Mapped[int | None] = mapped_column(sa.Integer)
+    pagamentos_mes: Mapped[int | None] = mapped_column(sa.Integer)
+    contas_bancarias: Mapped[int | None] = mapped_column(sa.Integer)
+    conciliacoes_cartao_mes: Mapped[int | None] = mapped_column(sa.Integer)
+    empregados_clt: Mapped[int | None] = mapped_column(sa.Integer)
+    admissoes_desligamentos_mes: Mapped[int | None] = mapped_column(sa.Integer)
+    cnpjs_no_escopo: Mapped[int | None] = mapped_column(sa.Integer)
+    tomadores_de_servico: Mapped[int | None] = mapped_column(sa.Integer)
+    """Os nove direcionadores da régua de porte (`crm.domain.porte`), agora também na carteira —
+    não só na oportunidade. `None` é "não se aplica ao escopo contratado"."""
+
+    servicos_contratados_alem_do_primeiro: Mapped[int] = mapped_column(
+        sa.SmallInteger, nullable=False, default=0, server_default=sa.text("0")
+    )
+    tem_consolidacao_de_grupo: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default=sa.false()
+    )
+    e_auditada: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default=sa.false()
+    )
+
+    porte: Mapped[str | None] = mapped_column(sa.String(20))
+    """O porte **confirmado** do grupo — não o calculado. A régua só sugere (`crm.domain.porte`);
+    este campo é o que a pessoa aceitou ou sobrepôs. Não entra no Score: por isso mora aqui, no
+    grupo, e não numa nova linha de `ClassificacaoDoGrupo` a cada revisão."""
+    porte_definido_por: Mapped[str | None] = mapped_column(sa.String(120))
+    """120, não 10 como em `Oportunidade.porte_definido_por` — lá é iniciais; aqui é o mesmo
+    campo de nome completo que `ClassificacaoDoGrupo.atribuido_por` e o painel de avaliação usam."""
+    porte_definido_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
     fundido_em_id: Mapped[int | None] = mapped_column(
         sa.ForeignKey("grupo_economico.id"), index=True
     )

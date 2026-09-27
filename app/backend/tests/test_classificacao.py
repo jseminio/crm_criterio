@@ -7,8 +7,8 @@ from decimal import Decimal as D
 import pytest
 
 from crm.domain.classificacao import (
-    PARAMETROS, GrupoDoRetrato, Notas, Unidade, alerta_de_churn, classe, classe_efetiva, cobranca, eixo_de_acao,
-    isc, retrato, score,
+    PARAMETROS, GrupoDoRetrato, Notas, Unidade, alerta_de_churn, classe, classe_efetiva, cobranca,
+    distribuicao_por_classe, eixo_de_acao, isc, retrato, score,
 )
 
 
@@ -128,3 +128,27 @@ class TestRetrato:
     def test_sem_nenhum_travado(self):
         r = retrato([GrupoDoRetrato("Alfa", D("1000"), False)])
         assert r.grupos_travados == 0 and r.percentual_travado == D("0.00")
+
+
+class TestDistribuicaoPorClasse:
+    def test_retrato_atual_da_carteira_esta_dentro_da_meta(self):
+        # documento-de-negocio.md: A 6 (19%), B 12 (39%), C 13 (42%), "dentro da meta declarada".
+        linhas = distribuicao_por_classe({"A": 6, "B": 12, "C": 13})
+        assert [f.classe for f in linhas] == ["A", "B", "C"]
+        a, b, c = linhas
+        assert a.unidades == 6 and a.percentual == D("19.4") and a.dentro_da_meta
+        assert b.unidades == 12 and b.percentual == D("38.7") and b.dentro_da_meta
+        assert c.unidades == 13 and c.percentual == D("41.9") and c.dentro_da_meta
+
+    def test_classe_fora_da_meta(self):
+        # A com quase tudo: bem acima da faixa 15-20%.
+        (a,) = [f for f in distribuicao_por_classe({"A": 9, "B": 1}) if f.classe == "A"]
+        assert a.percentual == D("90.0") and not a.dentro_da_meta
+
+    def test_classe_sem_nenhuma_unidade_fica_com_zero_e_fora_da_meta(self):
+        (c,) = [f for f in distribuicao_por_classe({"A": 5, "B": 5}) if f.classe == "C"]
+        assert c.unidades == 0 and c.percentual == D("0.0") and not c.dentro_da_meta
+
+    def test_carteira_vazia_nao_finge_estar_dentro_da_meta(self):
+        for f in distribuicao_por_classe({}):
+            assert f.unidades == 0 and f.percentual == D("0.0") and not f.dentro_da_meta

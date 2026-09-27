@@ -8,8 +8,8 @@
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { SugestaoDePorte, VolumetriaEntrada } from "../api/tipos";
-import { DIRECIONADORES_DE_PORTE, PORTES } from "./direcionadoresDePorte";
+import type { PorteDoGrupo, SugestaoDePorte, VolumetriaEntrada } from "../api/tipos";
+import { DIRECIONADORES_DE_PORTE } from "./direcionadoresDePorte";
 import { PainelLateral } from "./PainelLateral";
 
 const FATORES_COMPLEXIDADE = [
@@ -78,10 +78,12 @@ function Checklist({
 }
 
 export function AvaliacaoDeNotas({
-  grupoId, grupoNome, aoFechar, aoSalvar,
+  grupoId, grupoNome, porteAtual, portes, aoFechar, aoSalvar,
 }: {
   grupoId: number;
   grupoNome: string;
+  porteAtual: PorteDoGrupo;
+  portes: string[];
   aoFechar: () => void;
   aoSalvar: () => void;
 }) {
@@ -90,11 +92,18 @@ export function AvaliacaoDeNotas({
   const [mesesNoPrazo, definirMesesNoPrazo] = useState(3);
   const [cobrancaDobrada, definirCobrancaDobrada] = useState(false);
   const [atrasoRecorrente, definirAtrasoRecorrente] = useState(false);
-  const [volumetria, definirVolumetria] = useState<Record<string, string>>({});
-  const [servicosAlem, definirServicosAlem] = useState(0);
-  const [consolidacaoDeGrupo, definirConsolidacaoDeGrupo] = useState(false);
-  const [auditada, definirAuditada] = useState(false);
-  const [porteConfirmado, definirPorteConfirmado] = useState("");
+  const [volumetria, definirVolumetria] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      DIRECIONADORES_DE_PORTE.map((d) => {
+        const valor = porteAtual[d.id as keyof PorteDoGrupo];
+        return [d.id, valor === null || valor === undefined ? "" : String(valor)];
+      }),
+    ),
+  );
+  const [servicosAlem, definirServicosAlem] = useState(porteAtual.servicos_contratados_alem_do_primeiro ?? 0);
+  const [consolidacaoDeGrupo, definirConsolidacaoDeGrupo] = useState(porteAtual.tem_consolidacao_de_grupo ?? false);
+  const [auditada, definirAuditada] = useState(porteAtual.e_auditada ?? false);
+  const [porteConfirmado, definirPorteConfirmado] = useState(porteAtual.porte ?? "");
   const [sugestao, definirSugestao] = useState<SugestaoDePorte | null>(null);
   const [buscandoSugestao, definirBuscandoSugestao] = useState(false);
   const [autor, definirAutor] = useState("");
@@ -305,7 +314,7 @@ export function AvaliacaoDeNotas({
           <span className="campo-rotulo">Porte confirmado</span>
           <select className="selecao" value={porteConfirmado} onChange={(e) => definirPorteConfirmado(e.target.value)}>
             <option value="">— não confirmado —</option>
-            {PORTES.map((p) => <option key={p} value={p}>{p}</option>)}
+            {portes.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
         </label>
         {sugestao?.calculavel && porteConfirmado !== sugestao.porte && (

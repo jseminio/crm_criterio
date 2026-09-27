@@ -13,5 +13,3 @@ export const DIRECIONADORES_DE_PORTE: { id: string; rotulo: string; placeholder:
   { id: "cnpjs_no_escopo", rotulo: "CNPJs no escopo", placeholder: "" },
   { id: "tomadores_de_servico", rotulo: "Tomadores de serviço", placeholder: "" },
 ];
-
-export const PORTES = ["Micro", "Pequeno", "Médio", "Grande", "Extra Grande"] as const;

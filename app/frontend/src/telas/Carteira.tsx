@@ -6,7 +6,7 @@
 
 import { Fragment, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { AnaliseDaCarteira, ClassificacaoDaCarteira, FaixaDeClasse } from "../api/tipos";
+import type { AnaliseDaCarteira, ClassificacaoDaCarteira, FaixaDeClasse, ItemDaCarteira, Listas } from "../api/tipos";
 import { AvaliacaoDeNotas } from "../componentes/AvaliacaoDeNotas";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj, data, dinheiro } from "../formato";
@@ -173,10 +173,10 @@ function AnaliseDaIA() {
   );
 }
 
-export function Carteira() {
+export function Carteira({ listas }: { listas: Listas | null }) {
   const { dados, carregando, erro, recarregar } = usarDados<ClassificacaoDaCarteira>(() => api.classificacaoDaCarteira(), []);
   const [eixo, definirEixo] = useState("");
-  const [avaliando, definirAvaliando] = useState<{ id: number; nome: string } | null>(null);
+  const [avaliando, definirAvaliando] = useState<ItemDaCarteira | null>(null);
   const [abertos, definirAbertos] = useState<Set<number>>(new Set());
   const alternar = (id: number) =>
     definirAbertos((antes) => {
@@ -303,7 +303,7 @@ export function Carteira() {
                       <button
                         type="button"
                         className="botao botao-secundario"
-                        onClick={() => definirAvaliando({ id: i.grupo_id, nome: i.grupo_nome })}
+                        onClick={() => definirAvaliando(i)}
                       >
                         Avaliar
                       </button>
@@ -352,8 +352,11 @@ export function Carteira() {
 
       {avaliando && (
         <AvaliacaoDeNotas
-          grupoId={avaliando.id}
-          grupoNome={avaliando.nome}
+          key={avaliando.grupo_id}
+          grupoId={avaliando.grupo_id}
+          grupoNome={avaliando.grupo_nome}
+          porteAtual={avaliando.porte}
+          portes={listas?.portes ?? []}
           aoFechar={() => definirAvaliando(null)}
           aoSalvar={() => { definirAvaliando(null); recarregar(); }}
         />

@@ -200,6 +200,28 @@ def test_editar_porte_grava_a_volumetria_e_o_porte_confirmado(cliente, sessao: S
     assert corpo["porte_definido_em"] is not None
 
 
+def test_classificacao_expoe_o_porte_ja_salvo_do_grupo(cliente, sessao: Session):
+    # A tela de avaliação precisa pré-preencher com o que já foi salvo — sem isso, reavaliar um
+    # único direcionador pareceria apagar os outros (mesmo o backend preservando).
+    g = _grupo_classificado(sessao)
+    r = cliente.get("/api/carteira/classificacao").json()
+    vazio = r["itens"][0]["porte"]
+    assert vazio == {
+        "documentos_fiscais_mes": None, "lancamentos_contabeis_mes": None, "pagamentos_mes": None,
+        "contas_bancarias": None, "conciliacoes_cartao_mes": None, "empregados_clt": None,
+        "admissoes_desligamentos_mes": None, "cnpjs_no_escopo": None, "tomadores_de_servico": None,
+        "servicos_contratados_alem_do_primeiro": 0, "tem_consolidacao_de_grupo": False, "e_auditada": False,
+        "porte": None, "porte_definido_por": None, "porte_definido_em": None,
+    }
+
+    cliente.post(f"/api/carteira/grupos/{g.id}/porte", json={
+        "autor": "Eduardo Luiz", "cnpjs_no_escopo": 4, "empregados_clt": 30, "porte": "Médio",
+    })
+    depois = cliente.get("/api/carteira/classificacao").json()["itens"][0]["porte"]
+    assert depois["cnpjs_no_escopo"] == 4 and depois["empregados_clt"] == 30
+    assert depois["porte"] == "Médio" and depois["porte_definido_por"] == "Eduardo Luiz"
+
+
 def test_editar_porte_so_carimba_definido_por_quando_o_porte_muda(cliente, sessao: Session):
     g = _grupo_classificado(sessao)
     primeiro = cliente.post(f"/api/carteira/grupos/{g.id}/porte", json={

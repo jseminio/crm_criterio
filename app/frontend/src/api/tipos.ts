@@ -565,6 +565,7 @@ export interface ItemDaCarteira {
   churn: number | null;
   sem_contrato_ativo: boolean;
   empresas: EmpresaDoGrupo[];
+  porte: PorteDoGrupo;
 }
 
 export interface IscDaCarteira {
@@ -595,16 +596,21 @@ export interface FaixaDeClasse {
   dentro_da_meta: boolean;
 }
 
-export interface VolumetriaEntrada {
-  documentos_fiscais_mes?: number;
-  lancamentos_contabeis_mes?: number;
-  pagamentos_mes?: number;
-  contas_bancarias?: number;
-  conciliacoes_cartao_mes?: number;
-  empregados_clt?: number;
-  admissoes_desligamentos_mes?: number;
-  cnpjs_no_escopo?: number;
-  tomadores_de_servico?: number;
+/** Os nove direcionadores da régua de porte. `null` = "não se aplica ao escopo contratado" —
+ * fora da média, nunca zero (ver `direcionadoresDePorte.ts`). */
+export interface DirecionadoresDePorte {
+  documentos_fiscais_mes: number | null;
+  lancamentos_contabeis_mes: number | null;
+  pagamentos_mes: number | null;
+  contas_bancarias: number | null;
+  conciliacoes_cartao_mes: number | null;
+  empregados_clt: number | null;
+  admissoes_desligamentos_mes: number | null;
+  cnpjs_no_escopo: number | null;
+  tomadores_de_servico: number | null;
+}
+
+export interface VolumetriaEntrada extends Partial<DirecionadoresDePorte> {
   servicos_contratados_alem_do_primeiro?: number;
   tem_consolidacao_de_grupo?: boolean;
   e_auditada?: boolean;
@@ -623,7 +629,10 @@ export interface EdicaoDePorte extends VolumetriaEntrada {
   porte?: string;
 }
 
-export interface PorteDoGrupo extends VolumetriaEntrada {
+export interface PorteDoGrupo extends DirecionadoresDePorte {
+  servicos_contratados_alem_do_primeiro: number;
+  tem_consolidacao_de_grupo: boolean;
+  e_auditada: boolean;
   porte: string | null;
   porte_definido_por: string | null;
   porte_definido_em: string | null;

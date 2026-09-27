@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
-import type { ClassificacaoDaCarteira, ItemDaCarteira } from "../api/tipos";
+import type { ClassificacaoDaCarteira, ItemDaCarteira, Listas, PorteDoGrupo } from "../api/tipos";
 import { Carteira } from "../telas/Carteira";
 
 vi.mock("../api/cliente", async () => {
@@ -23,10 +23,23 @@ vi.mock("../api/cliente", async () => {
   };
 });
 
+const PORTE_VAZIO: PorteDoGrupo = {
+  documentos_fiscais_mes: null, lancamentos_contabeis_mes: null, pagamentos_mes: null,
+  contas_bancarias: null, conciliacoes_cartao_mes: null, empregados_clt: null,
+  admissoes_desligamentos_mes: null, cnpjs_no_escopo: null, tomadores_de_servico: null,
+  servicos_contratados_alem_do_primeiro: 0, tem_consolidacao_de_grupo: false, e_auditada: false,
+  porte: null, porte_definido_por: null, porte_definido_em: null,
+};
+const LISTAS: Listas = {
+  situacoes: [], situacoes_de_lead: [], temperaturas: [], tipos_de_canal: [], tipos_de_canal_em_operacao: [],
+  motivos_de_recusa: [], motivos_de_encerramento: [], iniciativas_de_encerramento: [], papeis_de_contato: [],
+  linhas_de_servico: [], situacoes_de_grupo: [], captadores: [],
+  portes: ["Micro", "Pequeno", "Médio", "Grande", "Extra Grande"], servicos: [],
+};
 const item = (o: Partial<ItemDaCarteira> = {}): ItemDaCarteira => ({
   grupo_id: 1, grupo_nome: "Alfa", receita_mensal: "1000.00", score: "3.00", classe: "B", classe_efetiva: "B1",
   alerta_de_churn: null, em_cobranca: false, eixo_de_acao: "Sem urgência de churn", semaforo: 1, churn: 1,
-  sem_contrato_ativo: false, empresas: [], ...o,
+  sem_contrato_ativo: false, empresas: [], porte: PORTE_VAZIO, ...o,
 });
 const resposta = (o: Partial<ClassificacaoDaCarteira> = {}): ClassificacaoDaCarteira => ({
   referencia: "2026-07-31", versao_dos_parametros: "v1", isc: null, retrato: null,
@@ -49,7 +62,7 @@ function nota(texto: string) {
 
 async function abrir() {
   vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
-  render(<Carteira />);
+  render(<Carteira listas={LISTAS} />);
   await screen.findByText(/▸ Alfa/);
   await userEvent.click(screen.getByRole("button", { name: "Avaliar" }));
 }
@@ -61,6 +74,29 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
     await abrir();
     expect(screen.getByText(nota("Nota calculada: 1 (0 de 6 marcados)"))).toBeInTheDocument();
     expect(screen.getByText(nota("Nota calculada: 5 (0 de 5 marcados)"))).toBeInTheDocument();
+  });
+
+  it("pré-preenche o porte com o que já foi salvo do grupo, em vez de abrir em branco", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({
+      itens: [item({
+        porte: {
+          ...PORTE_VAZIO, cnpjs_no_escopo: 4, empregados_clt: 30, servicos_contratados_alem_do_primeiro: 2,
+          tem_consolidacao_de_grupo: true, e_auditada: true,
+          porte: "Médio", porte_definido_por: "Eduardo Luiz", porte_definido_em: "2026-09-01T10:00:00",
+        },
+      })],
+    }));
+    render(<Carteira listas={LISTAS} />);
+    await screen.findByText(/▸ Alfa/);
+    await userEvent.click(screen.getByRole("button", { name: "Avaliar" }));
+
+    expect(screen.getByLabelText("CNPJs no escopo")).toHaveValue(4);
+    expect(screen.getByLabelText("Empregados CLT")).toHaveValue(30);
+    expect(screen.getByLabelText("Documentos fiscais/mês")).toHaveValue(null);
+    expect(screen.getByLabelText("Serviços contratados além do primeiro")).toHaveValue(2);
+    expect(screen.getByLabelText("Há consolidação de grupo")).toBeChecked();
+    expect(screen.getByLabelText("Empresa auditada")).toBeChecked();
+    expect(screen.getByLabelText("Porte confirmado")).toHaveValue("Médio");
   });
 
   it("marcar fatores de complexidade sobe a nota (0→1, 1→2, 2-3→3, 4→4, 5-6→5)", async () => {
@@ -96,9 +132,7 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
 
   it("salva as três notas calculadas e o porte, com motivo descrevendo o que foi marcado", async () => {
     vi.mocked(api.editarNotasDaCarteira).mockResolvedValue({ item: item(), isc: null, avisos: [] });
-    vi.mocked(api.editarPorte).mockResolvedValue({
-      porte: null, porte_definido_por: null, porte_definido_em: null,
-    });
+    vi.mocked(api.editarPorte).mockResolvedValue(PORTE_VAZIO);
     await abrir();
     await userEvent.click(screen.getByLabelText(/Holding com consolidação/));
     await userEvent.click(screen.getByLabelText(/Auto de infração/));

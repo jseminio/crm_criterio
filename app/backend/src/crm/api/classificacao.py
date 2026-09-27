@@ -68,6 +68,48 @@ class NotasDoGrupo(BaseModel):
     registrado_em: datetime
 
 
+class VolumetriaEntrada(BaseModel):
+    """Os nove direcionadores da régua de porte, mais os três ajustes. Mesmos campos de
+    `crm.domain.porte.Volumetria` — ver lá para o que cada um significa."""
+
+    documentos_fiscais_mes: int | None = Field(default=None, ge=0)
+    lancamentos_contabeis_mes: int | None = Field(default=None, ge=0)
+    pagamentos_mes: int | None = Field(default=None, ge=0)
+    contas_bancarias: int | None = Field(default=None, ge=0)
+    conciliacoes_cartao_mes: int | None = Field(default=None, ge=0)
+    empregados_clt: int | None = Field(default=None, ge=0)
+    admissoes_desligamentos_mes: int | None = Field(default=None, ge=0)
+    cnpjs_no_escopo: int | None = Field(default=None, ge=0)
+    tomadores_de_servico: int | None = Field(default=None, ge=0)
+    servicos_contratados_alem_do_primeiro: int = Field(default=0, ge=0)
+    tem_consolidacao_de_grupo: bool = False
+    e_auditada: bool = False
+
+
+class SugestaoDePorteResposta(BaseModel):
+    """O que a régua sugere — nunca o que decide. Ver `crm.domain.porte`."""
+
+    calculavel: bool
+    pontuacao: Decimal | None
+    porte: str | None
+    horas_base: int | None
+    direcionadores_aplicados: int
+
+
+class EdicaoDePorte(VolumetriaEntrada):
+    autor: str = Field(min_length=2, max_length=120)
+    porte: str | None = Field(default=None, max_length=20)
+    """Confirma ou sobrepõe a sugestão da régua. Quando vier preenchido e diferente do porte
+    atual, o servidor carimba `porte_definido_por`/`porte_definido_em` — instante do servidor,
+    não do navegador, porque é este par que vira material pra recalibrar a régua depois."""
+
+
+class PorteDoGrupo(VolumetriaEntrada):
+    porte: str | None
+    porte_definido_por: str | None
+    porte_definido_em: datetime | None
+
+
 class ItemDaCarteira(BaseModel):
     grupo_id: int
     grupo_nome: str
@@ -81,9 +123,10 @@ class ItemDaCarteira(BaseModel):
     semaforo: int
     churn: int | None
     sem_contrato_ativo: bool
+    """O grupo não tem contrato ativo hoje (ex.: baixado depois da referência)."""
     empresas: list[EmpresaDoGrupo] = []
     notas: NotasDoGrupo
-    """O grupo não tem contrato ativo hoje (ex.: baixado depois da referência)."""
+    porte: PorteDoGrupo
 
 
 class IscResposta(BaseModel):
@@ -177,48 +220,6 @@ class ResultadoDaEdicao(BaseModel):
     item: ItemDaCarteira
     isc: IscResposta | None
     avisos: list[str]
-
-
-class VolumetriaEntrada(BaseModel):
-    """Os nove direcionadores da régua de porte, mais os três ajustes. Mesmos campos de
-    `crm.domain.porte.Volumetria` — ver lá para o que cada um significa."""
-
-    documentos_fiscais_mes: int | None = Field(default=None, ge=0)
-    lancamentos_contabeis_mes: int | None = Field(default=None, ge=0)
-    pagamentos_mes: int | None = Field(default=None, ge=0)
-    contas_bancarias: int | None = Field(default=None, ge=0)
-    conciliacoes_cartao_mes: int | None = Field(default=None, ge=0)
-    empregados_clt: int | None = Field(default=None, ge=0)
-    admissoes_desligamentos_mes: int | None = Field(default=None, ge=0)
-    cnpjs_no_escopo: int | None = Field(default=None, ge=0)
-    tomadores_de_servico: int | None = Field(default=None, ge=0)
-    servicos_contratados_alem_do_primeiro: int = Field(default=0, ge=0)
-    tem_consolidacao_de_grupo: bool = False
-    e_auditada: bool = False
-
-
-class SugestaoDePorteResposta(BaseModel):
-    """O que a régua sugere — nunca o que decide. Ver `crm.domain.porte`."""
-
-    calculavel: bool
-    pontuacao: Decimal | None
-    porte: str | None
-    horas_base: int | None
-    direcionadores_aplicados: int
-
-
-class EdicaoDePorte(VolumetriaEntrada):
-    autor: str = Field(min_length=2, max_length=120)
-    porte: str | None = Field(default=None, max_length=20)
-    """Confirma ou sobrepõe a sugestão da régua. Quando vier preenchido e diferente do porte
-    atual, o servidor carimba `porte_definido_por`/`porte_definido_em` — instante do servidor,
-    não do navegador, porque é este par que vira material pra recalibrar a régua depois."""
-
-
-class PorteDoGrupo(VolumetriaEntrada):
-    porte: str | None
-    porte_definido_por: str | None
-    porte_definido_em: datetime | None
 
 
 class AnaliseResposta(BaseModel):
@@ -341,12 +342,15 @@ def roteador(
             empresas.setdefault(e.grupo_id, []).append(
                 EmpresaDoGrupo(id=e.id, razao_social=e.razao_social, cnpj=e.cnpj, mensalidade=mensal.get(e.id))
             )
+        # Porte não é parte da classificação (não entra no Score, mora no grupo — ver `_porte`),
+        # mas a tela de avaliação precisa do que já está salvo pra não sobrescrever com branco.
+        grupos_por_id = {g.id: g for g in sessao.scalars(sa.select(GrupoEconomico).where(GrupoEconomico.id.in_(vistos)))}
         itens = [
             ItemDaCarteira(
                 grupo_id=c.grupo_id, grupo_nome=nome, receita_mensal=c.receita_mensal, score=c.score, classe=c.classe,
                 classe_efetiva=c.classe_efetiva, alerta_de_churn=c.alerta_de_churn, em_cobranca=c.em_cobranca,
                 eixo_de_acao=c.eixo_de_acao, semaforo=c.semaforo, churn=c.churn, sem_contrato_ativo=c.grupo_id not in ativos,
-                empresas=empresas.get(c.grupo_id, []), notas=_notas(c),
+                empresas=empresas.get(c.grupo_id, []), notas=_notas(c), porte=_porte(grupos_por_id[c.grupo_id]),
             )
             for c, nome in linhas
         ]

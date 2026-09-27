@@ -1180,6 +1180,14 @@ o teste seguinte — falha em cerca de 1 a cada 3 rodadas, sem padrão fixo.
 Teste instável é pior que teste lento: ensina a ignorar falha. `maxWorkers: 1`
 sozinho é suficiente; isolamento entre arquivos volta a ser o padrão.
 
+## Menu: Leads saiu do menu (27/09/2026)
+
+Decisão de Eduardo: "Nova oportunidade" (dentro de Oportunidades/Funil) já captura o mesmo que a tela
+Leads — nome, canal, captador, temperatura — e nasce direto como proposta, sem passar por um estágio
+de lead. O item **saiu do menu lateral**; `Leads.tsx`, o modelo `Lead` e as rotas `/api/leads` continuam
+no código (o único lead existente já está "Convertido", sem pendência). Na Agenda, o atalho que antes
+abria "Leads" agora abre **Oportunidades**.
+
 ## Ressalva de processo — resolvida
 
 Este código começou em 20/09/2026, depois de Eduardo dizer "pode codar agora",

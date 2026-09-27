@@ -97,6 +97,11 @@ recorrente**, e a linha sai do serviço, no passado e daqui para frente.
   Todo "Outro" aparece em **Configurações → Pedidos de serviço novo**
   (`GET /api/servicos/pedidos`). Sem roteiro: o SDR de IA passa a conversa para a equipe.
   Migração `bf638b8cce5f`, só aditiva, **ainda não aplicada**: rode `alembic upgrade head`.
+- **Duas pontas de migração (27/09/2026, corrigido).** A `bf638b8cce5f` e a junção da
+  volumetria da carteira com o SDR (`5935b1a6769e`) saíram do mesmo ponto; na `main`,
+  `alembic upgrade head` recusou rodar ("Multiple head revisions"). A junção `a96818a796a7`,
+  que veio com a ordenação nas tabelas, liga as duas sem mudar nenhuma tabela.
+  `tests/test_migracoes.py` falha se voltar a haver mais de uma ponta.
 - **O passado:** `scripts/reclassificar_linha_por_servico.py` mostra, sem gravar, quantas
   oportunidades mudam de linha e de quê para quê; `--aplicar` grava com backup antes, na
   pasta `~/Backups-CRM`. **Ainda não rodado na máquina de Eduardo.**

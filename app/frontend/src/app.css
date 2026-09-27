@@ -118,6 +118,13 @@
 .tabela tbody tr:last-child td { border-bottom: 0; }
 .tabela tbody tr:hover { background: var(--surface-sunken); }
 .tabela-numero { text-align: right; font-variant-numeric: tabular-nums; }
+.th-ordenar { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 4px;
+  cursor: pointer; font: inherit; color: inherit; }
+.th-ordenar:hover, .th-ordenar-ativa { color: var(--texto-forte); }
+.th-ordenar:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.th-seta { font-size: 9px; opacity: .45; }
+.th-ordenar-ativa .th-seta { opacity: 1; }
+
 .tabela-clicavel { cursor: pointer; }
 
 /* ------------------------------------------------------------------ painéis */
@@ -259,6 +266,10 @@
   padding: 7px 14px; cursor: pointer; }
 .visao-botao.visao-ativa { background: var(--azul-noturno); color: var(--branco); }
 .visao-botao:not(:last-child) { border-right: 1px solid var(--azul-noturno); }
+.kanban-ordenar-valor { all: revert; appearance: none; border: 1px solid var(--borda-forte); border-radius: 8px;
+  background: var(--surface-card); color: var(--texto-medio); font: 600 13px var(--fonte-ui); padding: 7px 14px;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.kanban-ordenar-valor.th-ordenar-ativa { color: var(--azul-noturno); border-color: var(--azul-noturno); }
 
 .abas { display: flex; gap: var(--e1); border-bottom: 1px solid var(--borda); }
 .aba { appearance: none; border: 0; background: transparent; cursor: pointer; font-weight: 500;

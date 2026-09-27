@@ -8,19 +8,25 @@
 import { useState } from "react";
 import { ErroDaApi, api } from "../api/cliente";
 import type { ResumoDeBackup } from "../api/cliente";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { dataHora } from "../formato";
 
 function Tabelas({ resumo }: { resumo: ResumoDeBackup }) {
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
+  const linhas = ordenar(Object.entries(resumo.tabelas), ordenacao, {
+    tabela: ([nome]) => nome,
+    registros: ([, n]) => n,
+  });
   return (
     <table className="tabela">
       <thead>
         <tr>
-          <th>Tabela</th>
-          <th>Registros</th>
+          <ThOrdenavel coluna="tabela" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Tabela</ThOrdenavel>
+          <ThOrdenavel coluna="registros" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Registros</ThOrdenavel>
         </tr>
       </thead>
       <tbody>
-        {Object.entries(resumo.tabelas).map(([nome, n]) => (
+        {linhas.map(([nome, n]) => (
           <tr key={nome}>
             <td>{nome}</td>
             <td>{n}</td>

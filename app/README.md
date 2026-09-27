@@ -13,6 +13,18 @@ vendas, cobertura do processo e dependência de canal — e o começo da
 26/09/2026, o **agente SDR** do go-to-market: pesquisa a conta, monta a ficha
 e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo.
 
+## Ordenação nas tabelas (27/09/2026)
+
+Todo título de coluna clicável ordena a lista: primeiro clique crescente, segundo decrescente, terceiro
+volta à ordem original (a que a API mandou). `componentes/Ordenacao.tsx` reúne o hook (`usarOrdenacao`),
+a função pura (`ordenar`, testada) e o cabeçalho clicável (`ThOrdenavel`, com seta e `aria-sort`). Valor
+sem informação (`null`) fica sempre por último, nas duas direções — nunca parece "o menor" nem "o maior".
+Aplicado em: Funil (Grade e, por valor, dentro de cada coluna do Kanban), Contatos (empresas e pessoas),
+Grupos, Contratos, Carteira, Abordagens, histórico de revisões, propostas de um grupo (DetalheDoGrupo),
+Conferência e Configurações (resumo do backup). Fora do escopo, de propósito: Receita (o movimento do
+MRR é uma sequência contábil, não uma lista), Cenários de ticket (três cenários fixos), o histórico de
+preço de uma oportunidade (é uma linha do tempo) e a tela Leads (fora do menu desde 27/09/2026).
+
 ## Estado
 
 | | |

@@ -7,6 +7,7 @@
 import { Fragment, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { AnaliseDaCarteira, ClassificacaoDaCarteira } from "../api/tipos";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
@@ -150,6 +151,7 @@ function AnaliseDaIA() {
 export function Carteira() {
   const { dados, carregando, erro, recarregar } = usarDados<ClassificacaoDaCarteira>(() => api.classificacaoDaCarteira(), []);
   const [eixo, definirEixo] = useState("");
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
   const [abertos, definirAbertos] = useState<Set<number>>(new Set());
   const alternar = (id: number) =>
     definirAbertos((antes) => {
@@ -170,9 +172,18 @@ export function Carteira() {
     );
 
   const eixos = Array.from(new Set(dados.itens.map((i) => i.eixo_de_acao))).sort((a, b) => rank(a) - rank(b));
-  const itens = dados.itens
+  const itensDoEixo = dados.itens
     .filter((i) => !eixo || i.eixo_de_acao === eixo)
     .sort((a, b) => rank(a.eixo_de_acao) - rank(b.eixo_de_acao) || Number(b.receita_mensal) - Number(a.receita_mensal));
+  const itens = ordenar(itensDoEixo, ordenacao, {
+    grupo: (i) => i.grupo_nome,
+    receita: (i) => Number(i.receita_mensal),
+    score: (i) => Number(i.score),
+    classe: (i) => i.classe_efetiva,
+    alerta: (i) => i.alerta_de_churn,
+    churn: (i) => i.churn,
+    eixo: (i) => i.eixo_de_acao,
+  });
   const { isc } = dados;
 
   return (
@@ -232,13 +243,15 @@ export function Carteira() {
         <table className="tabela" aria-label="Grupos classificados">
           <thead>
             <tr>
-              <th>Grupo</th>
-              <th className="tabela-numero">Receita/mês</th>
-              <th className="tabela-numero">Score</th>
-              <th>Classe</th>
-              <th>Alerta</th>
-              <th className="tabela-numero">Churn</th>
-              <th>Eixo de ação <span className="carteira-remissao">Legenda do Eixo de Ação no rodapé</span></th>
+              <ThOrdenavel coluna="grupo" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Grupo</ThOrdenavel>
+              <ThOrdenavel coluna="receita" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Receita/mês</ThOrdenavel>
+              <ThOrdenavel coluna="score" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Score</ThOrdenavel>
+              <ThOrdenavel coluna="classe" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Classe</ThOrdenavel>
+              <ThOrdenavel coluna="alerta" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Alerta</ThOrdenavel>
+              <ThOrdenavel coluna="churn" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Churn</ThOrdenavel>
+              <ThOrdenavel coluna="eixo" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>
+                Eixo de ação <span className="carteira-remissao">Legenda do Eixo de Ação no rodapé</span>
+              </ThOrdenavel>
             </tr>
           </thead>
           <tbody>

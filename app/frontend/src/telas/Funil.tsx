@@ -21,6 +21,7 @@ import { CenariosDeTicket } from "../componentes/CenariosDeTicket";
 import { Numeros } from "../componentes/Numeros";
 import { Recolhivel } from "../componentes/Recolhivel";
 import { Recortes } from "../componentes/Recortes";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { data, dinheiro, dinheiroCurto, prazo } from "../formato";
 import { usarDados } from "../usarDados";
@@ -91,6 +92,8 @@ export function Funil({ listas }: { listas: Listas | null }) {
   const [movendo, definirMovendo] = useState<number | null>(null);
   const [erroDeMovimento, definirErroDeMovimento] = useState<string | null>(null);
   const [criando, definirCriando] = useState(false);
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
+  const { ordenacao: ordenacaoDoKanban, alternar: alternarOrdenacaoDoKanban } = usarOrdenacao();
 
   const kanban = usarDados<ColunaDoFunil[] | null>(
     () => (visao === "kanban" ? api.funil(paraConsulta(filtros)) : Promise.resolve(null)),
@@ -211,6 +214,19 @@ export function Funil({ listas }: { listas: Listas | null }) {
                 </select>
               </div>
             )}
+            {visao === "kanban" && (
+              <button
+                type="button"
+                className={`kanban-ordenar-valor${ordenacaoDoKanban ? " th-ordenar-ativa" : ""}`}
+                onClick={() => alternarOrdenacaoDoKanban("valor")}
+                aria-pressed={!!ordenacaoDoKanban}
+              >
+                Ordenar por valor
+                <span className="th-seta" aria-hidden="true">
+                  {ordenacaoDoKanban ? (ordenacaoDoKanban.direcao === "asc" ? "▲" : "▼") : "⇅"}
+                </span>
+              </button>
+            )}
             <div className="visao-toggle" role="group" aria-label="Visão do funil">
               <button
                 type="button"
@@ -305,7 +321,9 @@ export function Funil({ listas }: { listas: Listas | null }) {
                 </p>
               </header>
               <div className="coluna-cartoes">
-                {coluna.oportunidades.map((o) => (
+                {ordenar(coluna.oportunidades, ordenacaoDoKanban, {
+                  valor: (o) => (o.preco_mensal ? Number(o.preco_mensal) : o.preco_anual ? Number(o.preco_anual) : null),
+                }).map((o) => (
                   <Cartao
                     key={o.id}
                     oportunidade={o}
@@ -335,22 +353,27 @@ export function Funil({ listas }: { listas: Listas | null }) {
           <table className="tabela">
             <thead>
               <tr>
-                <th scope="col">Cliente</th>
-                <th scope="col">Oportunidade</th>
-                <th scope="col">Situação</th>
-                <th scope="col">Temperatura</th>
-                <th scope="col">Captador</th>
-                <th scope="col">Originação</th>
-                <th scope="col" className="tabela-numero">
-                  Mensal
-                </th>
-                <th scope="col" className="tabela-numero">
-                  Anual
-                </th>
+                <ThOrdenavel coluna="cliente" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Cliente</ThOrdenavel>
+                <ThOrdenavel coluna="nome" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Oportunidade</ThOrdenavel>
+                <ThOrdenavel coluna="situacao" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Situação</ThOrdenavel>
+                <ThOrdenavel coluna="temperatura" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Temperatura</ThOrdenavel>
+                <ThOrdenavel coluna="captador" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Captador</ThOrdenavel>
+                <ThOrdenavel coluna="originacao" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Originação</ThOrdenavel>
+                <ThOrdenavel coluna="mensal" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Mensal</ThOrdenavel>
+                <ThOrdenavel coluna="anual" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Anual</ThOrdenavel>
               </tr>
             </thead>
             <tbody>
-              {grade.dados?.itens.map((o) => (
+              {ordenar(grade.dados?.itens ?? [], ordenacao, {
+                cliente: (o) => o.grupo_nome ?? o.nome,
+                nome: (o) => o.nome,
+                situacao: (o) => o.situacao,
+                temperatura: (o) => o.temperatura,
+                captador: (o) => o.captador,
+                originacao: (o) => o.data_colocacao,
+                mensal: (o) => (o.preco_mensal ? Number(o.preco_mensal) : null),
+                anual: (o) => (o.preco_anual ? Number(o.preco_anual) : null),
+              }).map((o) => (
                 <tr
                   key={o.id}
                   className="tabela-clicavel"

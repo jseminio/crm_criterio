@@ -63,16 +63,46 @@ describe("Carteira", () => {
     expect(linhas[1]).toHaveTextContent("Alfa");
   });
 
-  it("mostra o retrato da carteira e filtra ao clicar nos chips travados", async () => {
+  it("mostra o retrato com o travado e o percentual juntos num só chip, e filtra ao clicar", async () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
     render(<Carteira />);
     await screen.findByText(/▸ Alfa/);
-    expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("16,7%")).toBeInTheDocument();
-    expect(screen.getByText("1", { selector: "b" })).toBeInTheDocument();
-    await userEvent.click(screen.getByText("16,7%").closest("button")!);
+    expect(screen.getByText("unidades (grupos + individuais)").previousElementSibling).toHaveTextContent("2");
+    const chipTravado = screen.getByRole("button", { name: /grupos travados, 16,7% da receita travada/ });
+    expect(chipTravado).toHaveTextContent("1"); // grupos_travados
+    await userEvent.click(chipTravado);
     expect(screen.getByLabelText("Eixo de ação")).toHaveValue("Cobrança — sem tratamento preferencial");
     expect(screen.queryByText(/▸ Beta/)).toBeNull();
+  });
+
+  it("mostra os três semáforos com a contagem, e filtra a lista ao clicar", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira />);
+    await screen.findByText(/▸ Alfa/);
+    await screen.findByText(/▸ Beta/);
+
+    const botao3 = screen.getByRole("button", { name: /^Semáforo 3/ });
+    expect(botao3).toHaveTextContent("2"); // Alfa e Beta são semáforo 3
+    expect(screen.getByRole("button", { name: /^Semáforo 1/ })).toHaveTextContent("0");
+
+    await userEvent.click(botao3);
+    expect(botao3).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/▸ Alfa/)).toBeInTheDocument();
+    expect(screen.getByText(/▸ Beta/)).toBeInTheDocument();
+
+    // clicar de novo no mesmo semáforo desliga o filtro
+    await userEvent.click(botao3);
+    expect(botao3).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("semáforo sem nenhum grupo filtra para uma lista vazia, com o botão de limpar", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira />);
+    await screen.findByText(/▸ Alfa/);
+    await userEvent.click(screen.getByRole("button", { name: /^Semáforo 1/ }));
+    expect(await screen.findByText(/nenhum resultado/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(await screen.findByText(/▸ Alfa/)).toBeInTheDocument();
   });
 
   it("filtra por eixo e oferece limpar quando nada passa", async () => {

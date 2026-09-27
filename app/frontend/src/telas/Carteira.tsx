@@ -20,6 +20,7 @@ const um1 = (v: string) => decimais(v, 1);
 const ALERTA: Record<string, string> = { "⚠": "⚠ Risco de churn", "⚑": "⚑ Saída a organizar" };
 const PRIORIDADE = ["Cobrança", "Reter já", "Reter / vigiar", "Saída organizada", "Sem urgência"];
 const EIXO_COBRANCA = "Cobrança — sem tratamento preferencial";
+const SEMAFORO_ROTULO: Record<number, string> = { 1: "Controlada", 2: "Atenção", 3: "Crítico" };
 
 const LEGENDA_DOS_EIXOS: { nome: string; quando: string; significa: string }[] = [
   {
@@ -151,6 +152,7 @@ function AnaliseDaIA() {
 export function Carteira() {
   const { dados, carregando, erro, recarregar } = usarDados<ClassificacaoDaCarteira>(() => api.classificacaoDaCarteira(), []);
   const [eixo, definirEixo] = useState("");
+  const [semaforoFiltro, definirSemaforoFiltro] = useState<number | null>(null);
   const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
   const [abertos, definirAbertos] = useState<Set<number>>(new Set());
   const alternar = (id: number) =>
@@ -173,8 +175,11 @@ export function Carteira() {
 
   const eixos = Array.from(new Set(dados.itens.map((i) => i.eixo_de_acao))).sort((a, b) => rank(a) - rank(b));
   const itensDoEixo = dados.itens
-    .filter((i) => !eixo || i.eixo_de_acao === eixo)
+    .filter((i) => (!eixo || i.eixo_de_acao === eixo) && (semaforoFiltro === null || i.semaforo === semaforoFiltro))
     .sort((a, b) => rank(a.eixo_de_acao) - rank(b.eixo_de_acao) || Number(b.receita_mensal) - Number(a.receita_mensal));
+  const porSemaforo = { 1: 0, 2: 0, 3: 0 } as Record<number, number>;
+  for (const i of dados.itens) porSemaforo[i.semaforo] = (porSemaforo[i.semaforo] ?? 0) + 1;
+  const alternarSemaforo = (s: number) => definirSemaforoFiltro((atual) => (atual === s ? null : s));
   const itens = ordenar(itensDoEixo, ordenacao, {
     grupo: (i) => i.grupo_nome,
     receita: (i) => Number(i.receita_mensal),
@@ -192,12 +197,37 @@ export function Carteira() {
         <div className="retrato-faixa">
           <div className="retrato-chip"><b>{dados.retrato.unidades}</b><small>unidades (grupos + individuais)</small></div>
           <div className="retrato-chip"><b>{dinheiro(dados.retrato.receita_total)}</b><small>receita mensal recorrente</small></div>
-          <button type="button" className="retrato-chip retrato-chip-trav" onClick={() => definirEixo(EIXO_COBRANCA)}>
-            <b>{um1(dados.retrato.percentual_travado)}%</b><small>da receita travada por inadimplência (clique para filtrar)</small>
+          <button
+            type="button"
+            className="retrato-chip retrato-chip-trav"
+            onClick={() => definirEixo(EIXO_COBRANCA)}
+            aria-label={`${dados.retrato.grupos_travados} grupos travados, ${um1(dados.retrato.percentual_travado)}% da receita travada por inadimplência — clique para filtrar`}
+          >
+            <b>{dados.retrato.grupos_travados}</b>
+            <small>
+              grupos travados (clique para filtrar)
+              <br />
+              {um1(dados.retrato.percentual_travado)}% da receita travada por inadimplência
+            </small>
           </button>
-          <button type="button" className="retrato-chip retrato-chip-trav" onClick={() => definirEixo(EIXO_COBRANCA)}>
-            <b>{dados.retrato.grupos_travados}</b><small>grupos travados (clique para filtrar)</small>
-          </button>
+          <div className="retrato-chip retrato-semaforo">
+            <small className="retrato-semaforo-rotulo">Semáforo (clique para filtrar)</small>
+            <div className="retrato-semaforo-itens">
+              {([1, 2, 3] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  aria-pressed={semaforoFiltro === s}
+                  aria-label={`Semáforo ${s} — ${SEMAFORO_ROTULO[s]}: ${porSemaforo[s]} grupo${porSemaforo[s] === 1 ? "" : "s"}`}
+                  className={`retrato-semaforo-item retrato-semaforo-${s}${semaforoFiltro === s ? " retrato-semaforo-ativo" : ""}`}
+                  onClick={() => alternarSemaforo(s)}
+                >
+                  <b>{s}</b>
+                  <small>{porSemaforo[s]}</small>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -238,7 +268,7 @@ export function Carteira() {
 
 
       {itens.length === 0 ? (
-        <VazioPorFiltro aoLimpar={() => definirEixo("")} />
+        <VazioPorFiltro aoLimpar={() => { definirEixo(""); definirSemaforoFiltro(null); }} />
       ) : (
         <table className="tabela" aria-label="Grupos classificados">
           <thead>

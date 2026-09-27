@@ -50,6 +50,14 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Carteira: retrato com semáforo clicável (27/09/2026)
+
+Os chips de "% travado" e "grupos travados" viraram um só (o número grande é a contagem; o percentual da
+receita fica na legenda de baixo), sem perder o clique que filtra a tabela pelo eixo Cobrança. Um quarto
+elemento na faixa mostra os **três semáforos (1, 2, 3)** com a contagem de grupos em cada um; clicar
+filtra a tabela por aquele semáforo (clicar de novo desliga). As duas coisas se combinam com o filtro de
+eixo já existente.
+
 ## Carteira: revisão mensal do ISC e evolução (27/09/2026)
 
 Uma barra de uma linha só, acima do painel do ISC: "Registrar revisão do mês" (exige nome de quem

@@ -172,7 +172,9 @@ export function Carteira() {
   const irParaALista = () => listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   const filtrarInadimplentes = () => {
-    definirSomenteInadimplentes(true);
+    // Alterna como o semáforo: clicar de novo desliga. Sem isso, "aria-pressed" ficaria preso em
+    // true e o clique repetido pareceria não fazer nada.
+    definirSomenteInadimplentes((atual) => !atual);
     // Sem isto, um semáforo ainda ligado de um clique anterior soma com este filtro (E, não OU)
     // e a lista pode ficar vazia mesmo tendo grupo inadimplente — parece que o clique não fez nada.
     definirSemaforoFiltro(null);
@@ -222,8 +224,9 @@ export function Carteira() {
           <div className="retrato-chip"><b>{dinheiro(dados.retrato.receita_total)}</b><small>receita mensal recorrente</small></div>
           <button
             type="button"
-            className="retrato-chip retrato-chip-trav"
+            className={`retrato-chip retrato-chip-trav${somenteInadimplentes ? " retrato-chip-ativo" : ""}`}
             onClick={filtrarInadimplentes}
+            aria-pressed={somenteInadimplentes}
             aria-label={`${dados.retrato.grupos_travados} grupos inadimplentes, ${um1(dados.retrato.percentual_travado)}% da receita travada — clique para ver quais`}
           >
             <b>{dados.retrato.grupos_travados}</b>

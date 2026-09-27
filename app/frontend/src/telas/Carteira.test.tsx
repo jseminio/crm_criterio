@@ -80,6 +80,22 @@ describe("Carteira", () => {
     expect(screen.queryByText(/Alfa Comércio Ltda/)).toBeNull();
   });
 
+  it("chip de inadimplentes indica com aria-pressed quando está ativo, e desliga ao clicar de novo", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira />);
+    await screen.findByText(/▸ Alfa/);
+    const chipTravado = screen.getByRole("button", { name: /grupos inadimplentes/ });
+    expect(chipTravado).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.click(chipTravado);
+    expect(chipTravado).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText(/▸ Beta/)).toBeNull();
+
+    await userEvent.click(chipTravado);
+    expect(chipTravado).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText(/▸ Beta/)).toBeInTheDocument();
+  });
+
   it("mostra os três semáforos com a contagem, e filtra a lista ao clicar", async () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
     render(<Carteira />);

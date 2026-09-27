@@ -392,6 +392,8 @@
 .retrato-chip-trav b { color: var(--isc-crit); }
 .retrato-chip-trav:hover { background: #fce9e7; }
 .retrato-chip-trav:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.retrato-chip-trav.retrato-chip-ativo { background: var(--isc-crit); }
+.retrato-chip-trav.retrato-chip-ativo b, .retrato-chip-trav.retrato-chip-ativo small { color: #fff; }
 .retrato-semaforo { display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; }
 .retrato-semaforo-rotulo { color: var(--isc-cinza); }
 .retrato-semaforo-itens { display: flex; gap: 6px; }

@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { RevisaoDaCarteira } from "../api/tipos";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { dataHora } from "../formato";
 import { usarDados } from "../usarDados";
@@ -105,7 +106,17 @@ function LinhaDaRevisao({ revisao, aoMudar }: { revisao: RevisaoDaCarteira; aoMu
 }
 
 function HistoricoDeRevisoes({ revisoes, aoFechar, aoMudar }: { revisoes: RevisaoDaCarteira[]; aoFechar: () => void; aoMudar: () => void }) {
-  const ordenadas = [...revisoes].reverse();
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
+  const maisRecentePrimeiro = [...revisoes].reverse();
+  const ordenadas = ordenar(maisRecentePrimeiro, ordenacao, {
+    mes: (r) => r.mes_de_referencia,
+    isc: (r) => Number(r.isc_valor),
+    classe: (r) => Number(r.componente_classe),
+    semaforo: (r) => Number(r.componente_semaforo),
+    churn: (r) => Number(r.componente_churn),
+    travados: (r) => r.grupos_travados,
+    autor: (r) => r.registrada_por,
+  });
   return (
     <PainelLateral titulo="Histórico de revisões" subtitulo="Evolução do ISC mês a mês, com a data de cada revisão corrigível." aoFechar={aoFechar}>
       <GraficoDeEvolucao revisoes={revisoes} />
@@ -115,9 +126,13 @@ function HistoricoDeRevisoes({ revisoes, aoFechar, aoMudar }: { revisoes: Revisa
         <table className="tabela revisao-tabela" aria-label="Revisões registradas">
           <thead>
             <tr>
-              <th>Mês</th><th className="tabela-numero">ISC</th><th className="tabela-numero">Classe</th>
-              <th className="tabela-numero">Semáforo</th><th className="tabela-numero">Churn</th>
-              <th className="tabela-numero">Travados</th><th>Registrado por</th>
+              <ThOrdenavel coluna="mes" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Mês</ThOrdenavel>
+              <ThOrdenavel coluna="isc" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>ISC</ThOrdenavel>
+              <ThOrdenavel coluna="classe" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Classe</ThOrdenavel>
+              <ThOrdenavel coluna="semaforo" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Semáforo</ThOrdenavel>
+              <ThOrdenavel coluna="churn" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Churn</ThOrdenavel>
+              <ThOrdenavel coluna="travados" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Travados</ThOrdenavel>
+              <ThOrdenavel coluna="autor" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Registrado por</ThOrdenavel>
             </tr>
           </thead>
           <tbody>

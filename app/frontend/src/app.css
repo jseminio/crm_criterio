@@ -118,6 +118,13 @@
 .tabela tbody tr:last-child td { border-bottom: 0; }
 .tabela tbody tr:hover { background: var(--surface-sunken); }
 .tabela-numero { text-align: right; font-variant-numeric: tabular-nums; }
+.th-ordenar { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 4px;
+  cursor: pointer; font: inherit; color: inherit; }
+.th-ordenar:hover, .th-ordenar-ativa { color: var(--texto-forte); }
+.th-ordenar:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.th-seta { font-size: 9px; opacity: .45; }
+.th-ordenar-ativa .th-seta { opacity: 1; }
+
 .tabela-clicavel { cursor: pointer; }
 
 /* ------------------------------------------------------------------ painéis */
@@ -259,6 +266,10 @@
   padding: 7px 14px; cursor: pointer; }
 .visao-botao.visao-ativa { background: var(--azul-noturno); color: var(--branco); }
 .visao-botao:not(:last-child) { border-right: 1px solid var(--azul-noturno); }
+.kanban-ordenar-valor { all: revert; appearance: none; border: 1px solid var(--borda-forte); border-radius: 8px;
+  background: var(--surface-card); color: var(--texto-medio); font: 600 13px var(--fonte-ui); padding: 7px 14px;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.kanban-ordenar-valor.th-ordenar-ativa { color: var(--azul-noturno); border-color: var(--azul-noturno); }
 
 .abas { display: flex; gap: var(--e1); border-bottom: 1px solid var(--borda); }
 .aba { appearance: none; border: 0; background: transparent; cursor: pointer; font-weight: 500;
@@ -381,6 +392,22 @@
 .retrato-chip-trav b { color: var(--isc-crit); }
 .retrato-chip-trav:hover { background: #fce9e7; }
 .retrato-chip-trav:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.retrato-chip-trav.retrato-chip-ativo { background: var(--isc-crit); }
+.retrato-chip-trav.retrato-chip-ativo b, .retrato-chip-trav.retrato-chip-ativo small { color: #fff; }
+.retrato-semaforo { display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; }
+.retrato-semaforo-rotulo { color: var(--isc-cinza); }
+.retrato-semaforo-itens { display: flex; gap: 6px; }
+.retrato-semaforo-item { border: 1.5px solid var(--isc-linha); border-radius: 8px; background: #fff; padding: 4px 10px;
+  cursor: pointer; display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.retrato-semaforo-item b { font: 700 18px var(--isc-titulo); }
+.retrato-semaforo-item small { font-size: 10px; color: var(--isc-cinza); }
+.retrato-semaforo-1 { border-color: #2e7d5b; } .retrato-semaforo-1 b { color: #2e7d5b; }
+.retrato-semaforo-2 { border-color: #b8860b; } .retrato-semaforo-2 b { color: #b8860b; }
+.retrato-semaforo-3 { border-color: #c0392b; } .retrato-semaforo-3 b { color: #c0392b; }
+.retrato-semaforo-item.retrato-semaforo-ativo { color: #fff; }
+.retrato-semaforo-1.retrato-semaforo-ativo { background: #2e7d5b; } .retrato-semaforo-1.retrato-semaforo-ativo b, .retrato-semaforo-1.retrato-semaforo-ativo small { color: #fff; }
+.retrato-semaforo-2.retrato-semaforo-ativo { background: #b8860b; } .retrato-semaforo-2.retrato-semaforo-ativo b, .retrato-semaforo-2.retrato-semaforo-ativo small { color: #fff; }
+.retrato-semaforo-3.retrato-semaforo-ativo { background: #c0392b; } .retrato-semaforo-3.retrato-semaforo-ativo b, .retrato-semaforo-3.retrato-semaforo-ativo small { color: #fff; }
 @media (max-width: 720px) { .retrato-faixa { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .ia-analise { background: #efe9fa; border-radius: var(--raio-md); padding: var(--e3) var(--e4); font-size: 12.5px; line-height: 1.5; }

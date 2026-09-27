@@ -87,16 +87,97 @@ describe("Carteira", () => {
     expect(linhas[1]).toHaveTextContent("Alfa");
   });
 
-  it("mostra o retrato da carteira e filtra ao clicar nos chips travados", async () => {
+  it("mostra o retrato com o travado e o percentual juntos num só chip, e filtra ao clicar", async () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
     render(<Carteira listas={null} />);
     await screen.findByText(/▸ Alfa/);
-    expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("16,7%")).toBeInTheDocument();
-    expect(screen.getByText("1", { selector: "b" })).toBeInTheDocument();
-    await userEvent.click(screen.getByText("16,7%").closest("button")!);
+    expect(screen.getByText("unidades (grupos + individuais)").previousElementSibling).toHaveTextContent("2");
+    const chipTravado = screen.getByRole("button", { name: /grupos inadimplentes, 16,7% da receita travada/ });
+    expect(chipTravado).toHaveTextContent("1"); // grupos_travados
+    const rolou = vi.spyOn(Element.prototype, "scrollIntoView");
+    await userEvent.click(chipTravado);
     expect(screen.getByLabelText("Eixo de ação")).toHaveValue("Cobrança — sem tratamento preferencial");
     expect(screen.queryByText(/▸ Beta/)).toBeNull();
+    // Sem isto o filtro aplica fora da tela: a pessoa clica e parece que nada aconteceu.
+    expect(rolou).toHaveBeenCalled();
+    // Filtra pro grupo consolidado — não abre as empresas sozinho.
+    expect(screen.queryByText(/Alfa Comércio Ltda/)).toBeNull();
+  });
+
+  it("chip de inadimplentes indica com aria-pressed quando está ativo, e desliga ao clicar de novo", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira listas={null} />);
+    await screen.findByText(/▸ Alfa/);
+    const chipTravado = screen.getByRole("button", { name: /grupos inadimplentes/ });
+    expect(chipTravado).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.click(chipTravado);
+    expect(chipTravado).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText(/▸ Beta/)).toBeNull();
+
+    await userEvent.click(chipTravado);
+    expect(chipTravado).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText(/▸ Beta/)).toBeInTheDocument();
+  });
+
+  it("mostra os três semáforos com a contagem, e filtra a lista ao clicar", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira listas={null} />);
+    await screen.findByText(/▸ Alfa/);
+    await screen.findByText(/▸ Beta/);
+
+    const botao3 = screen.getByRole("button", { name: /^Semáforo 3/ });
+    expect(botao3).toHaveTextContent("2"); // Alfa e Beta são semáforo 3
+    expect(screen.getByRole("button", { name: /^Semáforo 1/ })).toHaveTextContent("0");
+
+    const rolou = vi.spyOn(Element.prototype, "scrollIntoView");
+    await userEvent.click(botao3);
+    expect(botao3).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/▸ Alfa/)).toBeInTheDocument();
+    expect(screen.getByText(/▸ Beta/)).toBeInTheDocument();
+    // Mesma correção do chip de inadimplentes: leva até a lista, não só filtra.
+    expect(rolou).toHaveBeenCalled();
+
+    // clicar de novo no mesmo semáforo desliga o filtro
+    await userEvent.click(botao3);
+    expect(botao3).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("chip de inadimplentes e semáforo não se somam: um clique desliga o outro", async () => {
+    // Alfa é o único em_cobranca, e está no semáforo 3; Gama é semáforo 1 mas não é inadimplente.
+    // Se os dois filtros se somassem (E), inadimplentes + semáforo 1 não bateria em ninguém —
+    // era exatamente o "às vezes some" relatado.
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(
+      resposta({ itens: [item(), item({ grupo_id: 3, grupo_nome: "Gama", em_cobranca: false, semaforo: 1, eixo_de_acao: "Sem urgência de churn" })] }),
+    );
+    render(<Carteira listas={null} />);
+    await screen.findByText(/▸ Alfa/);
+
+    await userEvent.click(screen.getByRole("button", { name: /grupos inadimplentes/ }));
+    expect(screen.getByText(/▸ Alfa/)).toBeInTheDocument();
+    expect(screen.queryByText(/▸ Gama/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Semáforo 1/ }));
+    // O chip desligou sozinho: aparece Gama (semáforo 1), não fica vazio.
+    expect(await screen.findByText(/▸ Gama/)).toBeInTheDocument();
+    expect(screen.queryByText(/▸ Alfa/)).toBeNull();
+    expect(screen.getByLabelText("Eixo de ação")).toHaveValue("");
+
+    await userEvent.click(screen.getByRole("button", { name: /grupos inadimplentes/ }));
+    // E o inverso: religar o chip desliga o semáforo.
+    expect(screen.getByRole("button", { name: /^Semáforo 1/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText(/▸ Alfa/)).toBeInTheDocument();
+    expect(screen.queryByText(/▸ Gama/)).toBeNull();
+  });
+
+  it("semáforo sem nenhum grupo filtra para uma lista vazia, com o botão de limpar", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira listas={null} />);
+    await screen.findByText(/▸ Alfa/);
+    await userEvent.click(screen.getByRole("button", { name: /^Semáforo 1/ }));
+    expect(await screen.findByText(/nenhum resultado/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(await screen.findByText(/▸ Alfa/)).toBeInTheDocument();
   });
 
   it("filtra por eixo e oferece limpar quando nada passa", async () => {

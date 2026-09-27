@@ -151,7 +151,11 @@ function AnaliseDaIA() {
 
 export function Carteira() {
   const { dados, carregando, erro, recarregar } = usarDados<ClassificacaoDaCarteira>(() => api.classificacaoDaCarteira(), []);
-  const [eixo, definirEixo] = useState("");
+  // O eixo efetivo é o do campo "Eixo de ação", a não ser que o chip de inadimplentes esteja
+  // ligado (aí ele manda, mas sem apagar o que estava no campo — desligar o chip volta pra ele).
+  const [eixoManual, definirEixoManual] = useState("");
+  const [somenteInadimplentes, definirSomenteInadimplentes] = useState(false);
+  const eixo = somenteInadimplentes ? EIXO_COBRANCA : eixoManual;
   const [semaforoFiltro, definirSemaforoFiltro] = useState<number | null>(null);
   const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
   const [abertos, definirAbertos] = useState<Set<number>>(new Set());
@@ -168,7 +172,10 @@ export function Carteira() {
   const irParaALista = () => listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   const filtrarInadimplentes = () => {
-    definirEixo(EIXO_COBRANCA);
+    definirSomenteInadimplentes(true);
+    // Sem isto, um semáforo ainda ligado de um clique anterior soma com este filtro (E, não OU)
+    // e a lista pode ficar vazia mesmo tendo grupo inadimplente — parece que o clique não fez nada.
+    definirSemaforoFiltro(null);
     // Mostra de cara as empresas dos grupos inadimplentes — é a lista concreta que se quer ver,
     // não só o grupo consolidado.
     definirAbertos(new Set(dados?.itens.filter((i) => i.em_cobranca).map((i) => i.grupo_id) ?? []));
@@ -194,6 +201,9 @@ export function Carteira() {
   for (const i of dados.itens) porSemaforo[i.semaforo] = (porSemaforo[i.semaforo] ?? 0) + 1;
   const alternarSemaforo = (s: number) => {
     definirSemaforoFiltro((atual) => (atual === s ? null : s));
+    // Desliga só o chip de inadimplentes (mesmo raciocínio do lado de lá). O eixo escolhido no
+    // campo "Eixo de ação" abaixo não é tocado — esse continua combinando de propósito.
+    definirSomenteInadimplentes(false);
     irParaALista();
   };
   const itens = ordenar(itensDoEixo, ordenacao, {
@@ -275,7 +285,11 @@ export function Carteira() {
       <div className="carteira-filtro" ref={listaRef}>
         <label className="campo">
           <span className="campo-rotulo">Eixo de ação</span>
-          <select className="selecao" value={eixo} onChange={(e) => definirEixo(e.target.value)}>
+          <select
+            className="selecao"
+            value={eixo}
+            onChange={(e) => { definirEixoManual(e.target.value); definirSomenteInadimplentes(false); }}
+          >
             <option value="">Todos</option>
             {eixos.map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
@@ -284,7 +298,7 @@ export function Carteira() {
 
 
       {itens.length === 0 ? (
-        <VazioPorFiltro aoLimpar={() => { definirEixo(""); definirSemaforoFiltro(null); }} />
+        <VazioPorFiltro aoLimpar={() => { definirEixoManual(""); definirSomenteInadimplentes(false); definirSemaforoFiltro(null); }} />
       ) : (
         <table className="tabela" aria-label="Grupos classificados">
           <thead>

@@ -101,6 +101,33 @@ describe("Carteira", () => {
     expect(botao3).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("chip de inadimplentes e semáforo não se somam: um clique desliga o outro", async () => {
+    // Alfa é o único em_cobranca, e está no semáforo 3; Gama é semáforo 1 mas não é inadimplente.
+    // Se os dois filtros se somassem (E), inadimplentes + semáforo 1 não bateria em ninguém —
+    // era exatamente o "às vezes some" relatado.
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(
+      resposta({ itens: [item(), item({ grupo_id: 3, grupo_nome: "Gama", em_cobranca: false, semaforo: 1, eixo_de_acao: "Sem urgência de churn" })] }),
+    );
+    render(<Carteira />);
+    await screen.findByText(/▸ Alfa/);
+
+    await userEvent.click(screen.getByRole("button", { name: /grupos inadimplentes/ }));
+    expect(screen.getByText(/▸ Alfa/)).toBeInTheDocument();
+    expect(screen.queryByText(/▸ Gama/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Semáforo 1/ }));
+    // O chip desligou sozinho: aparece Gama (semáforo 1), não fica vazio.
+    expect(await screen.findByText(/▸ Gama/)).toBeInTheDocument();
+    expect(screen.queryByText(/▸ Alfa/)).toBeNull();
+    expect(screen.getByLabelText("Eixo de ação")).toHaveValue("");
+
+    await userEvent.click(screen.getByRole("button", { name: /grupos inadimplentes/ }));
+    // E o inverso: religar o chip desliga o semáforo.
+    expect(screen.getByRole("button", { name: /^Semáforo 1/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText(/▸ Alfa/)).toBeInTheDocument();
+    expect(screen.queryByText(/▸ Gama/)).toBeNull();
+  });
+
   it("semáforo sem nenhum grupo filtra para uma lista vazia, com o botão de limpar", async () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
     render(<Carteira />);

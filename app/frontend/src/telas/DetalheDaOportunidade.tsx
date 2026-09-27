@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { Listas, MudancaDePreco, OportunidadeDetalhe } from "../api/tipos";
+import { DIRECIONADORES_DE_PORTE } from "../componentes/direcionadoresDePorte";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro } from "../componentes/estados";
@@ -16,21 +17,6 @@ function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }
     </div>
   );
 }
-
-/** Os nove direcionadores da régua de porte, na ordem de
- * `regua-de-porte-e-plano-de-teste.md`, seção 2. Em branco = "não se aplica
- * ao escopo contratado" — fica fora da média, nunca vira zero. */
-const DIRECIONADORES: { id: string; rotulo: string; placeholder: string }[] = [
-  { id: "documentos_fiscais_mes", rotulo: "Documentos fiscais/mês", placeholder: "emitidas + recebidas" },
-  { id: "lancamentos_contabeis_mes", rotulo: "Lançamentos contábeis/mês", placeholder: "" },
-  { id: "pagamentos_mes", rotulo: "Pagamentos/mês", placeholder: "" },
-  { id: "contas_bancarias", rotulo: "Contas bancárias", placeholder: "" },
-  { id: "conciliacoes_cartao_mes", rotulo: "Conciliações de cartão/mês", placeholder: "0 = nenhuma" },
-  { id: "empregados_clt", rotulo: "Empregados CLT", placeholder: "" },
-  { id: "admissoes_desligamentos_mes", rotulo: "Admissões + desligamentos/mês", placeholder: "" },
-  { id: "cnpjs_no_escopo", rotulo: "CNPJs no escopo", placeholder: "" },
-  { id: "tomadores_de_servico", rotulo: "Tomadores de serviço", placeholder: "" },
-];
 
 function HistoricoDePreco({ mudancas }: { mudancas: MudancaDePreco[] }) {
   return (
@@ -158,7 +144,7 @@ function VolumetriaEPorte({
         {nota1a5("risco_tecnico", "Risco técnico")}
       </div>
 
-      {paresDe(DIRECIONADORES).map((par, i) => (
+      {paresDe(DIRECIONADORES_DE_PORTE).map((par, i) => (
         <div className="formulario-duplo" key={i}>
           {par.map((d) => numero(d.id, d.rotulo, d.placeholder, true))}
         </div>
@@ -331,7 +317,7 @@ export function DetalheDaOportunidade({
           porte_definido_por: d.porte_definido_por ?? "",
           motivo_do_preco: "",
           ...Object.fromEntries(
-            DIRECIONADORES.map((x) => [`origem_${x.id}`, d.origem_da_volumetria?.[x.id] ?? ""]),
+            DIRECIONADORES_DE_PORTE.map((x) => [`origem_${x.id}`, d.origem_da_volumetria?.[x.id] ?? ""]),
           ),
         });
       })
@@ -365,7 +351,7 @@ export function DetalheDaOportunidade({
       );
       // A origem vai como um mapa só, e só de campo que ainda tem valor.
       mudancas.origem_da_volumetria = Object.fromEntries(
-        DIRECIONADORES.filter((x) => rascunho[`origem_${x.id}`] && rascunho[x.id]).map((x) => [
+        DIRECIONADORES_DE_PORTE.filter((x) => rascunho[`origem_${x.id}`] && rascunho[x.id]).map((x) => [
           x.id,
           rascunho[`origem_${x.id}`],
         ]),

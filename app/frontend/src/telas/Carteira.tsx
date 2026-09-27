@@ -98,24 +98,26 @@ function Componente({ nome, valor, legenda, cor }: { nome: string; valor: string
   );
 }
 
-function ComponenteDistribuicao({ faixas }: { faixas: FaixaDeClasse[] }) {
+function DistribuicaoNoHero({ faixas }: { faixas: FaixaDeClasse[] }) {
   return (
-    <div className="isc-componente isc-componente-distribuicao">
-      <h4>Distribuição</h4>
-      {faixas.map((f) => (
-        <div key={f.classe} className="distribuicao-linha">
-          <div className="distribuicao-cab">
-            <b>{f.classe}</b>
-            <span>{f.unidades} · {um1(f.percentual)}%</span>
+    <div className="hero-distribuicao">
+      <div className="isc-rotulo">DISTRIBUIÇÃO</div>
+      <div className="hero-distribuicao-linhas">
+        {faixas.map((f) => (
+          <div key={f.classe} className="distribuicao-linha distribuicao-linha-hero">
+            <div className="distribuicao-cab">
+              <b>{f.classe}</b>
+              <span>{f.unidades} · {um1(f.percentual)}%</span>
+            </div>
+            <div className="isc-trilho isc-trilho-hero" aria-hidden="true">
+              <div style={{ width: `${Math.min(100, Number(f.percentual))}%`, background: COR_DA_CLASSE[f.classe] ?? "#666" }} />
+            </div>
+            <small className={f.dentro_da_meta ? "distribuicao-dentro-hero" : "distribuicao-fora-hero"}>
+              {f.dentro_da_meta ? "dentro da meta" : "fora da meta"} (meta {f.minimo}–{f.maximo}%)
+            </small>
           </div>
-          <div className="isc-trilho" aria-hidden="true">
-            <div style={{ width: `${Math.min(100, Number(f.percentual))}%`, background: COR_DA_CLASSE[f.classe] ?? "#666" }} />
-          </div>
-          <small className={f.dentro_da_meta ? "distribuicao-dentro" : "distribuicao-fora"}>
-            {f.dentro_da_meta ? "dentro da meta" : "fora da meta"} (meta {f.minimo}–{f.maximo}%)
-          </small>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -229,6 +231,7 @@ export function Carteira() {
               <p className="isc-ref">Referência {data(dados.referencia)} · parâmetros {dados.versao_dos_parametros}</p>
             </div>
             <Medidor valor={isc.valor} zona={isc.zona} />
+            {dados.distribuicao_por_classe.length > 0 && <DistribuicaoNoHero faixas={dados.distribuicao_por_classe} />}
           </section>
 
           <div className="isc-componentes">
@@ -236,7 +239,6 @@ export function Carteira() {
               legenda={`${Object.entries(dados.por_classe).map(([c, n]) => `${c} ${n}`).join(" · ")}, ponderado por receita`} />
             <Componente nome="Semáforo" valor={isc.componente_semaforo} cor="#b8860b" legenda="Saúde operacional (pior = 3, melhor = 1)" />
             <Componente nome="Churn" valor={isc.componente_churn} cor="#2e7d5b" legenda="Risco de saída ponderado por receita" />
-            {dados.distribuicao_por_classe.length > 0 && <ComponenteDistribuicao faixas={dados.distribuicao_por_classe} />}
           </div>
         </>
       )}

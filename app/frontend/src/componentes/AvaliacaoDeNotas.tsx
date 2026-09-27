@@ -8,6 +8,8 @@
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
+import type { SugestaoDePorte, VolumetriaEntrada } from "../api/tipos";
+import { DIRECIONADORES_DE_PORTE, PORTES } from "./direcionadoresDePorte";
 import { PainelLateral } from "./PainelLateral";
 
 const FATORES_COMPLEXIDADE = [
@@ -88,6 +90,13 @@ export function AvaliacaoDeNotas({
   const [mesesNoPrazo, definirMesesNoPrazo] = useState(3);
   const [cobrancaDobrada, definirCobrancaDobrada] = useState(false);
   const [atrasoRecorrente, definirAtrasoRecorrente] = useState(false);
+  const [volumetria, definirVolumetria] = useState<Record<string, string>>({});
+  const [servicosAlem, definirServicosAlem] = useState(0);
+  const [consolidacaoDeGrupo, definirConsolidacaoDeGrupo] = useState(false);
+  const [auditada, definirAuditada] = useState(false);
+  const [porteConfirmado, definirPorteConfirmado] = useState("");
+  const [sugestao, definirSugestao] = useState<SugestaoDePorte | null>(null);
+  const [buscandoSugestao, definirBuscandoSugestao] = useState(false);
   const [autor, definirAutor] = useState("");
   const [salvando, definirSalvando] = useState(false);
   const [erro, definirErro] = useState<string | null>(null);
@@ -117,6 +126,29 @@ export function AvaliacaoDeNotas({
     return partes.join(". ").slice(0, 500);
   };
 
+  const numeroOuVazio = (v: string): number | undefined => (v.trim() === "" ? undefined : Number(v));
+
+  const volumetriaEntrada = (): VolumetriaEntrada => ({
+    ...(Object.fromEntries(
+      DIRECIONADORES_DE_PORTE.map((d) => [d.id, numeroOuVazio(volumetria[d.id] ?? "")]),
+    ) as VolumetriaEntrada),
+    servicos_contratados_alem_do_primeiro: servicosAlem,
+    tem_consolidacao_de_grupo: consolidacaoDeGrupo,
+    e_auditada: auditada,
+  });
+
+  const buscarSugestao = async () => {
+    definirBuscandoSugestao(true);
+    definirErro(null);
+    try {
+      definirSugestao(await api.sugestaoDePorte(volumetriaEntrada()));
+    } catch (falha) {
+      definirErro(falha instanceof ErroDaApi ? falha.message : "Falha ao calcular a sugestão de porte.");
+    } finally {
+      definirBuscandoSugestao(false);
+    }
+  };
+
   const salvar = async () => {
     definirSalvando(true);
     definirErro(null);
@@ -124,6 +156,10 @@ export function AvaliacaoDeNotas({
       await api.editarNotasDaCarteira(grupoId, {
         autor: autor.trim(), motivo: motivo(),
         complexidade: notaComplexidade, disciplina: notaDisciplina, risco: notaRisco,
+      });
+      await api.editarPorte(grupoId, {
+        autor: autor.trim(), ...volumetriaEntrada(),
+        porte: porteConfirmado || undefined,
       });
       aoSalvar();
     } catch (falha) {
@@ -136,7 +172,7 @@ export function AvaliacaoDeNotas({
   return (
     <PainelLateral
       titulo={grupoNome}
-      subtitulo="Avaliar complexidade, risco técnico e disciplina"
+      subtitulo="Avaliar complexidade, risco técnico, disciplina e porte"
       aoFechar={aoFechar}
       rodape={
         <>
@@ -202,6 +238,84 @@ export function AvaliacaoDeNotas({
         <p className="recado">
           Nota calculada: <strong>{notaDisciplina}</strong>
         </p>
+      </section>
+
+      <section className="avaliacao-secao">
+        <h3>Porte</h3>
+        <p className="campo-ajuda" style={{ marginTop: 0 }}>
+          Os nove direcionadores da régua de volume. Em branco, o campo não entra na média — não é
+          "zero". A régua sugere; o porte confirmado abaixo é o que vale.
+        </p>
+        <div className="formulario-duplo">
+          {DIRECIONADORES_DE_PORTE.map((d) => (
+            <label key={d.id} className="campo-bloco">
+              <span className="campo-rotulo">{d.rotulo}</span>
+              <input
+                className="entrada"
+                type="number"
+                min={0}
+                placeholder={d.placeholder}
+                value={volumetria[d.id] ?? ""}
+                onChange={(e) => definirVolumetria((antes) => ({ ...antes, [d.id]: e.target.value }))}
+              />
+            </label>
+          ))}
+        </div>
+
+        <div className="formulario-duplo">
+          <label className="campo-bloco">
+            <span className="campo-rotulo">Serviços contratados além do primeiro</span>
+            <input
+              className="entrada" type="number" min={0} value={servicosAlem}
+              onChange={(e) => definirServicosAlem(Number(e.target.value))}
+            />
+          </label>
+          <div className="campo-bloco">
+            <span className="campo-rotulo">Ajustes</span>
+            <label className="avaliacao-item">
+              <input type="checkbox" checked={consolidacaoDeGrupo} onChange={(e) => definirConsolidacaoDeGrupo(e.target.checked)} />
+              Há consolidação de grupo
+            </label>
+            <label className="avaliacao-item">
+              <input type="checkbox" checked={auditada} onChange={(e) => definirAuditada(e.target.checked)} />
+              Empresa auditada
+            </label>
+          </div>
+        </div>
+
+        <button type="button" className="botao botao-secundario" onClick={buscarSugestao} disabled={buscandoSugestao}>
+          {buscandoSugestao ? "Calculando…" : "Ver sugestão"}
+        </button>
+
+        {sugestao && (
+          <p className="recado">
+            {sugestao.calculavel ? (
+              <>
+                Sugestão da régua: <strong>{sugestao.porte}</strong> — pontuação{" "}
+                {sugestao.pontuacao?.replace(".", ",")}, {sugestao.horas_base}h base/mês,{" "}
+                {sugestao.direcionadores_aplicados} de 9 direcionadores preenchidos.
+              </>
+            ) : (
+              "Sugestão da régua: não calculável — nenhum direcionador preenchido ainda."
+            )}
+          </p>
+        )}
+
+        <label className="campo-bloco">
+          <span className="campo-rotulo">Porte confirmado</span>
+          <select className="selecao" value={porteConfirmado} onChange={(e) => definirPorteConfirmado(e.target.value)}>
+            <option value="">— não confirmado —</option>
+            {PORTES.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </label>
+        {sugestao?.calculavel && porteConfirmado !== sugestao.porte && (
+          <button
+            type="button" className="botao botao-secundario"
+            onClick={() => definirPorteConfirmado(sugestao.porte ?? "")}
+          >
+            Usar sugestão ({sugestao.porte})
+          </button>
+        )}
       </section>
     </PainelLateral>
   );

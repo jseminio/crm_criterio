@@ -63,7 +63,7 @@ describe("Carteira", () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
     render(<Carteira />);
     await screen.findByText("53,7");
-    expect(screen.getByText("Distribuição")).toBeInTheDocument();
+    expect(screen.getByText("DISTRIBUIÇÃO")).toBeInTheDocument();
     expect(screen.getByText("0 · 0,0%")).toBeInTheDocument(); // A
     expect(screen.getAllByText("1 · 50,0%")).toHaveLength(2); // B e C
     // B está fora da meta (50% contra 35–40%), C está dentro (50% contra 40–50%): o texto, não só a cor, marca a diferença.

@@ -17,6 +17,8 @@ vi.mock("../api/cliente", async () => {
       registrarRevisaoDaCarteira: vi.fn(),
       editarMesDaRevisao: vi.fn(),
       editarNotasDaCarteira: vi.fn(),
+      sugestaoDePorte: vi.fn(),
+      editarPorte: vi.fn(),
     },
   };
 });
@@ -92,8 +94,11 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
     expect(screen.getByRole("button", { name: "Salvar avaliação" })).toBeEnabled();
   });
 
-  it("salva as três notas calculadas, com motivo descrevendo o que foi marcado", async () => {
+  it("salva as três notas calculadas e o porte, com motivo descrevendo o que foi marcado", async () => {
     vi.mocked(api.editarNotasDaCarteira).mockResolvedValue({ item: item(), isc: null, avisos: [] });
+    vi.mocked(api.editarPorte).mockResolvedValue({
+      porte: null, porte_definido_por: null, porte_definido_em: null,
+    });
     await abrir();
     await userEvent.click(screen.getByLabelText(/Holding com consolidação/));
     await userEvent.click(screen.getByLabelText(/Auto de infração/));
@@ -105,9 +110,45 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
       motivo: "Complexidade 2 (1/6: holding). Risco técnico 4 (1/5: auto de infração). Disciplina 5 (3/3 meses no prazo)",
       complexidade: 2, disciplina: 5, risco: 4,
     });
+    expect(api.editarPorte).toHaveBeenCalledWith(1, {
+      autor: "Eduardo Luiz", porte: undefined,
+      servicos_contratados_alem_do_primeiro: 0, tem_consolidacao_de_grupo: false, e_auditada: false,
+    });
     // fecha o painel e recarrega a lista depois de salvar
-    await waitFor(() => expect(screen.queryByText("Avaliar complexidade, risco técnico e disciplina")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Avaliar complexidade, risco técnico, disciplina e porte")).toBeNull());
     expect(api.classificacaoDaCarteira).toHaveBeenCalledTimes(2);
+  });
+
+  it("porte: calcula a sugestão sob demanda e oferece usá-la", async () => {
+    vi.mocked(api.sugestaoDePorte).mockResolvedValue({
+      calculavel: true, pontuacao: "0.00", porte: "Micro", horas_base: 5, direcionadores_aplicados: 1,
+    });
+    await abrir();
+    await userEvent.type(screen.getByLabelText("CNPJs no escopo"), "1");
+    await userEvent.click(screen.getByRole("button", { name: "Ver sugestão" }));
+
+    expect(api.sugestaoDePorte).toHaveBeenCalledWith({
+      cnpjs_no_escopo: 1, servicos_contratados_alem_do_primeiro: 0,
+      tem_consolidacao_de_grupo: false, e_auditada: false,
+    });
+    expect(await screen.findByText(/Sugestão da régua:/)).toHaveTextContent(
+      "Sugestão da régua: Micro — pontuação 0,00, 5h base/mês, 1 de 9 direcionadores preenchidos.",
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Usar sugestão (Micro)" }));
+    expect(screen.getByLabelText("Porte confirmado")).toHaveValue("Micro");
+    // já usada: o botão de novo some
+    expect(screen.queryByRole("button", { name: "Usar sugestão (Micro)" })).toBeNull();
+  });
+
+  it("porte: sem nenhum direcionador, a sugestão avisa que não dá para calcular", async () => {
+    vi.mocked(api.sugestaoDePorte).mockResolvedValue({
+      calculavel: false, pontuacao: null, porte: null, horas_base: null, direcionadores_aplicados: 0,
+    });
+    await abrir();
+    await userEvent.click(screen.getByRole("button", { name: "Ver sugestão" }));
+    expect(await screen.findByText("Sugestão da régua: não calculável — nenhum direcionador preenchido ainda.")).toBeInTheDocument();
+    expect(screen.queryByText(/Usar sugestão/)).toBeNull();
   });
 
   it("mostra o erro da API sem travar a tela", async () => {
@@ -121,7 +162,7 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
   it("cancelar fecha o painel sem chamar a API", async () => {
     await abrir();
     await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    expect(screen.queryByText("Avaliar complexidade, risco técnico e disciplina")).toBeNull();
+    expect(screen.queryByText("Avaliar complexidade, risco técnico, disciplina e porte")).toBeNull();
     expect(api.editarNotasDaCarteira).not.toHaveBeenCalled();
   });
 });

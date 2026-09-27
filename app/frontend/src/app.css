@@ -419,6 +419,15 @@
 .revisao-tabela { margin-top: var(--e3); font-size: 12px; }
 .isc-hero { background: var(--isc-hero); border-radius: var(--raio-lg); padding: var(--e6) var(--e8); color: #fff;
   display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr); gap: var(--e5); align-items: center; }
+.hero-distribuicao { grid-column: 1 / -1; padding-top: var(--e5); margin-top: var(--e2);
+  border-top: 1px solid rgba(255, 255, 255, .12); }
+.hero-distribuicao .isc-rotulo { margin-bottom: var(--e3); }
+.hero-distribuicao-linhas { display: flex; gap: var(--e5); }
+.distribuicao-linha-hero { flex: 1; }
+.distribuicao-linha-hero .distribuicao-cab { color: #fff; }
+.isc-trilho-hero { background: rgba(255, 255, 255, .18); }
+.distribuicao-dentro-hero { color: #8b95b0; font-size: 10.5px; }
+.distribuicao-fora-hero { color: #e06a5a; font-weight: 700; font-size: 10.5px; }
 .isc-hero p { margin: 0; color: var(--isc-gelo); font-size: 13px; }
 .isc-hero .isc-ref { color: #8b95b0; font-size: 11px; margin-top: var(--e3); }
 .isc-rotulo { color: var(--isc-ouro); font-weight: 700; font-size: 12px; letter-spacing: .14em; }
@@ -434,7 +443,7 @@
 .isc-zona { font-weight: 700; font-size: 12px; letter-spacing: .1em; color: #e0a92b; }
 .isc-faixas { display: flex; justify-content: space-between; width: 400px; max-width: 100%; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; }
 .isc-faixas span:nth-child(1) { color: #e06a5a; } .isc-faixas span:nth-child(2) { color: #e0a92b; } .isc-faixas span:nth-child(3) { color: #4cc296; }
-.isc-componentes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e4); }
+.isc-componentes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e4); }
 .isc-componente { background: var(--isc-painel); border-radius: var(--raio-md); padding: var(--e4) var(--e5); }
 .isc-componente h4 { margin: 0; font: 700 12px var(--isc-corpo); color: var(--isc-marino); letter-spacing: .06em; text-transform: uppercase; }
 .isc-numero { font: 700 30px/1.25 var(--isc-titulo); color: var(--isc-marino); }
@@ -442,13 +451,10 @@
 .isc-trilho { height: 8px; border-radius: 5px; background: var(--isc-linha); overflow: hidden; }
 .isc-trilho div { height: 100%; }
 .isc-componente p { margin: 6px 0 0; font-size: 11.5px; }
-.isc-componente-distribuicao { display: flex; flex-direction: column; gap: 6px; }
 .distribuicao-linha { display: flex; flex-direction: column; gap: 3px; }
 .distribuicao-linha .isc-trilho { height: 6px; }
 .distribuicao-cab { display: flex; justify-content: space-between; font-size: 12px; color: var(--isc-marino); }
 .distribuicao-cab b { font-weight: 700; }
-.distribuicao-dentro { color: var(--isc-cinza-2); font-size: 10.5px; }
-.distribuicao-fora { color: var(--isc-crit); font-weight: 700; font-size: 10.5px; }
 .carteira-filtro { display: flex; gap: var(--e2); align-items: end; flex-wrap: wrap; }
 .carteira .tabela { font-size: 12.5px; }
 .carteira .tabela th { background: var(--isc-painel); color: var(--isc-marino); font: 700 10.5px var(--isc-corpo);
@@ -474,12 +480,10 @@
 .avaliacao-secao:last-child { border-bottom: 0; }
 .avaliacao-secao h3 { margin: 0; font-size: 13px; color: var(--texto-forte); }
 .avaliacao-item { display: flex; align-items: center; gap: var(--e2); font-size: 13px; color: var(--texto-forte); }
-@media (max-width: 1100px) {
-  .isc-componentes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 @media (max-width: 800px) {
   .isc-hero { grid-template-columns: 1fr; padding: var(--e5); }
   .isc-componentes { grid-template-columns: 1fr; }
+  .hero-distribuicao-linhas { flex-direction: column; gap: var(--e3); }
 }
 
 /* Movimento reduzido (26/09/2026). Fica no FIM do arquivo e vale para todo

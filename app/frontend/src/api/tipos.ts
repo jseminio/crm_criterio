@@ -586,6 +586,40 @@ export interface FaixaDeClasse {
   dentro_da_meta: boolean;
 }
 
+export interface VolumetriaEntrada {
+  documentos_fiscais_mes?: number;
+  lancamentos_contabeis_mes?: number;
+  pagamentos_mes?: number;
+  contas_bancarias?: number;
+  conciliacoes_cartao_mes?: number;
+  empregados_clt?: number;
+  admissoes_desligamentos_mes?: number;
+  cnpjs_no_escopo?: number;
+  tomadores_de_servico?: number;
+  servicos_contratados_alem_do_primeiro?: number;
+  tem_consolidacao_de_grupo?: boolean;
+  e_auditada?: boolean;
+}
+
+export interface SugestaoDePorte {
+  calculavel: boolean;
+  pontuacao: string | null;
+  porte: string | null;
+  horas_base: number | null;
+  direcionadores_aplicados: number;
+}
+
+export interface EdicaoDePorte extends VolumetriaEntrada {
+  autor: string;
+  porte?: string;
+}
+
+export interface PorteDoGrupo extends VolumetriaEntrada {
+  porte: string | null;
+  porte_definido_por: string | null;
+  porte_definido_em: string | null;
+}
+
 export interface EdicaoDeNotas {
   autor: string;
   motivo: string;

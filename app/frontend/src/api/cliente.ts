@@ -21,6 +21,7 @@ import type {
   InvestimentoEmMidia,
   PainelDoSdr,
   ParametrosDoSdr,
+  PedidoDeServicoNovo,
   ServicoDoCatalogo,
   DimensaoDeRecorte,
   LinhaDeRecorte,
@@ -233,6 +234,8 @@ export const api = {
     }),
 
   servicos: () => pedir<ServicoDoCatalogo[]>("/api/servicos"),
+
+  pedidosDeServicoNovo: () => pedir<PedidoDeServicoNovo[]>("/api/servicos/pedidos"),
 
   // ---------------------------------------------------------- SDR de IA
   painelDoSdr: (filtros: { mes: string; origem?: string }) =>

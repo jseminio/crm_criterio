@@ -19,7 +19,17 @@ from dataclasses import dataclass, field
 
 from crm.domain.listas import DestinoDoTransbordo, LinhaServico
 
-__all__ = ["Pergunta", "Servico", "CATALOGO", "linha_do_servico", "servico_do_catalogo"]
+__all__ = [
+    "Pergunta", "Servico", "CATALOGO", "OUTRO", "DESCRICAO_MINIMA",
+    "linha_do_servico", "servico_do_catalogo", "problema_na_descricao",
+]
+
+#: O serviço fora do catálogo (27/09/2026). A pessoa descreve o que o lead pediu,
+#: com as palavras dele, e a linha fica **sem definir** ("Ainda não sei") até
+#: Eduardo decidir se o serviço entra no catálogo. Não tem roteiro: o SDR de IA
+#: passa a conversa para a equipe.
+OUTRO = "Outro"
+DESCRICAO_MINIMA = 10
 
 
 @dataclass(frozen=True)
@@ -175,3 +185,16 @@ def linha_do_servico(nome: str | None) -> LinhaServico | None:
     quem chama decide o que fazer (a carga mantém a coluna da planilha)."""
     servico = servico_do_catalogo(nome)
     return servico.linha if servico else None
+
+
+def problema_na_descricao(servico: str | None, descricao: str | None) -> str | None:
+    """"Outro" exige a descrição; os serviços do catálogo não levam descrição."""
+    texto = (descricao or "").strip()
+    if (servico or "").strip() == OUTRO:
+        if len(texto) < DESCRICAO_MINIMA:
+            return f'para "Outro", descreva o serviço que o lead pediu (ao menos {DESCRICAO_MINIMA} caracteres)'
+        return None
+    if texto:
+        return 'a descrição do serviço só vale para "Outro"'
+    return None
+

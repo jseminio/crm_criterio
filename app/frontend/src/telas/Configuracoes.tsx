@@ -8,8 +8,60 @@
 import { useState } from "react";
 import { ErroDaApi, api } from "../api/cliente";
 import type { ResumoDeBackup } from "../api/cliente";
+import type { PedidoDeServicoNovo } from "../api/tipos";
+import { Carregando, Erro } from "../componentes/estados";
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { dataHora } from "../formato";
+import { usarDados } from "../usarDados";
+
+/** Todo "Outro" do catálogo de serviços (27/09/2026): o que o lead pediu e não
+ * está na lista. Serve para decidir o que entra no catálogo; só leitura. */
+function PedidosDeServicoNovo() {
+  const { dados, carregando, erro, recarregar } = usarDados<PedidoDeServicoNovo[]>(
+    () => api.pedidosDeServicoNovo(),
+    [],
+  );
+  return (
+    <section className="numero" aria-labelledby="pedidos-titulo">
+      <h3 className="numero-rotulo" id="pedidos-titulo">
+        Pedidos de serviço novo
+      </h3>
+      <p>
+        Cada proposta ou lead em que o serviço escolhido foi "Outro", com a descrição do que o lead
+        pediu. Quando um pedido se repetir, ele é candidato a entrar no catálogo.
+      </p>
+      {carregando && <Carregando rotulo="Carregando os pedidos" />}
+      {erro && !carregando && <Erro mensagem={erro} aoTentarDeNovo={recarregar} />}
+      {!carregando && !erro && dados?.length === 0 && (
+        <p className="numero-detalhe">
+          Nenhum pedido ainda. Eles aparecem quando alguém escolhe "Outro serviço" no catálogo.
+        </p>
+      )}
+      {!carregando && !erro && (dados?.length ?? 0) > 0 && (
+        <table className="tabela">
+          <thead>
+            <tr>
+              <th scope="col">Quando</th>
+              <th scope="col">Onde</th>
+              <th scope="col">Nome</th>
+              <th scope="col">O que o lead pediu</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dados!.map((p) => (
+              <tr key={`${p.onde}-${p.id}`}>
+                <td>{dataHora(p.registrado_em)}</td>
+                <td>{p.onde}</td>
+                <td>{p.nome}</td>
+                <td>{p.descricao}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
 
 function Tabelas({ resumo }: { resumo: ResumoDeBackup }) {
   const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
@@ -160,6 +212,7 @@ export function Configuracoes() {
         )}
         {feito && <p role="status">{feito}</p>}
       </section>
+      <PedidosDeServicoNovo />
     </div>
   );
 }

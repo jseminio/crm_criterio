@@ -1,11 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
 import { Configuracoes } from "./Configuracoes";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { verificarBackup: vi.fn(), importarBackup: vi.fn() } };
+  return { ...real, api: { verificarBackup: vi.fn(), importarBackup: vi.fn(), pedidosDeServicoNovo: vi.fn().mockResolvedValue([]) } };
 });
 
 const RESUMO = {
@@ -23,7 +23,10 @@ async function escolherArquivo() {
 }
 
 describe("Configurações", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(api.pedidosDeServicoNovo).mockResolvedValue([]);
+  });
 
   it("oferece o download do backup completo", () => {
     render(<Configuracoes />);
@@ -64,3 +67,24 @@ describe("Configurações", () => {
     expect(await screen.findByText(/importado: 156/i)).toBeInTheDocument();
   });
 });
+
+describe("pedidos de serviço novo", () => {
+  it("lista o que o lead pediu fora do catálogo", async () => {
+    vi.mocked(api.pedidosDeServicoNovo).mockResolvedValue([
+      { onde: "Lead", id: 3, nome: "Lead da feira", descricao: "Perícia contábil judicial", registrado_em: "2026-09-27T15:00:00Z" },
+    ]);
+    render(<Configuracoes />);
+
+    const linha = (await screen.findByText("Perícia contábil judicial")).closest("tr")!;
+    expect(within(linha).getByText("Lead da feira")).toBeInTheDocument();
+    expect(within(linha).getByText("Lead")).toBeInTheDocument();
+  });
+
+  it("sem pedido explica de onde eles vêm", async () => {
+    vi.mocked(api.pedidosDeServicoNovo).mockResolvedValue([]);
+    render(<Configuracoes />);
+
+    expect(await screen.findByText(/Nenhum pedido ainda/)).toBeInTheDocument();
+  });
+});
+

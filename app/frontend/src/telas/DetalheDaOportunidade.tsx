@@ -310,6 +310,7 @@ export function DetalheDaOportunidade({
           proxima_acao_em: d.proxima_acao_em ?? "",
           observacao: d.observacao ?? "",
           servico: d.servico ?? "",
+          servico_descricao: d.servico_descricao ?? "",
           tipo_servico: d.tipo_servico ?? "",
           data_colocacao: d.data_colocacao ?? "",
           preco_mensal: d.preco_mensal ?? "",
@@ -480,7 +481,11 @@ export function DetalheDaOportunidade({
                 id="d-servico"
                 rotulo="Serviço"
                 valor={rascunho.servico}
-                aoEscolher={(nome) => mudar("servico", nome)}
+                descricao={rascunho.servico_descricao}
+                aoEscolher={(nome, texto) => {
+                  mudar("servico", nome);
+                  mudar("servico_descricao", texto);
+                }}
               />
               <div className="campo-bloco">
                 <label className="campo-rotulo" htmlFor="d-tipo-servico">

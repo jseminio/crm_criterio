@@ -32,16 +32,25 @@ const CATALOGO: ServicoDoCatalogo[] = [
   },
 ];
 
-function Formulario({ inicial = "", aoEscolher = vi.fn() }: { inicial?: string; aoEscolher?: (n: string) => void }) {
+function Formulario({
+  inicial = "",
+  aoEscolher = vi.fn(),
+}: {
+  inicial?: string;
+  aoEscolher?: (n: string, d: string) => void;
+}) {
   const [valor, definirValor] = useState(inicial);
+  const [descricao, definirDescricao] = useState("");
   return (
     <EscolhaDeServico
       id="t-servico"
       rotulo="Serviço"
       valor={valor}
-      aoEscolher={(n) => {
+      descricao={descricao}
+      aoEscolher={(n, d) => {
         definirValor(n);
-        aoEscolher(n);
+        definirDescricao(d);
+        aoEscolher(n, d);
       }}
     />
   );
@@ -89,7 +98,7 @@ describe("catálogo de serviços", () => {
     expect(within(dialogo).getByText("Finance Statement Closing Procedure")).toBeInTheDocument();
     await userEvent.click(within(dialogo).getByRole("button", { name: "Usar este serviço" }));
 
-    expect(aoEscolher).toHaveBeenCalledWith("FSCP");
+    expect(aoEscolher).toHaveBeenCalledWith("FSCP", "");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Serviço FSCP C2 · Não recorrente/ })).toBeInTheDocument();
   });
@@ -100,7 +109,11 @@ describe("catálogo de serviços", () => {
 
     await userEvent.type(within(dialogo).getByLabelText("Buscar serviço"), "legalizacao");
 
-    expect(within(dialogo).getAllByRole("option").map((o) => o.textContent)).toEqual(["Legalização Empresarial"]);
+    // "Outro serviço" fica sempre no fim, para o que não estiver na lista.
+    expect(within(dialogo).getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Legalização Empresarial",
+      "Outro serviço",
+    ]);
   });
 
   it("busca sem resultado oferece limpar", async () => {
@@ -109,9 +122,9 @@ describe("catálogo de serviços", () => {
 
     await userEvent.type(within(dialogo).getByLabelText("Buscar serviço"), "xyz");
 
-    expect(within(dialogo).getByText("Nenhum serviço com esse nome.")).toBeInTheDocument();
+    expect(within(dialogo).getByText(/Nenhum serviço com esse nome/)).toBeInTheDocument();
     await userEvent.click(within(dialogo).getByRole("button", { name: "Limpar a busca" }));
-    expect(within(dialogo).getAllByRole("option")).toHaveLength(3);
+    expect(within(dialogo).getAllByRole("option")).toHaveLength(4);
   });
 
   it("Esc fecha sem escolher", async () => {
@@ -147,3 +160,39 @@ describe("catálogo de serviços", () => {
     expect(dialogo.querySelectorAll(".botao-primario")).toHaveLength(1);
   });
 });
+
+describe("outro serviço", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.servicos).mockResolvedValue(CATALOGO);
+  });
+
+  it("pede a descrição e só libera com ao menos 10 caracteres", async () => {
+    const aoEscolher = vi.fn();
+    render(<Formulario aoEscolher={aoEscolher} />);
+    const dialogo = await abrir();
+
+    await userEvent.click(within(dialogo).getByRole("option", { name: "Outro serviço" }));
+    const usar = within(dialogo).getByRole("button", { name: "Usar outro serviço" });
+    expect(usar).toBeDisabled();
+    expect(within(dialogo).getByText("Linha: ainda não sei")).toBeInTheDocument();
+
+    await userEvent.type(within(dialogo).getByLabelText("Descreva o serviço desejado"), "Perícia contábil judicial");
+    expect(usar).toBeEnabled();
+    await userEvent.click(usar);
+
+    expect(aoEscolher).toHaveBeenCalledWith("Outro", "Perícia contábil judicial");
+    expect(screen.getByRole("button", { name: /^Serviço Outro: Perícia contábil judicial Linha: ainda não sei/ })).toBeInTheDocument();
+  });
+
+  it("aparece mesmo quando a busca não acha nada", async () => {
+    render(<Formulario />);
+    const dialogo = await abrir();
+
+    await userEvent.type(within(dialogo).getByLabelText("Buscar serviço"), "pericia");
+
+    expect(within(dialogo).getByText(/use "Outro serviço"/)).toBeInTheDocument();
+    expect(within(dialogo).getByRole("option", { name: "Outro serviço" })).toBeInTheDocument();
+  });
+});
+

@@ -21,7 +21,7 @@ resultado (ver "SDR de IA", abaixo).
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil, agente SDR, SDR de IA (registro e painel) e dez telas |
-| Testes | **767** no backend, **293** nas telas (27/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Testes | **776** no backend, **297** nas telas (27/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
 | Banco | PostgreSQL 18.6 local, 21 tabelas (as quatro do SDR de IA desde 27/09/2026 — migração `562856af0eb8`, ainda não aplicada; `ficha_de_conta`, `abordagem` e `execucao_do_agente` desde 26/09/2026 — migração `8673eda1df27`, **ainda não aplicada nesta máquina**: rode `alembic upgrade head`). Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
 | API | 45 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Agenda de follow-up, contatos, funil em kanban (com arrasto entre colunas), oportunidades em lista, grupos econômicos (com detalhe), contratos (23/09/2026), abordagens do agente SDR (26/09/2026), SDR da IA com painel, leads e custos (27/09/2026) e conferência da carga. React com TypeScript, em `../frontend` |
@@ -69,6 +69,14 @@ recorrente**, e a linha sai do serviço, no passado e daqui para frente.
   mantém a coluna.
 - **Nomes antigos da planilha** também são reconhecidos: "BPO Contábil" (C1, sem dizer se
   tinha folha), "Legalização" (agora C2), "Representação".
+- **"Outro serviço"** (aprovado no mesmo dia): fica no fim do pop-up, em "Fora do catálogo", e
+  abre uma caixa para descrever o serviço como o lead falou (ao menos 10 caracteres). Grava
+  `servico = "Outro"` e a descrição em `servico_descricao` (no lead, `interesse_descricao`).
+  **A linha fica "ainda não sei"** (vazia) até Eduardo decidir se o serviço entra no catálogo.
+  Serviço do catálogo não leva descrição, e trocar de "Outro" para um do catálogo apaga a antiga.
+  Todo "Outro" aparece em **Configurações → Pedidos de serviço novo**
+  (`GET /api/servicos/pedidos`). Sem roteiro: o SDR de IA passa a conversa para a equipe.
+  Migração `bf638b8cce5f`, só aditiva, **ainda não aplicada**: rode `alembic upgrade head`.
 - **O passado:** `scripts/reclassificar_linha_por_servico.py` mostra, sem gravar, quantas
   oportunidades mudam de linha e de quê para quê; `--aplicar` grava com backup antes, na
   pasta `~/Backups-CRM`. **Ainda não rodado na máquina de Eduardo.**

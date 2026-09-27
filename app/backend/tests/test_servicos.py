@@ -181,3 +181,77 @@ class TestReclassificacao:
         assert sessao.get(Oportunidade, oportunidades["legalizacao_c1"]).linha_servico is C2
         assert sessao.get(Oportunidade, oportunidades["fora"]).linha_servico is C1
         assert linha_por_servico.planejar(sessao) == []
+
+
+class TestOutroServico:
+    """Serviço fora do catálogo (27/09/2026): descrição obrigatória, linha "Ainda não sei"."""
+
+    DESCRICAO = "Gestão dos contratos de aluguel da holding"
+
+    def test_outro_exige_descricao(self, cliente):
+        resposta = cliente.post("/api/oportunidades", json={"nome": "P", "servico": "Outro"})
+        assert resposta.status_code == 422
+        assert "descreva" in resposta.json()["detail"]
+
+    def test_descricao_curta_demais(self, cliente):
+        resposta = cliente.post(
+            "/api/oportunidades", json={"nome": "P", "servico": "Outro", "servico_descricao": "  aluguel "}
+        )
+        assert resposta.status_code == 422
+
+    def test_outro_fica_sem_linha(self, cliente):
+        criada = cliente.post(
+            "/api/oportunidades",
+            json={"nome": "P", "servico": "Outro", "servico_descricao": self.DESCRICAO},
+        ).json()
+        assert (criada["servico"], criada["linha_servico"], criada["servico_descricao"]) == (
+            "Outro", None, self.DESCRICAO
+        )
+
+    def test_servico_do_catalogo_nao_leva_descricao(self, cliente):
+        resposta = cliente.post(
+            "/api/oportunidades",
+            json={"nome": "P", "servico": "Auditoria", "servico_descricao": self.DESCRICAO},
+        )
+        assert resposta.status_code == 422
+
+    def test_trocar_para_o_catalogo_apaga_a_descricao(self, cliente):
+        criada = cliente.post(
+            "/api/oportunidades",
+            json={"nome": "P", "servico": "Outro", "servico_descricao": self.DESCRICAO},
+        ).json()
+        editada = cliente.patch(f"/api/oportunidades/{criada['id']}", json={"servico": "Auditoria"}).json()
+        assert (editada["servico_descricao"], editada["linha_servico"]) == (None, "C2")
+
+    def test_trocar_para_outro_sem_descricao_recusa(self, cliente):
+        criada = cliente.post("/api/oportunidades", json={"nome": "P", "servico": "Auditoria"}).json()
+        resposta = cliente.patch(f"/api/oportunidades/{criada['id']}", json={"servico": "Outro"})
+        assert resposta.status_code == 422
+
+    def test_lead_com_interesse_outro(self, cliente):
+        assert cliente.post("/api/leads", json={"nome": "L", "interesse": "Outro"}).status_code == 422
+        lead = cliente.post(
+            "/api/leads", json={"nome": "L", "interesse": "Outro", "interesse_descricao": self.DESCRICAO}
+        ).json()
+        assert lead["interesse_descricao"] == self.DESCRICAO
+        editado = cliente.patch(f"/api/leads/{lead['id']}", json={"interesse": "Dep. Pessoal"}).json()
+        assert editado["interesse_descricao"] is None
+
+    def test_conversao_leva_a_descricao(self, cliente):
+        lead = cliente.post("/api/leads", json={"nome": "L"}).json()["id"]
+        cliente.patch(f"/api/leads/{lead}", json={"situacao": "Qualificado", "porte_estimado": "Médio"})
+        assert cliente.post(f"/api/leads/{lead}/converter", json={"servico": "Outro"}).status_code == 422
+        oportunidade = cliente.post(
+            f"/api/leads/{lead}/converter", json={"servico": "Outro", "servico_descricao": self.DESCRICAO}
+        ).json()
+        assert (oportunidade["servico_descricao"], oportunidade["linha_servico"]) == (self.DESCRICAO, None)
+
+    def test_pedidos_juntam_oportunidades_e_leads(self, cliente):
+        cliente.post("/api/oportunidades", json={"nome": "Op", "servico": "Outro", "servico_descricao": self.DESCRICAO})
+        cliente.post("/api/leads", json={"nome": "Ld", "interesse": "Outro", "interesse_descricao": "Perícia contábil judicial"})
+        cliente.post("/api/oportunidades", json={"nome": "Normal", "servico": "Auditoria"})
+        pedidos = cliente.get("/api/servicos/pedidos").json()
+        assert sorted((p["onde"], p["nome"], p["descricao"]) for p in pedidos) == [
+            ("Lead", "Ld", "Perícia contábil judicial"),
+            ("Oportunidade", "Op", self.DESCRICAO),
+        ]

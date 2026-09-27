@@ -88,7 +88,7 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     chave: "configuracoes",
     rotulo: "Configurações",
     titulo: "Configurações",
-    descricao: "Backup lógico: leve os dados para outra máquina ou guarde uma cópia.",
+    descricao: "Backup lógico dos dados e os pedidos de serviço fora do catálogo.",
   },
 ];
 

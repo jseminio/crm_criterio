@@ -242,6 +242,8 @@ class Lead(CarimboMixin, Base):
 
     captador: Mapped[str | None] = mapped_column(sa.String(10))
     interesse: Mapped[str | None] = mapped_column(sa.String(200))
+    interesse_descricao: Mapped[str | None] = mapped_column(sa.Text)
+    """Só quando o interesse é "Outro": o que o lead pediu, com as palavras dele."""
     temperatura: Mapped[Temperatura | None] = mapped_column(coluna_lista(Temperatura))
     situacao: Mapped[SituacaoLead] = mapped_column(
         coluna_lista(SituacaoLead), nullable=False, default=SituacaoLead.NOVO
@@ -306,6 +308,8 @@ class Oportunidade(CarimboMixin, Base):
     servico: Mapped[str | None] = mapped_column(sa.String(120))
     tipo_servico: Mapped[str | None] = mapped_column(sa.String(120))
     linha_servico: Mapped[LinhaServico | None] = mapped_column(coluna_lista(LinhaServico))
+    servico_descricao: Mapped[str | None] = mapped_column(sa.Text)
+    """Só quando o serviço é "Outro": o que o lead pediu, com as palavras dele."""
 
     tipo_canal: Mapped[TipoCanal | None] = mapped_column(coluna_lista(TipoCanal))
     canal: Mapped[str | None] = mapped_column(sa.String(120))

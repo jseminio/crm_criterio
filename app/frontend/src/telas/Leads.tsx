@@ -172,6 +172,7 @@ function Conversao({
   const [nomeDoGrupo, definirNomeDoGrupo] = useState(lead.empresa_texto ?? lead.nome);
   // O serviço de interesse que a qualificação registrou já vem escolhido.
   const [servico, definirServico] = useState(lead.interesse ?? "");
+  const [servicoDescricao, definirServicoDescricao] = useState(lead.interesse_descricao ?? "");
   const [erro, definirErro] = useState<string | null>(null);
   const [salvando, definirSalvando] = useState(false);
 
@@ -182,6 +183,7 @@ function Conversao({
       await api.converterLead(lead.id, {
         nome_do_grupo: nomeDoGrupo || undefined,
         servico: servico || undefined,
+        servico_descricao: servicoDescricao || undefined,
       });
       aoConverter();
       aoFechar();
@@ -230,7 +232,16 @@ function Conversao({
             onChange={(e) => definirNomeDoGrupo(e.target.value)}
           />
         </div>
-        <EscolhaDeServico id="c-servico" rotulo="Serviço" valor={servico} aoEscolher={definirServico} />
+        <EscolhaDeServico
+          id="c-servico"
+          rotulo="Serviço"
+          valor={servico}
+          descricao={servicoDescricao}
+          aoEscolher={(nome, texto) => {
+            definirServico(nome);
+            definirServicoDescricao(texto);
+          }}
+        />
       </div>
       <div className="recado">
         A oportunidade nasce em <strong>Enviar proposta</strong> e carrega a origem do lead —
@@ -256,6 +267,7 @@ function EdicaoDeLead({
     situacao: lead.situacao,
     temperatura: lead.temperatura ?? "",
     interesse: lead.interesse ?? "",
+    interesse_descricao: lead.interesse_descricao ?? "",
     proxima_acao: lead.proxima_acao ?? "",
     proxima_acao_em: lead.proxima_acao_em ?? "",
     observacao: lead.observacao ?? "",
@@ -467,7 +479,11 @@ function EdicaoDeLead({
             id="e-interesse"
             rotulo="Serviço de interesse"
             valor={rascunho.interesse}
-            aoEscolher={(nome) => mudar("interesse", nome)}
+            descricao={rascunho.interesse_descricao}
+            aoEscolher={(nome, texto) => {
+              mudar("interesse", nome);
+              mudar("interesse_descricao", texto);
+            }}
           />
         </div>
 

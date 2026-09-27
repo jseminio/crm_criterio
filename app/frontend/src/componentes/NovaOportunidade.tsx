@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { Listas } from "../api/tipos";
+import { EscolhaDeServico } from "./CatalogoDeServicos";
 import { PainelLateral } from "./PainelLateral";
 
 function hoje(): string {
@@ -131,7 +132,12 @@ export function NovaOportunidade({
         })}
 
         <div className="formulario-duplo">
-          {campo("servico", "Serviço", { placeholder: "BPO Contábil" })}
+          <EscolhaDeServico
+            id="n-servico"
+            rotulo="Serviço"
+            valor={campos.servico}
+            aoEscolher={(nome) => mudar("servico", nome)}
+          />
           {campo("tipo_servico", "Tipo de serviço", { placeholder: "Contabilidade" })}
         </div>
 

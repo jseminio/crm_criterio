@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { ConversaDoSdr, LeadResumo, Listas, Pagina } from "../api/tipos";
+import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
@@ -169,7 +170,8 @@ function Conversao({
   aoConverter: () => void;
 }) {
   const [nomeDoGrupo, definirNomeDoGrupo] = useState(lead.empresa_texto ?? lead.nome);
-  const [servico, definirServico] = useState("");
+  // O serviço de interesse que a qualificação registrou já vem escolhido.
+  const [servico, definirServico] = useState(lead.interesse ?? "");
   const [erro, definirErro] = useState<string | null>(null);
   const [salvando, definirSalvando] = useState(false);
 
@@ -228,18 +230,7 @@ function Conversao({
             onChange={(e) => definirNomeDoGrupo(e.target.value)}
           />
         </div>
-        <div className="campo-bloco">
-          <label className="campo-rotulo" htmlFor="c-servico">
-            Serviço
-          </label>
-          <input
-            id="c-servico"
-            className="entrada"
-            value={servico}
-            onChange={(e) => definirServico(e.target.value)}
-            placeholder="BPO Contábil, Consultoria…"
-          />
-        </div>
+        <EscolhaDeServico id="c-servico" rotulo="Serviço" valor={servico} aoEscolher={definirServico} />
       </div>
       <div className="recado">
         A oportunidade nasce em <strong>Enviar proposta</strong> e carrega a origem do lead —
@@ -472,17 +463,12 @@ function EdicaoDeLead({
               ))}
             </select>
           </div>
-          <div className="campo-bloco">
-            <label className="campo-rotulo" htmlFor="e-interesse">
-              Interesse
-            </label>
-            <input
-              id="e-interesse"
-              className="entrada"
-              value={rascunho.interesse}
-              onChange={(e) => mudar("interesse", e.target.value)}
-            />
-          </div>
+          <EscolhaDeServico
+            id="e-interesse"
+            rotulo="Serviço de interesse"
+            valor={rascunho.interesse}
+            aoEscolher={(nome) => mudar("interesse", nome)}
+          />
         </div>
 
         <div className="formulario-duplo">

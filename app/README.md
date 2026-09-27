@@ -21,7 +21,7 @@ resultado (ver "SDR de IA", abaixo).
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil, agente SDR, SDR de IA (registro e painel) e dez telas |
-| Testes | **746** no backend, **283** nas telas (27/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Testes | **767** no backend, **293** nas telas (27/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
 | Banco | PostgreSQL 18.6 local, 21 tabelas (as quatro do SDR de IA desde 27/09/2026 — migração `562856af0eb8`, ainda não aplicada; `ficha_de_conta`, `abordagem` e `execucao_do_agente` desde 26/09/2026 — migração `8673eda1df27`, **ainda não aplicada nesta máquina**: rode `alembic upgrade head`). Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
 | API | 45 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Agenda de follow-up, contatos, funil em kanban (com arrasto entre colunas), oportunidades em lista, grupos econômicos (com detalhe), contratos (23/09/2026), abordagens do agente SDR (26/09/2026), SDR da IA com painel, leads e custos (27/09/2026) e conferência da carga. React com TypeScript, em `../frontend` |
@@ -40,6 +40,38 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > repositório só com código e documentos: nada de binário, cache ou artefato de
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
+
+## Catálogo de serviços e C1/C2 pelo serviço (27/09/2026)
+
+Amostra do pop-up aprovada por Eduardo, com os textos em rascunho. Lista de serviços
+e linhas confirmadas por ele no mesmo dia. **Regra nova: C1 é recorrente, C2 não é
+recorrente**, e a linha sai do serviço, no passado e daqui para frente.
+
+| Serviço | Linha |
+|---|---|
+| BPO Contábil, Fiscal e Dep. Pessoal · BPO Contábil e Fiscal · Dep. Pessoal · BPO Financeiro · Endereço Fiscal · Representante Legal | C1 (recorrente) |
+| Consultoria · Legalização Empresarial · Auditoria · FSCP (Finance Statement Closing Procedure) | C2 (não recorrente) |
+
+- **Fonte única:** `crm/domain/servicos.py`. `GET /api/servicos` entrega o catálogo à tela e,
+  quando existir a integração, ao SDR de IA. **Sem preço**, de propósito.
+- **O pop-up** (`CatalogoDeServicos.tsx`) substitui o campo de texto "Serviço" na Nova
+  oportunidade, no detalhe da oportunidade, na conversão do lead e no "Serviço de interesse"
+  da qualificação. Mostra o roteiro: o que perguntar (as perguntas da régua de porte vêm
+  marcadas), quando fica fora do perfil e para quem a IA passa a conversa.
+- **Textos em rascunho:** "para quem é", "fora do perfil" e "passa para" foram escritos por
+  mim e aprovados para construir; faltam revisar com Eduardo. Representante Legal está quase
+  vazio porque ninguém descreveu o serviço ainda.
+- **A linha acompanha o serviço:** criar, editar e converter gravam a linha do catálogo.
+  Editar o serviço protege a linha da recarga (`campos_do_crm`). Serviço fora do catálogo
+  não mexe na linha que já estava.
+- **Carga:** vale o serviço, não a coluna "Responsável". Quando discordam, vira aviso
+  ("vale o serviço") no relatório de conferência, sem bloquear. Serviço fora do catálogo
+  mantém a coluna.
+- **Nomes antigos da planilha** também são reconhecidos: "BPO Contábil" (C1, sem dizer se
+  tinha folha), "Legalização" (agora C2), "Representação".
+- **O passado:** `scripts/reclassificar_linha_por_servico.py` mostra, sem gravar, quantas
+  oportunidades mudam de linha e de quê para quê; `--aplicar` grava com backup antes, na
+  pasta `~/Backups-CRM`. **Ainda não rodado na máquina de Eduardo.**
 
 ## SDR de IA: qualificação de leads (27/09/2026)
 

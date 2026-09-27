@@ -692,6 +692,26 @@ class Pagina[T](BaseModel):
     itens: list[T]
 
 
+class PerguntaDoCatalogo(BaseModel):
+    texto: str
+    direcionador: str | None = None
+
+
+class ServicoDoCatalogo(BaseModel):
+    """Um serviço do catálogo (`crm.domain.servicos`). Não tem preço de propósito."""
+
+    nome: str
+    nome_por_extenso: str | None = None
+    linha: LinhaServico
+    recorrente: bool
+    para_quem: str
+    perguntas: list[PerguntaDoCatalogo]
+    fora_do_perfil: list[str]
+    transbordo: DestinoDoTransbordo
+    nomes_antigos: list[str] = []
+    rascunho: bool = True
+
+
 class Listas(BaseModel):
     """As listas controladas, para a tela montar os seletores.
 

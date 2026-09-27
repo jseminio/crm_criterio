@@ -68,7 +68,7 @@ describe("Carteira", () => {
     render(<Carteira />);
     await screen.findByText(/▸ Alfa/);
     expect(screen.getByText("unidades (grupos + individuais)").previousElementSibling).toHaveTextContent("2");
-    const chipTravado = screen.getByRole("button", { name: /grupos travados, 16,7% da receita travada/ });
+    const chipTravado = screen.getByRole("button", { name: /grupos inadimplentes, 16,7% da receita travada/ });
     expect(chipTravado).toHaveTextContent("1"); // grupos_travados
     await userEvent.click(chipTravado);
     expect(screen.getByLabelText("Eixo de ação")).toHaveValue("Cobrança — sem tratamento preferencial");

@@ -162,6 +162,13 @@ export function Carteira() {
       return novo;
     });
 
+  const filtrarInadimplentes = () => {
+    definirEixo(EIXO_COBRANCA);
+    // Mostra de cara as empresas dos grupos inadimplentes — é a lista concreta que se quer ver,
+    // não só o grupo consolidado.
+    definirAbertos(new Set(dados?.itens.filter((i) => i.em_cobranca).map((i) => i.grupo_id) ?? []));
+  };
+
   if (carregando && !dados) return <Carregando rotulo="Carregando a classificação" />;
   if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
   if (!dados) return null;
@@ -200,14 +207,14 @@ export function Carteira() {
           <button
             type="button"
             className="retrato-chip retrato-chip-trav"
-            onClick={() => definirEixo(EIXO_COBRANCA)}
-            aria-label={`${dados.retrato.grupos_travados} grupos travados, ${um1(dados.retrato.percentual_travado)}% da receita travada por inadimplência — clique para filtrar`}
+            onClick={filtrarInadimplentes}
+            aria-label={`${dados.retrato.grupos_travados} grupos inadimplentes, ${um1(dados.retrato.percentual_travado)}% da receita travada — clique para ver quais`}
           >
             <b>{dados.retrato.grupos_travados}</b>
             <small>
-              grupos travados (clique para filtrar)
+              grupos inadimplentes (clique para ver quais)
               <br />
-              {um1(dados.retrato.percentual_travado)}% da receita travada por inadimplência
+              {um1(dados.retrato.percentual_travado)}% da receita travada
             </small>
           </button>
           <div className="retrato-chip retrato-semaforo">

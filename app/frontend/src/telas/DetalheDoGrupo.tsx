@@ -9,6 +9,7 @@ import { useState } from "react";
 import { api } from "../api/cliente";
 import type { GrupoResumo, Listas, OportunidadeResumo, Pagina } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
 import { data, dinheiro } from "../formato";
@@ -25,6 +26,7 @@ export function DetalheDoGrupo({
   aoFechar: () => void;
 }) {
   const [aberta, definirAberta] = useState<number | null>(null);
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
 
   const propostas = usarDados<Pagina<OportunidadeResumo>>(
     () => api.oportunidades({ grupo_id: grupo.id }),
@@ -71,15 +73,17 @@ export function DetalheDoGrupo({
             <table className="mini-tabela">
               <thead>
                 <tr>
-                  <th scope="col">Proposta</th>
-                  <th scope="col">Situação</th>
-                  <th scope="col" className="tabela-numero">
-                    Anual
-                  </th>
+                  <ThOrdenavel coluna="nome" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Proposta</ThOrdenavel>
+                  <ThOrdenavel coluna="situacao" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Situação</ThOrdenavel>
+                  <ThOrdenavel coluna="anual" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Anual</ThOrdenavel>
                 </tr>
               </thead>
               <tbody>
-                {propostas.dados!.itens.map((o) => (
+                {ordenar(propostas.dados!.itens, ordenacao, {
+                  nome: (o) => o.nome,
+                  situacao: (o) => o.situacao,
+                  anual: (o) => (o.preco_anual ? Number(o.preco_anual) : null),
+                }).map((o) => (
                   <tr key={o.id}>
                     <td>
                       <button

@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/cliente";
 import type { EntidadeDeContato, Listas, PaginaDeContatos, PessoaComOrigem, TipoDeContato } from "../api/tipos";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj as formatarCnpj, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
@@ -44,6 +45,8 @@ export function Contatos({ listas }: { listas: Listas | null }) {
   const [soComLacunas, definirSoComLacunas] = useState(false);
   const [aberto, definirAberto] = useState<EntidadeDeContato | null>(null);
   const [cadastrando, definirCadastrando] = useState(false);
+  const { ordenacao: ordenacaoDeEmpresas, alternar: alternarOrdenacaoDeEmpresas } = usarOrdenacao();
+  const { ordenacao: ordenacaoDePessoas, alternar: alternarOrdenacaoDePessoas } = usarOrdenacao();
   const busca = useAtrasado(texto);
 
   const empresas = usarDados<PaginaDeContatos<EntidadeDeContato> | null>(
@@ -121,16 +124,26 @@ export function Contatos({ listas }: { listas: Listas | null }) {
         <table className="tabela" aria-label="Empresas">
           <thead>
             <tr>
-              <th scope="col">{tipo === "cliente" ? "Cliente" : "Prospect"}</th>
-              <th scope="col">CNPJ</th>
-              <th scope="col">Contatos</th>
-              <th scope="col">Lacunas</th>
-              <th scope="col" className="tabela-numero">{tipo === "cliente" ? "Mensalidade" : "Propostas"}</th>
+              <ThOrdenavel coluna="nome" ordenacao={ordenacaoDeEmpresas} aoAlternar={alternarOrdenacaoDeEmpresas}>
+                {tipo === "cliente" ? "Cliente" : "Prospect"}
+              </ThOrdenavel>
+              <ThOrdenavel coluna="cnpj" ordenacao={ordenacaoDeEmpresas} aoAlternar={alternarOrdenacaoDeEmpresas}>CNPJ</ThOrdenavel>
+              <ThOrdenavel coluna="contatos" ordenacao={ordenacaoDeEmpresas} aoAlternar={alternarOrdenacaoDeEmpresas}>Contatos</ThOrdenavel>
+              <ThOrdenavel coluna="lacunas" ordenacao={ordenacaoDeEmpresas} aoAlternar={alternarOrdenacaoDeEmpresas}>Lacunas</ThOrdenavel>
+              <ThOrdenavel coluna="valor" numerico ordenacao={ordenacaoDeEmpresas} aoAlternar={alternarOrdenacaoDeEmpresas}>
+                {tipo === "cliente" ? "Mensalidade" : "Propostas"}
+              </ThOrdenavel>
               <th scope="col" />
             </tr>
           </thead>
           <tbody>
-            {empresas.dados!.itens.map((e) => (
+            {ordenar(empresas.dados!.itens, ordenacaoDeEmpresas, {
+              nome: (e) => e.razao_social ?? e.grupo_nome,
+              cnpj: (e) => e.cnpj,
+              contatos: (e) => e.contatos.length,
+              lacunas: (e) => e.lacunas.length,
+              valor: (e) => (tipo === "cliente" ? (e.mensalidade ? Number(e.mensalidade) : null) : e.propostas),
+            }).map((e) => (
               <tr key={`${e.grupo_id}-${e.empresa_id ?? "g"}`}>
                 <td>
                   <button type="button" className="link-de-tabela" onClick={() => definirAberto(e)}>{e.razao_social ?? e.grupo_nome}</button>
@@ -152,12 +165,23 @@ export function Contatos({ listas }: { listas: Listas | null }) {
         <table className="tabela" aria-label="Pessoas">
           <thead>
             <tr>
-              <th scope="col">Pessoa</th><th scope="col">Cargo</th><th scope="col">E-mail</th>
-              <th scope="col">Telefone</th><th scope="col">{tipo === "cliente" ? "Empresa" : "Prospect"}</th>
+              <ThOrdenavel coluna="nome" ordenacao={ordenacaoDePessoas} aoAlternar={alternarOrdenacaoDePessoas}>Pessoa</ThOrdenavel>
+              <ThOrdenavel coluna="cargo" ordenacao={ordenacaoDePessoas} aoAlternar={alternarOrdenacaoDePessoas}>Cargo</ThOrdenavel>
+              <ThOrdenavel coluna="email" ordenacao={ordenacaoDePessoas} aoAlternar={alternarOrdenacaoDePessoas}>E-mail</ThOrdenavel>
+              <ThOrdenavel coluna="telefone" ordenacao={ordenacaoDePessoas} aoAlternar={alternarOrdenacaoDePessoas}>Telefone</ThOrdenavel>
+              <ThOrdenavel coluna="empresa" ordenacao={ordenacaoDePessoas} aoAlternar={alternarOrdenacaoDePessoas}>
+                {tipo === "cliente" ? "Empresa" : "Prospect"}
+              </ThOrdenavel>
             </tr>
           </thead>
           <tbody>
-            {pessoas.dados!.itens.map((p) => (
+            {ordenar(pessoas.dados!.itens, ordenacaoDePessoas, {
+              nome: (p) => p.nome,
+              cargo: (p) => p.cargo,
+              email: (p) => p.email,
+              telefone: (p) => p.telefone,
+              empresa: (p) => p.razao_social ?? p.grupo_nome,
+            }).map((p) => (
               <tr key={p.id}>
                 <td>
                   <strong>{p.nome}</strong>

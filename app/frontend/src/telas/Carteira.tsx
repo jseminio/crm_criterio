@@ -4,10 +4,11 @@
  * carteira e são recalculados no CRM. Estado nunca só por cor: classe, alerta e cobrança têm texto.
  */
 
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { AnaliseDaCarteira, ClassificacaoDaCarteira, FaixaDeClasse, ItemDaCarteira, Listas } from "../api/tipos";
 import { AvaliacaoDeNotas } from "../componentes/AvaliacaoDeNotas";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
@@ -20,6 +21,7 @@ const um1 = (v: string) => decimais(v, 1);
 const ALERTA: Record<string, string> = { "⚠": "⚠ Risco de churn", "⚑": "⚑ Saída a organizar" };
 const PRIORIDADE = ["Cobrança", "Reter já", "Reter / vigiar", "Saída organizada", "Sem urgência"];
 const EIXO_COBRANCA = "Cobrança — sem tratamento preferencial";
+const SEMAFORO_ROTULO: Record<number, string> = { 1: "Controlada", 2: "Atenção", 3: "Crítico" };
 const COR_DA_CLASSE: Record<string, string> = { A: "#2e7d5b", B: "#2e5496", C: "#b8860b" };
 
 const LEGENDA_DOS_EIXOS: { nome: string; quando: string; significa: string }[] = [
@@ -175,7 +177,13 @@ function AnaliseDaIA() {
 
 export function Carteira({ listas }: { listas: Listas | null }) {
   const { dados, carregando, erro, recarregar } = usarDados<ClassificacaoDaCarteira>(() => api.classificacaoDaCarteira(), []);
-  const [eixo, definirEixo] = useState("");
+  // O eixo efetivo é o do campo "Eixo de ação", a não ser que o chip de inadimplentes esteja
+  // ligado (aí ele manda, mas sem apagar o que estava no campo — desligar o chip volta pra ele).
+  const [eixoManual, definirEixoManual] = useState("");
+  const [somenteInadimplentes, definirSomenteInadimplentes] = useState(false);
+  const eixo = somenteInadimplentes ? EIXO_COBRANCA : eixoManual;
+  const [semaforoFiltro, definirSemaforoFiltro] = useState<number | null>(null);
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
   const [avaliando, definirAvaliando] = useState<ItemDaCarteira | null>(null);
   const [abertos, definirAbertos] = useState<Set<number>>(new Set());
   const alternar = (id: number) =>
@@ -184,6 +192,21 @@ export function Carteira({ listas }: { listas: Listas | null }) {
       if (!novo.delete(id)) novo.add(id);
       return novo;
     });
+
+  const listaRef = useRef<HTMLDivElement>(null);
+  // Entre o chip e a lista tem ISC, análise da IA e revisão mensal — sem isto o filtro aplica,
+  // mas o resultado fica fora da tela e parece que o clique não fez nada.
+  const irParaALista = () => listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const filtrarInadimplentes = () => {
+    // Alterna como o semáforo: clicar de novo desliga. Sem isso, "aria-pressed" ficaria preso em
+    // true e o clique repetido pareceria não fazer nada.
+    definirSomenteInadimplentes((atual) => !atual);
+    // Sem isto, um semáforo ainda ligado de um clique anterior soma com este filtro (E, não OU)
+    // e a lista pode ficar vazia mesmo tendo grupo inadimplente — parece que o clique não fez nada.
+    definirSemaforoFiltro(null);
+    irParaALista();
+  };
 
   if (carregando && !dados) return <Carregando rotulo="Carregando a classificação" />;
   if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
@@ -197,9 +220,27 @@ export function Carteira({ listas }: { listas: Listas | null }) {
     );
 
   const eixos = Array.from(new Set(dados.itens.map((i) => i.eixo_de_acao))).sort((a, b) => rank(a) - rank(b));
-  const itens = dados.itens
-    .filter((i) => !eixo || i.eixo_de_acao === eixo)
+  const itensDoEixo = dados.itens
+    .filter((i) => (!eixo || i.eixo_de_acao === eixo) && (semaforoFiltro === null || i.semaforo === semaforoFiltro))
     .sort((a, b) => rank(a.eixo_de_acao) - rank(b.eixo_de_acao) || Number(b.receita_mensal) - Number(a.receita_mensal));
+  const porSemaforo = { 1: 0, 2: 0, 3: 0 } as Record<number, number>;
+  for (const i of dados.itens) porSemaforo[i.semaforo] = (porSemaforo[i.semaforo] ?? 0) + 1;
+  const alternarSemaforo = (s: number) => {
+    definirSemaforoFiltro((atual) => (atual === s ? null : s));
+    // Desliga só o chip de inadimplentes (mesmo raciocínio do lado de lá). O eixo escolhido no
+    // campo "Eixo de ação" abaixo não é tocado — esse continua combinando de propósito.
+    definirSomenteInadimplentes(false);
+    irParaALista();
+  };
+  const itens = ordenar(itensDoEixo, ordenacao, {
+    grupo: (i) => i.grupo_nome,
+    receita: (i) => Number(i.receita_mensal),
+    score: (i) => Number(i.score),
+    classe: (i) => i.classe_efetiva,
+    alerta: (i) => i.alerta_de_churn,
+    churn: (i) => i.churn,
+    eixo: (i) => i.eixo_de_acao,
+  });
   const { isc } = dados;
 
   return (
@@ -208,12 +249,38 @@ export function Carteira({ listas }: { listas: Listas | null }) {
         <div className="retrato-faixa">
           <div className="retrato-chip"><b>{dados.retrato.unidades}</b><small>unidades (grupos + individuais)</small></div>
           <div className="retrato-chip"><b>{dinheiro(dados.retrato.receita_total)}</b><small>receita mensal recorrente</small></div>
-          <button type="button" className="retrato-chip retrato-chip-trav" onClick={() => definirEixo(EIXO_COBRANCA)}>
-            <b>{um1(dados.retrato.percentual_travado)}%</b><small>da receita travada por inadimplência (clique para filtrar)</small>
+          <button
+            type="button"
+            className={`retrato-chip retrato-chip-trav${somenteInadimplentes ? " retrato-chip-ativo" : ""}`}
+            onClick={filtrarInadimplentes}
+            aria-pressed={somenteInadimplentes}
+            aria-label={`${dados.retrato.grupos_travados} grupos inadimplentes, ${um1(dados.retrato.percentual_travado)}% da receita travada — clique para ver quais`}
+          >
+            <b>{dados.retrato.grupos_travados}</b>
+            <small>
+              grupos inadimplentes (clique para ver quais)
+              <br />
+              {um1(dados.retrato.percentual_travado)}% da receita travada
+            </small>
           </button>
-          <button type="button" className="retrato-chip retrato-chip-trav" onClick={() => definirEixo(EIXO_COBRANCA)}>
-            <b>{dados.retrato.grupos_travados}</b><small>grupos travados (clique para filtrar)</small>
-          </button>
+          <div className="retrato-chip retrato-semaforo">
+            <small className="retrato-semaforo-rotulo">Semáforo (clique para filtrar)</small>
+            <div className="retrato-semaforo-itens">
+              {([1, 2, 3] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  aria-pressed={semaforoFiltro === s}
+                  aria-label={`Semáforo ${s} — ${SEMAFORO_ROTULO[s]}: ${porSemaforo[s]} grupo${porSemaforo[s] === 1 ? "" : "s"}`}
+                  className={`retrato-semaforo-item retrato-semaforo-${s}${semaforoFiltro === s ? " retrato-semaforo-ativo" : ""}`}
+                  onClick={() => alternarSemaforo(s)}
+                >
+                  <b>{s}</b>
+                  <small>{porSemaforo[s]}</small>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -243,10 +310,14 @@ export function Carteira({ listas }: { listas: Listas | null }) {
         </>
       )}
 
-      <div className="carteira-filtro">
+      <div className="carteira-filtro" ref={listaRef}>
         <label className="campo">
           <span className="campo-rotulo">Eixo de ação</span>
-          <select className="selecao" value={eixo} onChange={(e) => definirEixo(e.target.value)}>
+          <select
+            className="selecao"
+            value={eixo}
+            onChange={(e) => { definirEixoManual(e.target.value); definirSomenteInadimplentes(false); }}
+          >
             <option value="">Todos</option>
             {eixos.map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
@@ -255,18 +326,20 @@ export function Carteira({ listas }: { listas: Listas | null }) {
 
 
       {itens.length === 0 ? (
-        <VazioPorFiltro aoLimpar={() => definirEixo("")} />
+        <VazioPorFiltro aoLimpar={() => { definirEixoManual(""); definirSomenteInadimplentes(false); definirSemaforoFiltro(null); }} />
       ) : (
         <table className="tabela" aria-label="Grupos classificados">
           <thead>
             <tr>
-              <th>Grupo</th>
-              <th className="tabela-numero">Receita/mês</th>
-              <th className="tabela-numero">Score</th>
-              <th>Classe</th>
-              <th>Alerta</th>
-              <th className="tabela-numero">Churn</th>
-              <th>Eixo de ação <span className="carteira-remissao">Legenda do Eixo de Ação no rodapé</span></th>
+              <ThOrdenavel coluna="grupo" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Grupo</ThOrdenavel>
+              <ThOrdenavel coluna="receita" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Receita/mês</ThOrdenavel>
+              <ThOrdenavel coluna="score" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Score</ThOrdenavel>
+              <ThOrdenavel coluna="classe" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Classe</ThOrdenavel>
+              <ThOrdenavel coluna="alerta" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Alerta</ThOrdenavel>
+              <ThOrdenavel coluna="churn" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Churn</ThOrdenavel>
+              <ThOrdenavel coluna="eixo" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>
+                Eixo de ação <span className="carteira-remissao">Legenda do Eixo de Ação no rodapé</span>
+              </ThOrdenavel>
               <th scope="col" />
             </tr>
           </thead>

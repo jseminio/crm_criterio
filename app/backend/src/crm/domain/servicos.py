@@ -20,8 +20,9 @@ from dataclasses import dataclass, field
 from crm.domain.listas import DestinoDoTransbordo, LinhaServico
 
 __all__ = [
-    "Pergunta", "Servico", "CATALOGO", "OUTRO", "DESCRICAO_MINIMA",
-    "linha_do_servico", "servico_do_catalogo", "problema_na_descricao",
+    "Pergunta", "Tema", "Servico", "CATALOGO", "OUTRO", "DESCRICAO_MINIMA", "CONSULTORIA_SERVICO",
+    "linha_do_servico", "servico_do_catalogo", "problema_na_descricao", "problema_no_tema",
+    "reclassificar_pelo_tipo",
 ]
 
 #: O serviço fora do catálogo (27/09/2026). A pessoa descreve o que o lead pediu,
@@ -29,6 +30,7 @@ __all__ = [
 #: Eduardo decidir se o serviço entra no catálogo. Não tem roteiro: o SDR de IA
 #: passa a conversa para a equipe.
 OUTRO = "Outro"
+CONSULTORIA_SERVICO = "Consultoria"
 DESCRICAO_MINIMA = 10
 
 
@@ -38,6 +40,15 @@ class Pergunta:
     direcionador: str | None = None
     """Campo da régua de porte (`crm.domain.porte.DIRECIONADORES`) que a
     pergunta preenche, quando preenche um."""
+
+
+@dataclass(frozen=True)
+class Tema:
+    """Um tema dentro de um serviço (27/09/2026: os temas de Consultoria).
+    Cada tema tem as suas perguntas para o SDR de IA."""
+
+    nome: str
+    perguntas: tuple[Pergunta, ...]
 
 
 @dataclass(frozen=True)
@@ -52,6 +63,8 @@ class Servico:
     nomes_antigos: tuple[str, ...] = field(default=())
     """Como a planilha escrevia o serviço antes do catálogo."""
     rascunho: bool = True
+    temas: tuple[Tema, ...] = field(default=())
+    """Quando o serviço tem temas, o tema é **obrigatório** (decisão de 27/09/2026)."""
 
 
 _DOCS = Pergunta("Documentos fiscais por mês (emitidas + recebidas)", "documentos_fiscais_mes")
@@ -121,7 +134,7 @@ CATALOGO: tuple[Servico, ...] = (
     ),
     Servico(
         "Consultoria", C2,
-        "Projeto com começo e fim: planejamento tributário, reorganização, diagnóstico.",
+        "Projeto com começo e fim. Escolha o tema: cada um tem as suas perguntas.",
         (
             Pergunta("Qual é o tema ou o problema"),
             Pergunta("Prazo que a empresa tem"),
@@ -130,6 +143,44 @@ CATALOGO: tuple[Servico, ...] = (
         ),
         ("Quer resposta pontual sem contratar um projeto",),
         CONSULTORIA,
+        # Temas aprovados em 27/09/2026, a partir da coluna "Tipo serviço" da
+        # planilha (204 propostas de Consultoria de 2023 a 2026).
+        temas=(
+            Tema("Tributária e fiscal", (
+                _REGIME,
+                Pergunta("O que busca: planejamento, recuperação de crédito, revisão ou regularização"),
+                Pergunta("Períodos envolvidos"),
+                _CNPJ,
+            )),
+            Tema("Valuation, PPA e laudos", (
+                Pergunta("Para que é a avaliação: venda, entrada ou saída de sócio, PPA, impairment ou processo"),
+                Pergunta("Data-base"),
+                Pergunta("Quantas empresas avaliar"),
+                Pergunta("Prazo de entrega"),
+            )),
+            Tema("M&A, due diligence e captação", (
+                Pergunta("Lado da operação: compra, venda ou captação"),
+                Pergunta("Em que estágio está a negociação"),
+                Pergunta("Prazo esperado"),
+                Pergunta("Quem mais assessora a operação"),
+            )),
+            Tema("Contábil e financeira", (
+                Pergunta("O que precisa: reprocessar anos, adequar a CPCs, prestar contas"),
+                Pergunta("Períodos envolvidos"),
+                Pergunta("Sistema contábil usado"),
+                _LANC,
+            )),
+            Tema("Societária e reestruturação", (
+                Pergunta("Qual operação: incorporação, cisão, holding, recuperação judicial"),
+                Pergunta("Quantas empresas"),
+                Pergunta("Prazo"),
+            )),
+            Tema("Trabalhista", (
+                Pergunta("Tema: desoneração, passivo trabalhista, revisão de rotinas"),
+                _CLT,
+                Pergunta("Períodos envolvidos"),
+            )),
+        ),
     ),
     Servico(
         "Legalização Empresarial", C2,
@@ -158,6 +209,32 @@ CATALOGO: tuple[Servico, ...] = (
         (),
         CONSULTORIA,
         nome_por_extenso="Finance Statement Closing Procedure",
+    ),
+    Servico(
+        "DIRPF", C2,
+        "Pessoa física que precisa entregar a declaração anual de imposto de renda.",
+        (
+            Pergunta("Quantas declarações"),
+            Pergunta("Tem bens ou rendimentos no exterior"),
+            Pergunta("Teve ganho de capital ou venda de bens no ano"),
+            Pergunta("Prazo: dentro ou fora do período de entrega"),
+        ),
+        (),
+        CONSULTORIA,
+        nome_por_extenso="Declaração do Imposto de Renda da Pessoa Física",
+        nomes_antigos=("DIRPFs",),
+    ),
+    Servico(
+        "Perícia", C2,
+        "Perícia contábil ou cálculo em processo judicial ou arbitral.",
+        (
+            Pergunta("Judicial, arbitral ou extrajudicial"),
+            Pergunta("Perito do juízo ou assistente técnico de uma das partes"),
+            Pergunta("Tema do cálculo"),
+            Pergunta("Prazo do processo"),
+        ),
+        (),
+        CONSULTORIA,
     ),
 )
 
@@ -196,5 +273,88 @@ def problema_na_descricao(servico: str | None, descricao: str | None) -> str | N
         return None
     if texto:
         return 'a descrição do serviço só vale para "Outro"'
+    return None
+
+
+def problema_no_tema(servico: str | None, tema: str | None, exigir: bool) -> str | None:
+    """Serviço com temas pede um tema da lista; os outros não levam tema.
+
+    `exigir` é falso só para a proposta antiga que já era "Consultoria" sem
+    tema e está sendo editada por outro motivo: ela continua editável.
+    """
+    do_catalogo = servico_do_catalogo(servico)
+    texto = (tema or "").strip()
+    if do_catalogo is None or not do_catalogo.temas:
+        return f'o tema só vale para serviço com temas, como "{CONSULTORIA_SERVICO}"' if texto else None
+    nomes = [t.nome for t in do_catalogo.temas]
+    if not texto:
+        return f"escolha o tema da {do_catalogo.nome.lower()}" if exigir else None
+    if texto not in nomes:
+        return f"tema desconhecido: {texto!r}. Use um de: {', '.join(nomes)}"
+    return None
+
+
+# ------------------------------------------------ de-para da coluna "Tipo serviço"
+#: As propostas marcadas "Consultoria" na planilha, pela coluna "Tipo serviço".
+#: Aprovado por Eduardo em 27/09/2026 (tabela "De onde saíram os temas").
+#: Chave sem acento e sem caixa. Tipo que não está aqui fica sem tema.
+_OUTRO_SERVICO_PELO_TIPO: dict[str, str] = {
+    "encerramento de empresa": "Legalização Empresarial",
+    "alteracao contratual": "Legalização Empresarial",
+    "alteracao de endereco": "Legalização Empresarial",
+    "constituicao de empresa + bpo": "Legalização Empresarial",
+    "auditoria": "Auditoria",
+    "fscp": "FSCP",
+    "mapeamento do processo de fscp e diagnostico cpcs": "FSCP",
+    "calculo judicial": "Perícia",
+    "calculo pericial": "Perícia",
+    "dirpfs": "DIRPF",
+}
+_TEMA_PELO_TIPO: dict[str, str] = {
+    **dict.fromkeys((
+        "consultoria tributaria", "fiscal", "transfer princing", "consultoria (reapuracao fiscal)",
+        "contabilidade / reapuracao", "calculo credito icms conta de luz", "ganho de capital",
+        "avaliacao tributaria", "trabalho de revisao fiscal e previdenciario",
+        "regularizacao da malha fiscal", "revisao de iss, politica de faturamento",
+        "tratamento tributario diferenciado",
+        "cancelamento de protesto (pgfn) + baixa de arrolamento (rgi)",
+    ), "Tributária e fiscal"),
+    **dict.fromkeys((
+        "valuation", "ppa", "ppa de auditoria", "laudo de avaliacao contabil", "teste de impairment",
+        "avaliacao de stock options", "avaliacao imobiliaria",
+    ), "Valuation, PPA e laudos"),
+    **dict.fromkeys((
+        "m&a", "due diligence", "due dilligence", "financial advisory", "modelagem financeira",
+        "captacao de recursos", "consorcio",
+    ), "M&A, due diligence e captação"),
+    **dict.fromkeys((
+        "contabilidade", "consultoria financeira", "contabilidade dos ultimos 05 anos",
+        "consultoria prestacao de contas",
+    ), "Contábil e financeira"),
+    **dict.fromkeys((
+        "consultoria societaria", "revisao societaria",
+        "processo de incorporacao de duas sociedades empresarias",
+        "apoio ao processo de recuperacao judicial",
+    ), "Societária e reestruturação"),
+    **dict.fromkeys((
+        "consultoria de dp", "consultoria de dp (desoneracao)", "departamento de pessoal",
+        "consultoria (ordens de servico fiscal e dp)",
+    ), "Trabalhista"),
+}
+
+
+def reclassificar_pelo_tipo(servico: str | None, tipo: str | None) -> tuple[str, str | None] | None:
+    """Para uma proposta marcada "Consultoria": o serviço certo e o tema, pelo tipo.
+
+    Devolve `None` quando não há o que mudar (outro serviço, ou tipo sem
+    correspondência — como "Consultoria" sem detalhe, que fica sem tema).
+    """
+    if _chave(servico) != _chave(CONSULTORIA_SERVICO):
+        return None
+    chave = _chave(tipo)
+    if chave in _OUTRO_SERVICO_PELO_TIPO:
+        return _OUTRO_SERVICO_PELO_TIPO[chave], None
+    if chave in _TEMA_PELO_TIPO:
+        return CONSULTORIA_SERVICO, _TEMA_PELO_TIPO[chave]
     return None
 

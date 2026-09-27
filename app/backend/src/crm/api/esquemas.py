@@ -242,6 +242,7 @@ class OportunidadeDetalhe(OportunidadeResumo):
     canal: str | None = None
     linha_servico: LinhaServico | None = None
     servico_descricao: str | None = None
+    servico_tema: str | None = None
     data_aceite: date | None = None
     motivo_recusa: MotivoRecusa | None = None
     motivo_recusa_original: str | None = None
@@ -298,6 +299,7 @@ class OportunidadeEdicao(BaseModel):
     servico: str | None = Field(default=None, max_length=120)
     tipo_servico: str | None = Field(default=None, max_length=120)
     servico_descricao: str | None = Field(default=None, max_length=2000)
+    servico_tema: str | None = Field(default=None, max_length=80)
     data_colocacao: date | None = None
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
@@ -345,6 +347,7 @@ class OportunidadeNova(BaseModel):
     servico: str | None = Field(default=None, max_length=120)
     tipo_servico: str | None = Field(default=None, max_length=120)
     servico_descricao: str | None = Field(default=None, max_length=2000)
+    servico_tema: str | None = Field(default=None, max_length=80)
     data_colocacao: date | None = None
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
@@ -367,6 +370,7 @@ class LeadResumo(Base):
     captador: str | None = None
     interesse: str | None = None
     interesse_descricao: str | None = None
+    interesse_tema: str | None = None
     campanha: str | None = None
     campanha_midia: str | None = None
     proxima_acao: str | None = None
@@ -399,6 +403,7 @@ class LeadNovo(BaseModel):
     captador: str | None = Field(default=None, max_length=10)
     interesse: str | None = Field(default=None, max_length=200)
     interesse_descricao: str | None = Field(default=None, max_length=2000)
+    interesse_tema: str | None = Field(default=None, max_length=80)
     temperatura: Temperatura | None = None
     campanha: str | None = Field(default=None, max_length=120)
     campanha_midia: str | None = Field(default=None, max_length=120)
@@ -416,6 +421,7 @@ class LeadEdicao(BaseModel):
     temperatura: Temperatura | None = None
     interesse: str | None = Field(default=None, max_length=200)
     interesse_descricao: str | None = Field(default=None, max_length=2000)
+    interesse_tema: str | None = Field(default=None, max_length=80)
     proxima_acao: str | None = Field(default=None, max_length=200)
     proxima_acao_em: date | None = None
     observacao: str | None = None
@@ -435,6 +441,7 @@ class ConversaoDeLead(BaseModel):
     servico: str | None = Field(default=None, max_length=120)
     tipo_servico: str | None = Field(default=None, max_length=120)
     servico_descricao: str | None = Field(default=None, max_length=2000)
+    servico_tema: str | None = Field(default=None, max_length=80)
 
 
 class ContratoResumo(Base):
@@ -715,6 +722,11 @@ class PedidoDeServicoNovo(BaseModel):
     registrado_em: datetime
 
 
+class TemaDoCatalogo(BaseModel):
+    nome: str
+    perguntas: list[PerguntaDoCatalogo]
+
+
 class ServicoDoCatalogo(BaseModel):
     """Um serviço do catálogo (`crm.domain.servicos`). Não tem preço de propósito."""
 
@@ -728,6 +740,8 @@ class ServicoDoCatalogo(BaseModel):
     transbordo: DestinoDoTransbordo
     nomes_antigos: list[str] = []
     rascunho: bool = True
+    temas: list[TemaDoCatalogo] = []
+    """Quando há temas, escolher um é obrigatório."""
 
 
 class Listas(BaseModel):
@@ -911,6 +925,7 @@ class Encerramento(BaseModel):
     porte_estimado: str | None = Field(default=None, max_length=20)
     cnpj: str | None = Field(default=None, max_length=18)
     interesse: str | None = Field(default=None, max_length=200)
+    interesse_tema: str | None = Field(default=None, max_length=80)
     motivo_descarte: MotivoDeDescarte | None = None
     motivo_transbordo: MotivoDeTransbordo | None = None
     destino_transbordo: DestinoDoTransbordo | None = None

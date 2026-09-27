@@ -18,17 +18,17 @@ const CATALOGO: ServicoDoCatalogo[] = [
     nome: "Dep. Pessoal", nome_por_extenso: null, linha: "C1", recorrente: true,
     para_quem: "Empresa que quer terceirizar só a folha.",
     perguntas: [{ texto: "Empregados CLT", direcionador: "empregados_clt" }, { texto: "Sindicato", direcionador: null }],
-    fora_do_perfil: ["Nenhum empregado CLT"], transbordo: "Comercial · BPO (C1)", nomes_antigos: [], rascunho: true,
+    fora_do_perfil: ["Nenhum empregado CLT"], transbordo: "Comercial · BPO (C1)", nomes_antigos: [], rascunho: true, temas: [],
   },
   {
     nome: "Legalização Empresarial", nome_por_extenso: null, linha: "C2", recorrente: false,
     para_quem: "Abrir, alterar ou encerrar empresa.", perguntas: [{ texto: "UF e município", direcionador: null }],
-    fora_do_perfil: [], transbordo: "Consultoria (C2)", nomes_antigos: ["Legalização"], rascunho: true,
+    fora_do_perfil: [], transbordo: "Consultoria (C2)", nomes_antigos: ["Legalização"], rascunho: true, temas: [],
   },
   {
     nome: "FSCP", nome_por_extenso: "Finance Statement Closing Procedure", linha: "C2", recorrente: false,
     para_quem: "Fechamento das demonstrações.", perguntas: [], fora_do_perfil: [],
-    transbordo: "Consultoria (C2)", nomes_antigos: [], rascunho: true,
+    transbordo: "Consultoria (C2)", nomes_antigos: [], rascunho: true, temas: [],
   },
 ];
 
@@ -37,20 +37,23 @@ function Formulario({
   aoEscolher = vi.fn(),
 }: {
   inicial?: string;
-  aoEscolher?: (n: string, d: string) => void;
+  aoEscolher?: (n: string, d: string, t: string) => void;
 }) {
   const [valor, definirValor] = useState(inicial);
   const [descricao, definirDescricao] = useState("");
+  const [tema, definirTema] = useState("");
   return (
     <EscolhaDeServico
       id="t-servico"
       rotulo="Serviço"
       valor={valor}
       descricao={descricao}
-      aoEscolher={(n, d) => {
+      tema={tema}
+      aoEscolher={(n, d, t) => {
         definirValor(n);
         definirDescricao(d);
-        aoEscolher(n, d);
+        definirTema(t);
+        aoEscolher(n, d, t);
       }}
     />
   );
@@ -98,7 +101,7 @@ describe("catálogo de serviços", () => {
     expect(within(dialogo).getByText("Finance Statement Closing Procedure")).toBeInTheDocument();
     await userEvent.click(within(dialogo).getByRole("button", { name: "Usar este serviço" }));
 
-    expect(aoEscolher).toHaveBeenCalledWith("FSCP", "");
+    expect(aoEscolher).toHaveBeenCalledWith("FSCP", "", "");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Serviço FSCP C2 · Não recorrente/ })).toBeInTheDocument();
   });
@@ -181,7 +184,7 @@ describe("outro serviço", () => {
     expect(usar).toBeEnabled();
     await userEvent.click(usar);
 
-    expect(aoEscolher).toHaveBeenCalledWith("Outro", "Perícia contábil judicial");
+    expect(aoEscolher).toHaveBeenCalledWith("Outro", "Perícia contábil judicial", "");
     expect(screen.getByRole("button", { name: /^Serviço Outro: Perícia contábil judicial Linha: ainda não sei/ })).toBeInTheDocument();
   });
 
@@ -196,3 +199,50 @@ describe("outro serviço", () => {
   });
 });
 
+
+describe("tema da consultoria", () => {
+  const COM_TEMAS: ServicoDoCatalogo[] = [
+    {
+      nome: "Consultoria", nome_por_extenso: null, linha: "C2", recorrente: false,
+      para_quem: "Projeto com começo e fim.", perguntas: [{ texto: "Qual é o tema", direcionador: null }],
+      fora_do_perfil: [], transbordo: "Consultoria (C2)", nomes_antigos: [], rascunho: true,
+      temas: [
+        { nome: "Tributária e fiscal", perguntas: [{ texto: "Regime tributário", direcionador: null }] },
+        { nome: "Valuation, PPA e laudos", perguntas: [{ texto: "Data-base", direcionador: null }] },
+      ],
+    },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.servicos).mockResolvedValue(COM_TEMAS);
+  });
+
+  it("só libera com o tema escolhido, e as perguntas seguem o tema", async () => {
+    const aoEscolher = vi.fn();
+    render(<Formulario aoEscolher={aoEscolher} />);
+    const dialogo = await abrir();
+
+    await userEvent.click(within(dialogo).getByRole("option", { name: "Consultoria" }));
+    const usar = within(dialogo).getByRole("button", { name: "Usar este serviço" });
+    expect(usar).toBeDisabled();
+    expect(within(dialogo).getByText("Escolha o tema para continuar.")).toBeInTheDocument();
+
+    await userEvent.click(within(dialogo).getByLabelText("Valuation, PPA e laudos"));
+    expect(within(dialogo).getByText("Data-base")).toBeInTheDocument();
+    expect(within(dialogo).queryByText("Regime tributário")).not.toBeInTheDocument();
+    expect(usar).toBeEnabled();
+
+    await userEvent.click(usar);
+    expect(aoEscolher).toHaveBeenCalledWith("Consultoria", "", "Valuation, PPA e laudos");
+    expect(
+      screen.getByRole("button", { name: /^Serviço Consultoria · Valuation, PPA e laudos C2/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("proposta antiga de Consultoria sem tema mostra que falta o tema", async () => {
+    render(<Formulario inicial="Consultoria" />);
+
+    expect(await screen.findByText("falta o tema")).toBeInTheDocument();
+  });
+});

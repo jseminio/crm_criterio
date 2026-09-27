@@ -232,7 +232,8 @@ class TestEdicao:
         """Desde 22/09/2026 (E4) a proposta pode ser ajustada direto no CRM."""
         resposta = cliente.patch(
             f"/api/oportunidades/{carteira['primeira']}",
-            json={"preco_mensal": "999.00", "servico": "Consultoria"},
+            # Consultoria pede o tema desde 27/09/2026.
+            json={"preco_mensal": "999.00", "servico": "Consultoria", "servico_tema": "Tributária e fiscal"},
         )
 
         assert resposta.status_code == 200

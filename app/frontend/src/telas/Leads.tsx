@@ -173,6 +173,7 @@ function Conversao({
   // O serviço de interesse que a qualificação registrou já vem escolhido.
   const [servico, definirServico] = useState(lead.interesse ?? "");
   const [servicoDescricao, definirServicoDescricao] = useState(lead.interesse_descricao ?? "");
+  const [servicoTema, definirServicoTema] = useState(lead.interesse_tema ?? "");
   const [erro, definirErro] = useState<string | null>(null);
   const [salvando, definirSalvando] = useState(false);
 
@@ -184,6 +185,7 @@ function Conversao({
         nome_do_grupo: nomeDoGrupo || undefined,
         servico: servico || undefined,
         servico_descricao: servicoDescricao || undefined,
+        servico_tema: servicoTema || undefined,
       });
       aoConverter();
       aoFechar();
@@ -237,9 +239,11 @@ function Conversao({
           rotulo="Serviço"
           valor={servico}
           descricao={servicoDescricao}
-          aoEscolher={(nome, texto) => {
+          tema={servicoTema}
+          aoEscolher={(nome, texto, tema) => {
             definirServico(nome);
             definirServicoDescricao(texto);
+            definirServicoTema(tema);
           }}
         />
       </div>
@@ -268,6 +272,7 @@ function EdicaoDeLead({
     temperatura: lead.temperatura ?? "",
     interesse: lead.interesse ?? "",
     interesse_descricao: lead.interesse_descricao ?? "",
+    interesse_tema: lead.interesse_tema ?? "",
     proxima_acao: lead.proxima_acao ?? "",
     proxima_acao_em: lead.proxima_acao_em ?? "",
     observacao: lead.observacao ?? "",
@@ -480,9 +485,11 @@ function EdicaoDeLead({
             rotulo="Serviço de interesse"
             valor={rascunho.interesse}
             descricao={rascunho.interesse_descricao}
-            aoEscolher={(nome, texto) => {
+            tema={rascunho.interesse_tema}
+            aoEscolher={(nome, texto, tema) => {
               mudar("interesse", nome);
               mudar("interesse_descricao", texto);
+              mudar("interesse_tema", tema);
             }}
           />
         </div>

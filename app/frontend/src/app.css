@@ -185,14 +185,48 @@
   margin-bottom: var(--e4);
 }
 
-/* --------------------------------------------------------- faixa de números */
-.numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--e3); margin-bottom: var(--e5); }
-@media (max-width: 1100px) { .numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* --------------------------------------------------------- faixa de números
+   Indicadores compactos: número à vista, explicação em janela (hover ou foco). Cores do design base
+   "Critério CRM": chart-1/4/5/6 e status-ganho/atenção/perdido, com fundo em tom suave. */
+.numeros { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--e2); margin-bottom: var(--e3); }
+@media (max-width: 1280px) { .numeros { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .numero { background: var(--surface-card); border: 1px solid var(--borda);
   border-radius: var(--raio-md); padding: var(--e4); display: flex; flex-direction: column; gap: var(--e1); }
 .numero-rotulo { font-family: var(--fonte-ui); font-size: 12px; font-weight: 500; color: var(--texto-medio); }
 .numero-valor { margin: 0; font-family: var(--fonte-titulo); font-size: 24px; font-weight: 600; line-height: 1.2; }
+.ind { --cor: #0072b2; --fundo: #e6f1f8; position: relative; padding: var(--e2) var(--e3) var(--e3); gap: 2px;
+  background: var(--fundo); border-top: 4px solid var(--cor); cursor: default; }
+.ind:hover, .ind:focus-visible { box-shadow: var(--sombra-menu); }
+.ind-azul { --cor: #0072b2; --fundo: #e4eef8; }
+.ind-verde { --cor: #0f6b52; --fundo: #e2f3ed; }
+.ind-ambar { --cor: #8a5300; --fundo: #fbefdc; }
+.ind-vermelho { --cor: #a81f17; --fundo: #fce9e7; }
+.ind-dourado { --cor: #a37700; --fundo: #f8f0dc; }
+.ind-violeta { --cor: #6a4fb3; --fundo: #efe9fa; }
+.ind-rosa { --cor: #b5578f; --fundo: #f8e9f2; }
+.ind-marinho { --cor: #1a2338; --fundo: #e8eef5; }
+.ind .ind-rotulo { font-size: 11px; font-weight: 600; color: #2a3242; line-height: 1.25; min-height: 28px; margin: 0; }
+.ind .ind-valor { font-size: 22px; font-weight: 700; color: var(--cor); }
+.ind .ind-valor-pendente { font-family: var(--fonte-ui); font-size: 13px; font-weight: 600; color: var(--espera); margin: 0; }
+.ind-apoio { margin: 0; font-size: 11px; color: #5a6779; line-height: 1.3; }
+.ind > .etiqueta { align-self: flex-start; margin-top: 2px; }
+.ind-janela { display: none; position: absolute; z-index: 20; top: calc(100% + 8px); left: 0; width: 280px; max-width: 80vw;
+  background: var(--surface-card); border: 1px solid var(--borda); border-top: 4px solid var(--cor); border-radius: var(--raio-md);
+  box-shadow: var(--sombra-painel); padding: var(--e3); font-size: 12px; color: #2a3242; line-height: 1.45; }
+.ind-janela p { margin: 0 0 var(--e1); }
+.ind:hover .ind-janela, .ind:focus .ind-janela, .ind:focus-within .ind-janela { display: block; }
+.numeros > .ind:nth-child(n + 5) .ind-janela { left: auto; right: 0; }
+@media (max-width: 1280px) {
+  .numeros > .ind:nth-child(n) .ind-janela { left: 0; right: auto; }
+  .numeros > .ind:nth-child(4n) .ind-janela, .numeros > .ind:nth-child(4n - 1) .ind-janela { left: auto; right: 0; }
+}
+.funil-analises { display: grid; gap: var(--e2); margin-bottom: var(--e4); }
+.recolhivel { background: var(--surface-card); border: 1px solid var(--borda); border-radius: var(--raio-md); padding: var(--e2) var(--e3); font-size: 13px; }
+.recolhivel > summary { cursor: pointer; color: var(--texto-forte); }
+.recolhivel-resumo { color: var(--texto-fraco); font-weight: 400; }
+.recolhivel-corpo { margin-top: var(--e2); }
+.recolhivel-corpo .numero { border: 0; padding: 0; margin: 0; }
 .numero-detalhe { font-size: 12px; color: var(--texto-medio); font-variant-numeric: tabular-nums; }
 .numero-detalhe p { margin: var(--e1) 0 0; }
 .numero-nota { color: var(--texto-fraco); }

@@ -9,6 +9,7 @@
  * receita contratada da carteira inteira, e este número é outra coisa.
  */
 
+import { useId } from "react";
 import { api } from "../api/cliente";
 import type { Indicadores, TaxaDeConversao } from "../api/tipos";
 import { Carregando, Erro } from "./estados";
@@ -21,6 +22,11 @@ import { usarDados } from "../usarDados";
  * Mesma regra do PAD-002 que `Etiqueta` aplica às situações: a palavra vem
  * sempre junto da cor, nunca só a cor sozinha.
  */
+function tomDaConversao(tx: TaxaDeConversao): Tom {
+  if (!tx.calculavel) return "azul";
+  return tx.atingiu_a_meta ? "verde" : tx.abaixo_do_alerta ? "vermelho" : "ambar";
+}
+
 function EtiquetaDeConversao({ tx }: { tx: TaxaDeConversao }) {
   if (!tx.calculavel) return null;
   const [texto, tom] = tx.atingiu_a_meta
@@ -31,22 +37,37 @@ function EtiquetaDeConversao({ tx }: { tx: TaxaDeConversao }) {
   return <span className={`etiqueta etiqueta-${tom}`}>{texto}</span>;
 }
 
+type Tom = "azul" | "verde" | "ambar" | "vermelho" | "dourado" | "violeta" | "rosa" | "marinho";
+
+/** Um indicador compacto: rótulo, número e uma linha de apoio. O que explica o número (definição, ressalvas)
+ * fica numa janela que abre ao passar o mouse ou ao focar com o teclado (Tab), ao redor do indicador. */
 function Cartao({
   rotulo,
   destaque,
+  apoio,
+  etiqueta,
+  tom,
   children,
   pendente = false,
 }: {
   rotulo: string;
   destaque?: string;
+  apoio?: string;
+  etiqueta?: React.ReactNode;
+  tom: Tom;
   children?: React.ReactNode;
   pendente?: boolean;
 }) {
+  const id = useId();
   return (
-    <section className={`numero ${pendente ? "numero-pendente" : ""}`}>
-      <h3 className="numero-rotulo">{rotulo}</h3>
-      {destaque && <p className="numero-valor">{destaque}</p>}
-      <div className="numero-detalhe">{children}</div>
+    <section className={`numero ind ind-${tom} ${pendente ? "numero-pendente" : ""}`} tabIndex={0} aria-describedby={id}>
+      <h3 className="numero-rotulo ind-rotulo">{rotulo}</h3>
+      {destaque ? <p className="numero-valor ind-valor">{destaque}</p> : <p className="ind-valor ind-valor-pendente">Não calculável</p>}
+      {apoio && <p className="ind-apoio">{apoio}</p>}
+      {etiqueta}
+      <div className="numero-detalhe ind-janela" role="tooltip" id={id}>
+        {children}
+      </div>
     </section>
   );
 }
@@ -84,7 +105,9 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
     <div className="numeros" aria-label="Números do funil">
       <Cartao
         rotulo="Em aberto"
+        tom="azul"
         destaque={`${aberto.quantas} proposta${aberto.quantas === 1 ? "" : "s"}`}
+        apoio={`${dinheiroCurto(aberto.valor_anual)} ao ano`}
       >
         <p>{dinheiroCurto(aberto.valor_anual)} ao ano</p>
         <p>
@@ -96,7 +119,9 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
       <Cartao
         rotulo="Aceitas em 2026"
+        tom="verde"
         destaque={`${aceitas.quantas} proposta${aceitas.quantas === 1 ? "" : "s"}`}
+        apoio={`${dinheiroCurto(aceitas.valor_anual)} ao ano`}
       >
         <p>{dinheiroCurto(aceitas.valor_anual)} ao ano</p>
         <p>
@@ -114,7 +139,9 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
       <Cartao
         rotulo="Ticket recorrente aceito"
-        destaque={ticket.calculavel ? `${dinheiro(ticket.ticket_medio)} por mês` : undefined}
+        tom="dourado"
+        destaque={ticket.calculavel ? dinheiro(ticket.ticket_medio) : undefined}
+        apoio={ticket.calculavel ? `por mês · mediana ${dinheiro(ticket.mediana)}` : undefined}
         pendente={!ticket.calculavel}
       >
         {ticket.calculavel ? (
@@ -142,7 +169,9 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
       <Cartao
         rotulo="Ciclo médio de vendas"
+        tom="violeta"
         destaque={ciclo.calculavel ? `${dias(ciclo.dias)} dias` : undefined}
+        apoio={ciclo.calculavel ? `amostra de ${ciclo.amostra} proposta${ciclo.amostra === 1 ? "" : "s"}` : undefined}
         pendente={!ciclo.calculavel}
       >
         {ciclo.calculavel ? (
@@ -165,6 +194,9 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
       <Cartao
         rotulo="Taxa de conversão"
+        tom={tomDaConversao(dados.taxa_de_conversao)}
+        apoio={dados.taxa_de_conversao.calculavel ? `${dados.taxa_de_conversao.aceitas} de ${dados.taxa_de_conversao.decididas} decididas` : undefined}
+        etiqueta={<EtiquetaDeConversao tx={dados.taxa_de_conversao} />}
         destaque={
           dados.taxa_de_conversao.calculavel
             ? percentual(dados.taxa_de_conversao.percentual)
@@ -176,7 +208,7 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
           <>
             <p>
               {dados.taxa_de_conversao.aceitas} de {dados.taxa_de_conversao.decididas}{" "}
-              decididas · <EtiquetaDeConversao tx={dados.taxa_de_conversao} />
+              decididas. Meta 50%, alerta abaixo de 30%.
             </p>
             <p className="numero-nota">
               Só o que já tem desfecho entra na conta — aceita, recusada ou
@@ -192,15 +224,14 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
       <Cartao
         rotulo="Cobertura do processo"
-        destaque={
-          cobertura.percentual_com_proxima_acao !== null
-            ? `${percentual(cobertura.percentual_com_proxima_acao)} com próxima ação`
-            : undefined
-        }
+        tom="rosa"
+        destaque={cobertura.percentual_com_proxima_acao !== null ? percentual(cobertura.percentual_com_proxima_acao) : undefined}
+        apoio={cobertura.percentual_com_proxima_acao !== null ? "com próxima ação" : undefined}
         pendente={cobertura.percentual_com_proxima_acao === null}
       >
         {cobertura.percentual_com_proxima_acao !== null ? (
           <p>
+            {percentual(cobertura.percentual_com_proxima_acao)} com próxima ação:{" "}
             {cobertura.em_aberto_com_proxima_acao} de {cobertura.em_aberto_total} em aberto
             têm próxima ação definida
           </p>
@@ -219,6 +250,8 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
       <Cartao
         rotulo="Dependência de canal"
+        tom="marinho"
+        apoio={dependencia.percentual !== null ? "da rede dos sócios" : undefined}
         destaque={
           dependencia.percentual !== null ? percentual(dependencia.percentual) : undefined
         }

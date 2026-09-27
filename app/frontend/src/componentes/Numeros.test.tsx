@@ -201,7 +201,7 @@ describe("Numeros — ticket recorrente", () => {
     );
     expect(screen.getByText("Ticket recorrente aceito")).toBeInTheDocument();
     expect(screen.getByText(/5\.539,95/)).toBeInTheDocument();
-    expect(screen.getByText(/2\.450,00/)).toBeInTheDocument();
+    expect(screen.getAllByText(/2\.450,00/).length).toBeGreaterThanOrEqual(1); // no cartão (apoio) e na janela
     expect(screen.getByText(/19 propostas de 17 clientes/)).toBeInTheDocument();
     expect(screen.getByText(/pesa 38,0%/)).toBeInTheDocument();
     expect(screen.getByText(/não é o ticket médio da carteira/i)).toBeInTheDocument();
@@ -212,3 +212,28 @@ describe("Numeros — ticket recorrente", () => {
     expect(screen.getByText(/nenhuma aceita com preço mensal/i)).toBeInTheDocument();
   });
 });
+
+describe("Numeros — indicadores compactos com explicação em janela", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("cada indicador é focável e ligado à sua explicação (janela ao passar o mouse ou com Tab)", async () => {
+    await abrir(indicadores({ aceitas: 40, decididas: 105, percentual: "38.1", calculavel: true, abaixo_do_alerta: false, atingiu_a_meta: false }));
+    const cartao = screen.getByText("Taxa de conversão").closest(".ind") as HTMLElement;
+    expect(cartao).toHaveAttribute("tabindex", "0");
+    const janela = document.getElementById(cartao.getAttribute("aria-describedby")!)!;
+    expect(janela).toHaveAttribute("role", "tooltip");
+    expect(janela).toHaveTextContent(/só o que já tem desfecho entra na conta/i);
+  });
+
+  it("o tom da conversão acompanha o estado, com a palavra ao lado", async () => {
+    await abrir(indicadores({ aceitas: 10, decididas: 100, percentual: "10.0", calculavel: true, abaixo_do_alerta: true, atingiu_a_meta: false }));
+    expect(screen.getByText("Taxa de conversão").closest(".ind")).toHaveClass("ind-vermelho");
+    expect(screen.getByText("Abaixo do alerta")).toBeInTheDocument();
+  });
+
+  it("indicador não calculável diz Não calculável no cartão, nunca zero", async () => {
+    await abrir(indicadores());
+    expect(screen.getAllByText("Não calculável").length).toBeGreaterThan(0);
+  });
+});
+

@@ -470,6 +470,10 @@
 .isc-como { background: var(--isc-painel); border-radius: var(--raio-md); padding: var(--e3) var(--e5); font-size: 12.5px; }
 .isc-como summary { cursor: pointer; font-weight: 700; color: var(--isc-marino); }
 .isc-como p { margin: var(--e2) 0 0; }
+.avaliacao-secao { display: flex; flex-direction: column; gap: var(--e2); padding-bottom: var(--e4); border-bottom: 1px solid var(--borda); }
+.avaliacao-secao:last-child { border-bottom: 0; }
+.avaliacao-secao h3 { margin: 0; font-size: 13px; color: var(--texto-forte); }
+.avaliacao-item { display: flex; align-items: center; gap: var(--e2); font-size: 13px; color: var(--texto-forte); }
 @media (max-width: 1100px) {
   .isc-componentes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

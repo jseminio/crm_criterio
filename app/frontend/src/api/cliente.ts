@@ -15,6 +15,8 @@ import type {
   AnaliseDaCarteira,
   RevisaoDaCarteira,
   ClassificacaoDaCarteira,
+  EdicaoDeNotas,
+  ResultadoDaEdicao,
   CenariosDeTicket,
   ColunaDoFunil,
   DimensaoDeRecorte,
@@ -162,6 +164,8 @@ export const api = {
     pedir<RevisaoDaCarteira>("/api/carteira/revisoes", { method: "POST", body: JSON.stringify({ autor }) }),
   editarMesDaRevisao: (id: number, mes: string) =>
     pedir<RevisaoDaCarteira>(`/api/carteira/revisoes/${id}/mes`, { method: "PATCH", body: JSON.stringify({ mes }) }),
+  editarNotasDaCarteira: (grupoId: number, corpo: EdicaoDeNotas) =>
+    pedir<ResultadoDaEdicao>(`/api/carteira/grupos/${grupoId}/notas`, { method: "POST", body: JSON.stringify(corpo) }),
   mrr: (de?: string) => pedir<Mrr>(comParametros("/api/mrr", { de })),
 
   agenda: (captador?: string[]) =>

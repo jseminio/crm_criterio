@@ -586,6 +586,24 @@ export interface FaixaDeClasse {
   dentro_da_meta: boolean;
 }
 
+export interface EdicaoDeNotas {
+  autor: string;
+  motivo: string;
+  complexidade?: number;
+  disciplina?: number;
+  risco?: number;
+  cross_sell?: number;
+  adimplencia?: number;
+  semaforo?: number;
+  churn?: number;
+}
+
+export interface ResultadoDaEdicao {
+  item: ItemDaCarteira;
+  isc: IscDaCarteira | null;
+  avisos: string[];
+}
+
 export interface ClassificacaoDaCarteira {
   referencia: string | null;
   versao_dos_parametros: string | null;

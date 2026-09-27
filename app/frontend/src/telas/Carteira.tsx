@@ -7,6 +7,7 @@
 import { Fragment, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { AnaliseDaCarteira, ClassificacaoDaCarteira, FaixaDeClasse } from "../api/tipos";
+import { AvaliacaoDeNotas } from "../componentes/AvaliacaoDeNotas";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
@@ -173,6 +174,7 @@ function AnaliseDaIA() {
 export function Carteira() {
   const { dados, carregando, erro, recarregar } = usarDados<ClassificacaoDaCarteira>(() => api.classificacaoDaCarteira(), []);
   const [eixo, definirEixo] = useState("");
+  const [avaliando, definirAvaliando] = useState<{ id: number; nome: string } | null>(null);
   const [abertos, definirAbertos] = useState<Set<number>>(new Set());
   const alternar = (id: number) =>
     definirAbertos((antes) => {
@@ -263,6 +265,7 @@ export function Carteira() {
               <th>Alerta</th>
               <th className="tabela-numero">Churn</th>
               <th>Eixo de ação <span className="carteira-remissao">Legenda do Eixo de Ação no rodapé</span></th>
+              <th scope="col" />
             </tr>
           </thead>
           <tbody>
@@ -294,13 +297,22 @@ export function Carteira() {
                     <td>{i.alerta_de_churn ? ALERTA[i.alerta_de_churn] ?? i.alerta_de_churn : "—"}</td>
                     <td className="tabela-numero">{i.churn ?? "—"}</td>
                     <td>{i.eixo_de_acao}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="botao botao-secundario"
+                        onClick={() => definirAvaliando({ id: i.grupo_id, nome: i.grupo_nome })}
+                      >
+                        Avaliar
+                      </button>
+                    </td>
                   </tr>
                   {aberto &&
                     i.empresas.map((e) => (
                       <tr key={`e${e.id}`} className="carteira-empresa">
                         <td>• {e.razao_social}{e.cnpj ? <span className="numero-nota"> · {cnpj(e.cnpj)}</span> : null}</td>
                         <td className="tabela-numero">{e.mensalidade !== null ? dinheiro(e.mensalidade) : "—"}</td>
-                        <td colSpan={5} />
+                        <td colSpan={6} />
                       </tr>
                     ))}
                 </Fragment>
@@ -335,6 +347,15 @@ export function Carteira() {
           Revisão mensal nos primeiros 6 a 12 meses; depois, trimestral.
         </p>
       </details>
+
+      {avaliando && (
+        <AvaliacaoDeNotas
+          grupoId={avaliando.id}
+          grupoNome={avaliando.nome}
+          aoFechar={() => definirAvaliando(null)}
+          aoSalvar={() => { definirAvaliando(null); recarregar(); }}
+        />
+      )}
     </section>
   );
 }

@@ -17,6 +17,11 @@ import type {
   ClassificacaoDaCarteira,
   CenariosDeTicket,
   ColunaDoFunil,
+  ConversaDoSdr,
+  InvestimentoEmMidia,
+  PainelDoSdr,
+  ParametrosDoSdr,
+  ServicoDoCatalogo,
   DimensaoDeRecorte,
   LinhaDeRecorte,
   ContratoDetalhe,
@@ -209,7 +214,7 @@ export const api = {
       body: JSON.stringify(mudancas),
     }),
 
-  leads: (filtros: { apenas_abertos?: boolean; busca?: string } = {}) =>
+  leads: (filtros: { apenas_abertos?: boolean; busca?: string; tipo_canal?: string } = {}) =>
     pedir<Pagina<LeadResumo>>(comParametros("/api/leads", filtros)),
 
   criarLead: (lead: Record<string, unknown>) =>
@@ -226,6 +231,25 @@ export const api = {
       method: "POST",
       body: JSON.stringify(dados),
     }),
+
+  servicos: () => pedir<ServicoDoCatalogo[]>("/api/servicos"),
+
+  // ---------------------------------------------------------- SDR de IA
+  painelDoSdr: (filtros: { mes: string; origem?: string }) =>
+    pedir<PainelDoSdr>(comParametros("/api/sdr/painel", filtros)),
+
+  conversasDoLead: (leadId: number) =>
+    pedir<ConversaDoSdr[]>(`/api/sdr/leads/${leadId}/conversas`),
+
+  parametrosDoSdr: () => pedir<ParametrosDoSdr>("/api/sdr/parametros"),
+
+  gravarParametrosDoSdr: (dados: Record<string, unknown>) =>
+    pedir<ParametrosDoSdr>("/api/sdr/parametros", { method: "PUT", body: JSON.stringify(dados) }),
+
+  midia: (mes: string) => pedir<InvestimentoEmMidia[]>(comParametros("/api/sdr/midia", { mes })),
+
+  gravarMidia: (dados: { mes: string; canal: string; valor: string }) =>
+    pedir<InvestimentoEmMidia>("/api/sdr/midia", { method: "PUT", body: JSON.stringify(dados) }),
 
   grupos: (filtros: { busca?: string; limite?: number; incluir_fundidos?: boolean } = {}) =>
     pedir<Pagina<GrupoResumo>>(comParametros("/api/grupos", { limite: 500, ...filtros })),

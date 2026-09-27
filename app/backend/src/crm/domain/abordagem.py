@@ -23,6 +23,7 @@ __all__ = [
     "proximo_passo",
     "normalizar_destino",
     "link_whatsapp",
+    "fala_de_preco",
 ]
 
 #: Mês de abordagem, `AAAA-MM`.
@@ -34,6 +35,13 @@ _PRECO = re.compile(
     r"R\$|\breais\b|\bpre[çc]o|\bhonor[áa]rio|\bdesconto|\bmensalidade|\d+\s*mil\b",
     re.IGNORECASE,
 )
+
+
+def fala_de_preco(texto: str | None) -> bool:
+    """A mesma trava vale para a abordagem aprovada e para a mensagem do SDR de IA."""
+    return bool(_PRECO.search(texto or ""))
+
+
 _COLCHETES = re.compile(r"\[[^\]]+\]")
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 

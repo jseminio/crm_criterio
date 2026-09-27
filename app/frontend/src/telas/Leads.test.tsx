@@ -16,7 +16,21 @@ vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
   return {
     ...real,
-    api: { leads: vi.fn(), criarLead: vi.fn(), editarLead: vi.fn(), converterLead: vi.fn() },
+    api: {
+      leads: vi.fn(),
+      criarLead: vi.fn(),
+      editarLead: vi.fn(),
+      converterLead: vi.fn(),
+      conversasDoLead: vi.fn().mockResolvedValue([]),
+      servicos: vi.fn().mockResolvedValue([
+        { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
+          para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],
+          fora_do_perfil: ["MEI"], transbordo: "Comercial · BPO (C1)", nomes_antigos: ["BPO Contábil"], rascunho: true },
+        { nome: "Auditoria", nome_por_extenso: null, linha: "C2", recorrente: false,
+          para_quem: "Auditoria das demonstrações.", perguntas: [{ texto: "Exercício a auditar", direcionador: null }],
+          fora_do_perfil: [], transbordo: "Consultoria (C2)", nomes_antigos: [], rascunho: true },
+      ]),
+    },
   };
 });
 
@@ -33,8 +47,9 @@ const LISTAS: Listas = {
   linhas_de_servico: [],
   situacoes_de_grupo: [],
   captadores: ["EL", "BO"],
-  portes: [],
+  portes: ["Micro", "Pequeno", "Médio", "Grande", "Extra Grande"],
   servicos: [],
+  motivos_de_descarte: ["Porte abaixo do mínimo", "Pediu para não ser contatado"],
 };
 
 function lead(extra: Partial<LeadResumo> = {}): LeadResumo {
@@ -116,7 +131,10 @@ describe("cadastro de lead", () => {
 });
 
 describe("edição da situação", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.conversasDoLead).mockResolvedValue([]);
+  });
 
   it("'Convertido' nunca aparece como opção — só a conversão leva lá", async () => {
     await abrir([lead()]);
@@ -168,18 +186,110 @@ describe("edição da situação", () => {
 describe("lista", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("um lead não convertido tem botão de converter; um convertido, não", async () => {
+  it("só o lead qualificado tem botão de converter; o convertido diz que virou oportunidade", async () => {
     await abrir([
-      lead({ id: 1, nome: "Aberto" }),
-      lead({ id: 2, nome: "Fechado", convertido_em_id: 9 }),
+      lead({ id: 1, nome: "Pronto", situacao: "Qualificado", porte_estimado: "Médio" }),
+      lead({ id: 2, nome: "Aberto" }),
+      lead({ id: 3, nome: "Fechado", convertido_em_id: 9 }),
     ]);
 
-    const linhaAberta = screen.getByText("Aberto").closest("tr")!;
-    const linhaFechada = screen.getByText("Fechado").closest("tr")!;
+    const linha = (nome: string) => screen.getByText(nome).closest("tr")!;
 
-    expect(within(linhaAberta).getByRole("button", { name: "Converter" })).toBeInTheDocument();
-    expect(within(linhaFechada).queryByRole("button", { name: "Converter" })).not.toBeInTheDocument();
-    expect(within(linhaFechada).getByText("Virou oportunidade")).toBeInTheDocument();
+    expect(within(linha("Pronto")).getByRole("button", { name: "Converter" })).toBeInTheDocument();
+    expect(within(linha("Aberto")).queryByRole("button", { name: "Converter" })).not.toBeInTheDocument();
+    expect(within(linha("Aberto")).getByText("Qualifique para converter")).toBeInTheDocument();
+    expect(within(linha("Fechado")).getByText("Virou oportunidade")).toBeInTheDocument();
+  });
+
+  it("mostra o porte do qualificado e a marca de não contatar", async () => {
+    await abrir([
+      lead({ situacao: "Qualificado", porte_estimado: "Grande" }),
+      lead({ id: 2, nome: "Saiu", situacao: "Descartado", motivo_descarte: "Pediu para não ser contatado", nao_contatar: true }),
+    ]);
+
+    expect(screen.getByText("Porte Grande")).toBeInTheDocument();
+    const linhaSaiu = screen.getByText("Saiu").closest("tr")!;
+    expect(within(linhaSaiu).getByText("Não contatar")).toBeInTheDocument();
+    expect(within(linhaSaiu).getByText("Pediu para não ser contatado")).toBeInTheDocument();
+  });
+
+  it("filtra pela origem", async () => {
+    await abrir([lead()]);
+
+    await userEvent.selectOptions(screen.getByLabelText("Origem"), "Prospecção ativa");
+
+    await waitFor(() =>
+      expect(vi.mocked(api.leads)).toHaveBeenLastCalledWith(
+        expect.objectContaining({ tipo_canal: "Prospecção ativa" }),
+      ),
+    );
+  });
+});
+
+describe("qualificação e descarte", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.conversasDoLead).mockResolvedValue([]);
+  });
+
+  it("qualificar exige o porte antes de salvar, e envia o porte", async () => {
+    vi.mocked(api.editarLead).mockResolvedValue(lead());
+    await abrir([lead()]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    await userEvent.selectOptions(screen.getByLabelText("Situação"), "Qualificado");
+
+    expect(screen.getByRole("button", { name: /salvar alterações/i })).toBeDisabled();
+    expect(screen.getByText(/escolha o porte estimado/i)).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText("Porte estimado"), "Médio");
+    await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+
+    await waitFor(() => expect(api.editarLead).toHaveBeenCalledOnce());
+    const [, mudancas] = vi.mocked(api.editarLead).mock.calls[0];
+    expect(mudancas).toMatchObject({ situacao: "Qualificado", porte_estimado: "Médio" });
+    expect(mudancas).not.toHaveProperty("motivo_descarte");
+  });
+
+  it("descartar exige o motivo", async () => {
+    vi.mocked(api.editarLead).mockResolvedValue(lead());
+    await abrir([lead()]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    await userEvent.selectOptions(screen.getByLabelText("Situação"), "Descartado");
+    expect(screen.getByRole("button", { name: /salvar alterações/i })).toBeDisabled();
+
+    await userEvent.selectOptions(screen.getByLabelText("Motivo do descarte"), "Porte abaixo do mínimo");
+    await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+
+    await waitFor(() => expect(api.editarLead).toHaveBeenCalledOnce());
+    expect(vi.mocked(api.editarLead).mock.calls[0][1]).toMatchObject({
+      situacao: "Descartado",
+      motivo_descarte: "Porte abaixo do mínimo",
+    });
+  });
+
+  it("mostra a conversa com a IA dentro do lead", async () => {
+    vi.mocked(api.conversasDoLead).mockResolvedValue([
+      {
+        id: 7, lead_id: 1, canal: "WhatsApp", iniciada_em: "2026-09-27T12:00:00Z",
+        encerrada_em: null, desfecho: null, motivo_transbordo: null, destino_transbordo: null,
+        atendida_em: null, nota: null,
+        mensagens: [
+          { id: 1, autor: "IA", enviada_em: "2026-09-27T12:00:05Z", texto: "Oi, aqui é da Critério",
+            intencao: null, confianca: null, fallback: false, termo_nao_reconhecido: null, tom: null },
+          { id: 2, autor: "Lead", enviada_em: "2026-09-27T12:01:00Z", texto: "Quero trocar de contador",
+            intencao: null, confianca: null, fallback: false, termo_nao_reconhecido: null, tom: "Positivo" },
+        ],
+      },
+    ]);
+    await abrir([lead()]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Abrir" }));
+
+    expect(await screen.findByText("Quero trocar de contador")).toBeInTheDocument();
+    expect(screen.getByText("Em andamento")).toBeInTheDocument();
+    expect(api.conversasDoLead).toHaveBeenCalledWith(1);
   });
 });
 
@@ -188,23 +298,27 @@ describe("conversão em oportunidade", () => {
 
   it("pré-preenche o grupo com a empresa do lead, e envia o que foi digitado", async () => {
     vi.mocked(api.converterLead).mockResolvedValue({} as never);
-    await abrir([lead({ empresa_texto: "Gama Ltda" })]);
+    await abrir([lead({ empresa_texto: "Gama Ltda", situacao: "Qualificado", porte_estimado: "Médio" })]);
 
     await userEvent.click(screen.getByRole("button", { name: "Converter" }));
 
     expect(screen.getByLabelText(/grupo econômico/i)).toHaveValue("Gama Ltda");
 
-    await userEvent.type(screen.getByLabelText(/serviço/i), "BPO Contábil");
+    await userEvent.click(screen.getByRole("button", { name: /^Serviço/ }));
+    await userEvent.click(await screen.findByRole("option", { name: "Auditoria" }));
+    await userEvent.click(screen.getByRole("button", { name: "Usar este serviço" }));
     await userEvent.click(screen.getByRole("button", { name: /converter em oportunidade/i }));
 
     await waitFor(() => expect(api.converterLead).toHaveBeenCalledOnce());
     const [id, dados] = vi.mocked(api.converterLead).mock.calls[0];
     expect(id).toBe(1);
-    expect(dados).toEqual({ nome_do_grupo: "Gama Ltda", servico: "BPO Contábil" });
+    expect(dados).toEqual({ nome_do_grupo: "Gama Ltda", servico: "Auditoria" });
   });
 
   it("sem empresa informada, usa o nome do próprio lead", async () => {
-    await abrir([lead({ empresa_texto: null, nome: "Fulano de Tal" })]);
+    await abrir([
+      lead({ empresa_texto: null, nome: "Fulano de Tal", situacao: "Qualificado", porte_estimado: "Médio" }),
+    ]);
 
     await userEvent.click(screen.getByRole("button", { name: "Converter" }));
 

@@ -19,6 +19,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable
 
+from crm.domain.servicos import linha_do_servico
 from crm.domain.listas import (
     LinhaServico,
     MotivoRecusa,
@@ -202,6 +203,20 @@ def carregar(linhas: Iterable[dict[str, Any]]) -> tuple[list[Proposta], Relatori
 
         linha_servico = normalizar_linha_servico(bruta.get("Responsável"))
         _registrar(rel, numero, "linha de serviço", linha_servico, False)
+        # A linha sai do serviço quando ele está no catálogo (27/09/2026: C1
+        # recorrente, C2 não recorrente). A coluna da planilha só vale para
+        # serviço fora do catálogo. Discordância vira aviso, sem bloquear.
+        linha_do_catalogo = linha_do_servico(_texto(bruta.get("Serviço")))
+        if linha_do_catalogo is not None and linha_do_catalogo is not linha_servico.valor:
+            rel.avisos.append(
+                Aviso(
+                    numero,
+                    "linha de serviço",
+                    f"planilha diz {linha_servico.valor.value if linha_servico.valor else 'vazio'}, "
+                    f"o serviço é {linha_do_catalogo.value} ({linha_do_catalogo.descricao.lower()}) — vale o serviço",
+                )
+            )
+        linha_final = linha_do_catalogo or linha_servico.valor
 
         captador = normalizar_captador(bruta.get("Responsável 2"))
         _registrar(rel, numero, "captador", captador, False)
@@ -247,7 +262,7 @@ def carregar(linhas: Iterable[dict[str, Any]]) -> tuple[list[Proposta], Relatori
                 data_colocacao=_data(bruta.get("Data da colocação")),
                 servico=_texto(bruta.get("Serviço")),
                 tipo_servico=_texto(bruta.get("Tipo serviço")),
-                linha_servico=linha_servico.valor,
+                linha_servico=linha_final,
                 captador=captador.valor,
                 canal=_texto(bruta.get("Canal")),
                 tipo_canal=tipo_canal.valor,

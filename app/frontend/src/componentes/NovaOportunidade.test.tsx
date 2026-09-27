@@ -10,7 +10,14 @@ import { NovaOportunidade } from "./NovaOportunidade";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { criarOportunidade: vi.fn() } };
+  return { ...real, api: { criarOportunidade: vi.fn(), servicos: vi.fn().mockResolvedValue([
+        { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
+          para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],
+          fora_do_perfil: ["MEI"], transbordo: "Comercial · BPO (C1)", nomes_antigos: ["BPO Contábil"], rascunho: true },
+        { nome: "Auditoria", nome_por_extenso: null, linha: "C2", recorrente: false,
+          para_quem: "Auditoria das demonstrações.", perguntas: [{ texto: "Exercício a auditar", direcionador: null }],
+          fora_do_perfil: [], transbordo: "Consultoria (C2)", nomes_antigos: [], rascunho: true },
+      ]) } };
 });
 
 const LISTAS: Listas = {
@@ -65,6 +72,20 @@ describe("NovaOportunidade", () => {
     // que o servidor decidiria por padrão (ex. data de hoje).
     expect(corpo).not.toHaveProperty("servico");
     expect(aoCriar).toHaveBeenCalledOnce();
+  });
+
+  it("o serviço vem do catálogo e vai no pedido pelo nome", async () => {
+    vi.mocked(api.criarOportunidade).mockResolvedValue({} as OportunidadeDetalhe);
+    render(<NovaOportunidade listas={LISTAS} aoFechar={() => {}} aoCriar={() => {}} />);
+
+    await userEvent.type(screen.getByLabelText("Nome da oportunidade"), "Delta Engenharia");
+    await userEvent.click(screen.getByRole("button", { name: /^Serviço/ }));
+    await userEvent.click(await screen.findByRole("option", { name: "Auditoria" }));
+    await userEvent.click(screen.getByRole("button", { name: "Usar este serviço" }));
+    await userEvent.click(screen.getByRole("button", { name: /criar oportunidade/i }));
+
+    await waitFor(() => expect(api.criarOportunidade).toHaveBeenCalledOnce());
+    expect(vi.mocked(api.criarOportunidade).mock.calls[0][0]).toMatchObject({ servico: "Auditoria" });
   });
 
   it("mostra o erro da API sem fechar o painel", async () => {

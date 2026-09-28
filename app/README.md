@@ -33,7 +33,7 @@ preço de uma oportunidade (é uma linha do tempo) e a tela Leads (fora do menu 
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil, agente SDR, SDR de IA (registro e painel) e dez telas |
-| Testes | **776** no backend, **297** nas telas (27/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Testes | **789** no backend, **324** nas telas (27/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
 | Banco | PostgreSQL 18.6 local, 21 tabelas (as quatro do SDR de IA desde 27/09/2026 — migração `562856af0eb8`, ainda não aplicada; `ficha_de_conta`, `abordagem` e `execucao_do_agente` desde 26/09/2026 — migração `8673eda1df27`, **ainda não aplicada nesta máquina**: rode `alembic upgrade head`). Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
 | API | 45 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Agenda de follow-up, contatos, funil em kanban (com arrasto entre colunas), oportunidades em lista, grupos econômicos (com detalhe), contratos (23/09/2026), abordagens do agente SDR (26/09/2026), SDR da IA com painel, leads e custos (27/09/2026) e conferência da carga. React com TypeScript, em `../frontend` |
@@ -258,10 +258,16 @@ abre um painel com quatro seções:
 - **Porte**: os nove direcionadores da régua de volume (`crm.domain.porte`, a mesma que já roda
   na Oportunidade — rótulos compartilhados em `componentes/direcionadoresDePorte.ts`), um botão
   "Ver sugestão" que calcula sem gravar (`POST /api/carteira/porte/sugestao`) e um "Porte
-  confirmado" que a pessoa aceita ou sobrepõe. Diferente das outras notas, o porte **não entra no
-  Score** — por isso grava direto no grupo (`GrupoEconomico.porte`/`porte_definido_por`/
-  `porte_definido_em`, `POST /api/carteira/grupos/{id}/porte`), não numa nova revisão da
-  classificação. Exigiu migração (`GrupoEconomico` ganha os campos de volumetria e porte).
+  confirmado" que a pessoa aceita ou sobrepõe. As opções desse seletor vêm de `Listas.portes` —
+  a mesma lista que a Oportunidade usa, não uma cópia fixa no frontend. Diferente das outras
+  notas, o porte **não entra no Score** — por isso grava direto no grupo (`GrupoEconomico.porte`/
+  `porte_definido_por`/`porte_definido_em`, `POST /api/carteira/grupos/{id}/porte`), não numa
+  nova revisão da classificação. Exigiu migração (`GrupoEconomico` ganha os campos de volumetria
+  e porte).
+- **Reabrir "Avaliar" não abre em branco.** `GET /api/carteira/classificacao` expõe o porte
+  já salvo de cada grupo (`ItemDaCarteira.porte`), e o painel pré-preenche os campos com ele —
+  sem isso, reavaliar um único direcionador dava a impressão de apagar os outros, mesmo o
+  backend já preservando o que não vem na edição (`exclude_unset`).
 
 `componentes/AvaliacaoDeNotas.tsx`.
 
@@ -1267,14 +1273,20 @@ preparo. Achado só porque o fluxo inteiro rodou num PostgreSQL de verdade.
 
 ## Classificação da carteira (Etapa 3, 26/09/2026)
 
-Tela **Carteira** (somente leitura): ISC, componentes, distribuição por classe e, por grupo, classe efetiva, Score, alerta de churn e eixo de ação.
+Tela **Carteira**: ISC, componentes, distribuição por classe contra a meta e, por grupo, classe efetiva, Score, alerta de churn e eixo de ação. Deixou de ser só leitura em 27/09/2026, com o botão "Avaliar" (ver seção própria, abaixo) — as notas humanas de Complexidade, Risco técnico e Disciplina, e o Porte, se editam ali.
 
 - **Regra** em `backend/src/crm/domain/classificacao.py`, parâmetros versionados (`2026-07-planilha-v1`). Score = 0,20 receita + 0,25 rentabilidade + 0,12 cross-sell + 0,12×(6−complexidade) + 0,09 disciplina + 0,07×(6−risco) + 0,15 adimplência. Classe por corte fixo (A ≥ 3,95; B ≥ 3,35; senão C) mais o sufixo do semáforo. Adimplência ≤ 2 marca "(TRAVADO)" e `$$$` sem rebaixar. O churn é campo próprio (na planilha estava escondido na fórmula).
 - **Carga**: `backend/scripts/importar_classificacao.py <classificacao.xlsx> <rentabilidade.xlsx>` roda em ensaio por padrão. Liga cada unidade ao grupo do CRM pelo CNPJ (seguindo as fusões), recalcula tudo e compara com a planilha; qualquer divergência bloqueia a gravação. `--aplicar` faz backup antes e grava um snapshot por (grupo, referência), idempotente.
 - **Conferência de 31/07/2026**: 31 unidades, ISC 53,65 (zona de atenção), igual ao da planilha; receita R$ 226.341,20.
 - **Notas de grupo são decimais** (média das empresas), por isso as colunas são `Numeric(4,2)`.
 - **Rentabilidade recalculada (defeito 7.2, decisão de 26/09/2026)**: a fórmula viva da planilha indexa o atrito de indisciplina com a disciplina direta, contra a própria documentação (`6 − disciplina`) e o Score (5 = cliente ótimo). `crm/domain/rentabilidade.py` calcula margem e nota com a disciplina invertida; `importar_classificacao.py --recalcular-rentabilidade` grava a **revisão 2** da mesma referência (a revisão 1, com a nota da planilha, fica; a tela e a API mostram a maior). Antes de gravar, confere que a fórmula viva reproduz a nota da planilha. Onde os honorários por empresa não fecham com a receita oficial: empresa única usa a oficial (aviso); grupo com várias empresas não rateia e mantém a nota da planilha (aviso). Resultado em 31/07/2026: ISC 53,65 → 50,40; 7 notas de rentabilidade e 2 classes mudam. `horas_por_mes` guarda as horas-base, como a planilha.
-- **Pendente**: notas humanas (complexidade, disciplina, risco, cross-sell, adimplência), churn e semáforo: quem atribui e a régua de cada uma. Grupo sem contrato ativo hoje (ex.: Tabor) continua no snapshot da referência e é marcado.
+- **Pendente**: complexidade, risco técnico e disciplina já têm régua e tela desde 27/09/2026
+  ("Carteira: avaliação de complexidade, risco, disciplina e porte por checklist", abaixo) — a
+  régua em si segue como proposta escrita (`escala-das-notas-humanas.md`), sem validação formal
+  registrada de Eduardo. **Cross-sell, adimplência, semáforo e churn continuam sem régua**: hoje
+  só a carga da planilha grava essas notas, ninguém as atribui pela tela. Detalhe das pendências
+  em `../modelo-classificacao-carteira.md`, seção 10. Grupo sem contrato ativo hoje (ex.: Tabor)
+  continua no snapshot da referência e é marcado.
 - Rota: `GET /api/carteira/classificacao`.
 - **Empresas do grupo (opcional)**: cada grupo tem um botão "+" que abre as empresas dele (razão social, CNPJ e mensalidade dos contratos ativos e suspensos); "−" fecha. Vêm no mesmo `GET /api/carteira/classificacao`, no campo `empresas`, e seguem as fusões (as empresas ficam no grupo que ficou).
 - **Observações** (rentabilidade recalculada, grupos que mantiveram a nota da planilha, grupo sem contrato ativo) ficam no rodapé da tela, em texto pequeno, e não no topo.

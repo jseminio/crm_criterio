@@ -38,7 +38,9 @@ from crm.domain import parametros as regra_de_parametros
 from crm.domain import porte as regras_de_porte
 from crm.domain.listas import SituacaoContrato
 from crm.domain.rentabilidade import PARAMETROS_DE_RENTABILIDADE
-from crm.relatorios.exportacao_da_carteira import LinhaDeHistorico, ParametrosDaPlanilha, gerar_planilha
+from crm.relatorios.exportacao_da_carteira import (
+    EmpresaDaExportacao, LinhaDeHistorico, ParametrosDaPlanilha, gerar_planilha,
+)
 
 AVISO_DA_PLANILHA = (
     "A nota de rentabilidade vem da planilha de saúde da carteira, sem recálculo: a regra de atrito/disciplina "
@@ -667,7 +669,9 @@ def roteador(
     @r.get("/exportar")
     def exportar(sessao: Session = Depends(obter_sessao)) -> Response:
         """O histórico completo — todas as leituras de todos os grupos, não só o snapshot atual —
-        numa planilha com fórmula viva para Score e Classe (`crm.relatorios.exportacao_da_carteira`)."""
+        na visão Grupo → Empresa do modelo `Classificacao_Grupo_COMPLETO.xlsx`, com fórmula viva
+        para Score, Rentabilidade, Classe, Classe Efetiva, Alerta, $$$ e Eixo de Ação
+        (`crm.relatorios.exportacao_da_carteira`)."""
         linhas = sessao.execute(
             sa.select(ClassificacaoDoGrupo, GrupoEconomico.nome)
             .join(GrupoEconomico, GrupoEconomico.id == ClassificacaoDoGrupo.grupo_id)
@@ -677,6 +681,7 @@ def roteador(
             LinhaDeHistorico(
                 grupo_nome=nome, referencia=c.referencia, revisao=c.revisao, registrado_em=c.registrado_em,
                 fonte=c.fonte, atribuido_por=c.atribuido_por, motivo=c.motivo, receita_mensal=c.receita_mensal,
+                margem=c.margem, horas_por_mes=c.horas_por_mes,
                 nota_receita=c.nota_receita, nota_rentabilidade=c.nota_rentabilidade, complexidade=c.complexidade,
                 disciplina=c.disciplina, risco_tecnico=c.risco_tecnico, cross_sell=c.cross_sell,
                 adimplencia=c.adimplencia, semaforo=c.semaforo, churn=c.churn, score=c.score, classe=c.classe,
@@ -685,6 +690,25 @@ def roteador(
             )
             for c, nome in linhas
         ]
+
+        nomes_dos_grupos = {nome for _, nome in linhas}
+        mensal = {
+            e: v for e, v in sessao.execute(
+                sa.select(Contrato.empresa_id, sa.func.sum(Contrato.preco_mensal))
+                .where(Contrato.empresa_id.is_not(None),
+                       Contrato.situacao.in_([SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO]))
+                .group_by(Contrato.empresa_id)
+            )
+        }
+        empresas_por_grupo: dict[str, list[EmpresaDaExportacao]] = {}
+        for e, grupo_nome in sessao.execute(
+            sa.select(Empresa, GrupoEconomico.nome).join(GrupoEconomico, GrupoEconomico.id == Empresa.grupo_id)
+            .where(GrupoEconomico.nome.in_(nomes_dos_grupos)).order_by(GrupoEconomico.nome, Empresa.razao_social)
+        ):
+            empresas_por_grupo.setdefault(grupo_nome, []).append(
+                EmpresaDaExportacao(razao_social=e.razao_social, cnpj=e.cnpj, mensalidade=mensal.get(e.id))
+            )
+
         parametros_atuais, _ = _parametros_vigentes(sessao)
         parametros_da_planilha = ParametrosDaPlanilha(
             corte_a=parametros_atuais.corte_a, corte_b=parametros_atuais.corte_b,
@@ -694,7 +718,7 @@ def roteador(
             peso_cross_sell=parametros_atuais.peso_cross_sell, peso_disciplina=parametros_atuais.peso_disciplina,
             peso_risco=parametros_atuais.peso_risco,
         )
-        conteudo = gerar_planilha(de_exportacao, parametros_da_planilha)
+        conteudo = gerar_planilha(de_exportacao, parametros_da_planilha, empresas_por_grupo)
         nome = f"carteira-historico-{date.today():%Y%m%d}.xlsx"
         return Response(
             conteudo, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

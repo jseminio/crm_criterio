@@ -598,6 +598,40 @@ class TestGrupos:
     def test_busca_por_nome(self, cliente: TestClient, carteira):
         assert cliente.get("/api/grupos", params={"busca": "beta"}).json()["total"] == 1
 
+    def test_corrige_nome_responsavel_e_observacao(self, cliente: TestClient, carteira):
+        resposta = cliente.patch(
+            f"/api/grupos/{carteira['alfa']}",
+            json={"nome": "Alfa Participações", "responsavel_cs": "EL", "observacao": "nome corrigido"},
+        )
+
+        assert resposta.status_code == 200
+        corpo = resposta.json()
+        assert corpo["nome"] == "Alfa Participações"
+        assert corpo["responsavel_cs"] == "EL"
+        assert corpo["observacao"] == "nome corrigido"
+        # a lista reflete a correção, e a contagem de oportunidades não se perde na volta
+        pagina = cliente.get("/api/grupos").json()
+        editado = next(g for g in pagina["itens"] if g["id"] == carteira["alfa"])
+        assert editado["nome"] == "Alfa Participações" and editado["quantas_oportunidades"] == 2
+
+    def test_so_o_que_vier_no_corpo_muda(self, cliente: TestClient, carteira):
+        cliente.patch(f"/api/grupos/{carteira['alfa']}", json={"responsavel_cs": "EL"})
+
+        corpo = cliente.patch(f"/api/grupos/{carteira['alfa']}", json={"observacao": "outra nota"}).json()
+        assert corpo["responsavel_cs"] == "EL"  # preservado, não veio no segundo corpo
+        assert corpo["observacao"] == "outra nota"
+
+    def test_grupo_inexistente_e_recusado(self, cliente: TestClient):
+        resposta = cliente.patch("/api/grupos/999999", json={"nome": "Novo nome"})
+        assert resposta.status_code == 404
+
+    def test_situacao_nao_e_editavel_por_aqui(self, cliente: TestClient, carteira):
+        # Situação muda sozinha pela regra de negócio (proposta aceita vira Cliente); um campo
+        # extra no corpo é ignorado pelo Pydantic, não quebra, mas também não move a situação.
+        resposta = cliente.patch(f"/api/grupos/{carteira['alfa']}", json={"situacao": "Encerrado"})
+        assert resposta.status_code == 200
+        assert resposta.json()["situacao"] == "Prospect"
+
     def test_funde_dois_grupos(self, cliente: TestClient, carteira):
         resposta = cliente.post(
             f"/api/grupos/{carteira['alfa']}/fundir",

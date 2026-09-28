@@ -96,9 +96,21 @@ class GrupoResumo(Base):
     situacao: SituacaoGrupo
     origem: Origem
     responsavel_cs: str | None = None
+    observacao: str | None = None
     data_entrada: date | None = None
     fundido_em_id: int | None = None
     quantas_oportunidades: int = 0
+
+
+class GrupoEdicao(BaseModel):
+    """Correção dos dados cadastrais do grupo. Só o que vier muda; o resto continua como estava.
+
+    **Situação fica de fora de propósito:** hoje ela muda sozinha (proposta aceita vira Cliente) —
+    editar à mão aqui abriria brecha pra destoar dessa regra sem ninguém perceber."""
+
+    nome: str | None = Field(default=None, min_length=1, max_length=200)
+    responsavel_cs: str | None = Field(default=None, max_length=10)
+    observacao: str | None = None
 
 
 class MrrAtualResposta(Base):

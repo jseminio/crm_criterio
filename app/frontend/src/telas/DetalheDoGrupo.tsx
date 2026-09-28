@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import { api } from "../api/cliente";
+import { api, ErroDaApi } from "../api/cliente";
 import type { GrupoResumo, Listas, OportunidadeResumo, Pagina } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
@@ -16,17 +16,86 @@ import { data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 
+function FormularioDeGrupo({
+  grupo,
+  aoSalvar,
+  aoCancelar,
+}: {
+  grupo: GrupoResumo;
+  aoSalvar: (corpo: Record<string, unknown>) => Promise<void>;
+  aoCancelar: () => void;
+}) {
+  const [nome, definirNome] = useState(grupo.nome);
+  const [responsavelCs, definirResponsavelCs] = useState(grupo.responsavel_cs ?? "");
+  const [observacao, definirObservacao] = useState(grupo.observacao ?? "");
+  const [erro, definirErro] = useState<string | null>(null);
+  const [salvando, definirSalvando] = useState(false);
+
+  const salvar = async () => {
+    definirSalvando(true);
+    definirErro(null);
+    try {
+      await aoSalvar({
+        nome: nome.trim(),
+        responsavel_cs: responsavelCs.trim() === "" ? null : responsavelCs.trim(),
+        observacao: observacao.trim() === "" ? null : observacao.trim(),
+      });
+    } catch (f) {
+      definirErro(f instanceof ErroDaApi ? f.message : "Falha ao salvar.");
+    } finally {
+      definirSalvando(false);
+    }
+  };
+
+  return (
+    <div className="formulario">
+      <div className="formulario-duplo">
+        <div className="campo-bloco">
+          <label className="campo-rotulo" htmlFor="grupo-nome">Nome</label>
+          <input id="grupo-nome" className="entrada" maxLength={200} value={nome} onChange={(e) => definirNome(e.target.value)} />
+        </div>
+        <div className="campo-bloco">
+          <label className="campo-rotulo" htmlFor="grupo-responsavel">Responsável CS</label>
+          <input id="grupo-responsavel" className="entrada" maxLength={10} value={responsavelCs} onChange={(e) => definirResponsavelCs(e.target.value)} />
+        </div>
+      </div>
+      <div className="campo-bloco">
+        <label className="campo-rotulo" htmlFor="grupo-observacao">Observação</label>
+        <input id="grupo-observacao" className="entrada" value={observacao} onChange={(e) => definirObservacao(e.target.value)} />
+      </div>
+      {erro && <p role="alert" className="estado-texto">{erro}</p>}
+      <div className="sugestao-acoes">
+        <button type="button" className="botao botao-secundario" onClick={aoCancelar}>Cancelar</button>
+        <button type="button" className="botao botao-primario" disabled={salvando || nome.trim() === ""} onClick={salvar}>
+          {salvando ? "Salvando…" : "Salvar grupo"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function DetalheDoGrupo({
   grupo,
   listas,
   aoFechar,
+  aoMudar,
 }: {
   grupo: GrupoResumo;
   listas: Listas | null;
   aoFechar: () => void;
+  aoMudar: () => void;
 }) {
+  const [grupoAtual, definirGrupoAtual] = useState(grupo);
+  const [editando, definirEditando] = useState(false);
   const [aberta, definirAberta] = useState<number | null>(null);
   const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
+
+  const salvarGrupo = async (corpo: Record<string, unknown>) => {
+    const atualizado = await api.editarGrupo(grupoAtual.id, corpo);
+    definirGrupoAtual(atualizado);
+    definirEditando(false);
+    aoMudar();
+  };
 
   const propostas = usarDados<Pagina<OportunidadeResumo>>(
     () => api.oportunidades({ grupo_id: grupo.id }),
@@ -43,18 +112,31 @@ export function DetalheDoGrupo({
   return (
     <>
       <PainelLateral
-        titulo={grupo.nome}
+        titulo={grupoAtual.nome}
         subtitulo="Grupo econômico"
         aoFechar={aoFechar}
       >
         <div className="secao-do-painel">
-          <div className="cartao-linha">
-            <Etiqueta texto={grupo.situacao} />
-            <Etiqueta texto={grupo.origem} tipo="neutra" />
-            {grupo.data_entrada && (
-              <span className="campo-ajuda">Cliente desde {data(grupo.data_entrada)}</span>
-            )}
-          </div>
+          {editando ? (
+            <FormularioDeGrupo grupo={grupoAtual} aoSalvar={salvarGrupo} aoCancelar={() => definirEditando(false)} />
+          ) : (
+            <>
+              <div className="cartao-linha">
+                <Etiqueta texto={grupoAtual.situacao} />
+                <Etiqueta texto={grupoAtual.origem} tipo="neutra" />
+                {grupoAtual.data_entrada && (
+                  <span className="campo-ajuda">Cliente desde {data(grupoAtual.data_entrada)}</span>
+                )}
+              </div>
+              {grupoAtual.responsavel_cs && (
+                <p className="campo-ajuda" style={{ marginTop: "var(--e2)" }}>Responsável CS: {grupoAtual.responsavel_cs}</p>
+              )}
+              {grupoAtual.observacao && <p className="campo-ajuda">{grupoAtual.observacao}</p>}
+              <button type="button" className="botao botao-secundario" style={{ marginTop: "var(--e2)" }} onClick={() => definirEditando(true)}>
+                Editar
+              </button>
+            </>
+          )}
         </div>
 
         <div className="secao-do-painel">

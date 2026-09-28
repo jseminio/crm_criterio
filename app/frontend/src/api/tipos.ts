@@ -558,6 +558,9 @@ export interface EmpresaDoGrupo {
 export interface NotasDoGrupo {
   receita: string;
   rentabilidade: string;
+  /** A nota tal como veio da planilha/deck de classificação (revisão 1), sem o recálculo do
+   * defeito 7.2 — pode diferir de `rentabilidade` acima, que é a que entra no Score. */
+  rentabilidade_planilha: string;
   complexidade: string;
   disciplina: string;
   risco: string;

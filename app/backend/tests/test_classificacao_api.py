@@ -91,6 +91,30 @@ def test_na_mesma_referencia_a_revisao_maior_vence(cliente, sessao: Session):
     assert len(itens) == 1 and itens[0]["classe"] == "A"
 
 
+def test_rentabilidade_planilha_e_sempre_a_da_revisao_1_mesmo_com_recalculo(cliente, sessao: Session):
+    original = regra.Notas(receita=3, rentabilidade=2, complexidade=3, disciplina=3, risco=3, cross_sell=3, adimplencia=3, semaforo=1, churn=2)
+    recalculada = regra.Notas(receita=3, rentabilidade=4, complexidade=3, disciplina=3, risco=3, cross_sell=3, adimplencia=3, semaforo=1, churn=2)
+    a = GrupoEconomico(nome="Alfa", situacao=SituacaoGrupo.CLIENTE)
+    sessao.add(a); sessao.flush()
+    _snap(sessao, a, date(2026, 7, 31), "1000", original, revisao=1)
+    _snap(sessao, a, date(2026, 7, 31), "1000", recalculada, revisao=2)
+    sessao.commit()
+    notas = cliente.get("/api/carteira/classificacao").json()["itens"][0]["notas"]
+    # A que entra no Score é a revisão mais recente (recalculada); a "da planilha/deck" é sempre a revisão 1.
+    assert Decimal(notas["rentabilidade"]) == Decimal("4")
+    assert Decimal(notas["rentabilidade_planilha"]) == Decimal("2")
+
+
+def test_rentabilidade_planilha_sem_recalculo_e_igual_a_mostrada(cliente, sessao: Session):
+    n = regra.Notas(receita=3, rentabilidade=3, complexidade=3, disciplina=3, risco=3, cross_sell=3, adimplencia=3, semaforo=1, churn=2)
+    a = GrupoEconomico(nome="Alfa", situacao=SituacaoGrupo.CLIENTE)
+    sessao.add(a); sessao.flush()
+    _snap(sessao, a, date(2026, 7, 31), "1000", n)
+    sessao.commit()
+    notas = cliente.get("/api/carteira/classificacao").json()["itens"][0]["notas"]
+    assert notas["rentabilidade"] == notas["rentabilidade_planilha"]
+
+
 def test_traz_as_empresas_do_grupo_com_a_mensalidade(cliente, sessao: Session):
     n = regra.Notas(receita=3, rentabilidade=3, complexidade=3, disciplina=3, risco=3, cross_sell=3, adimplencia=3, semaforo=1, churn=2)
     a = GrupoEconomico(nome="Alfa", situacao=SituacaoGrupo.CLIENTE)

@@ -16,6 +16,7 @@ import { Funil } from "./telas/Funil";
 import { Grupos } from "./telas/Grupos";
 import { Sdr } from "./telas/Sdr";
 import { usarDados } from "./usarDados";
+import { VERSAO } from "./versao";
 
 type Tela =
   | "agenda"
@@ -105,6 +106,7 @@ export default function App() {
         <div className="marca">
           Critério
           <span className="marca-linha2">CRM</span>
+          <span className="marca-versao">Versão {VERSAO}</span>
         </div>
 
         <div className="menu">

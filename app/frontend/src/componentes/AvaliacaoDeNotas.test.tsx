@@ -37,7 +37,7 @@ const LISTAS: Listas = {
   portes: ["Micro", "Pequeno", "Médio", "Grande", "Extra Grande"], servicos: [],
 };
 const NOTAS_VAZIO: NotasDoGrupo = {
-  receita: "3.00", rentabilidade: "3.00", complexidade: "3.00", disciplina: "3.00", risco: "3.00",
+  receita: "3.00", rentabilidade: "3.00", rentabilidade_planilha: "3.00", complexidade: "3.00", disciplina: "3.00", risco: "3.00",
   cross_sell: "3.00", adimplencia: "3.00", semaforo: 1, churn: 1, rentabilidade_da_planilha: false,
   atribuido_por: null, motivo: null, registrado_em: "2026-07-31T00:00:00",
 };

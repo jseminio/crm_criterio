@@ -238,7 +238,7 @@ export function Carteira({ listas }: { listas: Listas | null }) {
     grupo: (i) => i.grupo_nome,
     receita: (i) => Number(i.receita_mensal),
     score: (i) => Number(i.score),
-    rentabilidade: (i) => Number(i.notas.rentabilidade),
+    rentabilidade: (i) => Number(i.notas.rentabilidade_planilha),
     classe: (i) => i.classe_efetiva,
     alerta: (i) => i.alerta_de_churn,
     churn: (i) => i.churn,
@@ -384,7 +384,7 @@ export function Carteira({ listas }: { listas: Listas | null }) {
                     </td>
                     <td className="tabela-numero">{dinheiro(i.receita_mensal)}</td>
                     <td className="tabela-numero">{um(i.score)}</td>
-                    <td className="tabela-numero">{um(i.notas.rentabilidade)}</td>
+                    <td className="tabela-numero">{um(i.notas.rentabilidade_planilha)}</td>
                     <td className="carteira-classe">{i.classe_efetiva}{i.em_cobranca ? " · $$$ cobrança" : ""}</td>
                     <td>{i.alerta_de_churn ? ALERTA[i.alerta_de_churn] ?? i.alerta_de_churn : "—"}</td>
                     <td className="tabela-numero">{i.churn ?? "—"}</td>

@@ -20,6 +20,7 @@ export interface GrupoResumo {
   situacao: string;
   origem: string;
   responsavel_cs: string | null;
+  observacao: string | null;
   data_entrada: string | null;
   fundido_em_id: number | null;
   quantas_oportunidades: number;

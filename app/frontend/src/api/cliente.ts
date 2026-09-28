@@ -274,6 +274,9 @@ export const api = {
   grupos: (filtros: { busca?: string; limite?: number; incluir_fundidos?: boolean } = {}) =>
     pedir<Pagina<GrupoResumo>>(comParametros("/api/grupos", { limite: 500, ...filtros })),
 
+  editarGrupo: (id: number, mudancas: Record<string, unknown>) =>
+    pedir<GrupoResumo>(`/api/grupos/${id}`, { method: "PATCH", body: JSON.stringify(mudancas) }),
+
   sugestoesDeFusao: () => pedir<SugestaoDeFusao[]>("/api/grupos/sugestoes-de-fusao"),
 
   fusoesFeitas: () => pedir<FusaoFeita[]>("/api/grupos/fusoes"),

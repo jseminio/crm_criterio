@@ -35,6 +35,7 @@ from crm.db.modelos import (
 )
 from crm.domain import sdr as regras
 from crm.domain.listas import AutorDaMensagem, DesfechoDaConversa, SituacaoLead
+from crm.domain.servicos import problema_no_tema
 
 __all__ = ["roteador"]
 
@@ -167,7 +168,11 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
             if corpo.cnpj is not None:
                 lead.cnpj = corpo.cnpj
             if corpo.interesse is not None:
+                problema = problema_no_tema(corpo.interesse, corpo.interesse_tema, exigir=True)
+                if problema:
+                    raise regras_do_lead.RegraDoLead(problema)
                 lead.interesse = corpo.interesse
+                lead.interesse_tema = (corpo.interesse_tema or "").strip() or None
             if corpo.desfecho is D.QUALIFICADO:
                 regras_do_lead.qualificar(lead)
             elif corpo.desfecho is D.FORA_DO_PERFIL:

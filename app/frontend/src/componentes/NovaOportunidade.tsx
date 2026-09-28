@@ -20,6 +20,7 @@ const CAMPOS_VAZIOS = {
   nome_do_grupo: "",
   servico: "",
   servico_descricao: "",
+  servico_tema: "",
   tipo_servico: "",
   data_colocacao: hoje(),
   preco_mensal: "",
@@ -138,9 +139,11 @@ export function NovaOportunidade({
             rotulo="Serviço"
             valor={campos.servico}
             descricao={campos.servico_descricao}
-            aoEscolher={(nome, texto) => {
+            tema={campos.servico_tema}
+            aoEscolher={(nome, texto, tema) => {
               mudar("servico", nome);
               mudar("servico_descricao", texto);
+              mudar("servico_tema", tema);
             }}
           />
           {campo("tipo_servico", "Tipo de serviço", { placeholder: "Contabilidade" })}

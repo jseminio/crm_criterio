@@ -33,7 +33,7 @@ preço de uma oportunidade (é uma linha do tempo) e a tela Leads (fora do menu 
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, API do funil, agente SDR, SDR de IA (registro e painel) e dez telas |
-| Testes | **789** no backend, **324** nas telas (27/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
+| Testes | **802** no backend, **326** nas telas (27/09/2026), todos passando. Backend com pytest; telas com Vitest e Testing Library |
 | Banco | PostgreSQL 18.6 local, 21 tabelas (as quatro do SDR de IA desde 27/09/2026 — migração `562856af0eb8`, ainda não aplicada; `ficha_de_conta`, `abordagem` e `execucao_do_agente` desde 26/09/2026 — migração `8673eda1df27`, **ainda não aplicada nesta máquina**: rode `alembic upgrade head`). Dados de 2026 carregados: 155 oportunidades (153 da planilha + 2 do kit do Bruno), 138+ grupos |
 | API | 45 rotas, em `127.0.0.1:8000`, **sem autenticação** — o E1 foi adiado |
 | Telas | Agenda de follow-up, contatos, funil em kanban (com arrasto entre colunas), oportunidades em lista, grupos econômicos (com detalhe), contratos (23/09/2026), abordagens do agente SDR (26/09/2026), SDR da IA com painel, leads e custos (27/09/2026) e conferência da carga. React com TypeScript, em `../frontend` |
@@ -102,6 +102,20 @@ recorrente**, e a linha sai do serviço, no passado e daqui para frente.
   `alembic upgrade head` recusou rodar ("Multiple head revisions"). A junção `a96818a796a7`,
   que veio com a ordenação nas tabelas, liga as duas sem mudar nenhuma tabela.
   `tests/test_migracoes.py` falha se voltar a haver mais de uma ponta.
+- **DIRPF e Perícia** (27/09/2026) entram como C2. **Consultoria pede o tema**, obrigatório:
+  Tributária e fiscal · Valuation, PPA e laudos · M&A, due diligence e captação · Contábil e
+  financeira · Societária e reestruturação · Trabalhista. Cada tema tem as suas perguntas para o
+  SDR de IA. O tema fica em `servico_tema` (no lead, `interesse_tema`), **não** em
+  `tipo_servico`: esse vem da planilha e faz parte da identidade da proposta na carga. Proposta
+  antiga que já era Consultoria sem tema continua editável; o tema só é exigido de quem escolhe
+  Consultoria agora. Migração `a3727af424db`, só aditiva.
+- **Reclassificação pelo tipo:** `scripts/reclassificar_servico_pelo_tipo.py` (ensaio por padrão,
+  `--aplicar` com backup) lê a coluna "Tipo serviço" das propostas marcadas "Consultoria": as que
+  são de outro serviço do catálogo (Legalização Empresarial, Auditoria, FSCP, Perícia, DIRPF)
+  passam a ele, com a troca protegida da recarga em `campos_do_crm`; as demais ganham o tema.
+  Tema escolhido por uma pessoa nunca é sobrescrito. O de-para está em
+  `crm.domain.servicos.reclassificar_pelo_tipo`, aprovado por Eduardo em 27/09/2026. Rodar de
+  novo depois de uma recarga pega as propostas novas.
 - **O passado:** `scripts/reclassificar_linha_por_servico.py` mostra, sem gravar, quantas
   oportunidades mudam de linha e de quê para quê; `--aplicar` grava com backup antes, na
   pasta `~/Backups-CRM`. **Ainda não rodado na máquina de Eduardo.**

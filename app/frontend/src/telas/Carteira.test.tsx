@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
-import type { ClassificacaoDaCarteira, ItemDaCarteira, PorteDoGrupo } from "../api/tipos";
+import type { ClassificacaoDaCarteira, ItemDaCarteira, NotasDoGrupo, PorteDoGrupo } from "../api/tipos";
 import { Carteira } from "./Carteira";
 
 vi.mock("../api/cliente", async () => {
@@ -27,10 +27,15 @@ const PORTE_VAZIO: PorteDoGrupo = {
   servicos_contratados_alem_do_primeiro: 0, tem_consolidacao_de_grupo: false, e_auditada: false,
   porte: null, porte_definido_por: null, porte_definido_em: null,
 };
+const NOTAS_VAZIO: NotasDoGrupo = {
+  receita: "3.00", rentabilidade: "3.00", complexidade: "3.00", disciplina: "3.00", risco: "3.00",
+  cross_sell: "3.00", adimplencia: "3.00", semaforo: 1, churn: 1, rentabilidade_da_planilha: false,
+  atribuido_por: null, motivo: null, registrado_em: "2026-07-31T00:00:00",
+};
 const item = (o: Partial<ItemDaCarteira> = {}): ItemDaCarteira => ({
   grupo_id: 1, grupo_nome: "Alfa", receita_mensal: "1000.00", score: "3.5270", classe: "B", classe_efetiva: "B3 (TRAVADO)",
   alerta_de_churn: "⚠", em_cobranca: true, eixo_de_acao: "Cobrança — sem tratamento preferencial", semaforo: 3, churn: 4,
-  sem_contrato_ativo: false, porte: PORTE_VAZIO,
+  sem_contrato_ativo: false, notas: NOTAS_VAZIO, porte: PORTE_VAZIO,
   empresas: [
     { id: 10, razao_social: "Alfa Comércio Ltda", cnpj: "11222333000181", mensalidade: "700.00" },
     { id: 11, razao_social: "Alfa Serviços SA", cnpj: null, mensalidade: null },

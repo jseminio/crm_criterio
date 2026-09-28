@@ -555,6 +555,22 @@ export interface EmpresaDoGrupo {
   mensalidade: string | null;
 }
 
+export interface NotasDoGrupo {
+  receita: string;
+  rentabilidade: string;
+  complexidade: string;
+  disciplina: string;
+  risco: string;
+  cross_sell: string;
+  adimplencia: string;
+  semaforo: number;
+  churn: number | null;
+  rentabilidade_da_planilha: boolean;
+  atribuido_por: string | null;
+  motivo: string | null;
+  registrado_em: string;
+}
+
 export interface ItemDaCarteira {
   grupo_id: number;
   grupo_nome: string;
@@ -569,6 +585,7 @@ export interface ItemDaCarteira {
   churn: number | null;
   sem_contrato_ativo: boolean;
   empresas: EmpresaDoGrupo[];
+  notas: NotasDoGrupo;
   porte: PorteDoGrupo;
 }
 

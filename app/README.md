@@ -267,17 +267,32 @@ versionada como pesos e cortes do Score (`Parametros.meta_distribuicao_de_classe
 `crm.domain.classificacao.distribuicao_por_classe()` (pura, testada) e exposta em
 `GET /api/carteira/classificacao` no campo `distribuicao_por_classe`.
 
-## Carteira: avaliação de complexidade, risco, disciplina e porte por checklist (27/09/2026)
+## Carteira: avaliação dos sete componentes do Score, em abas (27/09/2026, ampliado 28/09/2026)
 
 Régua em `escala-das-notas-humanas.md`, agora com tela. Cada grupo ganha o botão **"Avaliar"**, que
-abre um painel com quatro seções:
+abre um painel com uma aba por componente do Score — oito no total, em duas fileiras
+(`.abas-avaliacao` em `app.css`, para caber na largura do painel sem transbordar):
 
-- **Complexidade** (6 fatores), **Risco técnico** (5 fatores) e **Disciplina** (interina: 3
-  perguntas trimestrais, até existir o registro de prazo × entrega) — cada uma calculando a nota
-  1–5 sozinha a partir do que foi marcado, sem número "no olho". O motivo enviado ao servidor é
-  montado a partir do que foi marcado (ex.: "Complexidade 3 (2/6: holding; auditoria externa)"),
-  sem exigir texto livre de quem avalia. Salva as três notas de uma vez, reaproveitando
-  `POST /api/carteira/grupos/{id}/notas` (endpoint que já existia, sem tela até agora).
+- **Receita** (20%) e **Rentabilidade** (25%): abas **somente leitura** — mostram a nota já
+  registrada (`notas.receita`/`notas.rentabilidade`, campo que já vinha do backend mas faltava no
+  tipo TS `ItemDaCarteira`, corrigido nesta rodada). **Decisão de 28/09/2026:** Receita passa a vir
+  direto do Porte (Micro=1, Pequeno=2, Médio=3, Grande=4, Extra Grande=5), substituindo o corte por
+  percentil sobre o honorário praticado (`modelo-classificacao-carteira.md`, seção 4, que fica como
+  registro histórico da régua anterior); Rentabilidade continua pela margem sobre o honorário
+  praticado, sem mudança. **Pendência:** o recálculo automático de Receita a partir do Porte ainda
+  não está implementado no backend — hoje o valor mostrado é o que já está gravado.
+- **Complexidade** (12%, invertida), **Risco técnico** (7%, invertida), **Disciplina** (9%,
+  interina: 3 perguntas trimestrais, até existir o registro de prazo × entrega), **Cross-sell**
+  (12%, proposta de 27/09/2026 aprovada por Eduardo: 5 fatores estruturais sim/não, revisita só
+  quando algo muda) e **Inadimplência** (15%, trava a classe e marca "$$$" se a nota ficar ≤2;
+  interina, mesma lógica de 3 perguntas da Disciplina, até existir o registro automático de atraso
+  de pagamento) — todas calculando a nota 1–5 sozinhas a partir do que foi marcado ou respondido,
+  **em tempo real, sem clique extra** (conferido ao vivo: marcar um fator ou trocar uma resposta já
+  atualiza "Nota calculada" na hora). O motivo enviado ao servidor é montado a partir do que foi
+  marcado (ex.: "Complexidade 3 (2/6: holding; auditoria externa). Cross-sell 2 (1/5: porte comporta
+  upsell)"), sem exigir texto livre de quem avalia. Salva as cinco notas de uma vez, reaproveitando
+  `POST /api/carteira/grupos/{id}/notas` (que já aceitava `cross_sell`/`adimplencia`, sem tela até
+  agora).
 - **Porte**: os nove direcionadores da régua de volume (`crm.domain.porte`, a mesma que já roda
   na Oportunidade — rótulos compartilhados em `componentes/direcionadoresDePorte.ts`), um botão
   "Ver sugestão" que calcula sem gravar (`POST /api/carteira/porte/sugestao`) e um "Porte

@@ -428,6 +428,7 @@ export function Carteira({ listas }: { listas: Listas | null }) {
           key={avaliando.grupo_id}
           grupoId={avaliando.grupo_id}
           grupoNome={avaliando.grupo_nome}
+          notasAtuais={avaliando.notas}
           porteAtual={avaliando.porte}
           portes={listas?.portes ?? []}
           aoFechar={() => definirAvaliando(null)}

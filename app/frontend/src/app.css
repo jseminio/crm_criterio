@@ -16,6 +16,8 @@
 .marca-linha2 { display: block; font-family: var(--fonte-ui); font-size: 12px;
   font-weight: 400; color: var(--texto-sobre-marca-fraco); letter-spacing: .08em;
   text-transform: uppercase; margin-top: var(--e1); }
+.marca-versao { display: block; font-family: var(--fonte-ui); font-size: 10px;
+  font-weight: 400; color: var(--texto-sobre-marca-fraco); opacity: .7; margin-top: var(--e1); }
 
 .menu { display: flex; flex-direction: column; gap: var(--e1); }
 .menu-item {

@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
-import type { ClassificacaoDaCarteira, ItemDaCarteira, Listas, PorteDoGrupo } from "../api/tipos";
+import type { ClassificacaoDaCarteira, ItemDaCarteira, Listas, NotasDoGrupo, PorteDoGrupo } from "../api/tipos";
 import { Carteira } from "../telas/Carteira";
 
 vi.mock("../api/cliente", async () => {
@@ -36,10 +36,15 @@ const LISTAS: Listas = {
   linhas_de_servico: [], situacoes_de_grupo: [], captadores: [],
   portes: ["Micro", "Pequeno", "Médio", "Grande", "Extra Grande"], servicos: [],
 };
+const NOTAS_VAZIO: NotasDoGrupo = {
+  receita: "3.00", rentabilidade: "3.00", complexidade: "3.00", disciplina: "3.00", risco: "3.00",
+  cross_sell: "3.00", adimplencia: "3.00", semaforo: 1, churn: 1, rentabilidade_da_planilha: false,
+  atribuido_por: null, motivo: null, registrado_em: "2026-07-31T00:00:00",
+};
 const item = (o: Partial<ItemDaCarteira> = {}): ItemDaCarteira => ({
   grupo_id: 1, grupo_nome: "Alfa", receita_mensal: "1000.00", score: "3.00", classe: "B", classe_efetiva: "B1",
   alerta_de_churn: null, em_cobranca: false, eixo_de_acao: "Sem urgência de churn", semaforo: 1, churn: 1,
-  sem_contrato_ativo: false, empresas: [], porte: PORTE_VAZIO, ...o,
+  sem_contrato_ativo: false, empresas: [], notas: NOTAS_VAZIO, porte: PORTE_VAZIO, ...o,
 });
 const resposta = (o: Partial<ClassificacaoDaCarteira> = {}): ClassificacaoDaCarteira => ({
   referencia: "2026-07-31", versao_dos_parametros: "v1", isc: null, retrato: null,
@@ -73,6 +78,7 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
   it("abre com nota 1 em complexidade e 5 em risco, sem nenhum fator marcado", async () => {
     await abrir();
     expect(screen.getByText(nota("Nota calculada: 1 (0 de 6 marcados)"))).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Risco técnico" }));
     expect(screen.getByText(nota("Nota calculada: 5 (0 de 5 marcados)"))).toBeInTheDocument();
   });
 
@@ -89,6 +95,7 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
     render(<Carteira listas={LISTAS} />);
     await screen.findByText(/▸ Alfa/);
     await userEvent.click(screen.getByRole("button", { name: "Avaliar" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Porte" }));
 
     expect(screen.getByLabelText("CNPJs no escopo")).toHaveValue(4);
     expect(screen.getByLabelText("Empregados CLT")).toHaveValue(30);
@@ -110,12 +117,14 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
 
   it("marcar fatores de risco desce a nota (0→5, 1→4 … 4-5→1)", async () => {
     await abrir();
+    await userEvent.click(screen.getByRole("tab", { name: "Risco técnico" }));
     await userEvent.click(screen.getByLabelText(/Auto de infração/));
     expect(screen.getByText(nota("Nota calculada: 4 (1 de 5 marcados)"))).toBeInTheDocument();
   });
 
   it("disciplina: 3 meses no prazo e sem furo extra é nota 5; cada furo desce um ponto", async () => {
     await abrir();
+    await userEvent.click(screen.getByRole("tab", { name: "Disciplina" }));
     expect(screen.getByText(nota("Nota calculada: 5"))).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText(/quantos o cliente entregou tudo no prazo/), "1");
     expect(screen.getByText(nota("Nota calculada: 3"))).toBeInTheDocument(); // 2 furos de mês
@@ -135,21 +144,23 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
     vi.mocked(api.editarPorte).mockResolvedValue(PORTE_VAZIO);
     await abrir();
     await userEvent.click(screen.getByLabelText(/Holding com consolidação/));
+    await userEvent.click(screen.getByRole("tab", { name: "Risco técnico" }));
     await userEvent.click(screen.getByLabelText(/Auto de infração/));
     await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Eduardo Luiz");
     await userEvent.click(screen.getByRole("button", { name: "Salvar avaliação" }));
 
     expect(api.editarNotasDaCarteira).toHaveBeenCalledWith(1, {
       autor: "Eduardo Luiz",
-      motivo: "Complexidade 2 (1/6: holding). Risco técnico 4 (1/5: auto de infração). Disciplina 5 (3/3 meses no prazo)",
-      complexidade: 2, disciplina: 5, risco: 4,
+      motivo: "Complexidade 2 (1/6: holding). Risco técnico 4 (1/5: auto de infração). Disciplina 5 (3/3 meses no prazo). "
+        + "Cross-sell 1 (0/5). Inadimplência 5 (3/3 meses em dia)",
+      complexidade: 2, disciplina: 5, risco: 4, cross_sell: 1, adimplencia: 5,
     });
     expect(api.editarPorte).toHaveBeenCalledWith(1, {
       autor: "Eduardo Luiz", porte: undefined,
       servicos_contratados_alem_do_primeiro: 0, tem_consolidacao_de_grupo: false, e_auditada: false,
     });
     // fecha o painel e recarrega a lista depois de salvar
-    await waitFor(() => expect(screen.queryByText("Avaliar complexidade, risco técnico, disciplina e porte")).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("tablist", { name: "Componentes do Score e porte" })).toBeNull());
     expect(api.classificacaoDaCarteira).toHaveBeenCalledTimes(2);
   });
 
@@ -158,6 +169,7 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
       calculavel: true, pontuacao: "0.00", porte: "Micro", horas_base: 5, direcionadores_aplicados: 1,
     });
     await abrir();
+    await userEvent.click(screen.getByRole("tab", { name: "Porte" }));
     await userEvent.type(screen.getByLabelText("CNPJs no escopo"), "1");
     await userEvent.click(screen.getByRole("button", { name: "Ver sugestão" }));
 
@@ -180,6 +192,7 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
       calculavel: false, pontuacao: null, porte: null, horas_base: null, direcionadores_aplicados: 0,
     });
     await abrir();
+    await userEvent.click(screen.getByRole("tab", { name: "Porte" }));
     await userEvent.click(screen.getByRole("button", { name: "Ver sugestão" }));
     expect(await screen.findByText("Sugestão da régua: não calculável — nenhum direcionador preenchido ainda.")).toBeInTheDocument();
     expect(screen.queryByText(/Usar sugestão/)).toBeNull();
@@ -196,7 +209,7 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
   it("cancelar fecha o painel sem chamar a API", async () => {
     await abrir();
     await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    expect(screen.queryByText("Avaliar complexidade, risco técnico, disciplina e porte")).toBeNull();
+    expect(screen.queryByRole("tablist", { name: "Componentes do Score e porte" })).toBeNull();
     expect(api.editarNotasDaCarteira).not.toHaveBeenCalled();
   });
 });

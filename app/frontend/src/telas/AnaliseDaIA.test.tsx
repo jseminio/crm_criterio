@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ErroDaApi } from "../api/cliente";
-import type { AnaliseDaCarteira, ClassificacaoDaCarteira, ItemDaCarteira, PorteDoGrupo } from "../api/tipos";
+import type { AnaliseDaCarteira, ClassificacaoDaCarteira, ItemDaCarteira, NotasDoGrupo, PorteDoGrupo } from "../api/tipos";
 import { Carteira } from "./Carteira";
 
 vi.mock("../api/cliente", async () => {
@@ -27,10 +27,15 @@ const PORTE_VAZIO: PorteDoGrupo = {
   servicos_contratados_alem_do_primeiro: 0, tem_consolidacao_de_grupo: false, e_auditada: false,
   porte: null, porte_definido_por: null, porte_definido_em: null,
 };
+const NOTAS_VAZIO: NotasDoGrupo = {
+  receita: "3.00", rentabilidade: "3.00", complexidade: "3.00", disciplina: "3.00", risco: "3.00",
+  cross_sell: "3.00", adimplencia: "3.00", semaforo: 1, churn: 1, rentabilidade_da_planilha: false,
+  atribuido_por: null, motivo: null, registrado_em: "2026-07-31T00:00:00",
+};
 const item = (o: Partial<ItemDaCarteira> = {}): ItemDaCarteira => ({
   grupo_id: 1, grupo_nome: "Alfa", receita_mensal: "1000.00", score: "3.00", classe: "B", classe_efetiva: "B1",
   alerta_de_churn: null, em_cobranca: false, eixo_de_acao: "Sem urgência de churn", semaforo: 1, churn: 1,
-  sem_contrato_ativo: false, empresas: [], porte: PORTE_VAZIO, ...o,
+  sem_contrato_ativo: false, empresas: [], notas: NOTAS_VAZIO, porte: PORTE_VAZIO, ...o,
 });
 const classificacao = (o: Partial<ClassificacaoDaCarteira> = {}): ClassificacaoDaCarteira => ({
   referencia: "2026-07-31", versao_dos_parametros: "v1",

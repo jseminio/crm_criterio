@@ -555,6 +555,22 @@ export interface EmpresaDoGrupo {
   mensalidade: string | null;
 }
 
+export interface NotasDoGrupo {
+  receita: string;
+  rentabilidade: string;
+  complexidade: string;
+  disciplina: string;
+  risco: string;
+  cross_sell: string;
+  adimplencia: string;
+  semaforo: number;
+  churn: number | null;
+  rentabilidade_da_planilha: boolean;
+  atribuido_por: string | null;
+  motivo: string | null;
+  registrado_em: string;
+}
+
 export interface ItemDaCarteira {
   grupo_id: number;
   grupo_nome: string;
@@ -569,6 +585,7 @@ export interface ItemDaCarteira {
   churn: number | null;
   sem_contrato_ativo: boolean;
   empresas: EmpresaDoGrupo[];
+  notas: NotasDoGrupo;
   porte: PorteDoGrupo;
 }
 
@@ -658,6 +675,99 @@ export interface ResultadoDaEdicao {
   item: ItemDaCarteira;
   isc: IscDaCarteira | null;
   avisos: string[];
+}
+
+export interface CelulaDeMix {
+  porte: string;
+  cargo: string;
+  mix_percentual: string;
+}
+
+export interface Parametros {
+  id: number;
+  criado_em: string;
+  autor: string;
+  motivo: string;
+  peso_receita: string;
+  peso_rentabilidade: string;
+  peso_cross_sell: string;
+  peso_complexidade: string;
+  peso_disciplina: string;
+  peso_risco: string;
+  peso_adimplencia: string;
+  corte_a: string;
+  corte_b: string;
+  trava_de_adimplencia: number;
+  churn_alto: number;
+  imposto: string;
+  teto_de_atrito: string;
+  atrito_nota_1: string;
+  atrito_nota_2: string;
+  atrito_nota_3: string;
+  atrito_nota_4: string;
+  atrito_nota_5: string;
+  corte_margem_2: string;
+  corte_margem_3: string;
+  corte_margem_4: string;
+  corte_margem_5: string;
+  horas_micro: number;
+  horas_pequeno: number;
+  horas_medio: number;
+  horas_grande: number;
+  horas_extra_grande: number;
+  taxa_socio_senior: string;
+  taxa_socio_junior: string;
+  taxa_supervisor: string;
+  taxa_analista_senior: string;
+  taxa_analista_pleno: string;
+  taxa_analista_junior: string;
+  mix: CelulaDeMix[];
+  custo_hora: Record<string, string>;
+}
+
+export interface CelulaDeMixEntrada {
+  porte: string;
+  cargo: string;
+  mix_percentual: number;
+}
+
+export interface EdicaoDeParametros {
+  autor: string;
+  motivo: string;
+  peso_receita: number;
+  peso_rentabilidade: number;
+  peso_cross_sell: number;
+  peso_complexidade: number;
+  peso_disciplina: number;
+  peso_risco: number;
+  peso_adimplencia: number;
+  corte_a: number;
+  corte_b: number;
+  trava_de_adimplencia: number;
+  churn_alto: number;
+  imposto: number;
+  teto_de_atrito: number;
+  atrito_nota_1: number;
+  atrito_nota_2: number;
+  atrito_nota_3: number;
+  atrito_nota_4: number;
+  atrito_nota_5: number;
+  corte_margem_2: number;
+  corte_margem_3: number;
+  corte_margem_4: number;
+  corte_margem_5: number;
+  horas_micro: number;
+  horas_pequeno: number;
+  horas_medio: number;
+  horas_grande: number;
+  horas_extra_grande: number;
+  taxa_socio_senior: number;
+  taxa_socio_junior: number;
+  taxa_supervisor: number;
+  taxa_analista_senior: number;
+  taxa_analista_pleno: number;
+  taxa_analista_junior: number;
+  mix: CelulaDeMixEntrada[];
 }
 
 export interface ClassificacaoDaCarteira {

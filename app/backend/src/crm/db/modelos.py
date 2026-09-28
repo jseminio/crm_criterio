@@ -549,6 +549,90 @@ class ClassificacaoDoGrupo(Base):
     grupo: Mapped[GrupoEconomico] = relationship()
 
 
+PARAMETRO = sa.Numeric(6, 4)
+
+
+class VersaoDeParametros(Base):
+    """Os parâmetros do Score e da Rentabilidade — pesos, cortes e a matriz de horas/mix/taxa por
+    Porte (Etapa 3, 28/09/2026, decisão de Eduardo: "podem variar", então saem do código e viram
+    linha de banco).
+
+    **Snapshot imutável, como `ClassificacaoDoGrupo`**: uma edição grava uma versão nova, a
+    anterior nunca é tocada — é o que mantém `ClassificacaoDoGrupo.versao_dos_parametros` de uma
+    classificação antiga apontando para algo estável mesmo depois dos pesos mudarem. A vigente é
+    sempre a de `criado_em` mais recente. A regra de construção e validação está em
+    `crm.domain.parametros`."""
+
+    __tablename__ = "versao_de_parametros"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    criado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False, index=True)
+    autor: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    motivo: Mapped[str] = mapped_column(sa.String(500), nullable=False)
+
+    # Pesos do Score — somam 100% (validado antes de gravar, não pelo banco).
+    peso_receita: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    peso_rentabilidade: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    peso_cross_sell: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    peso_complexidade: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    peso_disciplina: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    peso_risco: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    peso_adimplencia: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    corte_a: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    corte_b: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    trava_de_adimplencia: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False)
+    churn_alto: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False)
+
+    # Rentabilidade: imposto, atrito e cortes de margem.
+    imposto: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    teto_de_atrito: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    atrito_nota_1: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    atrito_nota_2: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    atrito_nota_3: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    atrito_nota_4: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    atrito_nota_5: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    corte_margem_2: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    corte_margem_3: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    corte_margem_4: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+    corte_margem_5: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+
+    # Matriz de horas por Porte (seção 2 da régua de porte).
+    horas_micro: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False)
+    horas_pequeno: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False)
+    horas_medio: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False)
+    horas_grande: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False)
+    horas_extra_grande: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False)
+
+    # Taxa por hora, por cargo (R$/h) — não varia por Porte; o mix é que varia (tabela `MixDeEquipe`).
+    taxa_socio_senior: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    taxa_socio_junior: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    taxa_supervisor: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    taxa_analista_senior: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    taxa_analista_pleno: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    taxa_analista_junior: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+
+    mix: Mapped[list["MixDeEquipe"]] = relationship(back_populates="versao", cascade="all, delete-orphan")
+
+
+class MixDeEquipe(Base):
+    """Uma célula da "MATRIZ DE HORAS E MIX DE EQUIPE — por Porte do cliente": quanto do tempo de
+    um cargo entra no atendimento de cada Porte. Junto com as taxas de `VersaoDeParametros`,
+    produz o custo/hora ponderado — calculado sempre, nunca digitado solto (ver
+    `crm.domain.parametros.custo_hora_por_porte`). Cinco Portes × seis cargos = 30 linhas por
+    versão; a soma por Porte precisa fechar 100%."""
+
+    __tablename__ = "mix_de_equipe"
+    __table_args__ = (sa.UniqueConstraint("versao_id", "porte", "cargo", name="uq_mix_versao_porte_cargo"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    versao_id: Mapped[int] = mapped_column(sa.ForeignKey("versao_de_parametros.id"), nullable=False, index=True)
+    porte: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    cargo: Mapped[str] = mapped_column(sa.String(30), nullable=False)
+    mix_percentual: Mapped[Decimal] = mapped_column(PARAMETRO, nullable=False)
+
+    versao: Mapped[VersaoDeParametros] = relationship(back_populates="mix")
+
+
 class FusaoDeGrupos(Base):
     """O registro de uma fusão de grupos, para poder **desfazê-la** (pedido de Eduardo, 26/09/2026).
 

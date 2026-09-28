@@ -16,7 +16,9 @@ import type {
   RevisaoDaCarteira,
   ClassificacaoDaCarteira,
   EdicaoDeNotas,
+  EdicaoDeParametros,
   EdicaoDePorte,
+  Parametros,
   PorteDoGrupo,
   ResultadoDaEdicao,
   SugestaoDePorte,
@@ -180,6 +182,9 @@ export const api = {
     pedir<SugestaoDePorte>("/api/carteira/porte/sugestao", { method: "POST", body: JSON.stringify(corpo) }),
   editarPorte: (grupoId: number, corpo: EdicaoDePorte) =>
     pedir<PorteDoGrupo>(`/api/carteira/grupos/${grupoId}/porte`, { method: "POST", body: JSON.stringify(corpo) }),
+  parametrosAtuais: () => pedir<Parametros>("/api/carteira/parametros"),
+  editarParametros: (corpo: EdicaoDeParametros) =>
+    pedir<Parametros>("/api/carteira/parametros", { method: "POST", body: JSON.stringify(corpo) }),
   mrr: (de?: string) => pedir<Mrr>(comParametros("/api/mrr", { de })),
 
   agenda: (captador?: string[]) =>

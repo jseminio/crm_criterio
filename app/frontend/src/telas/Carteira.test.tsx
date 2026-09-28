@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
-import type { ClassificacaoDaCarteira, ItemDaCarteira, PorteDoGrupo } from "../api/tipos";
+import type { ClassificacaoDaCarteira, ItemDaCarteira, NotasDoGrupo, Parametros, PorteDoGrupo } from "../api/tipos";
 import { Carteira } from "./Carteira";
 
 vi.mock("../api/cliente", async () => {
@@ -16,6 +16,8 @@ vi.mock("../api/cliente", async () => {
       revisoesDaCarteira: vi.fn().mockResolvedValue([]),
       registrarRevisaoDaCarteira: vi.fn(),
       editarMesDaRevisao: vi.fn(),
+      parametrosAtuais: vi.fn(),
+      editarParametros: vi.fn(),
     },
   };
 });
@@ -27,10 +29,15 @@ const PORTE_VAZIO: PorteDoGrupo = {
   servicos_contratados_alem_do_primeiro: 0, tem_consolidacao_de_grupo: false, e_auditada: false,
   porte: null, porte_definido_por: null, porte_definido_em: null,
 };
+const NOTAS_VAZIO: NotasDoGrupo = {
+  receita: "3.00", rentabilidade: "3.00", complexidade: "3.00", disciplina: "3.00", risco: "3.00",
+  cross_sell: "3.00", adimplencia: "3.00", semaforo: 1, churn: 1, rentabilidade_da_planilha: false,
+  atribuido_por: null, motivo: null, registrado_em: "2026-07-31T00:00:00",
+};
 const item = (o: Partial<ItemDaCarteira> = {}): ItemDaCarteira => ({
   grupo_id: 1, grupo_nome: "Alfa", receita_mensal: "1000.00", score: "3.5270", classe: "B", classe_efetiva: "B3 (TRAVADO)",
   alerta_de_churn: "⚠", em_cobranca: true, eixo_de_acao: "Cobrança — sem tratamento preferencial", semaforo: 3, churn: 4,
-  sem_contrato_ativo: false, porte: PORTE_VAZIO,
+  sem_contrato_ativo: false, notas: NOTAS_VAZIO, porte: PORTE_VAZIO,
   empresas: [
     { id: 10, razao_social: "Alfa Comércio Ltda", cnpj: "11222333000181", mensalidade: "700.00" },
     { id: 11, razao_social: "Alfa Serviços SA", cnpj: null, mensalidade: null },
@@ -51,6 +58,20 @@ const resposta = (o: Partial<ClassificacaoDaCarteira> = {}): ClassificacaoDaCart
     item({ grupo_id: 2, grupo_nome: "Beta", classe: "C", classe_efetiva: "C1", em_cobranca: false, alerta_de_churn: null, eixo_de_acao: "Sem urgência de churn", churn: 1, receita_mensal: "5000.00" }),
   ],
   avisos: ["A nota de rentabilidade vem da planilha."], ...o,
+});
+
+const parametros = (o: Partial<Parametros> = {}): Parametros => ({
+  id: 1, criado_em: "2026-09-28T08:02:29-03:00", autor: "Eduardo Luiz", motivo: "Semente inicial",
+  peso_receita: "0.20", peso_rentabilidade: "0.25", peso_cross_sell: "0.12", peso_complexidade: "0.12",
+  peso_disciplina: "0.09", peso_risco: "0.07", peso_adimplencia: "0.15",
+  corte_a: "3.95", corte_b: "3.35", trava_de_adimplencia: 2, churn_alto: 4,
+  imposto: "0.11", teto_de_atrito: "1.5",
+  atrito_nota_1: "0", atrito_nota_2: "0.05", atrito_nota_3: "0.10", atrito_nota_4: "0.30", atrito_nota_5: "0.50",
+  corte_margem_2: "0.30", corte_margem_3: "0.45", corte_margem_4: "0.60", corte_margem_5: "0.70",
+  horas_micro: 5, horas_pequeno: 10, horas_medio: 16, horas_grande: 40, horas_extra_grande: 80,
+  taxa_socio_senior: "93.75", taxa_socio_junior: "106.25", taxa_supervisor: "75.00",
+  taxa_analista_senior: "50.00", taxa_analista_pleno: "31.25", taxa_analista_junior: "18.75",
+  mix: [], custo_hora: {}, ...o,
 });
 
 describe("Carteira", () => {
@@ -234,6 +255,27 @@ describe("Carteira", () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
     render(<Carteira listas={null} />);
     expect(await screen.findByText("Legenda do Eixo de Ação no rodapé")).toBeInTheDocument();
+  });
+
+  it("oferece exportar o histórico para Excel", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira listas={null} />);
+    const link = await screen.findByRole("link", { name: "Exportar para conferência" });
+    expect(link).toHaveAttribute("href", "/api/carteira/exportar");
+  });
+
+  it("os parâmetros de cálculo ficam uma vez só, ao lado da exportação — não por grupo", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    vi.mocked(api.parametrosAtuais).mockResolvedValue(parametros());
+    render(<Carteira listas={null} />);
+    await screen.findByRole("link", { name: "Exportar para conferência" });
+    // recolhido por padrão — não busca nada até abrir
+    expect(api.parametrosAtuais).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByText("Parâmetros de cálculo"));
+    expect(await screen.findByText(/Vigente desde/)).toHaveTextContent("Eduardo Luiz");
+    // não aparece mais dentro do painel "Avaliar" de um grupo
+    await userEvent.click(screen.getAllByRole("button", { name: "Avaliar" })[0]);
+    expect(screen.queryByRole("tab", { name: "Parâmetros" })).toBeNull();
   });
 
   it("marca o grupo sem contrato ativo", async () => {

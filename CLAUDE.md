@@ -19,9 +19,19 @@ Banco: PostgreSQL 18 local. Credenciais só em `app/backend/.env`, a partir do
 ## Regras de trabalho
 
 1. **Uma branch por demanda.** Antes de editar, confira `git branch --show-current`.
-2. **A `main` só muda com autorização explícita de Eduardo**, seja commit, merge
-   ou push. Nenhum push para o GitHub sem pedido.
-3. **Nenhuma branch é apagada sem autorização**, nem local nem remota.
+2. **A `main` só muda por PR mesclada**, nunca por commit ou push direto. O
+   Claude pode mesclar sozinho a PR de uma demanda que Eduardo pediu, sem
+   perguntar de novo, quando tudo isto valer (autorizado por Eduardo em 28/09/2026):
+   - os testes do backend e das telas rodaram e passaram na branch já
+     atualizada com a `main`;
+   - a PR não tem nada da regra 6;
+   - se a mudança é visível, a amostra já foi aprovada (regra 5).
+
+   Depois de mesclar, avisa com o número da PR e o resultado dos testes. Faltando
+   qualquer condição, abre a PR e espera. O push da branch da demanda faz parte do
+   pedido; push para qualquer outra coisa, não.
+3. **Nenhuma branch é apagada sem autorização**, nem local nem remota. A
+   exclusão automática que o GitHub faz ao mesclar uma PR já está autorizada.
 4. **Evidência ou não aconteceu.** Antes de propor um merge, rode os testes do
    backend e das telas e mostre o resultado. Se algo não rodou, diga que não rodou.
 5. **Tela nova ou mudança visível:** mostre a amostra antes de construir e só

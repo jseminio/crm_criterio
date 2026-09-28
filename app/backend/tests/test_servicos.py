@@ -20,7 +20,7 @@ C1, C2 = LinhaServico.C1, LinhaServico.C2
 
 
 class TestCatalogo:
-    def test_os_dez_servicos_aprovados_com_a_linha(self):
+    def test_os_servicos_aprovados_com_a_linha(self):
         assert [(s.nome, s.linha) for s in CATALOGO] == [
             ("BPO Contábil, Fiscal e Dep. Pessoal", C1),
             ("BPO Contábil e Fiscal", C1),
@@ -32,6 +32,8 @@ class TestCatalogo:
             ("Legalização Empresarial", C2),
             ("Auditoria", C2),
             ("FSCP", C2),
+            ("DIRPF", C2),  # 27/09/2026
+            ("Perícia", C2),  # 27/09/2026
         ]
 
     def test_fscp_por_extenso(self):
@@ -100,7 +102,7 @@ def cliente(engine: sa.Engine) -> TestClient:
 class TestRotas:
     def test_catalogo_sem_preco_e_com_a_linha(self, cliente):
         catalogo = cliente.get("/api/servicos").json()
-        assert len(catalogo) == 10
+        assert len(catalogo) == 12
         fscp = next(s for s in catalogo if s["nome"] == "FSCP")
         assert (fscp["linha"], fscp["recorrente"], fscp["transbordo"]) == ("C2", False, "Consultoria (C2)")
         assert not any("preco" in chave for s in catalogo for chave in s)
@@ -113,7 +115,8 @@ class TestRotas:
 
     def test_trocar_o_servico_troca_a_linha_e_protege_da_recarga(self, cliente, sessao: Session):
         criada = cliente.post(
-            "/api/oportunidades", json={"nome": "Proposta Y", "servico": "Consultoria"}
+            "/api/oportunidades",
+            json={"nome": "Proposta Y", "servico": "Consultoria", "servico_tema": "Trabalhista"},
         ).json()
         editada = cliente.patch(
             f"/api/oportunidades/{criada['id']}", json={"servico": "Dep. Pessoal"}
@@ -255,3 +258,151 @@ class TestOutroServico:
             ("Lead", "Ld", "Perícia contábil judicial"),
             ("Oportunidade", "Op", self.DESCRICAO),
         ]
+
+
+class TestTemasDeConsultoria:
+    """Consultoria pede o tema (27/09/2026); DIRPF e Perícia entram como C2."""
+
+    def test_catalogo_traz_os_seis_temas(self, cliente):
+        consultoria = next(s for s in cliente.get("/api/servicos").json() if s["nome"] == "Consultoria")
+        assert [t["nome"] for t in consultoria["temas"]] == [
+            "Tributária e fiscal", "Valuation, PPA e laudos", "M&A, due diligence e captação",
+            "Contábil e financeira", "Societária e reestruturação", "Trabalhista",
+        ]
+        assert all(t["perguntas"] for t in consultoria["temas"])
+
+    def test_consultoria_sem_tema_recusa(self, cliente):
+        resposta = cliente.post("/api/oportunidades", json={"nome": "P", "servico": "Consultoria"})
+        assert resposta.status_code == 422
+        assert "tema" in resposta.json()["detail"]
+
+    def test_tema_desconhecido_recusa(self, cliente):
+        resposta = cliente.post(
+            "/api/oportunidades", json={"nome": "P", "servico": "Consultoria", "servico_tema": "Astrologia"}
+        )
+        assert resposta.status_code == 422
+
+    def test_tema_so_para_servico_com_temas(self, cliente):
+        resposta = cliente.post(
+            "/api/oportunidades", json={"nome": "P", "servico": "Auditoria", "servico_tema": "Trabalhista"}
+        )
+        assert resposta.status_code == 422
+
+    def test_consultoria_com_tema(self, cliente):
+        criada = cliente.post(
+            "/api/oportunidades",
+            json={"nome": "P", "servico": "Consultoria", "servico_tema": "Valuation, PPA e laudos"},
+        ).json()
+        assert (criada["servico_tema"], criada["linha_servico"]) == ("Valuation, PPA e laudos", "C2")
+
+    def test_proposta_antiga_sem_tema_continua_editavel(self, cliente, sessao: Session):
+        """A tela manda o rascunho inteiro, serviço incluso, a cada salvar."""
+        grupo = GrupoEconomico(nome="G", origem=Origem.CRM)
+        sessao.add(grupo)
+        sessao.flush()
+        antiga = Oportunidade(
+            grupo_id=grupo.id, nome="Antiga", servico="Consultoria", situacao=Situacao.ENVIAR_PROPOSTA,
+            origem=Origem.CRM,
+        )
+        sessao.add(antiga)
+        sessao.commit()
+        resposta = cliente.patch(
+            f"/api/oportunidades/{antiga.id}",
+            json={"servico": "Consultoria", "servico_tema": None, "observacao": "ligar segunda"},
+        )
+        assert resposta.status_code == 200
+
+    def test_trocar_para_consultoria_exige_tema_e_sair_apaga(self, cliente):
+        criada = cliente.post("/api/oportunidades", json={"nome": "P", "servico": "Auditoria"}).json()
+        rota = f"/api/oportunidades/{criada['id']}"
+        assert cliente.patch(rota, json={"servico": "Consultoria"}).status_code == 422
+        com_tema = cliente.patch(rota, json={"servico": "Consultoria", "servico_tema": "Trabalhista"}).json()
+        assert com_tema["servico_tema"] == "Trabalhista"
+        de_volta = cliente.patch(rota, json={"servico": "Auditoria"}).json()
+        assert de_volta["servico_tema"] is None
+
+    def test_lead_e_conversao_com_tema(self, cliente):
+        assert cliente.post("/api/leads", json={"nome": "L", "interesse": "Consultoria"}).status_code == 422
+        lead = cliente.post(
+            "/api/leads", json={"nome": "L", "interesse": "Consultoria", "interesse_tema": "Trabalhista"}
+        ).json()
+        assert lead["interesse_tema"] == "Trabalhista"
+        cliente.patch(f"/api/leads/{lead['id']}", json={"situacao": "Qualificado", "porte_estimado": "Médio"})
+        assert cliente.post(f"/api/leads/{lead['id']}/converter", json={"servico": "Consultoria"}).status_code == 422
+        oportunidade = cliente.post(
+            f"/api/leads/{lead['id']}/converter",
+            json={"servico": "Consultoria", "servico_tema": "Trabalhista"},
+        ).json()
+        assert oportunidade["servico_tema"] == "Trabalhista"
+
+    @pytest.mark.parametrize("servico", ["DIRPF", "Perícia"])
+    def test_dirpf_e_pericia_sao_c2(self, cliente, servico):
+        criada = cliente.post("/api/oportunidades", json={"nome": "P", "servico": servico}).json()
+        assert criada["linha_servico"] == "C2"
+
+
+class TestReclassificacaoPeloTipo:
+    @pytest.fixture
+    def propostas(self, sessao: Session) -> dict[str, int]:
+        grupo = GrupoEconomico(nome="G", origem=Origem.CRM)
+        sessao.add(grupo)
+        sessao.flush()
+        dados = {
+            "alteracao": ("Consultoria", "Alteração contratual", None, Origem.CARGA_2026, "g|2026|consultoria|alteracao"),
+            "pericial": ("Consultoria", "Cálculo Pericial", None, Origem.CRM, None),
+            "valuation": ("Consultoria", "Valuation", None, Origem.CRM, None),
+            "ja_tem_tema": ("Consultoria", "Valuation", "Trabalhista", Origem.CRM, None),
+            "sem_detalhe": ("Consultoria", "Consultoria", None, Origem.CRM, None),
+            "bpo": ("BPO Contábil", "Valuation", None, Origem.CRM, None),
+        }
+        ids = {}
+        for chave, (servico, tipo, tema, origem, chave_origem) in dados.items():
+            o = Oportunidade(
+                grupo_id=grupo.id, nome=chave, servico=servico, tipo_servico=tipo, servico_tema=tema,
+                linha_servico=C2 if servico == "Consultoria" else C1,
+                situacao=Situacao.ENVIAR_PROPOSTA, origem=origem, chave_origem=chave_origem,
+            )
+            sessao.add(o)
+            sessao.flush()
+            ids[chave] = o.id
+        sessao.commit()
+        return ids
+
+    def test_ensaio(self, sessao, propostas):
+        from crm.db import servico_pelo_tipo
+
+        plano = servico_pelo_tipo.planejar(sessao)
+        assert {m.oportunidade_id for m in plano} == {
+            propostas["alteracao"], propostas["pericial"], propostas["valuation"]
+        }
+        assert servico_pelo_tipo.resumir(plano) == [
+            "   1  Consultoria → Legalização Empresarial",
+            "   1  Consultoria → Perícia",
+            "   1  Consultoria ganha o tema: Valuation, PPA e laudos",
+        ]
+
+    def test_aplicar_protege_da_recarga_e_nao_sobrescreve_tema(self, sessao, propostas):
+        from crm.db import servico_pelo_tipo
+
+        servico_pelo_tipo.aplicar(sessao, servico_pelo_tipo.planejar(sessao))
+        sessao.commit()
+        alteracao = sessao.get(Oportunidade, propostas["alteracao"])
+        assert alteracao.servico == "Legalização Empresarial"
+        assert "servico" in alteracao.campos_do_crm
+        assert alteracao.chave_origem == "g|2026|consultoria|alteracao"  # a identidade não muda
+        assert sessao.get(Oportunidade, propostas["valuation"]).servico_tema == "Valuation, PPA e laudos"
+        assert sessao.get(Oportunidade, propostas["ja_tem_tema"]).servico_tema == "Trabalhista"
+        assert sessao.get(Oportunidade, propostas["sem_detalhe"]).servico_tema is None
+        assert servico_pelo_tipo.planejar(sessao) == []
+
+
+def test_sdr_encerra_com_consultoria_so_com_tema(cliente):
+    lead = cliente.post("/api/leads", json={"nome": "L"}).json()["id"]
+    conversa = cliente.post("/api/sdr/conversas", json={"lead_id": lead, "canal": "WhatsApp"}).json()["id"]
+    rota = f"/api/sdr/conversas/{conversa}/encerrar"
+    corpo = {"desfecho": "Qualificado", "porte_estimado": "Médio", "interesse": "Consultoria"}
+    assert cliente.post(rota, json=corpo).status_code == 422
+    resposta = cliente.post(rota, json=corpo | {"interesse_tema": "Tributária e fiscal"})
+    assert resposta.status_code == 200
+    lead_gravado = next(l for l in cliente.get("/api/leads").json()["itens"] if l["id"] == lead)
+    assert lead_gravado["interesse_tema"] == "Tributária e fiscal"

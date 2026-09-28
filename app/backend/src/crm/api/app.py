@@ -59,7 +59,7 @@ from crm.domain import mrr as regras_de_mrr
 from crm.domain import recortes as regras_de_recortes
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
-from crm.domain.servicos import CATALOGO as CATALOGO_DE_SERVICOS, OUTRO, linha_do_servico, problema_na_descricao
+from crm.domain.servicos import CATALOGO as CATALOGO_DE_SERVICOS, OUTRO, linha_do_servico, problema_na_descricao, problema_no_tema
 from crm.domain.listas import (
     ORIGEM_DA_MUDANCA_NO_CRM,
     IniciativaDoEncerramento,
@@ -242,6 +242,13 @@ def _registrar(api: FastAPI) -> None:
                 transbordo=s.transbordo,
                 nomes_antigos=list(s.nomes_antigos),
                 rascunho=s.rascunho,
+                temas=[
+                    e.TemaDoCatalogo(
+                        nome=t.nome,
+                        perguntas=[e.PerguntaDoCatalogo(texto=p.texto, direcionador=p.direcionador) for p in t.perguntas],
+                    )
+                    for t in s.temas
+                ],
             )
             for s in CATALOGO_DE_SERVICOS
         ]
@@ -510,7 +517,9 @@ def _registrar(api: FastAPI) -> None:
         O grupo existente é reaproveitado pelo nome; se não houver, nasce um
         novo — mesmo padrão de `converter_lead`.
         """
-        problema = problema_na_descricao(corpo.servico, corpo.servico_descricao)
+        problema = problema_na_descricao(corpo.servico, corpo.servico_descricao) or problema_no_tema(
+            corpo.servico, corpo.servico_tema, exigir=True
+        )
         if problema:
             raise HTTPException(422, problema)
         if corpo.grupo_id is not None:
@@ -538,6 +547,7 @@ def _registrar(api: FastAPI) -> None:
             servico=corpo.servico,
             tipo_servico=corpo.tipo_servico,
             servico_descricao=(corpo.servico_descricao or "").strip() or None,
+            servico_tema=(corpo.servico_tema or "").strip() or None,
             linha_servico=linha_do_servico(corpo.servico),
             situacao=Situacao.ENVIAR_PROPOSTA,
             temperatura=corpo.temperatura,
@@ -821,6 +831,7 @@ def _registrar(api: FastAPI) -> None:
         motivo_do_preco = mudancas.pop("motivo_do_preco", None)
         origem_da_volumetria = mudancas.pop("origem_da_volumetria", None)
         preco_antes = (oportunidade.preco_mensal, oportunidade.preco_anual)
+        servico_antes = oportunidade.servico
 
         # Lembra o que foi mudado AQUI e a planilha também controla, para a
         # recarga não desfazer. Só conta o que de fato mudou de valor: abrir o
@@ -846,6 +857,18 @@ def _registrar(api: FastAPI) -> None:
         if "servico" in mudancas or "servico_descricao" in mudancas:
             oportunidade.servico_descricao = (oportunidade.servico_descricao or "").strip() or None
             problema = problema_na_descricao(oportunidade.servico, oportunidade.servico_descricao)
+            if problema:
+                raise HTTPException(422, problema)
+        # O tema é obrigatório para quem escolhe Consultoria agora. A proposta
+        # antiga que já era Consultoria sem tema continua editável.
+        if "servico" in mudancas or "servico_tema" in mudancas:
+            oportunidade.servico_tema = (oportunidade.servico_tema or "").strip() or None
+            servico_mudou = oportunidade.servico != servico_antes
+            if servico_mudou and "servico_tema" not in mudancas:
+                oportunidade.servico_tema = None
+            problema = problema_no_tema(
+                oportunidade.servico, oportunidade.servico_tema, exigir=servico_mudou
+            )
             if problema:
                 raise HTTPException(422, problema)
         if "servico" in mudancas:
@@ -1239,7 +1262,9 @@ def _registrar(api: FastAPI) -> None:
     @api.post("/api/leads", response_model=e.LeadResumo, status_code=201, tags=["leads"])
     def criar_lead(corpo: e.LeadNovo, sessao: Session = Depends(obter_sessao)) -> e.LeadResumo:
         """Cadastra um lead. É a porta de entrada que a planilha nunca teve."""
-        problema = problema_na_descricao(corpo.interesse, corpo.interesse_descricao)
+        problema = problema_na_descricao(corpo.interesse, corpo.interesse_descricao) or problema_no_tema(
+            corpo.interesse, corpo.interesse_tema, exigir=True
+        )
         if problema:
             raise HTTPException(422, problema)
         lead = Lead(**corpo.model_dump(exclude_unset=True))
@@ -1256,6 +1281,7 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(404, "lead não encontrado")
 
         mudancas = corpo.model_dump(exclude_unset=True)
+        interesse_antes = lead.interesse
 
         # "Convertido" significa que existe uma oportunidade apontada por este
         # lead. Marcá-lo à mão deixaria o estado sem a oportunidade que o
@@ -1304,6 +1330,14 @@ def _registrar(api: FastAPI) -> None:
             problema = problema_na_descricao(lead.interesse, lead.interesse_descricao)
             if problema:
                 raise HTTPException(422, problema)
+        if "interesse" in mudancas or "interesse_tema" in mudancas:
+            lead.interesse_tema = (lead.interesse_tema or "").strip() or None
+            interesse_mudou = lead.interesse != interesse_antes
+            if interesse_mudou and "interesse_tema" not in mudancas:
+                lead.interesse_tema = None
+            problema = problema_no_tema(lead.interesse, lead.interesse_tema, exigir=interesse_mudou)
+            if problema:
+                raise HTTPException(422, problema)
 
         sessao.flush()
         return e.LeadResumo.model_validate(lead)
@@ -1334,7 +1368,9 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(
                 422, "só lead qualificado vira oportunidade: qualifique o lead, com o porte estimado, antes"
             )
-        problema = problema_na_descricao(corpo.servico, corpo.servico_descricao)
+        problema = problema_na_descricao(corpo.servico, corpo.servico_descricao) or problema_no_tema(
+            corpo.servico, corpo.servico_tema, exigir=True
+        )
         if problema:
             raise HTTPException(422, problema)
 
@@ -1357,6 +1393,7 @@ def _registrar(api: FastAPI) -> None:
             servico=corpo.servico,
             tipo_servico=corpo.tipo_servico,
             servico_descricao=(corpo.servico_descricao or "").strip() or None,
+            servico_tema=(corpo.servico_tema or "").strip() or None,
             linha_servico=linha_do_servico(corpo.servico),
             situacao=Situacao.ENVIAR_PROPOSTA,
             temperatura=lead.temperatura,

@@ -275,6 +275,8 @@ class Lead(CarimboMixin, Base):
     interesse: Mapped[str | None] = mapped_column(sa.String(200))
     interesse_descricao: Mapped[str | None] = mapped_column(sa.Text)
     """Só quando o interesse é "Outro": o que o lead pediu, com as palavras dele."""
+    interesse_tema: Mapped[str | None] = mapped_column(sa.String(80))
+    """O tema, quando o serviço de interesse tem temas (Consultoria)."""
     temperatura: Mapped[Temperatura | None] = mapped_column(coluna_lista(Temperatura))
     situacao: Mapped[SituacaoLead] = mapped_column(
         coluna_lista(SituacaoLead), nullable=False, default=SituacaoLead.NOVO
@@ -341,6 +343,10 @@ class Oportunidade(CarimboMixin, Base):
     linha_servico: Mapped[LinhaServico | None] = mapped_column(coluna_lista(LinhaServico))
     servico_descricao: Mapped[str | None] = mapped_column(sa.Text)
     """Só quando o serviço é "Outro": o que o lead pediu, com as palavras dele."""
+    servico_tema: Mapped[str | None] = mapped_column(sa.String(80))
+    """O tema, quando o serviço tem temas (Consultoria). Campo do CRM: a
+    planilha não tem essa coluna, e `tipo_servico` faz parte da identidade da
+    proposta na carga, então não pode ser reaproveitado."""
 
     tipo_canal: Mapped[TipoCanal | None] = mapped_column(coluna_lista(TipoCanal))
     canal: Mapped[str | None] = mapped_column(sa.String(120))

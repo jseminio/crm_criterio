@@ -46,6 +46,7 @@ export function EscolhaDeServico({
   rotulo,
   valor,
   descricao = "",
+  tema = "",
   aoEscolher,
 }: {
   id: string;
@@ -53,7 +54,9 @@ export function EscolhaDeServico({
   valor: string;
   /** Só quando `valor` é "Outro": o que o lead pediu. */
   descricao?: string;
-  aoEscolher: (nome: string, descricao: string) => void;
+  /** Só quando o serviço tem temas (Consultoria). */
+  tema?: string;
+  aoEscolher: (nome: string, descricao: string, tema: string) => void;
 }) {
   const [aberto, definirAberto] = useState(false);
   const { dados } = usarDados<ServicoDoCatalogo[]>(() => api.servicos(), []);
@@ -80,7 +83,14 @@ export function EscolhaDeServico({
         onClick={() => definirAberto(true)}
       >
         <span id={`${id}-valor`} className={valor ? undefined : "escolha-servico-vazia"}>
-          {valor === OUTRO ? `Outro: ${resumo(descricao)}` : valor || "Escolha no catálogo"}{" "}
+          {valor === OUTRO
+            ? `Outro: ${resumo(descricao)}`
+            : valor
+              ? `${valor}${tema ? ` · ${tema}` : ""}`
+              : "Escolha no catálogo"}{" "}
+          {doCatalogo && doCatalogo.temas.length > 0 && !tema && (
+            <span className="etiqueta etiqueta-espera">falta o tema</span>
+          )}
           {doCatalogo && <EtiquetaDaLinha linha={doCatalogo.linha} />}
           {valor === OUTRO && <span className="etiqueta etiqueta-neutra">Linha: ainda não sei</span>}
           {valor && valor !== OUTRO && dados && !doCatalogo && (
@@ -93,9 +103,10 @@ export function EscolhaDeServico({
         <CatalogoDeServicos
           inicial={valor}
           descricaoInicial={descricao}
+          temaInicial={tema}
           aoFechar={fechar}
-          aoEscolher={(nome, texto) => {
-            aoEscolher(nome, texto);
+          aoEscolher={(nome, texto, escolhido) => {
+            aoEscolher(nome, texto, escolhido);
             fechar();
           }}
         />
@@ -107,13 +118,15 @@ export function EscolhaDeServico({
 export function CatalogoDeServicos({
   inicial,
   descricaoInicial = "",
+  temaInicial = "",
   aoFechar,
   aoEscolher,
 }: {
   inicial?: string;
   descricaoInicial?: string;
+  temaInicial?: string;
   aoFechar: () => void;
-  aoEscolher: (nome: string, descricao: string) => void;
+  aoEscolher: (nome: string, descricao: string, tema: string) => void;
 }) {
   const { dados, carregando, erro, recarregar } = usarDados<ServicoDoCatalogo[]>(
     () => api.servicos(),
@@ -122,6 +135,7 @@ export function CatalogoDeServicos({
   const [busca, definirBusca] = useState("");
   const [selecionado, definirSelecionado] = useState<string | null>(inicial || null);
   const [descricao, definirDescricao] = useState(descricaoInicial);
+  const [tema, definirTema] = useState(temaInicial);
   const campoDeBusca = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -138,7 +152,9 @@ export function CatalogoDeServicos({
   const outro = selecionado === OUTRO;
   const atual = outro ? null : (dados?.find((s) => s.nome === selecionado) ?? achados[0] ?? null);
   const descricaoOk = descricao.trim().length >= DESCRICAO_MINIMA;
-  const podeUsar = outro ? descricaoOk : atual !== null;
+  // Serviço com temas: escolher o tema é obrigatório (decisão de 27/09/2026).
+  const temaDoAtual = atual?.temas.find((t) => t.nome === tema) ?? null;
+  const podeUsar = outro ? descricaoOk : atual !== null && (atual.temas.length === 0 || temaDoAtual !== null);
 
   return createPortal(
     <div className="catalogo-cortina" onClick={(e) => e.target === e.currentTarget && aoFechar()}>
@@ -232,7 +248,7 @@ export function CatalogoDeServicos({
             {outro ? (
               <OutroServico descricao={descricao} aoMudar={definirDescricao} ok={descricaoOk} />
             ) : (
-              atual && <Roteiro servico={atual} />
+              atual && <Roteiro servico={atual} tema={temaDoAtual?.nome ?? ""} aoEscolherTema={definirTema} />
             )}
           </div>
         </div>
@@ -248,7 +264,9 @@ export function CatalogoDeServicos({
               className="botao botao-primario"
               disabled={!podeUsar}
               onClick={() =>
-                outro ? aoEscolher(OUTRO, descricao.trim()) : atual && aoEscolher(atual.nome, "")
+                outro
+                  ? aoEscolher(OUTRO, descricao.trim(), "")
+                  : atual && aoEscolher(atual.nome, "", temaDoAtual?.nome ?? "")
               }
             >
               {outro ? "Usar outro serviço" : "Usar este serviço"}
@@ -305,7 +323,17 @@ function OutroServico({
   );
 }
 
-function Roteiro({ servico: s }: { servico: ServicoDoCatalogo }) {
+function Roteiro({
+  servico: s,
+  tema,
+  aoEscolherTema,
+}: {
+  servico: ServicoDoCatalogo;
+  tema: string;
+  aoEscolherTema: (tema: string) => void;
+}) {
+  const doTema = s.temas.find((t) => t.nome === tema);
+  const perguntas = doTema ? doTema.perguntas : s.perguntas;
   return (
     <>
       <div className="catalogo-titulo-servico">
@@ -317,10 +345,28 @@ function Roteiro({ servico: s }: { servico: ServicoDoCatalogo }) {
         {s.para_quem}
         {s.rascunho && <span className="catalogo-rascunho">texto em rascunho</span>}
       </p>
+      {s.temas.length > 0 && (
+        <fieldset className="catalogo-bloco catalogo-temas">
+          <legend>Tema da {s.nome.toLowerCase()}</legend>
+          {s.temas.map((t) => (
+            <label key={t.nome} className="catalogo-tema">
+              <input
+                type="radio"
+                name="catalogo-tema"
+                value={t.nome}
+                checked={t.nome === tema}
+                onChange={() => aoEscolherTema(t.nome)}
+              />{" "}
+              {t.nome}
+            </label>
+          ))}
+          {!doTema && <p className="campo-ajuda">Escolha o tema para continuar.</p>}
+        </fieldset>
+      )}
       <div className="catalogo-bloco">
-        <h4>O que perguntar para qualificar</h4>
+        <h4>O que perguntar para qualificar{doTema ? ` · ${doTema.nome}` : ""}</h4>
         <ul>
-          {s.perguntas.map((p) => (
+          {perguntas.map((p) => (
             <li key={p.texto}>
               {p.texto}
               {p.direcionador && <span className="catalogo-regua">régua de porte</span>}

@@ -67,6 +67,7 @@ export interface OportunidadeDetalhe extends OportunidadeResumo {
   canal: string | null;
   linha_servico: string | null;
   servico_descricao?: string | null;
+  servico_tema?: string | null;
   data_aceite: string | null;
   motivo_recusa: string | null;
   motivo_recusa_original: string | null;
@@ -121,6 +122,7 @@ export interface LeadResumo {
   captador: string | null;
   interesse: string | null;
   interesse_descricao?: string | null;
+  interesse_tema?: string | null;
   campanha: string | null;
   campanha_midia: string | null;
   proxima_acao: string | null;
@@ -845,6 +847,8 @@ export interface ServicoDoCatalogo {
   transbordo: string;
   nomes_antigos: string[];
   rascunho: boolean;
+  /** Quando há temas, escolher um é obrigatório. */
+  temas: { nome: string; perguntas: { texto: string; direcionador: string | null }[] }[];
 }
 
 /** Um "Outro" registrado: o que o lead pediu fora do catálogo. */

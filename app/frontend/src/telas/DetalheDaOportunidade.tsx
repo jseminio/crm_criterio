@@ -22,7 +22,6 @@ function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }
 function HistoricoDePreco({ mudancas }: { mudancas: MudancaDePreco[] }) {
   return (
     <div>
-      <h3 style={{ fontSize: 14, marginBottom: "var(--e2)" }}>Histórico de preço</h3>
       {mudancas.length === 0 ? (
         <p className="campo-ajuda" style={{ margin: 0 }}>
           O preço ainda não mudou desde que a proposta entrou no CRM.
@@ -134,7 +133,6 @@ function VolumetriaEPorte({
 
   return (
     <div className="formulario">
-      <h3 style={{ fontSize: 14, marginBottom: "var(--e2)" }}>Volumetria e porte</h3>
       <p className="campo-ajuda" style={{ marginTop: 0 }}>
         A régua sugere o porte a partir do volume — <strong>nunca decide sozinha</strong>.
         Preencha só o que já for conhecido; direcionador em branco não entra na média.
@@ -280,6 +278,7 @@ export function DetalheDaOportunidade({
   const [rascunho, definirRascunho] = useState<Record<string, string>>({});
   const [convertendoEmContrato, definirConvertendoEmContrato] = useState(false);
   const [avisoDeContrato, definirAvisoDeContrato] = useState<string | null>(null);
+  const [aba, definirAba] = useState<"cadastro" | "volumetria" | "historico">("cadastro");
 
   const carregar = () => {
     definirErro(null);
@@ -444,6 +443,41 @@ export function DetalheDaOportunidade({
             </div>
           )}
 
+          <div className="abas" role="tablist" aria-label="Seções da oportunidade">
+            <button
+              type="button"
+              role="tab"
+              className="aba"
+              aria-selected={aba === "cadastro"}
+              onClick={() => definirAba("cadastro")}
+            >
+              Cadastro
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className="aba"
+              aria-selected={aba === "volumetria"}
+              onClick={() => definirAba("volumetria")}
+            >
+              Volumetria e porte
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className="aba"
+              aria-selected={aba === "historico"}
+              onClick={() => definirAba("historico")}
+            >
+              Histórico de preço
+              {(detalhe.historico_de_preco?.length ?? 0) > 0 && (
+                <span className="aba-contagem"> ({detalhe.historico_de_preco!.length})</span>
+              )}
+            </button>
+          </div>
+
+          {aba === "cadastro" && (
+          <>
           <div className="formulario">
             <div className="campo-bloco">
               <label className="campo-rotulo" htmlFor="d-situacao">
@@ -559,14 +593,6 @@ export function DetalheDaOportunidade({
               <strong>A mesma trava contra a recarga da planilha vale para eles.</strong>
             </p>
 
-            <VolumetriaEPorte
-              detalhe={detalhe}
-              rascunho={rascunho}
-              mudar={mudar}
-              alternar={alternar}
-              listas={listas}
-            />
-
             <div className="formulario-duplo">
               <div className="campo-bloco">
                 <label className="campo-rotulo" htmlFor="d-temperatura">
@@ -680,8 +706,6 @@ export function DetalheDaOportunidade({
             </div>
           </div>
 
-          <HistoricoDePreco mudancas={detalhe.historico_de_preco ?? []} />
-
           <div>
             <h3 style={{ fontSize: 14, marginBottom: "var(--e2)" }}>Vem da planilha</h3>
             <div className="recado">
@@ -697,6 +721,20 @@ export function DetalheDaOportunidade({
               <Par rotulo="Linha na planilha">{detalhe.linha_planilha}</Par>
             )}
           </div>
+          </>
+          )}
+
+          {aba === "volumetria" && (
+            <VolumetriaEPorte
+              detalhe={detalhe}
+              rascunho={rascunho}
+              mudar={mudar}
+              alternar={alternar}
+              listas={listas}
+            />
+          )}
+
+          {aba === "historico" && <HistoricoDePreco mudancas={detalhe.historico_de_preco ?? []} />}
         </>
       )}
     </PainelLateral>

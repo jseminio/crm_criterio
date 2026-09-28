@@ -53,6 +53,15 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Detalhe da oportunidade: abas no topo (27/09/2026)
+
+O painel de uma oportunidade tinha "Volumetria e porte" e "Histórico de preço" empilhados abaixo do
+cadastro, tomando a primeira visão. Agora o topo do painel tem três abas — **Cadastro**, **Volumetria e
+porte** e **Histórico de preço** (com a contagem de mudanças de preço) — e o **Salvar alterações** fica
+fixo no rodapé, fora das abas: salva o que estiver no rascunho, qualquer que seja a aba aberta. "Vem da
+planilha" (captador, origem, linha da planilha) ficou dentro da aba Cadastro, por ser parte do cadastro
+da oportunidade.
+
 ## Carteira: retrato com semáforo clicável (27/09/2026)
 
 Os chips de "% travado" e "grupos travados" viraram um só (o número grande é a contagem; o percentual da

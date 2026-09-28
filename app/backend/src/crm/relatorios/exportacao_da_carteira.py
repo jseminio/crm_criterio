@@ -40,6 +40,7 @@ _CINZA_CLARO = "F2F2F2"
 class LinhaDeHistorico:
     """Uma leitura de `ClassificacaoDoGrupo`, com o nome do grupo já resolvido."""
 
+    grupo_id: int
     grupo_nome: str
     referencia: date
     revisao: int
@@ -179,7 +180,7 @@ def _aba_de_criterios(wb: Workbook) -> None:
 def _cabecalho(ws: Worksheet) -> None:
     ws["A1"] = "HISTÓRICO DA CLASSIFICAÇÃO DA CARTEIRA — visão Grupo → Empresa, todas as leituras"
     ws["A1"].font = Font(bold=True, size=13, color=_BRANCO)
-    ws["A2"] = ("Score, Rentabilidade, Classe, Classe Efetiva, Alerta, $$$ e Eixo de Ação têm fórmula viva "
+    ws["A2"] = ("Score, Classe, Classe Efetiva, Alerta, $$$ e Eixo de Ação têm fórmula viva "
                 "(referencia a aba Parâmetros); o resto é o valor já calculado no CRM.")
     ws["A2"].font = Font(italic=True, color=_BRANCO)
     for linha in (1, 2):
@@ -248,10 +249,12 @@ def _escrever_grupo(ws: Worksheet, linha_n: int, l: LinhaDeHistorico, n_empresas
         f'IF({alerta_col}{linha_n}="⚑","Saída organizada","Sem urgência de churn"))))'
     ))
 
-    ws.cell(row=linha_n, column=_COL["referencia"], value=l.referencia).number_format = "DD/MM/AAAA"
+    # O código de formato gravado no arquivo é sempre o inglês (YYYY); o Excel em português o
+    # mostra traduzido. "AAAA" aqui não é ano para o Excel.
+    ws.cell(row=linha_n, column=_COL["referencia"], value=l.referencia).number_format = "DD/MM/YYYY"
     ws.cell(row=linha_n, column=_COL["revisao"], value=l.revisao)
     c = ws.cell(row=linha_n, column=_COL["registrado_em"], value=l.registrado_em.replace(tzinfo=None))
-    c.number_format = "DD/MM/AAAA HH:MM"
+    c.number_format = "DD/MM/YYYY HH:MM"
     ws.cell(row=linha_n, column=_COL["fonte"], value=l.fonte)
     ws.cell(row=linha_n, column=_COL["atribuido_por"], value=l.atribuido_por or "")
     ws.cell(row=linha_n, column=_COL["motivo"], value=l.motivo or "")
@@ -259,6 +262,7 @@ def _escrever_grupo(ws: Worksheet, linha_n: int, l: LinhaDeHistorico, n_empresas
 
 def _escrever_empresa(ws: Worksheet, linha_n: int, e: EmpresaDaExportacao) -> None:
     ws.cell(row=linha_n, column=_COL["grupo"], value=f"    • {e.razao_social}")
+    ws.cell(row=linha_n, column=_COL["tipo"], value="Empresa")
     ws.cell(row=linha_n, column=_COL["cnpj"], value=e.cnpj or "")
     if e.mensalidade is not None:
         ws.cell(row=linha_n, column=_COL["receita"], value=float(e.mensalidade)).number_format = "R$ #,##0.00"
@@ -266,12 +270,13 @@ def _escrever_empresa(ws: Worksheet, linha_n: int, e: EmpresaDaExportacao) -> No
 
 def gerar_planilha(
     linhas: list[LinhaDeHistorico], parametros: ParametrosDaPlanilha,
-    empresas_por_grupo: dict[str, list[EmpresaDaExportacao]] | None = None,
+    empresas_por_grupo: dict[int, list[EmpresaDaExportacao]] | None = None,
 ) -> bytes:
     """Devolve os bytes do `.xlsx` — três abas, prontas para `Content-Disposition: attachment`.
 
     `linhas` já deve vir ordenada por grupo (depois referência, depois revisão) — quem chama
-    (a rota) faz essa consulta; esta função só desenha."""
+    (a rota) faz essa consulta; esta função só desenha. `empresas_por_grupo` é por `grupo_id`:
+    o nome do grupo não é único no banco."""
     empresas_por_grupo = empresas_por_grupo or {}
     wb = Workbook()
     ws = wb.active
@@ -280,8 +285,8 @@ def gerar_planilha(
 
     linha_n = _PRIMEIRA_LINHA_DE_DADOS
     for i, l in enumerate(linhas):
-        proximo_e_outro_grupo = i + 1 >= len(linhas) or linhas[i + 1].grupo_nome != l.grupo_nome
-        empresas = empresas_por_grupo.get(l.grupo_nome, [])
+        proximo_e_outro_grupo = i + 1 >= len(linhas) or linhas[i + 1].grupo_id != l.grupo_id
+        empresas = empresas_por_grupo.get(l.grupo_id, [])
         _escrever_grupo(ws, linha_n, l, len(empresas))
         linha_n += 1
         if proximo_e_outro_grupo:

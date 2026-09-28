@@ -686,16 +686,17 @@ def roteador(
     def exportar(sessao: Session = Depends(obter_sessao)) -> Response:
         """O histórico completo — todas as leituras de todos os grupos, não só o snapshot atual —
         na visão Grupo → Empresa do modelo `Classificacao_Grupo_COMPLETO.xlsx`, com fórmula viva
-        para Score, Rentabilidade, Classe, Classe Efetiva, Alerta, $$$ e Eixo de Ação
+        para Score, Classe, Classe Efetiva, Alerta, $$$ e Eixo de Ação
         (`crm.relatorios.exportacao_da_carteira`)."""
         linhas = sessao.execute(
             sa.select(ClassificacaoDoGrupo, GrupoEconomico.nome)
             .join(GrupoEconomico, GrupoEconomico.id == ClassificacaoDoGrupo.grupo_id)
-            .order_by(GrupoEconomico.nome, ClassificacaoDoGrupo.referencia, ClassificacaoDoGrupo.revisao)
+            .order_by(GrupoEconomico.nome, GrupoEconomico.id, ClassificacaoDoGrupo.referencia,
+                      ClassificacaoDoGrupo.revisao)
         ).all()
         de_exportacao = [
             LinhaDeHistorico(
-                grupo_nome=nome, referencia=c.referencia, revisao=c.revisao, registrado_em=c.registrado_em,
+                grupo_id=c.grupo_id, grupo_nome=nome, referencia=c.referencia, revisao=c.revisao, registrado_em=c.registrado_em,
                 fonte=c.fonte, atribuido_por=c.atribuido_por, motivo=c.motivo, receita_mensal=c.receita_mensal,
                 margem=c.margem, horas_por_mes=c.horas_por_mes,
                 nota_receita=c.nota_receita, nota_rentabilidade=c.nota_rentabilidade, complexidade=c.complexidade,
@@ -707,7 +708,7 @@ def roteador(
             for c, nome in linhas
         ]
 
-        nomes_dos_grupos = {nome for _, nome in linhas}
+        ids_dos_grupos = {c.grupo_id for c, _ in linhas}
         mensal = {
             e: v for e, v in sessao.execute(
                 sa.select(Contrato.empresa_id, sa.func.sum(Contrato.preco_mensal))
@@ -716,12 +717,11 @@ def roteador(
                 .group_by(Contrato.empresa_id)
             )
         }
-        empresas_por_grupo: dict[str, list[EmpresaDaExportacao]] = {}
-        for e, grupo_nome in sessao.execute(
-            sa.select(Empresa, GrupoEconomico.nome).join(GrupoEconomico, GrupoEconomico.id == Empresa.grupo_id)
-            .where(GrupoEconomico.nome.in_(nomes_dos_grupos)).order_by(GrupoEconomico.nome, Empresa.razao_social)
+        empresas_por_grupo: dict[int, list[EmpresaDaExportacao]] = {}
+        for e in sessao.scalars(
+            sa.select(Empresa).where(Empresa.grupo_id.in_(ids_dos_grupos)).order_by(Empresa.razao_social)
         ):
-            empresas_por_grupo.setdefault(grupo_nome, []).append(
+            empresas_por_grupo.setdefault(e.grupo_id, []).append(
                 EmpresaDaExportacao(razao_social=e.razao_social, cnpj=e.cnpj, mensalidade=mensal.get(e.id))
             )
 

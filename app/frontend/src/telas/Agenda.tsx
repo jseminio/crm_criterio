@@ -108,7 +108,7 @@ function Linha({
           <span className="numero-nota">
             {item.proxima_acao
               ? `${item.proxima_acao} · ${data(item.proxima_acao_em)}`
-              : "Defina a próxima ação na tela Leads."}
+              : "Defina a próxima ação na tela Funil."}
             {item.tipo === "contrato" && " · abra em Contratos para renovar."}
           </span>
         </div>

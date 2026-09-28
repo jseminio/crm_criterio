@@ -9,6 +9,7 @@ import { useState } from "react";
 import { api } from "../api/cliente";
 import type { Execucao, ExecucaoDetalhe, Ocorrencia, Pagina } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
 import { dataHora } from "../formato";
 import { usarDados } from "../usarDados";
@@ -57,6 +58,7 @@ function Detalhe({ execucao }: { execucao: ExecucaoDetalhe }) {
     execucao.pendencias > 0 ? "Precisa de você" : "Ajustado sozinho",
   );
   const [campo, definirCampo] = useState<string>("");
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
 
   const ocorrencias = usarDados<Pagina<Ocorrencia>>(
     () => api.ocorrencias(execucao.id, { tipo, campo: campo || undefined }),
@@ -179,15 +181,17 @@ function Detalhe({ execucao }: { execucao: ExecucaoDetalhe }) {
           <table className="tabela">
             <thead>
               <tr>
-                <th scope="col" className="tabela-numero">
-                  Linha
-                </th>
-                <th scope="col">Campo</th>
-                <th scope="col">O que aconteceu</th>
+                <ThOrdenavel coluna="linha" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Linha</ThOrdenavel>
+                <ThOrdenavel coluna="campo" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Campo</ThOrdenavel>
+                <ThOrdenavel coluna="texto" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>O que aconteceu</ThOrdenavel>
               </tr>
             </thead>
             <tbody>
-              {ocorrencias.dados!.itens.map((o) => (
+              {ordenar(ocorrencias.dados!.itens, ordenacao, {
+                linha: (o) => o.linha,
+                campo: (o) => o.campo,
+                texto: (o) => o.texto,
+              }).map((o) => (
                 <tr key={o.id}>
                   <td className="tabela-numero">{o.linha ?? "—"}</td>
                   <td>{o.campo ?? "—"}</td>

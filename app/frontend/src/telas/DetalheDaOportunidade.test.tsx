@@ -16,7 +16,14 @@ import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn() } };
+  return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(), servicos: vi.fn().mockResolvedValue([
+        { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
+          para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],
+          fora_do_perfil: ["MEI"], transbordo: "Comercial · BPO (C1)", nomes_antigos: ["BPO Contábil"], rascunho: true, temas: [] },
+        { nome: "Auditoria", nome_por_extenso: null, linha: "C2", recorrente: false,
+          para_quem: "Auditoria das demonstrações.", perguntas: [{ texto: "Exercício a auditar", direcionador: null }],
+          fora_do_perfil: [], transbordo: "Consultoria (C2)", nomes_antigos: [], rascunho: true, temas: [] },
+      ]) } };
 });
 
 const LISTAS: Listas = {
@@ -179,7 +186,8 @@ describe("DetalheDaOportunidade", () => {
   it("preço, serviço e data de originação vêm preenchidos e editáveis — desde o E4", async () => {
     await abrir(oportunidade());
 
-    expect(screen.getByLabelText("Serviço")).toHaveValue("BPO Contábil");
+    // O serviço vira o seletor do catálogo (27/09/2026): o nome aparece no botão.
+    expect(screen.getByRole("button", { name: /^Serviço BPO Contábil/ })).toBeInTheDocument();
     expect(screen.getByLabelText("Tipo de serviço")).toHaveValue("Recorrente");
     expect(screen.getByLabelText("Preço mensal")).toHaveValue(5000);
     expect(screen.getByLabelText("Preço anual")).toHaveValue(65000);

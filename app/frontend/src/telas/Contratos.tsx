@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { ContratoDetalhe, ContratoResumo, Listas, Pagina } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { data, dinheiro } from "../formato";
@@ -244,6 +245,7 @@ function EdicaoDeContrato({
 export function Contratos({ listas }: { listas: Listas | null }) {
   const [situacao, definirSituacao] = useState("");
   const [editando, definirEditando] = useState<ContratoResumo | null>(null);
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
 
   const { dados, carregando, erro, recarregar } = usarDados<Pagina<ContratoResumo>>(
     () => api.contratos(situacao ? { situacao: [situacao] } : {}),
@@ -293,17 +295,24 @@ export function Contratos({ listas }: { listas: Listas | null }) {
         <table className="tabela">
           <thead>
             <tr>
-              <th scope="col">Grupo</th>
-              <th scope="col">Escopo</th>
-              <th scope="col">Situação</th>
-              <th scope="col">Preço mensal</th>
-              <th scope="col">Assinatura</th>
-              <th scope="col">Signatário</th>
+              <ThOrdenavel coluna="grupo" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Grupo</ThOrdenavel>
+              <ThOrdenavel coluna="escopo" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Escopo</ThOrdenavel>
+              <ThOrdenavel coluna="situacao" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Situação</ThOrdenavel>
+              <ThOrdenavel coluna="preco" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Preço mensal</ThOrdenavel>
+              <ThOrdenavel coluna="assinatura" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Assinatura</ThOrdenavel>
+              <ThOrdenavel coluna="signatario" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Signatário</ThOrdenavel>
               <th scope="col" />
             </tr>
           </thead>
           <tbody>
-            {dados!.itens.map((contrato) => (
+            {ordenar(dados!.itens, ordenacao, {
+              grupo: (c) => c.grupo_nome,
+              escopo: (c) => c.escopo,
+              situacao: (c) => c.situacao,
+              preco: (c) => (c.preco_mensal ? Number(c.preco_mensal) : null),
+              assinatura: (c) => c.data_inicio,
+              signatario: (c) => c.signatario,
+            }).map((contrato) => (
               <tr key={contrato.id}>
                 <td>{contrato.grupo_nome ?? "—"}</td>
                 <td>{contrato.escopo ?? "—"}</td>

@@ -8,6 +8,11 @@ import { afterEach } from "vitest";
 
 afterEach(() => cleanup());
 
+// jsdom não implementa scrollIntoView (usado para levar a tela até uma lista
+// filtrada); sem isto, todo clique que rola a página derruba o teste com
+// "scrollIntoView is not a function".
+if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
+
 // O padrão do Testing Library é 1 s para um `waitFor` desistir. Numa máquina
 // sob carga alta — aconteceu aqui, load average acima de 300 num Mac de dois
 // núcleos — 1 s some antes do React terminar de assentar uma atualização, e o

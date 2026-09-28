@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { api } from "../api/cliente";
 import type { DimensaoDeRecorte, LinhaDeRecorte } from "../api/tipos";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "./Ordenacao";
 import { Carregando, Erro } from "./estados";
 import { paraConsulta, type EstadoDosFiltros } from "./Filtros";
 import { dinheiro, percentual } from "../formato";
@@ -21,6 +22,7 @@ const DIMENSOES: { valor: DimensaoDeRecorte; rotulo: string }[] = [
 
 export function Recortes({ filtros }: { filtros: EstadoDosFiltros }) {
   const [dimensao, definirDimensao] = useState<DimensaoDeRecorte>("servico");
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
   const { dados, carregando, erro, recarregar } = usarDados<LinhaDeRecorte[]>(
     () => api.recortes(dimensao, paraConsulta(filtros)),
     [dimensao, filtros.busca, filtros.captador, filtros.tipo_canal, filtros.temperatura,
@@ -46,18 +48,29 @@ export function Recortes({ filtros }: { filtros: EstadoDosFiltros }) {
         <table className="tabela">
           <thead>
             <tr>
-              <th scope="col">{DIMENSOES.find((d) => d.valor === dimensao)!.rotulo}</th>
-              <th scope="col" className="tabela-numero">Propostas</th>
-              <th scope="col" className="tabela-numero">Aceitas</th>
-              <th scope="col" className="tabela-numero">Conversão</th>
-              <th scope="col" className="tabela-numero">Recorrentes</th>
-              <th scope="col" className="tabela-numero">Mensal aceito</th>
-              <th scope="col" className="tabela-numero">Ticket</th>
-              <th scope="col" className="tabela-numero">Mediana</th>
+              <ThOrdenavel coluna="chave" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>
+                {DIMENSOES.find((d) => d.valor === dimensao)!.rotulo}
+              </ThOrdenavel>
+              <ThOrdenavel coluna="propostas" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Propostas</ThOrdenavel>
+              <ThOrdenavel coluna="aceitas" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Aceitas</ThOrdenavel>
+              <ThOrdenavel coluna="conversao" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Conversão</ThOrdenavel>
+              <ThOrdenavel coluna="recorrentes" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Recorrentes</ThOrdenavel>
+              <ThOrdenavel coluna="mensal" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Mensal aceito</ThOrdenavel>
+              <ThOrdenavel coluna="ticket" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Ticket</ThOrdenavel>
+              <ThOrdenavel coluna="mediana" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Mediana</ThOrdenavel>
             </tr>
           </thead>
           <tbody>
-            {dados.map((l) => (
+            {ordenar(dados, ordenacao, {
+              chave: (l) => l.chave,
+              propostas: (l) => l.propostas,
+              aceitas: (l) => l.aceitas,
+              conversao: (l) => (l.conversao ? Number(l.conversao) : null),
+              recorrentes: (l) => l.recorrentes,
+              mensal: (l) => (l.recorrentes ? Number(l.valor_mensal) : null),
+              ticket: (l) => (l.ticket_medio ? Number(l.ticket_medio) : null),
+              mediana: (l) => (l.mediana ? Number(l.mediana) : null),
+            }).map((l) => (
               <tr key={l.chave}>
                 <td>{l.chave}</td>
                 <td className="tabela-numero">{l.propostas}</td>

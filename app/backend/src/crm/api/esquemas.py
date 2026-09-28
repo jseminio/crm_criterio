@@ -13,7 +13,13 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 from crm.domain.listas import (
+    AutorDaMensagem,
     CanalDeAbordagem,
+    DesfechoDaConversa,
+    DestinoDoTransbordo,
+    MotivoDeDescarte,
+    MotivoDeTransbordo,
+    Tom,
     LinhaServico,
     MotivoRecusa,
     Origem,
@@ -42,6 +48,16 @@ __all__ = [
     "LeadNovo",
     "LeadEdicao",
     "ConversaoDeLead",
+    "ConversaNova",
+    "ConversaResposta",
+    "MensagemNova",
+    "MensagemResposta",
+    "Encerramento",
+    "NotaDaConversa",
+    "ParametrosDoSdrResposta",
+    "ParametrosDoSdrEdicao",
+    "InvestimentoResposta",
+    "InvestimentoEdicao",
     "ContratoResumo",
     "ContratoDetalhe",
     "AbordagemResumo",
@@ -225,6 +241,8 @@ class MudancaDePreco(Base):
 class OportunidadeDetalhe(OportunidadeResumo):
     canal: str | None = None
     linha_servico: LinhaServico | None = None
+    servico_descricao: str | None = None
+    servico_tema: str | None = None
     data_aceite: date | None = None
     motivo_recusa: MotivoRecusa | None = None
     motivo_recusa_original: str | None = None
@@ -280,6 +298,8 @@ class OportunidadeEdicao(BaseModel):
     observacao: str | None = None
     servico: str | None = Field(default=None, max_length=120)
     tipo_servico: str | None = Field(default=None, max_length=120)
+    servico_descricao: str | None = Field(default=None, max_length=2000)
+    servico_tema: str | None = Field(default=None, max_length=80)
     data_colocacao: date | None = None
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
@@ -326,6 +346,8 @@ class OportunidadeNova(BaseModel):
     nome_do_grupo: str | None = Field(default=None, max_length=200)
     servico: str | None = Field(default=None, max_length=120)
     tipo_servico: str | None = Field(default=None, max_length=120)
+    servico_descricao: str | None = Field(default=None, max_length=2000)
+    servico_tema: str | None = Field(default=None, max_length=80)
     data_colocacao: date | None = None
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
@@ -347,12 +369,22 @@ class LeadResumo(Base):
     canal: str | None = None
     captador: str | None = None
     interesse: str | None = None
+    interesse_descricao: str | None = None
+    interesse_tema: str | None = None
     campanha: str | None = None
     campanha_midia: str | None = None
     proxima_acao: str | None = None
     proxima_acao_em: date | None = None
     observacao: str | None = None
     convertido_em_id: int | None = None
+    cnpj: str | None = None
+    porte_estimado: str | None = None
+    qualificado_em: datetime | None = None
+    descartado_em: datetime | None = None
+    motivo_descarte: MotivoDeDescarte | None = None
+    reuniao_marcada_para: datetime | None = None
+    nao_contatar: bool = False
+    criado_em: datetime | None = None
 
 
 class LeadNovo(BaseModel):
@@ -370,21 +402,34 @@ class LeadNovo(BaseModel):
     canal: str | None = Field(default=None, max_length=120)
     captador: str | None = Field(default=None, max_length=10)
     interesse: str | None = Field(default=None, max_length=200)
+    interesse_descricao: str | None = Field(default=None, max_length=2000)
+    interesse_tema: str | None = Field(default=None, max_length=80)
     temperatura: Temperatura | None = None
     campanha: str | None = Field(default=None, max_length=120)
     campanha_midia: str | None = Field(default=None, max_length=120)
     proxima_acao: str | None = Field(default=None, max_length=200)
     proxima_acao_em: date | None = None
     observacao: str | None = None
+    cnpj: str | None = Field(default=None, max_length=18)
 
 
 class LeadEdicao(BaseModel):
+    """Qualificado exige porte estimado; descartado exige o motivo. O servidor
+    carimba `qualificado_em` e `descartado_em`."""
+
     situacao: SituacaoLead | None = None
     temperatura: Temperatura | None = None
     interesse: str | None = Field(default=None, max_length=200)
+    interesse_descricao: str | None = Field(default=None, max_length=2000)
+    interesse_tema: str | None = Field(default=None, max_length=80)
     proxima_acao: str | None = Field(default=None, max_length=200)
     proxima_acao_em: date | None = None
     observacao: str | None = None
+    cnpj: str | None = Field(default=None, max_length=18)
+    porte_estimado: str | None = Field(default=None, max_length=20)
+    motivo_descarte: MotivoDeDescarte | None = None
+    reuniao_marcada_para: datetime | None = None
+    nao_contatar: bool | None = None
 
 
 class ConversaoDeLead(BaseModel):
@@ -395,6 +440,8 @@ class ConversaoDeLead(BaseModel):
     nome: str | None = Field(default=None, max_length=200)
     servico: str | None = Field(default=None, max_length=120)
     tipo_servico: str | None = Field(default=None, max_length=120)
+    servico_descricao: str | None = Field(default=None, max_length=2000)
+    servico_tema: str | None = Field(default=None, max_length=80)
 
 
 class ContratoResumo(Base):
@@ -659,6 +706,44 @@ class Pagina[T](BaseModel):
     itens: list[T]
 
 
+class PerguntaDoCatalogo(BaseModel):
+    texto: str
+    direcionador: str | None = None
+
+
+class PedidoDeServicoNovo(BaseModel):
+    """Um "Outro" registrado: o que o lead pediu fora do catálogo."""
+
+    onde: str
+    """"Oportunidade" ou "Lead"."""
+    id: int
+    nome: str
+    descricao: str
+    registrado_em: datetime
+
+
+class TemaDoCatalogo(BaseModel):
+    nome: str
+    perguntas: list[PerguntaDoCatalogo]
+
+
+class ServicoDoCatalogo(BaseModel):
+    """Um serviço do catálogo (`crm.domain.servicos`). Não tem preço de propósito."""
+
+    nome: str
+    nome_por_extenso: str | None = None
+    linha: LinhaServico
+    recorrente: bool
+    para_quem: str
+    perguntas: list[PerguntaDoCatalogo]
+    fora_do_perfil: list[str]
+    transbordo: DestinoDoTransbordo
+    nomes_antigos: list[str] = []
+    rascunho: bool = True
+    temas: list[TemaDoCatalogo] = []
+    """Quando há temas, escolher um é obrigatório."""
+
+
 class Listas(BaseModel):
     """As listas controladas, para a tela montar os seletores.
 
@@ -680,6 +765,7 @@ class Listas(BaseModel):
     captadores: list[str]
     portes: list[str]
     servicos: list[str]
+    motivos_de_descarte: list[str] = []
 
 
 # ---------------------------------------------------------------- abordagens
@@ -780,3 +866,99 @@ class ResumoDasAbordagens(BaseModel):
     Nulo quando nenhuma execução tem custo conhecido."""
     custo_parcial: bool = False
     """Há execução de modelo sem preço na tabela: a soma está incompleta."""
+
+
+# ------------------------------------------------------------ SDR de IA
+class ConversaNova(BaseModel):
+    lead_id: int
+    canal: CanalDeAbordagem
+
+
+class MensagemNova(BaseModel):
+    """O horário é do servidor, no instante do registro — nunca do cliente.
+
+    Os campos de leitura da IA (intenção, confiança, falha, termo, custo) só
+    valem para mensagem da IA; o tom, só para mensagem do lead.
+    """
+
+    autor: AutorDaMensagem
+    texto: str = Field(min_length=1)
+    intencao: str | None = Field(default=None, max_length=120)
+    confianca: Decimal | None = Field(default=None, ge=0, le=1)
+    fallback: bool = False
+    termo_nao_reconhecido: str | None = Field(default=None, max_length=120)
+    custo_usd: Decimal | None = Field(default=None, ge=0)
+    tom: Tom | None = None
+
+
+class MensagemResposta(Base):
+    id: int
+    autor: AutorDaMensagem
+    enviada_em: datetime
+    texto: str
+    intencao: str | None = None
+    confianca: Decimal | None = None
+    fallback: bool = False
+    termo_nao_reconhecido: str | None = None
+    tom: Tom | None = None
+
+
+class ConversaResposta(Base):
+    id: int
+    lead_id: int
+    canal: CanalDeAbordagem
+    iniciada_em: datetime
+    encerrada_em: datetime | None = None
+    desfecho: DesfechoDaConversa | None = None
+    motivo_transbordo: MotivoDeTransbordo | None = None
+    destino_transbordo: DestinoDoTransbordo | None = None
+    atendida_em: datetime | None = None
+    nota: int | None = None
+    mensagens: list[MensagemResposta] = []
+
+
+class Encerramento(BaseModel):
+    """Qualificado exige porte estimado; fora do perfil exige o motivo;
+    transbordo exige motivo e destino."""
+
+    desfecho: DesfechoDaConversa
+    porte_estimado: str | None = Field(default=None, max_length=20)
+    cnpj: str | None = Field(default=None, max_length=18)
+    interesse: str | None = Field(default=None, max_length=200)
+    interesse_tema: str | None = Field(default=None, max_length=80)
+    motivo_descarte: MotivoDeDescarte | None = None
+    motivo_transbordo: MotivoDeTransbordo | None = None
+    destino_transbordo: DestinoDoTransbordo | None = None
+
+
+class NotaDaConversa(BaseModel):
+    nota: int = Field(ge=1, le=5)
+
+
+class ParametrosDoSdrResposta(Base):
+    custo_hora_sdr: Decimal | None = None
+    minutos_por_conversa: int | None = None
+    cotacao_dolar: Decimal | None = None
+    atualizado_por: str | None = None
+    atualizado_em: datetime | None = None
+
+
+class ParametrosDoSdrEdicao(BaseModel):
+    custo_hora_sdr: Decimal | None = Field(default=None, ge=0)
+    minutos_por_conversa: int | None = Field(default=None, ge=1, le=600)
+    cotacao_dolar: Decimal | None = Field(default=None, gt=0)
+    atualizado_por: str | None = Field(default=None, max_length=10)
+
+
+class InvestimentoResposta(Base):
+    id: int
+    mes: str
+    canal: str
+    valor: Decimal
+
+
+class InvestimentoEdicao(BaseModel):
+    mes: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+    canal: str = Field(min_length=1, max_length=120)
+    valor: Decimal = Field(ge=0)
+

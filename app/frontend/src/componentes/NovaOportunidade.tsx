@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { Listas } from "../api/tipos";
+import { EscolhaDeServico } from "./CatalogoDeServicos";
 import { PainelLateral } from "./PainelLateral";
 
 function hoje(): string {
@@ -18,6 +19,8 @@ const CAMPOS_VAZIOS = {
   nome: "",
   nome_do_grupo: "",
   servico: "",
+  servico_descricao: "",
+  servico_tema: "",
   tipo_servico: "",
   data_colocacao: hoje(),
   preco_mensal: "",
@@ -131,7 +134,18 @@ export function NovaOportunidade({
         })}
 
         <div className="formulario-duplo">
-          {campo("servico", "Serviço", { placeholder: "BPO Contábil" })}
+          <EscolhaDeServico
+            id="n-servico"
+            rotulo="Serviço"
+            valor={campos.servico}
+            descricao={campos.servico_descricao}
+            tema={campos.servico_tema}
+            aoEscolher={(nome, texto, tema) => {
+              mudar("servico", nome);
+              mudar("servico_descricao", texto);
+              mudar("servico_tema", tema);
+            }}
+          />
           {campo("tipo_servico", "Tipo de serviço", { placeholder: "Contabilidade" })}
         </div>
 

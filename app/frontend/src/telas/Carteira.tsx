@@ -4,12 +4,15 @@
  * carteira e são recalculados no CRM. Estado nunca só por cor: classe, alerta e cobrança têm texto.
  */
 
-import { Fragment, useState } from "react";
-import { api } from "../api/cliente";
-import type { ClassificacaoDaCarteira } from "../api/tipos";
+import { Fragment, useRef, useState } from "react";
+import { api, ErroDaApi } from "../api/cliente";
+import type { AnaliseDaCarteira, ClassificacaoDaCarteira, FaixaDeClasse, ItemDaCarteira, Listas } from "../api/tipos";
+import { AvaliacaoDeNotas } from "../componentes/AvaliacaoDeNotas";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
+import { RevisaoMensal } from "./RevisaoMensal";
 
 const decimais = (v: string, n: number) =>
   Number(v).toLocaleString("pt-BR", { minimumFractionDigits: n, maximumFractionDigits: n });
@@ -17,6 +20,9 @@ const um = (v: string) => decimais(v, 2);
 const um1 = (v: string) => decimais(v, 1);
 const ALERTA: Record<string, string> = { "⚠": "⚠ Risco de churn", "⚑": "⚑ Saída a organizar" };
 const PRIORIDADE = ["Cobrança", "Reter já", "Reter / vigiar", "Saída organizada", "Sem urgência"];
+const EIXO_COBRANCA = "Cobrança — sem tratamento preferencial";
+const SEMAFORO_ROTULO: Record<number, string> = { 1: "Controlada", 2: "Atenção", 3: "Crítico" };
+const COR_DA_CLASSE: Record<string, string> = { A: "#2e7d5b", B: "#2e5496", C: "#b8860b" };
 
 const LEGENDA_DOS_EIXOS: { nome: string; quando: string; significa: string }[] = [
   {
@@ -94,9 +100,91 @@ function Componente({ nome, valor, legenda, cor }: { nome: string; valor: string
   );
 }
 
-export function Carteira() {
+function DistribuicaoNoHero({ faixas }: { faixas: FaixaDeClasse[] }) {
+  return (
+    <div className="hero-distribuicao">
+      <div className="isc-rotulo">DISTRIBUIÇÃO</div>
+      <div className="hero-distribuicao-linhas">
+        {faixas.map((f) => (
+          <div key={f.classe} className="distribuicao-linha distribuicao-linha-hero">
+            <div className="distribuicao-cab">
+              <b>{f.classe}</b>
+              <span>{f.unidades} · {um1(f.percentual)}%</span>
+            </div>
+            <div className="isc-trilho isc-trilho-hero" aria-hidden="true">
+              <div style={{ width: `${Math.min(100, Number(f.percentual))}%`, background: COR_DA_CLASSE[f.classe] ?? "#666" }} />
+            </div>
+            <small className={f.dentro_da_meta ? "distribuicao-dentro-hero" : "distribuicao-fora-hero"}>
+              {f.dentro_da_meta ? "dentro da meta" : "fora da meta"} (meta {f.minimo}–{f.maximo}%)
+            </small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AnaliseDaIA() {
+  const { dados, carregando, erro, recarregar } = usarDados<AnaliseDaCarteira | null>(
+    () => api.analiseDaCarteira(), [],
+  );
+  const [autor, definirAutor] = useState("");
+  const [gerando, definirGerando] = useState(false);
+  const [erroDeGeracao, definirErroDeGeracao] = useState<string | null>(null);
+
+  const gerar = async () => {
+    definirGerando(true);
+    definirErroDeGeracao(null);
+    try {
+      await api.gerarAnaliseDaCarteira(autor.trim());
+      recarregar();
+    } catch (falha) {
+      definirErroDeGeracao(falha instanceof ErroDaApi ? falha.message : "Falha ao gerar a análise.");
+    } finally {
+      definirGerando(false);
+    }
+  };
+
+  return (
+    <section className="ia-analise" aria-label="Análise da IA sobre a carteira">
+      <div className="ia-analise-cab">
+        <span className="ia-analise-titulo">Análise da IA · situação de hoje</span>
+        <span className="ia-analise-acao">
+          <label className="campo-rotulo" htmlFor="ia-autor">Quem está gerando</label>
+          <input id="ia-autor" className="entrada ia-analise-autor" value={autor}
+            onChange={(e) => definirAutor(e.target.value)} placeholder="Eduardo Luiz" />
+          <button type="button" className="ia-analise-botao" disabled={gerando || autor.trim().length < 2} onClick={gerar}>
+            {gerando ? "Gerando…" : dados ? "Gerar de novo" : "Gerar análise"}
+          </button>
+        </span>
+      </div>
+      {carregando && !dados && <p className="numero-nota">Carregando…</p>}
+      {erro && <p className="numero-nota">{erro}</p>}
+      {erroDeGeracao && <p role="alert" className="ia-analise-erro">{erroDeGeracao}</p>}
+      {dados ? (
+        <>
+          <p>{dados.texto}</p>
+          <p className="ia-analise-meta">
+            Gerada em {new Date(dados.gerada_em).toLocaleString("pt-BR")} por {dados.gerada_por}
+          </p>
+        </>
+      ) : (
+        !carregando && <p className="numero-nota">Nenhuma análise gerada ainda. Informe seu nome e clique em &quot;Gerar análise&quot;.</p>
+      )}
+    </section>
+  );
+}
+
+export function Carteira({ listas }: { listas: Listas | null }) {
   const { dados, carregando, erro, recarregar } = usarDados<ClassificacaoDaCarteira>(() => api.classificacaoDaCarteira(), []);
-  const [eixo, definirEixo] = useState("");
+  // O eixo efetivo é o do campo "Eixo de ação", a não ser que o chip de inadimplentes esteja
+  // ligado (aí ele manda, mas sem apagar o que estava no campo — desligar o chip volta pra ele).
+  const [eixoManual, definirEixoManual] = useState("");
+  const [somenteInadimplentes, definirSomenteInadimplentes] = useState(false);
+  const eixo = somenteInadimplentes ? EIXO_COBRANCA : eixoManual;
+  const [semaforoFiltro, definirSemaforoFiltro] = useState<number | null>(null);
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
+  const [avaliando, definirAvaliando] = useState<ItemDaCarteira | null>(null);
   const [abertos, definirAbertos] = useState<Set<number>>(new Set());
   const alternar = (id: number) =>
     definirAbertos((antes) => {
@@ -104,6 +192,21 @@ export function Carteira() {
       if (!novo.delete(id)) novo.add(id);
       return novo;
     });
+
+  const listaRef = useRef<HTMLDivElement>(null);
+  // Entre o chip e a lista tem ISC, análise da IA e revisão mensal — sem isto o filtro aplica,
+  // mas o resultado fica fora da tela e parece que o clique não fez nada.
+  const irParaALista = () => listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const filtrarInadimplentes = () => {
+    // Alterna como o semáforo: clicar de novo desliga. Sem isso, "aria-pressed" ficaria preso em
+    // true e o clique repetido pareceria não fazer nada.
+    definirSomenteInadimplentes((atual) => !atual);
+    // Sem isto, um semáforo ainda ligado de um clique anterior soma com este filtro (E, não OU)
+    // e a lista pode ficar vazia mesmo tendo grupo inadimplente — parece que o clique não fez nada.
+    definirSemaforoFiltro(null);
+    irParaALista();
+  };
 
   if (carregando && !dados) return <Carregando rotulo="Carregando a classificação" />;
   if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
@@ -117,17 +220,72 @@ export function Carteira() {
     );
 
   const eixos = Array.from(new Set(dados.itens.map((i) => i.eixo_de_acao))).sort((a, b) => rank(a) - rank(b));
-  const itens = dados.itens
-    .filter((i) => !eixo || i.eixo_de_acao === eixo)
+  const itensDoEixo = dados.itens
+    .filter((i) => (!eixo || i.eixo_de_acao === eixo) && (semaforoFiltro === null || i.semaforo === semaforoFiltro))
     .sort((a, b) => rank(a.eixo_de_acao) - rank(b.eixo_de_acao) || Number(b.receita_mensal) - Number(a.receita_mensal));
+  const porSemaforo = { 1: 0, 2: 0, 3: 0 } as Record<number, number>;
+  for (const i of dados.itens) porSemaforo[i.semaforo] = (porSemaforo[i.semaforo] ?? 0) + 1;
+  const alternarSemaforo = (s: number) => {
+    definirSemaforoFiltro((atual) => (atual === s ? null : s));
+    // Desliga só o chip de inadimplentes (mesmo raciocínio do lado de lá). O eixo escolhido no
+    // campo "Eixo de ação" abaixo não é tocado — esse continua combinando de propósito.
+    definirSomenteInadimplentes(false);
+    irParaALista();
+  };
+  const itens = ordenar(itensDoEixo, ordenacao, {
+    grupo: (i) => i.grupo_nome,
+    receita: (i) => Number(i.receita_mensal),
+    score: (i) => Number(i.score),
+    classe: (i) => i.classe_efetiva,
+    alerta: (i) => i.alerta_de_churn,
+    churn: (i) => i.churn,
+    eixo: (i) => i.eixo_de_acao,
+  });
   const { isc } = dados;
 
   return (
     <section className="carteira" aria-label="Classificação da carteira">
-      <div className="isc-chips">
-        <div className="isc-chip"><b>{dados.itens.length}</b><small>grupos</small></div>
-        <div className="isc-chip"><b>{dinheiro(dados.itens.reduce((t, i) => t + Number(i.receita_mensal), 0))}</b><small>receita/mês</small></div>
-      </div>
+      {dados.retrato && (
+        <div className="retrato-faixa">
+          <div className="retrato-chip"><b>{dados.retrato.unidades}</b><small>unidades (grupos + individuais)</small></div>
+          <div className="retrato-chip"><b>{dinheiro(dados.retrato.receita_total)}</b><small>receita mensal recorrente</small></div>
+          <button
+            type="button"
+            className={`retrato-chip retrato-chip-trav${somenteInadimplentes ? " retrato-chip-ativo" : ""}`}
+            onClick={filtrarInadimplentes}
+            aria-pressed={somenteInadimplentes}
+            aria-label={`${dados.retrato.grupos_travados} grupos inadimplentes, ${um1(dados.retrato.percentual_travado)}% da receita travada — clique para ver quais`}
+          >
+            <b>{dados.retrato.grupos_travados}</b>
+            <small>
+              grupos inadimplentes (clique para ver quais)
+              <br />
+              {um1(dados.retrato.percentual_travado)}% da receita travada
+            </small>
+          </button>
+          <div className="retrato-chip retrato-semaforo">
+            <small className="retrato-semaforo-rotulo">Semáforo (clique para filtrar)</small>
+            <div className="retrato-semaforo-itens">
+              {([1, 2, 3] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  aria-pressed={semaforoFiltro === s}
+                  aria-label={`Semáforo ${s} — ${SEMAFORO_ROTULO[s]}: ${porSemaforo[s]} grupo${porSemaforo[s] === 1 ? "" : "s"}`}
+                  className={`retrato-semaforo-item retrato-semaforo-${s}${semaforoFiltro === s ? " retrato-semaforo-ativo" : ""}`}
+                  onClick={() => alternarSemaforo(s)}
+                >
+                  <b>{s}</b>
+                  <small>{porSemaforo[s]}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <AnaliseDaIA />
+      <RevisaoMensal />
 
       {isc && (
         <>
@@ -140,6 +298,7 @@ export function Carteira() {
               <p className="isc-ref">Referência {data(dados.referencia)} · parâmetros {dados.versao_dos_parametros}</p>
             </div>
             <Medidor valor={isc.valor} zona={isc.zona} />
+            {dados.distribuicao_por_classe.length > 0 && <DistribuicaoNoHero faixas={dados.distribuicao_por_classe} />}
           </section>
 
           <div className="isc-componentes">
@@ -151,10 +310,14 @@ export function Carteira() {
         </>
       )}
 
-      <div className="carteira-filtro">
+      <div className="carteira-filtro" ref={listaRef}>
         <label className="campo">
           <span className="campo-rotulo">Eixo de ação</span>
-          <select className="selecao" value={eixo} onChange={(e) => definirEixo(e.target.value)}>
+          <select
+            className="selecao"
+            value={eixo}
+            onChange={(e) => { definirEixoManual(e.target.value); definirSomenteInadimplentes(false); }}
+          >
             <option value="">Todos</option>
             {eixos.map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
@@ -163,18 +326,21 @@ export function Carteira() {
 
 
       {itens.length === 0 ? (
-        <VazioPorFiltro aoLimpar={() => definirEixo("")} />
+        <VazioPorFiltro aoLimpar={() => { definirEixoManual(""); definirSomenteInadimplentes(false); definirSemaforoFiltro(null); }} />
       ) : (
         <table className="tabela" aria-label="Grupos classificados">
           <thead>
             <tr>
-              <th>Grupo</th>
-              <th className="tabela-numero">Receita/mês</th>
-              <th className="tabela-numero">Score</th>
-              <th>Classe</th>
-              <th>Alerta</th>
-              <th className="tabela-numero">Churn</th>
-              <th>Eixo de ação <span className="carteira-remissao">Legenda do Eixo de Ação no rodapé</span></th>
+              <ThOrdenavel coluna="grupo" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Grupo</ThOrdenavel>
+              <ThOrdenavel coluna="receita" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Receita/mês</ThOrdenavel>
+              <ThOrdenavel coluna="score" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Score</ThOrdenavel>
+              <ThOrdenavel coluna="classe" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Classe</ThOrdenavel>
+              <ThOrdenavel coluna="alerta" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Alerta</ThOrdenavel>
+              <ThOrdenavel coluna="churn" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Churn</ThOrdenavel>
+              <ThOrdenavel coluna="eixo" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>
+                Eixo de ação <span className="carteira-remissao">Legenda do Eixo de Ação no rodapé</span>
+              </ThOrdenavel>
+              <th scope="col" />
             </tr>
           </thead>
           <tbody>
@@ -206,13 +372,22 @@ export function Carteira() {
                     <td>{i.alerta_de_churn ? ALERTA[i.alerta_de_churn] ?? i.alerta_de_churn : "—"}</td>
                     <td className="tabela-numero">{i.churn ?? "—"}</td>
                     <td>{i.eixo_de_acao}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="botao botao-secundario"
+                        onClick={() => definirAvaliando(i)}
+                      >
+                        Avaliar
+                      </button>
+                    </td>
                   </tr>
                   {aberto &&
                     i.empresas.map((e) => (
                       <tr key={`e${e.id}`} className="carteira-empresa">
                         <td>• {e.razao_social}{e.cnpj ? <span className="numero-nota"> · {cnpj(e.cnpj)}</span> : null}</td>
                         <td className="tabela-numero">{e.mensalidade !== null ? dinheiro(e.mensalidade) : "—"}</td>
-                        <td colSpan={5} />
+                        <td colSpan={6} />
                       </tr>
                     ))}
                 </Fragment>
@@ -247,6 +422,18 @@ export function Carteira() {
           Revisão mensal nos primeiros 6 a 12 meses; depois, trimestral.
         </p>
       </details>
+
+      {avaliando && (
+        <AvaliacaoDeNotas
+          key={avaliando.grupo_id}
+          grupoId={avaliando.grupo_id}
+          grupoNome={avaliando.grupo_nome}
+          porteAtual={avaliando.porte}
+          portes={listas?.portes ?? []}
+          aoFechar={() => definirAvaliando(null)}
+          aoSalvar={() => { definirAvaliando(null); recarregar(); }}
+        />
+      )}
     </section>
   );
 }

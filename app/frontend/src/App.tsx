@@ -14,20 +14,18 @@ import { Configuracoes } from "./telas/Configuracoes";
 import { Contratos } from "./telas/Contratos";
 import { Funil } from "./telas/Funil";
 import { Grupos } from "./telas/Grupos";
-import { Leads } from "./telas/Leads";
-import { Lista } from "./telas/Lista";
+import { Sdr } from "./telas/Sdr";
 import { usarDados } from "./usarDados";
 
 type Tela =
   | "agenda"
   | "contatos"
   | "funil"
-  | "lista"
-  | "leads"
   | "grupos"
   | "contratos"
   | "carteira"
   | "abordagens"
+  | "sdr"
   | "conferencia"
   | "configuracoes";
 
@@ -48,19 +46,7 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     chave: "funil",
     rotulo: "Funil",
     titulo: "Funil comercial",
-    descricao: "Arraste o olho pelas etapas; clique num cartão para mover a oportunidade.",
-  },
-  {
-    chave: "lista",
-    rotulo: "Oportunidades",
-    titulo: "Oportunidades",
-    descricao: "A mesma base do funil, em lista, para comparar e filtrar.",
-  },
-  {
-    chave: "leads",
-    rotulo: "Leads",
-    titulo: "Leads",
-    descricao: "A porta de entrada do funil. Converta quando virar proposta.",
+    descricao: "Kanban ou grade — arraste um cartão ou abra a linha para mover a oportunidade.",
   },
   {
     chave: "grupos",
@@ -87,6 +73,12 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     descricao: "O agente SDR prepara a ficha e o rascunho. Nada sai sem a sua aprovação.",
   },
   {
+    chave: "sdr",
+    rotulo: "SDR da IA",
+    titulo: "Qualificação pela IA",
+    descricao: "Leads de tráfego pago e frios: quantos a IA qualificou, descartou ou passou para a equipe.",
+  },
+  {
     chave: "conferencia",
     rotulo: "Conferência",
     titulo: "Conferência da carga",
@@ -96,7 +88,7 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     chave: "configuracoes",
     rotulo: "Configurações",
     titulo: "Configurações",
-    descricao: "Backup lógico: leve os dados para outra máquina ou guarde uma cópia.",
+    descricao: "Backup lógico dos dados e os pedidos de serviço fora do catálogo.",
   },
 ];
 
@@ -144,17 +136,16 @@ export default function App() {
         <main className="area">
           {tela === "agenda" && <Agenda
               listas={listas}
-              aoAbrirLeads={() => definirTela("leads")}
+              aoAbrirLeads={() => definirTela("funil")}
               aoAbrirContratos={() => definirTela("contratos")}
             />}
           {tela === "contatos" && <Contatos listas={listas} />}
           {tela === "funil" && <Funil listas={listas} />}
-          {tela === "lista" && <Lista listas={listas} />}
-          {tela === "leads" && <Leads listas={listas} />}
           {tela === "grupos" && <Grupos listas={listas} />}
           {tela === "contratos" && <Contratos listas={listas} />}
-          {tela === "carteira" && <Carteira />}
+          {tela === "carteira" && <Carteira listas={listas} />}
           {tela === "abordagens" && <Abordagens />}
+          {tela === "sdr" && <Sdr listas={listas} />}
           {tela === "conferencia" && <Conferencia />}
           {tela === "configuracoes" && <Configuracoes />}
         </main>

@@ -24,6 +24,8 @@ from typing import Iterable
 __all__ = [
     "Parametros", "PARAMETROS", "Notas", "Isc", "Unidade",
     "score", "classe", "classe_efetiva", "cobranca", "alerta_de_churn", "eixo_de_acao", "isc",
+    "GrupoDoRetrato", "Retrato", "retrato",
+    "FaixaDeClasse", "distribuicao_por_classe",
 ]
 
 D = Decimal
@@ -56,6 +58,10 @@ class Parametros:
     peso_isc_churn: Decimal = D("0.34")
     meta_do_isc: int = 65
     zona_critica_ate: int = 35
+
+    #: Faixa-alvo de % de unidades por classe (mínimo, máximo, ambos inclusive). Declarada por
+    #: Eduardo em `documento-de-negocio.md`; vira parâmetro versionado como o resto.
+    meta_distribuicao_de_classe: tuple[tuple[str, int, int], ...] = (("A", 15, 20), ("B", 35, 40), ("C", 40, 50))
 
 
 PARAMETROS = Parametros()
@@ -195,3 +201,67 @@ def isc(unidades: Iterable[Unidade], p: Parametros = PARAMETROS) -> Isc | None:
     valor = c_classe * p.peso_isc_classe + c_sem * p.peso_isc_semaforo + c_churn * p.peso_isc_churn
     zona = "crítica" if valor < p.zona_critica_ate else ("atenção" if valor < p.meta_do_isc else "saudável")
     return Isc(valor, c_classe, c_sem, c_churn, total, len(completas), len(todas) - len(completas), zona)
+
+
+@dataclass(frozen=True)
+class GrupoDoRetrato:
+    """O que o retrato da carteira precisa de cada grupo: nome, receita e se está travado."""
+
+    nome: str
+    receita: Decimal
+    em_cobranca: bool
+
+
+@dataclass(frozen=True)
+class Retrato:
+    """O quadro geral da carteira: unidades, receita e quanto está travado por inadimplência."""
+
+    unidades: int
+    receita_total: Decimal
+    grupos_travados: int
+    receita_travada: Decimal
+    percentual_travado: Decimal
+    """0 a 100, com duas casas."""
+
+
+@dataclass(frozen=True)
+class FaixaDeClasse:
+    """Quanto a carteira tem de uma classe, contra a meta declarada para ela."""
+
+    classe: str
+    minimo: int
+    maximo: int
+    unidades: int
+    percentual: Decimal
+    """0 a 100, uma casa. `0` sem nenhuma unidade — não confundir com "dentro da meta"."""
+    dentro_da_meta: bool
+
+
+def distribuicao_por_classe(por_classe: dict[str, int], p: Parametros = PARAMETROS) -> list[FaixaDeClasse]:
+    """Uma linha por classe da meta declarada, na ordem de `meta_distribuicao_de_classe`.
+
+    Sem nenhuma unidade classificada, `percentual = 0` e `dentro_da_meta = False` — carteira vazia
+    não está "dentro da meta", está sem dado."""
+    total = sum(por_classe.values())
+    linhas = []
+    for classe, minimo, maximo in p.meta_distribuicao_de_classe:
+        unidades = por_classe.get(classe, 0)
+        percentual = (D(unidades) / D(total) * 100).quantize(D("0.1")) if total else D("0.0")
+        dentro = total > 0 and minimo <= percentual <= maximo
+        linhas.append(FaixaDeClasse(classe, minimo, maximo, unidades, percentual, dentro))
+    return linhas
+
+
+def retrato(grupos: Iterable[GrupoDoRetrato]) -> Retrato | None:
+    """`None` sem nenhum grupo — nada a retratar."""
+    lista = list(grupos)
+    if not lista:
+        return None
+    receita_total = sum((g.receita for g in lista), D(0))
+    travados = [g for g in lista if g.em_cobranca]
+    receita_travada = sum((g.receita for g in travados), D(0))
+    percentual = (receita_travada / receita_total * 100).quantize(D("0.01")) if receita_total else D("0.00")
+    return Retrato(
+        unidades=len(lista), receita_total=receita_total, grupos_travados=len(travados),
+        receita_travada=receita_travada, percentual_travado=percentual,
+    )

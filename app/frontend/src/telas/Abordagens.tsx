@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { AbordagemDetalhe, AbordagemResumo, Conferencia } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { data } from "../formato";
 import { usarDados } from "../usarDados";
@@ -414,6 +415,7 @@ export function Abordagens() {
   const [mesEscolhido, definirMes] = useState<string | null>(null);
   const [situacao, definirSituacao] = useState("");
   const [selecionada, definirSelecionada] = useState<number | null>(null);
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
   const [preparando, definirPreparando] = useState(false);
   const [aviso, definirAviso] = useState<string | null>(null);
   const [versao, definirVersao] = useState(0);
@@ -513,14 +515,19 @@ export function Abordagens() {
           <table className="tabela">
             <thead>
               <tr>
-                <th>Conta</th>
-                <th>Quem apresenta</th>
-                <th>Situação</th>
-                <th>Próximo passo</th>
+                <ThOrdenavel coluna="conta" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Conta</ThOrdenavel>
+                <ThOrdenavel coluna="quem" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Quem apresenta</ThOrdenavel>
+                <ThOrdenavel coluna="situacao" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Situação</ThOrdenavel>
+                <ThOrdenavel coluna="proximo" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Próximo passo</ThOrdenavel>
               </tr>
             </thead>
             <tbody>
-              {visiveis.map((i) => (
+              {ordenar(visiveis, ordenacao, {
+                conta: (i) => i.grupo_nome,
+                quem: (i) => i.quem_apresenta,
+                situacao: (i) => i.situacao,
+                proximo: (i) => i.proximo_passo,
+              }).map((i) => (
                 <tr key={i.id} className={i.id === selecionada ? "linha-selecionada" : undefined}>
                   <td>
                     <button type="button" className="link-de-tabela"

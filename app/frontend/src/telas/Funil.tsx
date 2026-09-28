@@ -1,8 +1,13 @@
-/** O funil em kanban — uma coluna por situação, todas sempre visíveis. */
+/** O funil comercial — Kanban (uma coluna por situação) ou Grade (tabela), a mesma base.
+ *
+ * Fusão de 27/09/2026: a tela Oportunidades virou a visão "Grade" desta mesma tela, porque as duas
+ * mostravam a mesma coisa em formatos diferentes. O botão Kanban/Grade fica na barra de filtros; o
+ * filtro "Situação" só faz sentido na Grade (no Kanban, todas as situações já ficam visíveis juntas).
+ */
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { ColunaDoFunil, Listas, OportunidadeResumo } from "../api/tipos";
+import type { ColunaDoFunil, Listas, OportunidadeResumo, Pagina } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
 import {
   FILTROS_VAZIOS,
@@ -16,10 +21,13 @@ import { CenariosDeTicket } from "../componentes/CenariosDeTicket";
 import { Numeros } from "../componentes/Numeros";
 import { Recolhivel } from "../componentes/Recolhivel";
 import { Recortes } from "../componentes/Recortes";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
-import { dinheiroCurto, prazo } from "../formato";
+import { data, dinheiro, dinheiroCurto, prazo } from "../formato";
 import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
+
+type Visao = "kanban" | "grade";
 
 function Cartao({
   oportunidade,
@@ -74,7 +82,9 @@ function Cartao({
 }
 
 export function Funil({ listas }: { listas: Listas | null }) {
+  const [visao, definirVisao] = useState<Visao>("kanban");
   const [filtros, definirFiltros] = useState<EstadoDosFiltros>(FILTROS_VAZIOS);
+  const [situacao, definirSituacao] = useState("");
   const [aberta, definirAberta] = useState<number | null>(null);
   const [situacaoDeAbertura, definirSituacaoDeAbertura] = useState<string | undefined>(undefined);
   const [arrastando, definirArrastando] = useState<number | null>(null);
@@ -82,10 +92,32 @@ export function Funil({ listas }: { listas: Listas | null }) {
   const [movendo, definirMovendo] = useState<number | null>(null);
   const [erroDeMovimento, definirErroDeMovimento] = useState<string | null>(null);
   const [criando, definirCriando] = useState(false);
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
+  const { ordenacao: ordenacaoDoKanban, alternar: alternarOrdenacaoDoKanban } = usarOrdenacao();
 
-  const { dados, carregando, erro, recarregar } = usarDados<ColunaDoFunil[]>(
-    () => api.funil(paraConsulta(filtros)),
+  const kanban = usarDados<ColunaDoFunil[] | null>(
+    () => (visao === "kanban" ? api.funil(paraConsulta(filtros)) : Promise.resolve(null)),
     [
+      visao,
+      filtros.busca,
+      filtros.captador,
+      filtros.tipo_canal,
+      filtros.temperatura,
+      filtros.servico,
+      filtros.dataTipo,
+      filtros.periodo,
+      filtros.dataDe,
+      filtros.dataAte,
+    ],
+  );
+  const grade = usarDados<Pagina<OportunidadeResumo> | null>(
+    () =>
+      visao === "grade"
+        ? api.oportunidades({ ...paraConsulta(filtros), situacao: situacao ? [situacao] : undefined })
+        : Promise.resolve(null),
+    [
+      visao,
+      situacao,
       filtros.busca,
       filtros.captador,
       filtros.tipo_canal,
@@ -98,7 +130,11 @@ export function Funil({ listas }: { listas: Listas | null }) {
     ],
   );
 
-  const total = dados?.reduce((soma, coluna) => soma + coluna.quantas, 0) ?? 0;
+  const { dados, carregando, erro, recarregar } = visao === "kanban" ? kanban : grade;
+  const total = visao === "kanban"
+    ? (kanban.dados?.reduce((soma, coluna) => soma + coluna.quantas, 0) ?? 0)
+    : (grade.dados?.total ?? 0);
+  const filtrando = temFiltro(filtros) || (visao === "grade" && situacao !== "");
 
   function abrir(id: number, comSituacao?: string) {
     definirSituacaoDeAbertura(comSituacao);
@@ -108,6 +144,11 @@ export function Funil({ listas }: { listas: Listas | null }) {
   function fechar() {
     definirAberta(null);
     definirSituacaoDeAbertura(undefined);
+  }
+
+  function limpar() {
+    definirFiltros(FILTROS_VAZIOS);
+    definirSituacao("");
   }
 
   async function mover(id: number, situacaoAtual: string, novaSituacao: string) {
@@ -152,17 +193,66 @@ export function Funil({ listas }: { listas: Listas | null }) {
         aoMudar={definirFiltros}
         listas={listas}
         acao={
-          <button
-            type="button"
-            className="botao botao-primario"
-            onClick={() => definirCriando(true)}
-          >
-            Nova oportunidade
-          </button>
+          <>
+            {visao === "grade" && (
+              <div className="campo">
+                <label className="campo-rotulo" htmlFor="filtro-situacao">
+                  Situação
+                </label>
+                <select
+                  id="filtro-situacao"
+                  className="selecao"
+                  value={situacao}
+                  onChange={(e) => definirSituacao(e.target.value)}
+                >
+                  <option value="">Todas</option>
+                  {listas?.situacoes.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {visao === "kanban" && (
+              <button
+                type="button"
+                className={`kanban-ordenar-valor${ordenacaoDoKanban ? " th-ordenar-ativa" : ""}`}
+                onClick={() => alternarOrdenacaoDoKanban("valor")}
+                aria-pressed={!!ordenacaoDoKanban}
+              >
+                Ordenar por valor
+                <span className="th-seta" aria-hidden="true">
+                  {ordenacaoDoKanban ? (ordenacaoDoKanban.direcao === "asc" ? "▲" : "▼") : "⇅"}
+                </span>
+              </button>
+            )}
+            <div className="visao-toggle" role="group" aria-label="Visão do funil">
+              <button
+                type="button"
+                aria-pressed={visao === "kanban"}
+                className={visao === "kanban" ? "visao-botao visao-ativa" : "visao-botao"}
+                onClick={() => definirVisao("kanban")}
+              >
+                ▦ Kanban
+              </button>
+              <button
+                type="button"
+                aria-pressed={visao === "grade"}
+                className={visao === "grade" ? "visao-botao visao-ativa" : "visao-botao"}
+                onClick={() => definirVisao("grade")}
+              >
+                ☰ Grade
+              </button>
+            </div>
+            <button type="button" className="botao botao-primario" onClick={() => definirCriando(true)}>
+              Nova oportunidade
+            </button>
+          </>
         }
       />
 
-      {erroDeMovimento && (
+      {visao === "kanban" && erroDeMovimento && (
         <div className="aviso-de-movimento" role="alert">
           <span>{erroDeMovimento}</span>
           <button
@@ -176,23 +266,25 @@ export function Funil({ listas }: { listas: Listas | null }) {
         </div>
       )}
 
-      {carregando && <Carregando rotulo="Carregando o funil" />}
+      {carregando && (
+        <Carregando rotulo={visao === "kanban" ? "Carregando o funil" : "Carregando as oportunidades"} />
+      )}
       {erro && !carregando && <Erro mensagem={erro} aoTentarDeNovo={recarregar} />}
 
-      {!carregando && !erro && total === 0 && temFiltro(filtros) && (
-        <VazioPorFiltro aoLimpar={() => definirFiltros(FILTROS_VAZIOS)} />
+      {!carregando && !erro && total === 0 && filtrando && (
+        <VazioPorFiltro aoLimpar={limpar} />
       )}
 
-      {!carregando && !erro && total === 0 && !temFiltro(filtros) && (
+      {!carregando && !erro && total === 0 && !filtrando && (
         <VazioSemDados
-          titulo="O funil está vazio"
+          titulo={visao === "kanban" ? "O funil está vazio" : "Nenhuma oportunidade"}
           explicacao="Nenhuma oportunidade foi carregada ainda. A carga da planilha de 2026 preenche esta tela."
         />
       )}
 
-      {!carregando && !erro && total > 0 && (
+      {!carregando && !erro && total > 0 && visao === "kanban" && (
         <div className="kanban">
-          {dados?.map((coluna) => (
+          {kanban.dados?.map((coluna) => (
             <section
               className={`coluna ${colunaAlvo === coluna.situacao ? "coluna-alvo" : ""}`}
               key={coluna.situacao}
@@ -211,7 +303,7 @@ export function Funil({ listas }: { listas: Listas | null }) {
                 evento.preventDefault();
                 definirColunaAlvo(null);
                 if (arrastando === null) return;
-                const origem = dados?.find((c) =>
+                const origem = kanban.dados?.find((c) =>
                   c.oportunidades.some((o) => o.id === arrastando),
                 );
                 const id = arrastando;
@@ -229,7 +321,9 @@ export function Funil({ listas }: { listas: Listas | null }) {
                 </p>
               </header>
               <div className="coluna-cartoes">
-                {coluna.oportunidades.map((o) => (
+                {ordenar(coluna.oportunidades, ordenacaoDoKanban, {
+                  valor: (o) => (o.preco_mensal ? Number(o.preco_mensal) : o.preco_anual ? Number(o.preco_anual) : null),
+                }).map((o) => (
                   <Cartao
                     key={o.id}
                     oportunidade={o}
@@ -249,6 +343,61 @@ export function Funil({ listas }: { listas: Listas | null }) {
             </section>
           ))}
         </div>
+      )}
+
+      {!carregando && !erro && total > 0 && visao === "grade" && (
+        <>
+          <p style={{ color: "var(--texto-medio)", marginTop: 0 }}>
+            {total} oportunidade{total === 1 ? "" : "s"}
+          </p>
+          <table className="tabela">
+            <thead>
+              <tr>
+                <ThOrdenavel coluna="cliente" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Cliente</ThOrdenavel>
+                <ThOrdenavel coluna="nome" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Oportunidade</ThOrdenavel>
+                <ThOrdenavel coluna="situacao" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Situação</ThOrdenavel>
+                <ThOrdenavel coluna="temperatura" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Temperatura</ThOrdenavel>
+                <ThOrdenavel coluna="captador" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Captador</ThOrdenavel>
+                <ThOrdenavel coluna="originacao" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Originação</ThOrdenavel>
+                <ThOrdenavel coluna="mensal" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Mensal</ThOrdenavel>
+                <ThOrdenavel coluna="anual" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Anual</ThOrdenavel>
+              </tr>
+            </thead>
+            <tbody>
+              {ordenar(grade.dados?.itens ?? [], ordenacao, {
+                cliente: (o) => o.grupo_nome ?? o.nome,
+                nome: (o) => o.nome,
+                situacao: (o) => o.situacao,
+                temperatura: (o) => o.temperatura,
+                captador: (o) => o.captador,
+                originacao: (o) => o.data_colocacao,
+                mensal: (o) => (o.preco_mensal ? Number(o.preco_mensal) : null),
+                anual: (o) => (o.preco_anual ? Number(o.preco_anual) : null),
+              }).map((o) => (
+                <tr
+                  key={o.id}
+                  className="tabela-clicavel"
+                  onClick={() => abrir(o.id)}
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === "Enter" && abrir(o.id)}
+                >
+                  <td>{o.grupo_nome ?? "—"}</td>
+                  <td>{o.nome}</td>
+                  <td>
+                    <Etiqueta texto={o.situacao} />
+                  </td>
+                  <td>
+                    <Etiqueta texto={o.temperatura} tipo="temperatura" />
+                  </td>
+                  <td>{o.captador ?? "—"}</td>
+                  <td>{data(o.data_colocacao)}</td>
+                  <td className="tabela-numero">{dinheiro(o.preco_mensal)}</td>
+                  <td className="tabela-numero">{dinheiro(o.preco_anual)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
 
       {aberta !== null && (

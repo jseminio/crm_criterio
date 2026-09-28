@@ -18,6 +18,12 @@ from enum import Enum
 __all__ = [
     "Situacao",
     "SituacaoLead",
+    "MotivoDeDescarte",
+    "DesfechoDaConversa",
+    "MotivoDeTransbordo",
+    "DestinoDoTransbordo",
+    "AutorDaMensagem",
+    "Tom",
     "SituacaoGrupo",
     "SituacaoEmpresa",
     "SituacaoContrato",
@@ -289,15 +295,88 @@ class TipoCanal(Enum):
     COLABORADORES = "Colaboradores"
     TRAFEGO_PAGO = "Tráfego pago"
     AFILIADOS = "Afiliados"
+    PROSPECCAO_ATIVA = "Prospecção ativa"
+    """O lead frio: a Critério foi atrás dele, a partir de uma lista. Entrou em
+    27/09/2026 com o SDR de IA, que qualifica tráfego pago e leads frios."""
 
     @property
     def em_operacao(self) -> bool:
-        """Tráfego pago e afiliados são desejo, ainda sem operação.
+        """Tráfego pago, afiliados e prospecção ativa ainda não operam.
 
         Existem na lista desde já para que o indicador de origem possa medir a
-        redução da dependência de sócios a partir do primeiro lead.
+        redução da dependência de sócios a partir do primeiro lead. Os dois
+        canais do SDR de IA passam a operar quando o WhatsApp estiver pronto.
         """
-        return self not in {TipoCanal.TRAFEGO_PAGO, TipoCanal.AFILIADOS}
+        return self not in {TipoCanal.TRAFEGO_PAGO, TipoCanal.AFILIADOS, TipoCanal.PROSPECCAO_ATIVA}
+
+
+class MotivoDeDescarte(Enum):
+    """Por que o lead ficou fora do perfil — SDR de IA, 27/09/2026.
+
+    A lista saiu da amostra do painel aprovada por Eduardo em 27/09/2026.
+    "Pediu para não ser contatado" marca o lead como "não contatar": nenhuma
+    mensagem sai para ele depois disso.
+    """
+
+    PORTE_ABAIXO = "Porte abaixo do mínimo"
+    SERVICO_PONTUAL = "Só quer serviço pontual"
+    JA_TEM_CONTADOR = "Já tem contador e não quer trocar agora"
+    NAO_CONTATAR = "Pediu para não ser contatado"
+    SEGMENTO = "Segmento que a Critério não atende"
+    ORCAMENTO = "Orçamento abaixo do piso"
+    OUTRO = "Outro"
+
+
+class DesfechoDaConversa(Enum):
+    """Como terminou uma conversa do SDR de IA.
+
+    Os dois primeiros são veredito da IA — é o que o painel chama de
+    "qualificação concluída pela IA". Os outros dois não são.
+    """
+
+    QUALIFICADO = "Qualificado"
+    FORA_DO_PERFIL = "Fora do perfil"
+    TRANSBORDO = "Passou para a equipe"
+    PAROU = "Parou no meio"
+
+    @property
+    def veredito_da_ia(self) -> bool:
+        return self in {DesfechoDaConversa.QUALIFICADO, DesfechoDaConversa.FORA_DO_PERFIL}
+
+
+class MotivoDeTransbordo(Enum):
+    """Por que a IA passou a conversa para uma pessoa."""
+
+    PEDIU_PESSOA = "Pediu para falar com uma pessoa"
+    PRECO = "Perguntou o preço"
+    GRUPO_COMPLEXO = "Grupo com vários CNPJs"
+    DUVIDA_TECNICA = "Dúvida técnica fora do roteiro"
+    LEAD_IRRITADO = "Lead irritado"
+    SISTEMA_FORA = "Sistema externo fora do ar"
+    OUTRO = "Outro"
+
+
+class DestinoDoTransbordo(Enum):
+    """Para quem a IA passou a conversa."""
+
+    COMERCIAL_C1 = "Comercial · BPO (C1)"
+    CONSULTORIA_C2 = "Consultoria (C2)"
+    SOCIOS = "Sócios · conta grande"
+    TECNICO_FISCAL = "Técnico fiscal"
+
+
+class AutorDaMensagem(Enum):
+    LEAD = "Lead"
+    IA = "IA"
+    EQUIPE = "Equipe"
+
+
+class Tom(Enum):
+    """Tom de uma mensagem do lead, como a IA o leu."""
+
+    POSITIVO = "Positivo"
+    NEUTRO = "Neutro"
+    NEGATIVO = "Negativo"
 
 
 class Temperatura(Enum):
@@ -307,17 +386,20 @@ class Temperatura(Enum):
 
 
 class LinhaServico(Enum):
-    """C1 e C2, como a planilha registra."""
+    """C1 e C2, como a planilha registra.
+
+    Regra de Eduardo em 27/09/2026: **C1 é recorrente, C2 não é recorrente**.
+    A linha sai do serviço (`crm.domain.servicos`), no passado e daqui para
+    frente. Antes disso, C1 era descrito como "BPO contábil, fiscal e DP" e C2
+    como "consultorias em geral".
+    """
 
     C1 = "C1"
     C2 = "C2"
 
     @property
     def descricao(self) -> str:
-        return {
-            LinhaServico.C1: "BPO contábil, fiscal e departamento pessoal",
-            LinhaServico.C2: "Consultorias em geral",
-        }[self]
+        return {LinhaServico.C1: "Recorrente", LinhaServico.C2: "Não recorrente"}[self]
 
 
 class MotivoRecusa(Enum):
@@ -387,6 +469,7 @@ _TIPO_CANAL: dict[str, TipoCanal] = {
     "colaborador": TipoCanal.COLABORADORES,
     "colaboradores": TipoCanal.COLABORADORES,
     "trafego pago": TipoCanal.TRAFEGO_PAGO,
+    "prospeccao ativa": TipoCanal.PROSPECCAO_ATIVA,
     "afiliado": TipoCanal.AFILIADOS,
     "afiliados": TipoCanal.AFILIADOS,
 }

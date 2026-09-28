@@ -29,12 +29,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from crm.api import esquemas as e
 from crm.api.abordagens import Servicos, roteador_de_abordagens, servicos_reais
 from crm.api.backup import roteador as roteador_de_backup
-from crm.api.classificacao import roteador as roteador_de_carteira
+from crm.api.classificacao import ServicosDeAnalise, roteador as roteador_de_carteira, servicos_de_analise_reais
 from crm.api.contatos import roteador as roteador_de_contatos
 from crm.api.contatos import roteador_de_empresas
+from crm.api.sdr import roteador as roteador_do_sdr
 from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
 from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, desfazer_fusao, fundir_grupos
+from crm.db import leads as regras_do_lead
 from crm.db.modelos import (
     Contrato,
     Empresa,
@@ -57,10 +59,12 @@ from crm.domain import mrr as regras_de_mrr
 from crm.domain import recortes as regras_de_recortes
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
+from crm.domain.servicos import CATALOGO as CATALOGO_DE_SERVICOS, OUTRO, linha_do_servico, problema_na_descricao, problema_no_tema
 from crm.domain.listas import (
     ORIGEM_DA_MUDANCA_NO_CRM,
     IniciativaDoEncerramento,
     LinhaServico,
+    MotivoDeDescarte,
     MotivoDeEncerramento,
     MotivoRecusa,
     Origem,
@@ -101,6 +105,7 @@ def obter_sessao() -> Iterator[Session]:
 def criar_app(
     fabrica: sessionmaker[Session] | None = None,
     servicos: Callable[[], Servicos] | None = None,
+    servicos_de_analise: Callable[[], ServicosDeAnalise] | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede."""
@@ -130,8 +135,9 @@ def criar_app(
         roteador_de_abordagens(obter_sessao, lambda: _fabrica, servicos or servicos_reais)
     )
     api.include_router(roteador_de_contatos(obter_sessao))
-    api.include_router(roteador_de_carteira(obter_sessao))
+    api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
+    api.include_router(roteador_do_sdr(obter_sessao))
     return api
 
 
@@ -218,7 +224,53 @@ def _registrar(api: FastAPI) -> None:
             captadores=sorted(_CAPTADORES),
             portes=[p.value for p in regras_de_porte.Porte],
             servicos=list(servicos),
+            motivos_de_descarte=_valores(MotivoDeDescarte),
         )
+
+    @api.get("/api/servicos", response_model=list[e.ServicoDoCatalogo], tags=["listas"])
+    def catalogo_de_servicos() -> list[e.ServicoDoCatalogo]:
+        """O catálogo do pop-up de serviços e do roteiro do SDR de IA. Sem preço."""
+        return [
+            e.ServicoDoCatalogo(
+                nome=s.nome,
+                nome_por_extenso=s.nome_por_extenso,
+                linha=s.linha,
+                recorrente=s.linha is LinhaServico.C1,
+                para_quem=s.para_quem,
+                perguntas=[e.PerguntaDoCatalogo(texto=p.texto, direcionador=p.direcionador) for p in s.perguntas],
+                fora_do_perfil=list(s.fora_do_perfil),
+                transbordo=s.transbordo,
+                nomes_antigos=list(s.nomes_antigos),
+                rascunho=s.rascunho,
+                temas=[
+                    e.TemaDoCatalogo(
+                        nome=t.nome,
+                        perguntas=[e.PerguntaDoCatalogo(texto=p.texto, direcionador=p.direcionador) for p in t.perguntas],
+                    )
+                    for t in s.temas
+                ],
+            )
+            for s in CATALOGO_DE_SERVICOS
+        ]
+
+    @api.get("/api/servicos/pedidos", response_model=list[e.PedidoDeServicoNovo], tags=["listas"])
+    def pedidos_de_servico_novo(sessao: Session = Depends(obter_sessao)) -> list[e.PedidoDeServicoNovo]:
+        """Todo "Outro" registrado, o mais recente primeiro — para decidir o que
+        entra no catálogo."""
+        pedidos = [
+            e.PedidoDeServicoNovo(
+                onde="Oportunidade", id=o.id, nome=o.nome, descricao=o.servico_descricao or "",
+                registrado_em=o.criado_em,
+            )
+            for o in sessao.scalars(sa.select(Oportunidade).where(Oportunidade.servico == OUTRO))
+        ] + [
+            e.PedidoDeServicoNovo(
+                onde="Lead", id=l.id, nome=l.nome, descricao=l.interesse_descricao or "",
+                registrado_em=l.criado_em,
+            )
+            for l in sessao.scalars(sa.select(Lead).where(Lead.interesse == OUTRO))
+        ]
+        return sorted(pedidos, key=lambda p: p.registrado_em, reverse=True)
 
     # ------------------------------------------------------------------ grupos
     @api.get("/api/grupos", response_model=e.Pagina[e.GrupoResumo], tags=["grupos"])
@@ -465,6 +517,11 @@ def _registrar(api: FastAPI) -> None:
         O grupo existente é reaproveitado pelo nome; se não houver, nasce um
         novo — mesmo padrão de `converter_lead`.
         """
+        problema = problema_na_descricao(corpo.servico, corpo.servico_descricao) or problema_no_tema(
+            corpo.servico, corpo.servico_tema, exigir=True
+        )
+        if problema:
+            raise HTTPException(422, problema)
         if corpo.grupo_id is not None:
             grupo = sessao.get(GrupoEconomico, corpo.grupo_id)
             if grupo is None:
@@ -489,6 +546,9 @@ def _registrar(api: FastAPI) -> None:
             nome=corpo.nome,
             servico=corpo.servico,
             tipo_servico=corpo.tipo_servico,
+            servico_descricao=(corpo.servico_descricao or "").strip() or None,
+            servico_tema=(corpo.servico_tema or "").strip() or None,
+            linha_servico=linha_do_servico(corpo.servico),
             situacao=Situacao.ENVIAR_PROPOSTA,
             temperatura=corpo.temperatura,
             tipo_canal=corpo.tipo_canal,
@@ -771,6 +831,7 @@ def _registrar(api: FastAPI) -> None:
         motivo_do_preco = mudancas.pop("motivo_do_preco", None)
         origem_da_volumetria = mudancas.pop("origem_da_volumetria", None)
         preco_antes = (oportunidade.preco_mensal, oportunidade.preco_anual)
+        servico_antes = oportunidade.servico
 
         # Lembra o que foi mudado AQUI e a planilha também controla, para a
         # recarga não desfazer. Só conta o que de fato mudou de valor: abrir o
@@ -787,6 +848,34 @@ def _registrar(api: FastAPI) -> None:
 
         for campo, valor in mudancas.items():
             setattr(oportunidade, campo, valor)
+        # A linha acompanha o serviço (C1 recorrente, C2 não recorrente).
+        # Serviço fora do catálogo não mexe na linha que já estava.
+        # "Outro" exige a descrição; os serviços do catálogo não levam. Trocar
+        # de "Outro" para um serviço do catálogo apaga a descrição antiga.
+        if "servico" in mudancas and oportunidade.servico != OUTRO and "servico_descricao" not in mudancas:
+            oportunidade.servico_descricao = None
+        if "servico" in mudancas or "servico_descricao" in mudancas:
+            oportunidade.servico_descricao = (oportunidade.servico_descricao or "").strip() or None
+            problema = problema_na_descricao(oportunidade.servico, oportunidade.servico_descricao)
+            if problema:
+                raise HTTPException(422, problema)
+        # O tema é obrigatório para quem escolhe Consultoria agora. A proposta
+        # antiga que já era Consultoria sem tema continua editável.
+        if "servico" in mudancas or "servico_tema" in mudancas:
+            oportunidade.servico_tema = (oportunidade.servico_tema or "").strip() or None
+            servico_mudou = oportunidade.servico != servico_antes
+            if servico_mudou and "servico_tema" not in mudancas:
+                oportunidade.servico_tema = None
+            problema = problema_no_tema(
+                oportunidade.servico, oportunidade.servico_tema, exigir=servico_mudou
+            )
+            if problema:
+                raise HTTPException(422, problema)
+        if "servico" in mudancas:
+            nova_linha = linha_do_servico(oportunidade.servico)
+            if nova_linha is not None and nova_linha is not oportunidade.linha_servico:
+                oportunidade.linha_servico = nova_linha
+                editados.add("linha_servico")
         # Histórico de preço: só quando o valor mudou de fato (a tela manda o
         # rascunho inteiro a cada salvar). Guarda antes e depois; nada é apagado.
         preco_depois = (oportunidade.preco_mensal, oportunidade.preco_anual)
@@ -1137,6 +1226,7 @@ def _registrar(api: FastAPI) -> None:
     def listar_leads(
         sessao: Session = Depends(obter_sessao),
         situacao: list[SituacaoLead] | None = Query(default=None),
+        tipo_canal: list[TipoCanal] | None = Query(default=None),
         apenas_abertos: bool = False,
         busca: str | None = None,
         limite: int = Query(default=100, le=1000),
@@ -1145,6 +1235,8 @@ def _registrar(api: FastAPI) -> None:
         consulta = sa.select(Lead)
         if situacao:
             consulta = consulta.where(Lead.situacao.in_(situacao))
+        if tipo_canal:
+            consulta = consulta.where(Lead.tipo_canal.in_(tipo_canal))
         if apenas_abertos:
             consulta = consulta.where(
                 Lead.situacao.in_([s for s in SituacaoLead if s.aberto])
@@ -1170,6 +1262,11 @@ def _registrar(api: FastAPI) -> None:
     @api.post("/api/leads", response_model=e.LeadResumo, status_code=201, tags=["leads"])
     def criar_lead(corpo: e.LeadNovo, sessao: Session = Depends(obter_sessao)) -> e.LeadResumo:
         """Cadastra um lead. É a porta de entrada que a planilha nunca teve."""
+        problema = problema_na_descricao(corpo.interesse, corpo.interesse_descricao) or problema_no_tema(
+            corpo.interesse, corpo.interesse_tema, exigir=True
+        )
+        if problema:
+            raise HTTPException(422, problema)
         lead = Lead(**corpo.model_dump(exclude_unset=True))
         sessao.add(lead)
         sessao.flush()
@@ -1184,6 +1281,7 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(404, "lead não encontrado")
 
         mudancas = corpo.model_dump(exclude_unset=True)
+        interesse_antes = lead.interesse
 
         # "Convertido" significa que existe uma oportunidade apontada por este
         # lead. Marcá-lo à mão deixaria o estado sem a oportunidade que o
@@ -1196,8 +1294,51 @@ def _registrar(api: FastAPI) -> None:
         if lead.convertido_em_id is not None and "situacao" in mudancas:
             raise HTTPException(409, "este lead já virou oportunidade")
 
-        for campo, valor in mudancas.items():
-            setattr(lead, campo, valor)
+        situacao = mudancas.pop("situacao", None)
+        porte = mudancas.pop("porte_estimado", None)
+        motivo = mudancas.pop("motivo_descarte", None)
+        nao_contatar = mudancas.pop("nao_contatar", None)
+        try:
+            if porte is not None:
+                lead.porte_estimado = regras_do_lead.validar_porte(porte)
+            for campo, valor in mudancas.items():
+                setattr(lead, campo, valor)
+
+            if situacao is SituacaoLead.QUALIFICADO:
+                regras_do_lead.qualificar(lead)
+            elif situacao is SituacaoLead.DESCARTADO:
+                regras_do_lead.descartar(lead, motivo)
+            elif situacao is not None:
+                regras_do_lead.reabrir(lead, situacao)
+            elif motivo is not None:
+                # Trocar o motivo de um lead já descartado.
+                if lead.situacao is not SituacaoLead.DESCARTADO:
+                    raise regras_do_lead.RegraDoLead("o motivo de descarte só vale para lead descartado")
+                regras_do_lead.descartar(lead, motivo)
+
+            if nao_contatar is True:
+                regras_do_lead.marcar_nao_contatar(lead)
+            elif nao_contatar is False:
+                lead.nao_contatar, lead.nao_contatar_em = False, None
+        except regras_do_lead.RegraDoLead as problema:
+            raise HTTPException(problema.status, str(problema)) from problema
+
+        if "interesse" in mudancas and lead.interesse != OUTRO and "interesse_descricao" not in mudancas:
+            lead.interesse_descricao = None
+        if "interesse" in mudancas or "interesse_descricao" in mudancas:
+            lead.interesse_descricao = (lead.interesse_descricao or "").strip() or None
+            problema = problema_na_descricao(lead.interesse, lead.interesse_descricao)
+            if problema:
+                raise HTTPException(422, problema)
+        if "interesse" in mudancas or "interesse_tema" in mudancas:
+            lead.interesse_tema = (lead.interesse_tema or "").strip() or None
+            interesse_mudou = lead.interesse != interesse_antes
+            if interesse_mudou and "interesse_tema" not in mudancas:
+                lead.interesse_tema = None
+            problema = problema_no_tema(lead.interesse, lead.interesse_tema, exigir=interesse_mudou)
+            if problema:
+                raise HTTPException(422, problema)
+
         sessao.flush()
         return e.LeadResumo.model_validate(lead)
 
@@ -1220,6 +1361,18 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(404, "lead não encontrado")
         if lead.convertido_em_id is not None:
             raise HTTPException(409, "este lead já virou oportunidade")
+        # Só o lead qualificado vira oportunidade (decisão de Eduardo em
+        # 27/09/2026): o funil e a conversão continuam medindo proposta, não
+        # contato. O trabalho de antes da qualificação fica no painel do SDR.
+        if lead.situacao is not SituacaoLead.QUALIFICADO:
+            raise HTTPException(
+                422, "só lead qualificado vira oportunidade: qualifique o lead, com o porte estimado, antes"
+            )
+        problema = problema_na_descricao(corpo.servico, corpo.servico_descricao) or problema_no_tema(
+            corpo.servico, corpo.servico_tema, exigir=True
+        )
+        if problema:
+            raise HTTPException(422, problema)
 
         if corpo.grupo_id is not None:
             grupo = sessao.get(GrupoEconomico, corpo.grupo_id)
@@ -1239,6 +1392,9 @@ def _registrar(api: FastAPI) -> None:
             nome=corpo.nome or lead.nome,
             servico=corpo.servico,
             tipo_servico=corpo.tipo_servico,
+            servico_descricao=(corpo.servico_descricao or "").strip() or None,
+            servico_tema=(corpo.servico_tema or "").strip() or None,
+            linha_servico=linha_do_servico(corpo.servico),
             situacao=Situacao.ENVIAR_PROPOSTA,
             temperatura=lead.temperatura,
             tipo_canal=lead.tipo_canal,

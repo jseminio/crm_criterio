@@ -12,9 +12,23 @@ import type {
   PessoaDeContato,
   TipoDeContato,
   Mrr,
+  AnaliseDaCarteira,
+  RevisaoDaCarteira,
   ClassificacaoDaCarteira,
+  EdicaoDeNotas,
+  EdicaoDePorte,
+  PorteDoGrupo,
+  ResultadoDaEdicao,
+  SugestaoDePorte,
+  VolumetriaEntrada,
   CenariosDeTicket,
   ColunaDoFunil,
+  ConversaDoSdr,
+  InvestimentoEmMidia,
+  PainelDoSdr,
+  ParametrosDoSdr,
+  PedidoDeServicoNovo,
+  ServicoDoCatalogo,
   DimensaoDeRecorte,
   LinhaDeRecorte,
   ContratoDetalhe,
@@ -152,6 +166,20 @@ export const api = {
     }),
 
   classificacaoDaCarteira: () => pedir<ClassificacaoDaCarteira>("/api/carteira/classificacao"),
+  analiseDaCarteira: () => pedir<AnaliseDaCarteira | null>("/api/carteira/analise"),
+  gerarAnaliseDaCarteira: (autor: string) =>
+    pedir<AnaliseDaCarteira>("/api/carteira/analise", { method: "POST", body: JSON.stringify({ autor }) }),
+  revisoesDaCarteira: () => pedir<RevisaoDaCarteira[]>("/api/carteira/revisoes"),
+  registrarRevisaoDaCarteira: (autor: string) =>
+    pedir<RevisaoDaCarteira>("/api/carteira/revisoes", { method: "POST", body: JSON.stringify({ autor }) }),
+  editarMesDaRevisao: (id: number, mes: string) =>
+    pedir<RevisaoDaCarteira>(`/api/carteira/revisoes/${id}/mes`, { method: "PATCH", body: JSON.stringify({ mes }) }),
+  editarNotasDaCarteira: (grupoId: number, corpo: EdicaoDeNotas) =>
+    pedir<ResultadoDaEdicao>(`/api/carteira/grupos/${grupoId}/notas`, { method: "POST", body: JSON.stringify(corpo) }),
+  sugestaoDePorte: (corpo: VolumetriaEntrada) =>
+    pedir<SugestaoDePorte>("/api/carteira/porte/sugestao", { method: "POST", body: JSON.stringify(corpo) }),
+  editarPorte: (grupoId: number, corpo: EdicaoDePorte) =>
+    pedir<PorteDoGrupo>(`/api/carteira/grupos/${grupoId}/porte`, { method: "POST", body: JSON.stringify(corpo) }),
   mrr: (de?: string) => pedir<Mrr>(comParametros("/api/mrr", { de })),
 
   agenda: (captador?: string[]) =>
@@ -199,7 +227,7 @@ export const api = {
       body: JSON.stringify(mudancas),
     }),
 
-  leads: (filtros: { apenas_abertos?: boolean; busca?: string } = {}) =>
+  leads: (filtros: { apenas_abertos?: boolean; busca?: string; tipo_canal?: string } = {}) =>
     pedir<Pagina<LeadResumo>>(comParametros("/api/leads", filtros)),
 
   criarLead: (lead: Record<string, unknown>) =>
@@ -216,6 +244,27 @@ export const api = {
       method: "POST",
       body: JSON.stringify(dados),
     }),
+
+  servicos: () => pedir<ServicoDoCatalogo[]>("/api/servicos"),
+
+  pedidosDeServicoNovo: () => pedir<PedidoDeServicoNovo[]>("/api/servicos/pedidos"),
+
+  // ---------------------------------------------------------- SDR de IA
+  painelDoSdr: (filtros: { mes: string; origem?: string }) =>
+    pedir<PainelDoSdr>(comParametros("/api/sdr/painel", filtros)),
+
+  conversasDoLead: (leadId: number) =>
+    pedir<ConversaDoSdr[]>(`/api/sdr/leads/${leadId}/conversas`),
+
+  parametrosDoSdr: () => pedir<ParametrosDoSdr>("/api/sdr/parametros"),
+
+  gravarParametrosDoSdr: (dados: Record<string, unknown>) =>
+    pedir<ParametrosDoSdr>("/api/sdr/parametros", { method: "PUT", body: JSON.stringify(dados) }),
+
+  midia: (mes: string) => pedir<InvestimentoEmMidia[]>(comParametros("/api/sdr/midia", { mes })),
+
+  gravarMidia: (dados: { mes: string; canal: string; valor: string }) =>
+    pedir<InvestimentoEmMidia>("/api/sdr/midia", { method: "PUT", body: JSON.stringify(dados) }),
 
   grupos: (filtros: { busca?: string; limite?: number; incluir_fundidos?: boolean } = {}) =>
     pedir<Pagina<GrupoResumo>>(comParametros("/api/grupos", { limite: 500, ...filtros })),

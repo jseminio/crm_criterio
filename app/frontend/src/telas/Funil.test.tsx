@@ -20,6 +20,15 @@ vi.mock("../api/cliente", async () => {
     api: {
       funil: vi.fn(), indicadores: vi.fn(), oportunidade: vi.fn(), editarOportunidade: vi.fn(),
       recortes: vi.fn().mockResolvedValue([]), cenariosDeTicket: vi.fn().mockResolvedValue(null),
+      oportunidades: vi.fn(),
+      servicos: vi.fn().mockResolvedValue([
+        { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
+          para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],
+          fora_do_perfil: ["MEI"], transbordo: "Comercial · BPO (C1)", nomes_antigos: ["BPO Contábil"], rascunho: true, temas: [] },
+        { nome: "Auditoria", nome_por_extenso: null, linha: "C2", recorrente: false,
+          para_quem: "Auditoria das demonstrações.", perguntas: [{ texto: "Exercício a auditar", direcionador: null }],
+          fora_do_perfil: [], transbordo: "Consultoria (C2)", nomes_antigos: [], rascunho: true, temas: [] },
+      ]),
     },
   };
 });
@@ -230,5 +239,87 @@ describe("arrasto no kanban", () => {
     // A falha não deve ter disparado uma recarga — o cartão continua onde
     // estava, e o teste confirma que ninguém chamou /api/funil de novo.
     expect(api.funil).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("fusão Kanban/Grade (27/09/2026)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("abre no Kanban por padrão, sem o filtro Situação", async () => {
+    await abrir([coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")])]);
+    expect(screen.getByRole("button", { name: "▦ Kanban" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByLabelText("Situação")).toBeNull();
+  });
+
+  it("troca para Grade: busca as oportunidades e mostra a tabela, com o filtro Situação", async () => {
+    await abrir([coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")])]);
+    vi.mocked(api.oportunidades).mockResolvedValue({
+      total: 1,
+      itens: [{ ...oportunidade(1, "Alfa BPO"), situacao: "Enviar proposta" }],
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "☰ Grade" }));
+
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getByLabelText("Situação")).toBeInTheDocument();
+    expect(screen.getByText("1 oportunidade")).toBeInTheDocument();
+    expect(api.oportunidades).toHaveBeenCalledWith(expect.objectContaining({ situacao: undefined }));
+    // Kanban não chamou de novo: cada visão busca só quando está ativa.
+    expect(api.funil).toHaveBeenCalledTimes(1);
+  });
+
+  it("na Grade, filtrar por situação manda o filtro para a API", async () => {
+    await abrir([coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")])]);
+    vi.mocked(api.oportunidades).mockResolvedValue({ total: 0, itens: [] });
+    await fireEvent.click(screen.getByRole("button", { name: "☰ Grade" }));
+    await screen.findByLabelText("Situação");
+
+    fireEvent.change(screen.getByLabelText("Situação"), { target: { value: "On hold" } });
+
+    await waitFor(() =>
+      expect(api.oportunidades).toHaveBeenLastCalledWith(expect.objectContaining({ situacao: ["On hold"] })),
+    );
+  });
+
+  it("clicar numa linha da Grade abre o painel de detalhe", async () => {
+    await abrir([coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")])]);
+    vi.mocked(api.oportunidades).mockResolvedValue({
+      total: 1,
+      itens: [{ ...oportunidade(1, "Alfa BPO"), situacao: "Enviar proposta" }],
+    });
+    vi.mocked(api.oportunidade).mockResolvedValue({
+      id: 1, nome: "Alfa BPO", grupo_id: 1, grupo_nome: "Alfa BPO", situacao: "Enviar proposta",
+      temperatura: "Morno", servico: null, tipo_servico: null, captador: null, tipo_canal: null,
+      data_colocacao: null, preco_mensal: null, preco_anual: null, proxima_acao: null, proxima_acao_em: null,
+      canal: null, motivo_recusa: null, motivo_recusa_original: null, data_aceite: null, observacao: null,
+      historico_de_preco: [], complexidade: null, risco_tecnico: null, documentos_fiscais_mes: null,
+      lancamentos_contabeis_mes: null, pagamentos_mes: null, contas_bancarias: null, conciliacoes_cartao_mes: null,
+      empregados_clt: null, admissoes_desligamentos_mes: null, cnpjs_no_escopo: null, tomadores_de_servico: null,
+      servicos_contratados_alem_do_primeiro: 0, tem_consolidacao_de_grupo: false, e_auditada: false,
+      porte: null, porte_definido_por: null, porte_definido_em: null, sugestao_de_porte: null,
+      origem_da_volumetria: null, linha_planilha: null,
+    } as OportunidadeDetalhe);
+
+    await fireEvent.click(screen.getByRole("button", { name: "☰ Grade" }));
+    await fireEvent.click((await screen.findAllByText("Alfa BPO"))[0]);
+
+    expect(await screen.findByLabelText("Situação")).toBeInTheDocument();
+    expect(api.oportunidade).toHaveBeenCalledWith(1);
+  });
+
+  it("voltar para Kanban busca de novo (a visão só troca de aba, não guarda cache) e mostra o Kanban certo", async () => {
+    await abrir([coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")])]);
+    vi.mocked(api.oportunidades).mockResolvedValue({
+      total: 1,
+      itens: [{ ...oportunidade(1, "Alfa BPO"), situacao: "Enviar proposta" }],
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "☰ Grade" }));
+    await screen.findByRole("table");
+
+    await fireEvent.click(screen.getByRole("button", { name: "▦ Kanban" }));
+
+    expect(await screen.findByRole("button", { name: "▦ Kanban" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(api.funil).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("table")).toBeNull();
   });
 });

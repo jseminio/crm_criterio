@@ -9,6 +9,7 @@ import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { GrupoResumo, Listas, Pagina } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { usarDados } from "../usarDados";
@@ -130,6 +131,7 @@ function Fusao({
 export function Grupos({ listas }: { listas: Listas | null }) {
   const [busca, definirBusca] = useState("");
   const [aberto, definirAberto] = useState<GrupoResumo | null>(null);
+  const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
   const [fundindo, definirFundindo] = useState<GrupoResumo | null>(null);
   const [versao, definirVersao] = useState(0);
 
@@ -187,17 +189,20 @@ export function Grupos({ listas }: { listas: Listas | null }) {
         <table className="tabela">
           <thead>
             <tr>
-              <th scope="col">Grupo econômico</th>
-              <th scope="col">Situação</th>
-              <th scope="col">Origem</th>
-              <th scope="col" className="tabela-numero">
-                Propostas
-              </th>
+              <ThOrdenavel coluna="nome" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Grupo econômico</ThOrdenavel>
+              <ThOrdenavel coluna="situacao" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Situação</ThOrdenavel>
+              <ThOrdenavel coluna="origem" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Origem</ThOrdenavel>
+              <ThOrdenavel coluna="propostas" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Propostas</ThOrdenavel>
               <th scope="col" />
             </tr>
           </thead>
           <tbody>
-            {dados!.itens.map((grupo) => (
+            {ordenar(dados!.itens, ordenacao, {
+              nome: (g) => g.nome,
+              situacao: (g) => g.situacao,
+              origem: (g) => g.origem,
+              propostas: (g) => g.quantas_oportunidades,
+            }).map((grupo) => (
               <tr key={grupo.id}>
                 <td>
                   {/* O nome é o caminho natural para o detalhe. */}

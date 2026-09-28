@@ -99,6 +99,36 @@ describe("Carteira", () => {
     expect(screen.getByText("dentro da meta (meta 40–50%)")).toBeInTheDocument();
   });
 
+  it("mostra a rentabilidade logo depois do Score, e ordena por ela", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({
+      itens: [
+        item({ grupo_id: 1, grupo_nome: "Alfa", notas: { ...NOTAS_VAZIO, rentabilidade: "2.50" } }),
+        item({
+          grupo_id: 2, grupo_nome: "Beta", classe: "C", classe_efetiva: "C1", em_cobranca: false,
+          alerta_de_churn: null, eixo_de_acao: "Sem urgência de churn", churn: 1, receita_mensal: "5000.00",
+          notas: { ...NOTAS_VAZIO, rentabilidade: "4.80" },
+        }),
+      ],
+    }));
+    render(<Carteira listas={null} />);
+    await screen.findByText(/▸ Alfa/);
+
+    const titulos = screen.getAllByRole("columnheader").map((th) => th.textContent?.trim() ?? "");
+    const iScore = titulos.findIndex((t) => t.startsWith("Score"));
+    const iRentabilidade = titulos.findIndex((t) => t.startsWith("Rentabilidade"));
+    const iClasse = titulos.findIndex((t) => t.startsWith("Classe"));
+    expect(iScore).toBeGreaterThanOrEqual(0);
+    expect(iRentabilidade).toBe(iScore + 1);
+    expect(iClasse).toBe(iRentabilidade + 1);
+
+    expect(screen.getByText("2,50")).toBeInTheDocument();
+    expect(screen.getByText("4,80")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Rentabilidade/ }));
+    const linhas = screen.getAllByRole("row");
+    expect(linhas[1]).toHaveTextContent("Alfa"); // crescente: 2,50 (Alfa) antes de 4,80 (Beta)
+  });
+
   it("estado nunca só por cor: cobrança e alerta têm texto, e a cobrança vem primeiro", async () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
     render(<Carteira listas={null} />);

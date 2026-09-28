@@ -7,8 +7,10 @@
 import { Fragment, useRef, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { AnaliseDaCarteira, ClassificacaoDaCarteira, FaixaDeClasse, ItemDaCarteira, Listas } from "../api/tipos";
+import { AbaDeParametros } from "../componentes/AbaDeParametros";
 import { AvaliacaoDeNotas } from "../componentes/AvaliacaoDeNotas";
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
+import { Recolhivel } from "../componentes/Recolhivel";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
@@ -322,6 +324,18 @@ export function Carteira({ listas }: { listas: Listas | null }) {
             {eixos.map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
         </label>
+        <div className="carteira-ferramentas" style={{ marginLeft: "auto" }}>
+          <a
+            className="botao botao-secundario"
+            href="/api/carteira/exportar"
+            title="Baixa o histórico completo da carteira em Excel, com fórmula viva de Score e Classe, para conferência"
+          >
+            Exportar para conferência
+          </a>
+          <Recolhivel titulo="Parâmetros de cálculo" resumo="pesos do Score, cortes e a matriz de horas por Porte">
+            <AbaDeParametros />
+          </Recolhivel>
+        </div>
       </div>
 
 

@@ -280,8 +280,8 @@
 .detalhe-abas-de-apoio { margin-top: var(--e2); }
 .detalhe-abas-de-apoio .abas { margin-bottom: var(--e3); }
 
-/* Painel "Avaliar" da Carteira: 8 componentes, sempre em duas fileiras de
-   quatro, dentro da largura do painel — nunca uma fileira única transbordando. */
+/* Painel "Avaliar" da Carteira: oito componentes (sete do Score e Porte), sempre em duas fileiras
+   de quatro, dentro da largura do painel — nunca uma fileira única transbordando. */
 .abas-avaliacao { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--e2) var(--e1); }
 .abas-avaliacao .aba { padding: var(--e2) var(--e1); text-align: center; font-size: 12px; }
 .botao[aria-pressed="true"] { background: var(--surface-brand); color: var(--branco); border-color: var(--surface-brand); }
@@ -490,6 +490,8 @@
 .distribuicao-cab { display: flex; justify-content: space-between; font-size: 12px; color: var(--isc-marino); }
 .distribuicao-cab b { font-weight: 700; }
 .carteira-filtro { display: flex; gap: var(--e2); align-items: end; flex-wrap: wrap; }
+.carteira-ferramentas { display: flex; gap: var(--e2); align-items: start; flex-wrap: wrap; }
+.carteira-ferramentas .recolhivel { max-width: 640px; }
 .carteira .tabela { font-size: 12.5px; }
 .carteira .tabela th { background: var(--isc-painel); color: var(--isc-marino); font: 700 10.5px var(--isc-corpo);
   letter-spacing: .06em; text-transform: uppercase; border-bottom: 2px solid var(--isc-marino); }

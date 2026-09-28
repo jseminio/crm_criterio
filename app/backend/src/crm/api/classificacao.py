@@ -14,6 +14,7 @@ from typing import Callable, Iterator
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -27,11 +28,17 @@ from crm.agente.analise_da_carteira import (
 from crm.agente.config import ler_configuracao
 from crm.agente.erros import mensagem_de_falha
 from crm.agente.sdr import AgenteFalhou, Uso
-from crm.db.modelos import AnaliseDaCarteira, ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico, RevisaoDaCarteira
+from crm.db.modelos import (
+    AnaliseDaCarteira, ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico, MixDeEquipe,
+    RevisaoDaCarteira, VersaoDeParametros,
+)
 from crm.db.base import agora
 from crm.domain import classificacao as regra
+from crm.domain import parametros as regra_de_parametros
 from crm.domain import porte as regras_de_porte
 from crm.domain.listas import SituacaoContrato
+from crm.domain.rentabilidade import PARAMETROS_DE_RENTABILIDADE
+from crm.relatorios.exportacao_da_carteira import LinhaDeHistorico, ParametrosDaPlanilha, gerar_planilha
 
 AVISO_DA_PLANILHA = (
     "A nota de rentabilidade vem da planilha de saúde da carteira, sem recálculo: a regra de atrito/disciplina "
@@ -300,6 +307,105 @@ class LeituraDoHistorico(BaseModel):
     notas: NotasDoGrupo
 
 
+class CelulaDeMixEntrada(BaseModel):
+    porte: str
+    cargo: str
+    mix_percentual: Decimal = Field(ge=0, le=1)
+
+
+class CelulaDeMixResposta(BaseModel):
+    porte: str
+    cargo: str
+    mix_percentual: Decimal
+
+
+_CAMPOS_DE_LINHA = tuple(regra_de_parametros.LinhaDeParametros.__dataclass_fields__)
+
+
+class EdicaoDeParametros(BaseModel):
+    """Uma edição vira **versão nova**, nunca sobrescreve a vigente (mesmo princípio de `EdicaoDeNotas`)."""
+
+    autor: str = Field(min_length=2, max_length=120)
+    motivo: str = Field(min_length=3, max_length=500)
+    peso_receita: Decimal = Field(ge=0, le=1)
+    peso_rentabilidade: Decimal = Field(ge=0, le=1)
+    peso_cross_sell: Decimal = Field(ge=0, le=1)
+    peso_complexidade: Decimal = Field(ge=0, le=1)
+    peso_disciplina: Decimal = Field(ge=0, le=1)
+    peso_risco: Decimal = Field(ge=0, le=1)
+    peso_adimplencia: Decimal = Field(ge=0, le=1)
+    corte_a: Decimal = Field(gt=0, le=5)
+    corte_b: Decimal = Field(gt=0, le=5)
+    trava_de_adimplencia: int = Field(ge=1, le=5)
+    churn_alto: int = Field(ge=1, le=5)
+    imposto: Decimal = Field(ge=0, le=1)
+    teto_de_atrito: Decimal = Field(ge=0)
+    atrito_nota_1: Decimal = Field(ge=0)
+    atrito_nota_2: Decimal = Field(ge=0)
+    atrito_nota_3: Decimal = Field(ge=0)
+    atrito_nota_4: Decimal = Field(ge=0)
+    atrito_nota_5: Decimal = Field(ge=0)
+    corte_margem_2: Decimal = Field(ge=0, le=1)
+    corte_margem_3: Decimal = Field(ge=0, le=1)
+    corte_margem_4: Decimal = Field(ge=0, le=1)
+    corte_margem_5: Decimal = Field(ge=0, le=1)
+    horas_micro: int = Field(gt=0)
+    horas_pequeno: int = Field(gt=0)
+    horas_medio: int = Field(gt=0)
+    horas_grande: int = Field(gt=0)
+    horas_extra_grande: int = Field(gt=0)
+    taxa_socio_senior: Decimal = Field(ge=0)
+    taxa_socio_junior: Decimal = Field(ge=0)
+    taxa_supervisor: Decimal = Field(ge=0)
+    taxa_analista_senior: Decimal = Field(ge=0)
+    taxa_analista_pleno: Decimal = Field(ge=0)
+    taxa_analista_junior: Decimal = Field(ge=0)
+    mix: list[CelulaDeMixEntrada]
+
+
+class ParametrosResposta(BaseModel):
+    id: int
+    criado_em: datetime
+    autor: str
+    motivo: str
+    peso_receita: Decimal
+    peso_rentabilidade: Decimal
+    peso_cross_sell: Decimal
+    peso_complexidade: Decimal
+    peso_disciplina: Decimal
+    peso_risco: Decimal
+    peso_adimplencia: Decimal
+    corte_a: Decimal
+    corte_b: Decimal
+    trava_de_adimplencia: int
+    churn_alto: int
+    imposto: Decimal
+    teto_de_atrito: Decimal
+    atrito_nota_1: Decimal
+    atrito_nota_2: Decimal
+    atrito_nota_3: Decimal
+    atrito_nota_4: Decimal
+    atrito_nota_5: Decimal
+    corte_margem_2: Decimal
+    corte_margem_3: Decimal
+    corte_margem_4: Decimal
+    corte_margem_5: Decimal
+    horas_micro: int
+    horas_pequeno: int
+    horas_medio: int
+    horas_grande: int
+    horas_extra_grande: int
+    taxa_socio_senior: Decimal
+    taxa_socio_junior: Decimal
+    taxa_supervisor: Decimal
+    taxa_analista_senior: Decimal
+    taxa_analista_pleno: Decimal
+    taxa_analista_junior: Decimal
+    mix: list[CelulaDeMixResposta]
+    custo_hora: dict[str, Decimal]
+    """Calculado (taxa × mix, somado por Porte) — nunca digitado solto, pra nunca destoar da matriz."""
+
+
 def roteador(
     obter_sessao: Callable[[], Iterator[Session]],
     servicos_de_analise: Callable[[], ServicosDeAnalise] = servicos_de_analise_reais,
@@ -394,6 +500,71 @@ def roteador(
             .order_by(ClassificacaoDoGrupo.referencia.desc(), ClassificacaoDoGrupo.revisao.desc()).limit(1)
         ).first()
 
+    def _versao_vigente(sessao: Session) -> VersaoDeParametros | None:
+        return sessao.scalars(
+            sa.select(VersaoDeParametros).order_by(VersaoDeParametros.criado_em.desc()).limit(1)
+        ).first()
+
+    def _linha_de_parametros(v: VersaoDeParametros) -> regra_de_parametros.LinhaDeParametros:
+        return regra_de_parametros.LinhaDeParametros(**{c: getattr(v, c) for c in _CAMPOS_DE_LINHA})
+
+    def _mix_de(v: VersaoDeParametros) -> list[regra_de_parametros.CelulaDeMix]:
+        return [regra_de_parametros.CelulaDeMix(porte=m.porte, cargo=m.cargo, mix_percentual=m.mix_percentual) for m in v.mix]
+
+    def _parametros_vigentes(sessao: Session) -> tuple[regra.Parametros, regra_de_parametros.ParametrosDeRentabilidade]:
+        """A versão mais recente do banco; sem nenhuma gravada ainda, cai nas constantes do código
+        (a mesma semente que a migração grava — nunca fica sem parâmetro)."""
+        v = _versao_vigente(sessao)
+        if v is None:
+            return regra.PARAMETROS, PARAMETROS_DE_RENTABILIDADE
+        linha = _linha_de_parametros(v)
+        versao_str = f"banco-v{v.id}"
+        return (
+            regra_de_parametros.construir_parametros(linha, versao=versao_str),
+            regra_de_parametros.construir_parametros_de_rentabilidade(linha, _mix_de(v), versao=versao_str),
+        )
+
+    def _parametros_resposta(v: VersaoDeParametros) -> ParametrosResposta:
+        linha = _linha_de_parametros(v)
+        mix = _mix_de(v)
+        campos = {c: getattr(v, c) for c in _CAMPOS_DE_LINHA}
+        return ParametrosResposta(
+            id=v.id, criado_em=v.criado_em, autor=v.autor, motivo=v.motivo, **campos,
+            mix=[CelulaDeMixResposta(porte=c.porte, cargo=c.cargo, mix_percentual=c.mix_percentual) for c in mix],
+            custo_hora=regra_de_parametros.custo_hora_por_porte(linha, mix),
+        )
+
+    @r.get("/parametros", response_model=ParametrosResposta)
+    def parametros_atuais(sessao: Session = Depends(obter_sessao)) -> ParametrosResposta:
+        v = _versao_vigente(sessao)
+        if v is None:
+            raise HTTPException(409, "ainda não há parâmetros gravados no banco — rode a migração pendente (alembic upgrade head)")
+        return _parametros_resposta(v)
+
+    @r.post("/parametros", response_model=ParametrosResposta, status_code=201)
+    def editar_parametros(corpo: EdicaoDeParametros, sessao: Session = Depends(obter_sessao)) -> ParametrosResposta:
+        """Grava uma **versão nova**; a vigente até aqui não é tocada (mesmo princípio das notas).
+
+        Pesos do Score e o mix de cada Porte precisam fechar 100% — senão a edição é recusada, com
+        o motivo exato (`crm.domain.parametros.erros_de_pesos`/`erros_de_mix`).
+        """
+        linha = regra_de_parametros.LinhaDeParametros(**corpo.model_dump(exclude={"autor", "motivo", "mix"}))
+        mix = [regra_de_parametros.CelulaDeMix(porte=c.porte, cargo=c.cargo, mix_percentual=c.mix_percentual) for c in corpo.mix]
+        erros = regra_de_parametros.erros_de_pesos(linha) + regra_de_parametros.erros_de_mix(mix)
+        if erros:
+            raise HTTPException(422, "; ".join(erros))
+        nova = VersaoDeParametros(
+            autor=corpo.autor.strip(), motivo=corpo.motivo.strip(),
+            **{c: getattr(linha, c) for c in _CAMPOS_DE_LINHA},
+        )
+        sessao.add(nova)
+        sessao.flush()
+        for c in corpo.mix:
+            sessao.add(MixDeEquipe(versao_id=nova.id, porte=c.porte, cargo=c.cargo, mix_percentual=c.mix_percentual))
+        sessao.commit()
+        sessao.refresh(nova)
+        return _parametros_resposta(nova)
+
     @r.post("/grupos/{grupo_id}/notas", response_model=ResultadoDaEdicao, status_code=201)
     def editar_notas(grupo_id: int, corpo: EdicaoDeNotas, sessao: Session = Depends(obter_sessao)) -> ResultadoDaEdicao:
         """Grava uma **nova leitura** com as notas alteradas; a anterior não é tocada (snapshot imutável).
@@ -424,18 +595,19 @@ def roteador(
             sa.select(sa.func.max(ClassificacaoDoGrupo.revisao)).where(
                 ClassificacaoDoGrupo.grupo_id == grupo_id, ClassificacaoDoGrupo.referencia == hoje)
         ) or 0)
-        pontos = regra.score(novas)
-        letra = regra.classe(pontos)
+        parametros, _ = _parametros_vigentes(sessao)
+        pontos = regra.score(novas, p=parametros)
+        letra = regra.classe(pontos, p=parametros)
         nova = ClassificacaoDoGrupo(
             grupo_id=grupo_id, referencia=hoje, revisao=revisao, fonte="Edição manual no CRM",
-            versao_dos_parametros=regra.PARAMETROS.versao, atribuido_por=corpo.autor.strip(), motivo=corpo.motivo.strip(),
+            versao_dos_parametros=parametros.versao, atribuido_por=corpo.autor.strip(), motivo=corpo.motivo.strip(),
             receita_mensal=anterior.receita_mensal, margem=anterior.margem, horas_por_mes=anterior.horas_por_mes,
             rentabilidade_da_planilha=anterior.rentabilidade_da_planilha,
             nota_receita=novas.receita, nota_rentabilidade=novas.rentabilidade, complexidade=novas.complexidade,
             disciplina=novas.disciplina, risco_tecnico=novas.risco, cross_sell=novas.cross_sell, adimplencia=novas.adimplencia,
             semaforo=novas.semaforo, churn=novas.churn, score=pontos.quantize(Decimal("0.0001")), classe=letra,
-            classe_efetiva=regra.classe_efetiva(letra, novas), alerta_de_churn=regra.alerta_de_churn(letra, novas),
-            em_cobranca=regra.cobranca(novas), eixo_de_acao=regra.eixo_de_acao(letra, novas),
+            classe_efetiva=regra.classe_efetiva(letra, novas, p=parametros), alerta_de_churn=regra.alerta_de_churn(letra, novas, p=parametros),
+            em_cobranca=regra.cobranca(novas, p=parametros), eixo_de_acao=regra.eixo_de_acao(letra, novas, p=parametros),
         )
         sessao.add(nova)
         sessao.commit()
@@ -491,6 +663,43 @@ def roteador(
             )
             for c in linhas
         ]
+
+    @r.get("/exportar")
+    def exportar(sessao: Session = Depends(obter_sessao)) -> Response:
+        """O histórico completo — todas as leituras de todos os grupos, não só o snapshot atual —
+        numa planilha com fórmula viva para Score e Classe (`crm.relatorios.exportacao_da_carteira`)."""
+        linhas = sessao.execute(
+            sa.select(ClassificacaoDoGrupo, GrupoEconomico.nome)
+            .join(GrupoEconomico, GrupoEconomico.id == ClassificacaoDoGrupo.grupo_id)
+            .order_by(GrupoEconomico.nome, ClassificacaoDoGrupo.referencia, ClassificacaoDoGrupo.revisao)
+        ).all()
+        de_exportacao = [
+            LinhaDeHistorico(
+                grupo_nome=nome, referencia=c.referencia, revisao=c.revisao, registrado_em=c.registrado_em,
+                fonte=c.fonte, atribuido_por=c.atribuido_por, motivo=c.motivo, receita_mensal=c.receita_mensal,
+                nota_receita=c.nota_receita, nota_rentabilidade=c.nota_rentabilidade, complexidade=c.complexidade,
+                disciplina=c.disciplina, risco_tecnico=c.risco_tecnico, cross_sell=c.cross_sell,
+                adimplencia=c.adimplencia, semaforo=c.semaforo, churn=c.churn, score=c.score, classe=c.classe,
+                classe_efetiva=c.classe_efetiva, alerta_de_churn=c.alerta_de_churn, em_cobranca=c.em_cobranca,
+                eixo_de_acao=c.eixo_de_acao,
+            )
+            for c, nome in linhas
+        ]
+        parametros_atuais, _ = _parametros_vigentes(sessao)
+        parametros_da_planilha = ParametrosDaPlanilha(
+            corte_a=parametros_atuais.corte_a, corte_b=parametros_atuais.corte_b,
+            trava_de_adimplencia=parametros_atuais.trava_de_adimplencia, churn_alto=parametros_atuais.churn_alto,
+            peso_receita=parametros_atuais.peso_receita, peso_rentabilidade=parametros_atuais.peso_rentabilidade,
+            peso_adimplencia=parametros_atuais.peso_adimplencia, peso_complexidade=parametros_atuais.peso_complexidade,
+            peso_cross_sell=parametros_atuais.peso_cross_sell, peso_disciplina=parametros_atuais.peso_disciplina,
+            peso_risco=parametros_atuais.peso_risco,
+        )
+        conteudo = gerar_planilha(de_exportacao, parametros_da_planilha)
+        nome = f"carteira-historico-{date.today():%Y%m%d}.xlsx"
+        return Response(
+            conteudo, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{nome}"'},
+        )
 
     def _analise_resposta(a: AnaliseDaCarteira) -> AnaliseResposta:
         return AnaliseResposta(texto=a.texto, gerada_em=a.gerada_em, gerada_por=a.gerada_por, modelo=a.modelo,

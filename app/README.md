@@ -270,7 +270,7 @@ versionada como pesos e cortes do Score (`Parametros.meta_distribuicao_de_classe
 ## Carteira: avaliação dos sete componentes do Score, em abas (27/09/2026, ampliado 28/09/2026)
 
 Régua em `escala-das-notas-humanas.md`, agora com tela. Cada grupo ganha o botão **"Avaliar"**, que
-abre um painel com uma aba por componente do Score — oito no total, em duas fileiras
+abre um painel com uma aba por componente do Score, mais Porte — oito no total, em duas fileiras
 (`.abas-avaliacao` em `app.css`, para caber na largura do painel sem transbordar):
 
 - **Receita** (20%) e **Rentabilidade** (25%): abas **somente leitura** — mostram a nota já
@@ -302,6 +302,55 @@ abre um painel com uma aba por componente do Score — oito no total, em duas fi
   classificação. Exigiu migração (`GrupoEconomico` ganha os campos de volumetria e porte).
 
 `componentes/AvaliacaoDeNotas.tsx`.
+
+## Carteira: parâmetros de cálculo e exportar o histórico para Excel (28/09/2026)
+
+Dois controles **globais** (valem para toda a carteira, não para um grupo), lado a lado, acima da
+tabela de grupos — deliberadamente **fora** do painel "Avaliar" de cada grupo, de onde saíram
+depois de nascer lá por engano: pesos e cortes afetam o Índice de Saúde da carteira inteira, não é
+avaliação de um grupo (decisão de Eduardo, 28/09/2026).
+
+**Parâmetros de cálculo** — recolhível, ao lado do botão de exportar. Pesos do Score, cortes de
+classe, trava, churn alto, imposto, atrito e cortes de margem, e a matriz de horas/mix de
+equipe/taxa por Porte — tudo editável e gravado no banco (decisão de Eduardo: "existe a
+possibilidade deles variarem"). Salvar grava uma **versão nova** (`VersaoDeParametros` +
+`MixDeEquipe`, snapshot imutável, mesmo princípio de `ClassificacaoDoGrupo`), nunca sobrescreve —
+as classificações já feitas continuam apontando pra versão que as produziu, e **quem mudou o quê
+fica registrado**: autor e motivo são obrigatórios em cada edição, e "Vigente desde/por" no topo do
+painel sempre mostra o responsável pela versão atual — é o log que a mudança pediu. O custo/hora
+ponderado por Porte é **calculado** (taxa × mix, somado), nunca digitado solto — bate célula a
+célula com `Classificacao_Grupo_COMPLETO.xlsx` (aba Parâmetros) e
+`Rentabilidade_Grupo_COMPLETO.xlsx` (abas "2. Matriz Horas", "3. Fator de Atrito" e "6. Régua
+Rentab."), conferido a ponto de reproduzir os mesmos R$ 41,69/R$ 39,88/R$ 40,19/R$ 45,06 que já
+estavam fixos no código. A validação (pesos somando 100%, mix de cada Porte somando 100%) roda no
+cliente e no servidor, com o mesmo motivo recusado nos dois lados
+(`crm.domain.parametros.erros_de_pesos`/`erros_de_mix`). `GET`/`POST /api/carteira/parametros`; sem
+nenhuma versão gravada, o motor cai nas constantes do código (mesma semente que a migração grava —
+nunca fica sem parâmetro). Migração `5dc8a026d67a`, com a versão inicial semeada a partir das
+constantes já vigentes. `componentes/AbaDeParametros.tsx`, montado em `telas/Carteira.tsx` dentro
+de `componentes/Recolhivel.tsx`.
+
+**Exportar para conferência** — baixa `carteira-historico-AAAAMMDD.xlsx` com **todas** as leituras
+de `ClassificacaoDoGrupo` de todos os grupos — não só o snapshot atual — porque o banco já é
+imutável (uma edição de nota grava linha nova, a anterior fica). Segue o modelo de
+`Faturamento_Grupo_COMPLETO.xlsx`, três abas:
+
+- **Histórico da Carteira**: uma linha por leitura, com **Score e Classe em fórmula viva** —
+  `=I5*Parâmetros!$B$8 + J5*Parâmetros!$B$9 + ...` para o Score (a mesma soma ponderada de
+  `crm.domain.classificacao.score`, com Complexidade e Risco técnico invertidos) e
+  `=IF(R5>=Parâmetros!$B$2,"A",IF(R5>=Parâmetros!$B$3,"B","C"))` para a Classe — reabrindo no Excel
+  e mudando um peso na aba Parâmetros, a planilha inteira recalcula sozinha. Classe efetiva, alerta
+  de churn e eixo de ação ficam como **valor**, não fórmula: misturam texto e precedência (trava >
+  churn > o resto), não conta — o mesmo critério que o próprio modelo de faturamento já usava (só a
+  nota de receita, ali, virava fórmula).
+- **Parâmetros**: os pesos e cortes vigentes no banco no momento da exportação, no mesmo layout de
+  linhas da aba "Parâmetros" de `Classificacao_Grupo_COMPLETO.xlsx` — é nela que as fórmulas da
+  primeira aba se apoiam.
+- **Critérios e Fórmulas**: documenta em prosa o que não virou fórmula, e por quê.
+
+`crm/relatorios/exportacao_da_carteira.py` (função pura, testada sem banco) +
+`GET /api/carteira/exportar` (monta as linhas e os parâmetros vigentes, devolve o `.xlsx` como
+anexo).
 
 ## Funil: indicadores compactos (26/09/2026)
 

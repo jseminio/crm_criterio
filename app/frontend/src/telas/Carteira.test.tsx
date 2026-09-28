@@ -30,7 +30,7 @@ const PORTE_VAZIO: PorteDoGrupo = {
   porte: null, porte_definido_por: null, porte_definido_em: null,
 };
 const NOTAS_VAZIO: NotasDoGrupo = {
-  receita: "3.00", rentabilidade: "3.00", complexidade: "3.00", disciplina: "3.00", risco: "3.00",
+  receita: "3.00", rentabilidade: "3.00", rentabilidade_planilha: "3.00", complexidade: "3.00", disciplina: "3.00", risco: "3.00",
   cross_sell: "3.00", adimplencia: "3.00", semaforo: 1, churn: 1, rentabilidade_da_planilha: false,
   atribuido_por: null, motivo: null, registrado_em: "2026-07-31T00:00:00",
 };
@@ -97,6 +97,36 @@ describe("Carteira", () => {
     // B está fora da meta (50% contra 35–40%), C está dentro (50% contra 40–50%): o texto, não só a cor, marca a diferença.
     expect(screen.getByText("fora da meta (meta 35–40%)")).toBeInTheDocument();
     expect(screen.getByText("dentro da meta (meta 40–50%)")).toBeInTheDocument();
+  });
+
+  it("mostra a rentabilidade logo depois do Score, e ordena por ela", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({
+      itens: [
+        item({ grupo_id: 1, grupo_nome: "Alfa", notas: { ...NOTAS_VAZIO, rentabilidade: "5.00", rentabilidade_planilha: "2.50" } }),
+        item({
+          grupo_id: 2, grupo_nome: "Beta", classe: "C", classe_efetiva: "C1", em_cobranca: false,
+          alerta_de_churn: null, eixo_de_acao: "Sem urgência de churn", churn: 1, receita_mensal: "5000.00",
+          notas: { ...NOTAS_VAZIO, rentabilidade: "1.00", rentabilidade_planilha: "4.80" },
+        }),
+      ],
+    }));
+    render(<Carteira listas={null} />);
+    await screen.findByText(/▸ Alfa/);
+
+    const titulos = screen.getAllByRole("columnheader").map((th) => th.textContent?.trim() ?? "");
+    const iScore = titulos.findIndex((t) => t.startsWith("Score"));
+    const iRentabilidade = titulos.findIndex((t) => t.startsWith("Rentabilidade"));
+    const iClasse = titulos.findIndex((t) => t.startsWith("Classe"));
+    expect(iScore).toBeGreaterThanOrEqual(0);
+    expect(iRentabilidade).toBe(iScore + 1);
+    expect(iClasse).toBe(iRentabilidade + 1);
+
+    expect(screen.getByText("2,50")).toBeInTheDocument();
+    expect(screen.getByText("4,80")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Rentabilidade/ }));
+    const linhas = screen.getAllByRole("row");
+    expect(linhas[1]).toHaveTextContent("Alfa"); // crescente: 2,50 (Alfa) antes de 4,80 (Beta)
   });
 
   it("estado nunca só por cor: cobrança e alerta têm texto, e a cobrança vem primeiro", async () => {

@@ -238,9 +238,11 @@ export function Grupos({ listas }: { listas: Listas | null }) {
 
       {aberto && (
         <DetalheDoGrupo
+          key={aberto.id}
           grupo={aberto}
           listas={listas}
           aoFechar={() => definirAberto(null)}
+          aoMudar={recarregar}
         />
       )}
 

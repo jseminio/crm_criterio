@@ -20,6 +20,7 @@ export interface GrupoResumo {
   situacao: string;
   origem: string;
   responsavel_cs: string | null;
+  observacao: string | null;
   data_entrada: string | null;
   fundido_em_id: number | null;
   quantas_oportunidades: number;
@@ -558,6 +559,9 @@ export interface EmpresaDoGrupo {
 export interface NotasDoGrupo {
   receita: string;
   rentabilidade: string;
+  /** A nota tal como veio da planilha/deck de classificação (revisão 1), sem o recálculo do
+   * defeito 7.2 — pode diferir de `rentabilidade` acima, que é a que entra no Score. */
+  rentabilidade_planilha: string;
   complexidade: string;
   disciplina: string;
   risco: string;

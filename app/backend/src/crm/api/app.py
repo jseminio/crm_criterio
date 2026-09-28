@@ -308,6 +308,23 @@ def _registrar(api: FastAPI) -> None:
             itens.append(resumo)
         return e.Pagina(total=total or 0, itens=itens)
 
+    @api.patch("/api/grupos/{grupo_id}", response_model=e.GrupoResumo, tags=["grupos"])
+    def editar_grupo(
+        grupo_id: int, corpo: e.GrupoEdicao, sessao: Session = Depends(obter_sessao),
+    ) -> e.GrupoResumo:
+        """Corrige nome, responsável CS e observação. Só o que vier no corpo muda."""
+        grupo = sessao.get(GrupoEconomico, grupo_id)
+        if grupo is None:
+            raise HTTPException(404, "grupo não encontrado")
+        for campo, valor in corpo.model_dump(exclude_unset=True).items():
+            setattr(grupo, campo, valor)
+        sessao.flush()
+        resumo = e.GrupoResumo.model_validate(grupo)
+        resumo.quantas_oportunidades = sessao.scalar(
+            sa.select(sa.func.count(Oportunidade.id)).where(Oportunidade.grupo_id == grupo.id)
+        ) or 0
+        return resumo
+
     @api.get(
         "/api/grupos/sugestoes-de-fusao", response_model=list[e.SugestaoDeFusao], tags=["grupos"]
     )

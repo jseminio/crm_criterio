@@ -64,6 +64,10 @@ class EmpresaDoGrupo(BaseModel):
 class NotasDoGrupo(BaseModel):
     receita: Decimal
     rentabilidade: Decimal
+    rentabilidade_planilha: Decimal
+    """A nota de rentabilidade tal como veio da planilha/deck de classificação (revisão 1), sem o
+    recálculo do defeito 7.2. `rentabilidade` acima é a que entra no Score — pode ser a mesma ou a
+    recalculada; esta aqui é sempre a original, para quem quer comparar com o material de fora."""
     complexidade: Decimal
     disciplina: Decimal
     risco: Decimal
@@ -177,9 +181,11 @@ class ClassificacaoDaCarteira(BaseModel):
     avisos: list[str]
 
 
-def _notas(c: ClassificacaoDoGrupo) -> NotasDoGrupo:
+def _notas(c: ClassificacaoDoGrupo, rentabilidade_planilha: Decimal | None = None) -> NotasDoGrupo:
     return NotasDoGrupo(
-        receita=c.nota_receita, rentabilidade=c.nota_rentabilidade, complexidade=c.complexidade, disciplina=c.disciplina,
+        receita=c.nota_receita, rentabilidade=c.nota_rentabilidade,
+        rentabilidade_planilha=rentabilidade_planilha if rentabilidade_planilha is not None else c.nota_rentabilidade,
+        complexidade=c.complexidade, disciplina=c.disciplina,
         risco=c.risco_tecnico, cross_sell=c.cross_sell, adimplencia=c.adimplencia, semaforo=c.semaforo, churn=c.churn,
         rentabilidade_da_planilha=c.rentabilidade_da_planilha, atribuido_por=c.atribuido_por, motivo=c.motivo,
         registrado_em=c.registrado_em,
@@ -453,12 +459,22 @@ def roteador(
         # Porte não é parte da classificação (não entra no Score, mora no grupo — ver `_porte`),
         # mas a tela de avaliação precisa do que já está salvo pra não sobrescrever com branco.
         grupos_por_id = {g.id: g for g in sessao.scalars(sa.select(GrupoEconomico).where(GrupoEconomico.id.in_(vistos)))}
+        # A rentabilidade "da planilha/deck" é sempre a revisão 1 da mesma referência — mesmo quando
+        # a revisão mostrada (a mais recente) já foi recalculada pelo defeito 7.2.
+        referencia_por_grupo = {c.grupo_id: c.referencia for c, _ in linhas}
+        rentabilidade_planilha_por_grupo = {
+            c.grupo_id: c.nota_rentabilidade
+            for c, _ in todas
+            if c.revisao == 1 and referencia_por_grupo.get(c.grupo_id) == c.referencia
+        }
         itens = [
             ItemDaCarteira(
                 grupo_id=c.grupo_id, grupo_nome=nome, receita_mensal=c.receita_mensal, score=c.score, classe=c.classe,
                 classe_efetiva=c.classe_efetiva, alerta_de_churn=c.alerta_de_churn, em_cobranca=c.em_cobranca,
                 eixo_de_acao=c.eixo_de_acao, semaforo=c.semaforo, churn=c.churn, sem_contrato_ativo=c.grupo_id not in ativos,
-                empresas=empresas.get(c.grupo_id, []), notas=_notas(c), porte=_porte(grupos_por_id[c.grupo_id]),
+                empresas=empresas.get(c.grupo_id, []),
+                notas=_notas(c, rentabilidade_planilha_por_grupo.get(c.grupo_id)),
+                porte=_porte(grupos_por_id[c.grupo_id]),
             )
             for c, nome in linhas
         ]

@@ -12,9 +12,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
 from crm.api.app import criar_app
-from crm.db.modelos import ClassificacaoDoGrupo, GrupoEconomico
+from crm.db.modelos import ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico
 from crm.domain import classificacao as regra
-from crm.domain.listas import SituacaoGrupo
+from crm.domain.listas import SituacaoContrato, SituacaoGrupo
 
 
 @pytest.fixture
@@ -61,8 +61,36 @@ def test_traz_todo_o_historico_de_todos_os_grupos(cliente, sessao: Session):
     wb = openpyxl.load_workbook(io.BytesIO(r.content))
     ws = wb["Histórico da Carteira"]
     nomes = [ws.cell(row=linha, column=1).value for linha in (5, 6, 7)]
-    assert nomes == ["Alfa", "Alfa", "Beta"]  # ordenado por grupo, depois referência — as duas leituras de Alfa antes de Beta
-    assert ws["R5"].value.startswith("=I5*")  # fórmula viva do Score
+    assert nomes == ["▸ Alfa", "▸ Alfa", "▸ Beta"]  # ordenado por grupo, depois referência — as duas leituras de Alfa antes de Beta
+    assert ws["O5"].value.startswith("=F5*")  # fórmula viva do Score
+
+
+def test_empresas_do_grupo_com_a_mensalidade_dos_contratos_vigentes(cliente, sessao: Session):
+    n = regra.Notas(receita=5, rentabilidade=1, complexidade=3, disciplina=3, risco=3, cross_sell=3, adimplencia=3, semaforo=1, churn=1)
+    a = GrupoEconomico(nome="Alfa", situacao=SituacaoGrupo.CLIENTE)
+    homonimo = GrupoEconomico(nome="Alfa", situacao=SituacaoGrupo.CLIENTE)
+    sessao.add_all([a, homonimo]); sessao.flush()
+    e1 = Empresa(grupo_id=a.id, razao_social="Alfa Ltda", cnpj="11111111000191")
+    e2 = Empresa(grupo_id=a.id, razao_social="Alfa Serviços")
+    e3 = Empresa(grupo_id=homonimo.id, razao_social="Outra Alfa")
+    sessao.add_all([e1, e2, e3]); sessao.flush()
+    sessao.add_all([
+        Contrato(grupo_id=a.id, empresa_id=e1.id, anterior_ao_crm=True, situacao=SituacaoContrato.ATIVO, preco_mensal=Decimal("1000.00")),
+        Contrato(grupo_id=a.id, empresa_id=e1.id, anterior_ao_crm=True, situacao=SituacaoContrato.SUSPENSO, preco_mensal=Decimal("500.00")),
+        Contrato(grupo_id=a.id, empresa_id=e1.id, anterior_ao_crm=True, situacao=SituacaoContrato.ENCERRADO, preco_mensal=Decimal("9999.00")),
+        Contrato(grupo_id=a.id, empresa_id=e2.id, anterior_ao_crm=True, situacao=SituacaoContrato.AGUARDANDO_ASSINATURA, preco_mensal=Decimal("300.00")),
+    ])
+    _snap(sessao, a, date(2026, 7, 31), "1500", n)
+    _snap(sessao, homonimo, date(2026, 7, 31), "700", n)
+    sessao.commit()
+
+    ws = openpyxl.load_workbook(io.BytesIO(cliente.get("/api/carteira/exportar").content))["Histórico da Carteira"]
+    assert [ws.cell(row=r, column=1).value for r in range(5, 10)] == [
+        "▸ Alfa", "    • Alfa Ltda", "    • Alfa Serviços", "▸ Alfa", "    • Outra Alfa",
+    ]
+    assert ws["D6"].value == 1500.0  # ativo + suspenso; encerrado fica de fora
+    assert ws["D7"].value is None    # aguardando assinatura ainda não é mensalidade
+    assert ws["C6"].value == "11111111000191"
 
 
 _MIX_POR_PORTE = {

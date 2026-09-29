@@ -9,10 +9,12 @@ import { api, ErroDaApi } from "../api/cliente";
 import type { AnaliseDaCarteira, ClassificacaoDaCarteira, FaixaDeClasse, ItemDaCarteira, Listas } from "../api/tipos";
 import { AbaDeParametros } from "../componentes/AbaDeParametros";
 import { AvaliacaoDeNotas } from "../componentes/AvaliacaoDeNotas";
+import { FaixaDoPeriodo } from "../componentes/FaixaDoPeriodo";
+import { JanelaDeRentabilidade } from "../componentes/JanelaDeRentabilidade";
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Recolhivel } from "../componentes/Recolhivel";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
-import { cnpj, data, dinheiro } from "../formato";
+import { cnpj, data, defasagem, dinheiro, fracaoEmPercentual } from "../formato";
 import { usarDados } from "../usarDados";
 import { RevisaoMensal } from "./RevisaoMensal";
 
@@ -23,8 +25,30 @@ const um1 = (v: string) => decimais(v, 1);
 const ALERTA: Record<string, string> = { "⚠": "⚠ Risco de churn", "⚑": "⚑ Saída a organizar" };
 const PRIORIDADE = ["Cobrança", "Reter já", "Reter / vigiar", "Saída organizada", "Sem urgência"];
 const EIXO_COBRANCA = "Cobrança — sem tratamento preferencial";
+/** Filtro a mais no campo "Eixo de ação": não é um eixo, o grupo continua no seu. */
+const REVISAO_DE_HONORARIOS = "Revisão de honorários";
+const ABAS_DO_PERIODO = 6;
+
+function BotaoAvaliar({ item, comPeriodo, aoClicar }: { item: ItemDaCarteira; comPeriodo: boolean; aoClicar: () => void }) {
+  if (!comPeriodo) {
+    return <button type="button" className="botao botao-secundario" onClick={aoClicar}>Avaliar</button>;
+  }
+  const feitas = item.rascunho?.preenchidas.length ?? 0;
+  // Cor e texto juntos: a regra do PAD-002 não deixa o estado só na cor.
+  const [classe, texto] = feitas >= ABAS_DO_PERIODO
+    ? ["avaliar-ok", "Avaliar ✓ completo"]
+    : feitas === 0 ? ["avaliar-vazio", "Avaliar · vazio"] : ["avaliar-parcial", `Avaliar · ${feitas} de ${ABAS_DO_PERIODO}`];
+  return <button type="button" className={`botao avaliar-status ${classe}`} onClick={aoClicar}>{texto}</button>;
+}
 const SEMAFORO_ROTULO: Record<number, string> = { 1: "Controlada", 2: "Atenção", 3: "Crítico" };
 const COR_DA_CLASSE: Record<string, string> = { A: "#2e7d5b", B: "#2e5496", C: "#b8860b" };
+
+function classeDaDefasagem(i: ItemDaCarteira): string {
+  const r = i.rentabilidade_do_grupo;
+  if (!r || r.defasagem === null) return "";
+  if (r.revisao_de_honorarios) return "texto-revisao";
+  return Number(r.defasagem) >= 0 ? "texto-acima" : "texto-abaixo";
+}
 
 const LEGENDA_DOS_EIXOS: { nome: string; quando: string; significa: string }[] = [
   {
@@ -222,8 +246,11 @@ export function Carteira({ listas }: { listas: Listas | null }) {
     );
 
   const eixos = Array.from(new Set(dados.itens.map((i) => i.eixo_de_acao))).sort((a, b) => rank(a) - rank(b));
+  const emRevisao = dados.itens.filter((i) => i.rentabilidade_do_grupo?.revisao_de_honorarios).length;
+  const noEixo = (i: ItemDaCarteira) =>
+    !eixo || (eixo === REVISAO_DE_HONORARIOS ? !!i.rentabilidade_do_grupo?.revisao_de_honorarios : i.eixo_de_acao === eixo);
   const itensDoEixo = dados.itens
-    .filter((i) => (!eixo || i.eixo_de_acao === eixo) && (semaforoFiltro === null || i.semaforo === semaforoFiltro))
+    .filter((i) => noEixo(i) && (semaforoFiltro === null || i.semaforo === semaforoFiltro))
     .sort((a, b) => rank(a.eixo_de_acao) - rank(b.eixo_de_acao) || Number(b.receita_mensal) - Number(a.receita_mensal));
   const porSemaforo = { 1: 0, 2: 0, 3: 0 } as Record<number, number>;
   for (const i of dados.itens) porSemaforo[i.semaforo] = (porSemaforo[i.semaforo] ?? 0) + 1;
@@ -237,6 +264,9 @@ export function Carteira({ listas }: { listas: Listas | null }) {
   const itens = ordenar(itensDoEixo, ordenacao, {
     grupo: (i) => i.grupo_nome,
     receita: (i) => Number(i.receita_mensal),
+    calculada: (i) => (i.rentabilidade_do_grupo ? Number(i.rentabilidade_do_grupo.honorario_calculado) : null),
+    defasagem: (i) => (i.rentabilidade_do_grupo?.defasagem != null ? Number(i.rentabilidade_do_grupo.defasagem) : null),
+    margem: (i) => (i.rentabilidade_do_grupo?.margem != null ? Number(i.rentabilidade_do_grupo.margem) : null),
     score: (i) => Number(i.score),
     rentabilidade: (i) => Number(i.notas.rentabilidade_planilha),
     classe: (i) => i.classe_efetiva,
@@ -313,6 +343,8 @@ export function Carteira({ listas }: { listas: Listas | null }) {
         </>
       )}
 
+      <FaixaDoPeriodo periodo={dados.periodo ?? null} janela={dados.janela ?? null} aoMudar={recarregar} />
+
       <div className="carteira-filtro" ref={listaRef}>
         <label className="campo">
           <span className="campo-rotulo">Eixo de ação</span>
@@ -323,6 +355,7 @@ export function Carteira({ listas }: { listas: Listas | null }) {
           >
             <option value="">Todos</option>
             {eixos.map((e) => <option key={e} value={e}>{e}</option>)}
+            <option value={REVISAO_DE_HONORARIOS}>{REVISAO_DE_HONORARIOS} ({emRevisao})</option>
           </select>
         </label>
         <div className="carteira-ferramentas" style={{ marginLeft: "auto" }}>
@@ -333,7 +366,11 @@ export function Carteira({ listas }: { listas: Listas | null }) {
           >
             Exportar para conferência
           </a>
-          <Recolhivel titulo="Parâmetros de cálculo" resumo="pesos do Score, cortes e a matriz de horas por Porte">
+          <Recolhivel titulo="Parâmetros de cálculo" resumo="janela de rentabilidade, pesos do Score, cortes e a matriz de horas por Porte">
+            <JanelaDeRentabilidade
+              key={dados.periodo?.id ?? "sem-periodo"}
+              periodo={dados.periodo ?? null} janela={dados.janela ?? null} aoMudar={recarregar}
+            />
             <AbaDeParametros />
           </Recolhivel>
         </div>
@@ -343,11 +380,17 @@ export function Carteira({ listas }: { listas: Listas | null }) {
       {itens.length === 0 ? (
         <VazioPorFiltro aoLimpar={() => { definirEixoManual(""); definirSomenteInadimplentes(false); definirSemaforoFiltro(null); }} />
       ) : (
+        <div className="tabela-rolagem">
         <table className="tabela" aria-label="Grupos classificados">
           <thead>
             <tr>
               <ThOrdenavel coluna="grupo" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Grupo</ThOrdenavel>
-              <ThOrdenavel coluna="receita" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Receita/mês</ThOrdenavel>
+              <ThOrdenavel coluna="receita" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Receita praticada</ThOrdenavel>
+              <ThOrdenavel coluna="calculada" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>
+                Receita calculada <span className="carteira-remissao">alvo {fracaoEmPercentual(dados.janela?.margem_alvo, 0)}</span>
+              </ThOrdenavel>
+              <ThOrdenavel coluna="defasagem" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Defasagem</ThOrdenavel>
+              <ThOrdenavel coluna="margem" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Margem</ThOrdenavel>
               <ThOrdenavel coluna="score" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Score</ThOrdenavel>
               <ThOrdenavel coluna="rentabilidade" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Rentabilidade</ThOrdenavel>
               <ThOrdenavel coluna="classe" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Classe</ThOrdenavel>
@@ -383,6 +426,14 @@ export function Carteira({ listas }: { listas: Listas | null }) {
                       {i.sem_contrato_ativo && <span className="numero-nota"> · sem contrato ativo hoje</span>}
                     </td>
                     <td className="tabela-numero">{dinheiro(i.receita_mensal)}</td>
+                    <td className="tabela-numero">{i.rentabilidade_do_grupo ? dinheiro(i.rentabilidade_do_grupo.honorario_calculado) : <span className="numero-nota">sem porte</span>}</td>
+                    <td className={`tabela-numero ${classeDaDefasagem(i)}`}>
+                      {i.rentabilidade_do_grupo ? defasagem(i.rentabilidade_do_grupo.defasagem) : "—"}
+                      {i.rentabilidade_do_grupo?.revisao_de_honorarios && " · revisão"}
+                    </td>
+                    <td className={`tabela-numero ${i.rentabilidade_do_grupo?.revisao_de_honorarios ? "texto-revisao" : ""}`}>
+                      {fracaoEmPercentual(i.rentabilidade_do_grupo?.margem)}
+                    </td>
                     <td className="tabela-numero">{um(i.score)}</td>
                     <td className="tabela-numero">{um(i.notas.rentabilidade_planilha)}</td>
                     <td className="carteira-classe">{i.classe_efetiva}{i.em_cobranca ? " · $$$ cobrança" : ""}</td>
@@ -390,13 +441,7 @@ export function Carteira({ listas }: { listas: Listas | null }) {
                     <td className="tabela-numero">{i.churn ?? "—"}</td>
                     <td>{i.eixo_de_acao}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="botao botao-secundario"
-                        onClick={() => definirAvaliando(i)}
-                      >
-                        Avaliar
-                      </button>
+                      <BotaoAvaliar item={i} comPeriodo={!!dados.periodo} aoClicar={() => definirAvaliando(i)} />
                     </td>
                   </tr>
                   {aberto &&
@@ -404,7 +449,7 @@ export function Carteira({ listas }: { listas: Listas | null }) {
                       <tr key={`e${e.id}`} className="carteira-empresa">
                         <td>• {e.razao_social}{e.cnpj ? <span className="numero-nota"> · {cnpj(e.cnpj)}</span> : null}</td>
                         <td className="tabela-numero">{e.mensalidade !== null ? dinheiro(e.mensalidade) : "—"}</td>
-                        <td colSpan={7} />
+                        <td colSpan={10} />
                       </tr>
                     ))}
                 </Fragment>
@@ -412,6 +457,7 @@ export function Carteira({ listas }: { listas: Listas | null }) {
             })}
           </tbody>
         </table>
+        </div>
       )}
           <p className="carteira-legenda">
         ▸ grupo (consolidado) · + mostra as empresas do grupo · • empresa (CNPJ) · classe efetiva = letra + semáforo · ⚠ risco de churn em A/B · ⚑ saída a organizar em C ·
@@ -448,9 +494,11 @@ export function Carteira({ listas }: { listas: Listas | null }) {
           notasAtuais={avaliando.notas}
           porteAtual={avaliando.porte}
           avaliacaoGravada={avaliando.avaliacao ?? null}
+          rascunho={avaliando.rascunho ?? null}
+          periodo={dados.periodo ?? null}
           portes={listas?.portes ?? []}
           aoFechar={() => definirAvaliando(null)}
-          aoSalvar={() => { definirAvaliando(null); recarregar(); }}
+          aoMudar={recarregar}
         />
       )}
     </section>

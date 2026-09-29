@@ -498,7 +498,7 @@
 .carteira .tabela th { background: var(--isc-painel); color: var(--isc-marino); font: 700 10.5px var(--isc-corpo);
   letter-spacing: .06em; text-transform: uppercase; border-bottom: 2px solid var(--isc-marino); }
 .carteira .tabela td { border-bottom: 1px solid var(--isc-linha); }
-.carteira-grupo { font-weight: 700; color: var(--isc-marino); }
+.carteira-grupo { font-weight: 700; color: var(--isc-marino); min-width: 220px; }
 .carteira-mais { width: 22px; height: 22px; margin-right: var(--e2); padding: 0; border: 1px solid var(--isc-linha); border-radius: 50%;
   background: #fff; color: var(--isc-marino); font: 700 14px/1 var(--isc-corpo); cursor: pointer; vertical-align: middle; }
 .carteira-mais:hover { background: var(--isc-painel); }
@@ -714,6 +714,36 @@
    A duração cai para quase zero em vez de `none` para que o estado final
    continue sendo aplicado (o destaque da coluna-alvo ainda aparece, só que
    sem esmaecer). O teste `movimento.test.ts` confere que ela segue aqui. */
+/* Período de avaliação (29/09/2026): faixa na Carteira, status do Avaliar e resultado do cliente.
+   Estado nunca só por cor (PAD-002): todo verde/amarelo/vermelho vem com texto. */
+.periodo-faixa { display: flex; flex-wrap: wrap; gap: var(--e4); align-items: flex-end; justify-content: space-between;
+  background: var(--surface-card); border: 1px solid var(--borda); border-radius: var(--raio-md);
+  padding: var(--e3) var(--e4); margin: var(--e4) 0; }
+.periodo-titulo { margin: var(--e1) 0; font-weight: 600; font-size: 15px; }
+.periodo-acoes { display: flex; flex-wrap: wrap; gap: var(--e3); align-items: flex-end; }
+.periodo-faltam { margin: 0; font-size: 13px; color: var(--espera); background: var(--espera-suave);
+  border: 1px solid var(--espera); border-radius: var(--raio-sm); padding: var(--e2) var(--e3); max-width: 520px; }
+.periodo-completo { margin: 0; font-size: 13px; color: var(--ganho); background: var(--ganho-suave);
+  border: 1px solid var(--ganho); border-radius: var(--raio-sm); padding: var(--e2) var(--e3); }
+.periodo-erro { flex-basis: 100%; margin: 0; color: var(--perda); font-size: 13px; }
+.avaliar-status { font-weight: 600; font-size: 12px; white-space: nowrap; border: 1px solid; }
+.avaliar-ok { color: var(--ganho); background: var(--ganho-suave); border-color: var(--ganho); }
+.avaliar-parcial { color: var(--espera); background: var(--espera-suave); border-color: var(--espera); }
+.avaliar-vazio { color: var(--perda); background: var(--perda-suave); border-color: var(--perda); }
+.aba-status { display: block; font-size: 11px; font-weight: 400; color: var(--texto-fraco); }
+.aba-status-ok { color: var(--ganho); }
+.aba-status-pendente { color: var(--espera); }
+.texto-acima { color: var(--ganho); }
+.texto-abaixo { color: var(--espera); }
+.texto-revisao { color: var(--perda); font-weight: 600; }
+.resultado-do-cliente { border: 1px solid var(--borda); border-radius: var(--raio-md); background: var(--surface-sunken);
+  padding: var(--e3) var(--e4); font-size: 13px; }
+.resultado-do-cliente table { width: 100%; border-collapse: collapse; margin-top: var(--e2); }
+.resultado-do-cliente td { padding: 3px 0; vertical-align: top; }
+.resultado-do-cliente td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.parametros-grupo { display: flex; flex-direction: column; gap: var(--e2); margin-bottom: var(--e4); }
+
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

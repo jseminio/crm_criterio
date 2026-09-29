@@ -593,6 +593,77 @@ export interface ItemDaCarteira {
   porte: PorteDoGrupo;
   /** Respostas da avaliação mais recente que as gravou (pode ser anterior à leitura mostrada). */
   avaliacao?: AvaliacaoGravada | null;
+  /** Rascunho do período aberto, se houver. */
+  rascunho?: RascunhoDaAvaliacao | null;
+  /** Margem e honorário calculado no nível do grupo; `null` sem porte confirmado. */
+  rentabilidade_do_grupo?: RentabilidadeDoGrupo | null;
+}
+
+export type AbaDaAvaliacao = "complexidade" | "risco" | "disciplina" | "cross_sell" | "inadimplencia" | "porte";
+
+export interface RespostasDePorte extends VolumetriaEntrada {
+  porte: string;
+  justificativa?: string | null;
+}
+
+/** Cada aba presente foi revista por alguém neste período. */
+export interface RespostasDoRascunho {
+  complexidade?: string[];
+  risco?: string[];
+  cross_sell?: string[];
+  disciplina?: RespostasDaAvaliacao["disciplina"];
+  inadimplencia?: RespostasDaAvaliacao["inadimplencia"];
+  porte?: RespostasDePorte;
+}
+
+export interface RascunhoDaAvaliacao {
+  respostas: RespostasDoRascunho;
+  preenchidas: AbaDaAvaliacao[];
+  atualizado_em: string;
+  atualizado_por: string;
+}
+
+export interface RentabilidadeDoGrupo {
+  porte: string;
+  horas: string;
+  custo_de_servir: string;
+  honorario_praticado: string;
+  margem: string | null;
+  honorario_calculado: string;
+  defasagem: string | null;
+  revisao_de_honorarios: boolean;
+}
+
+export interface PeriodoDeAvaliacao {
+  id: number;
+  mes_de_referencia: string;
+  aberto_em: string;
+  aberto_por: string;
+  margem_minima: string;
+  margem_alvo: string;
+  calculado_em: string | null;
+  calculado_por: string | null;
+  grupos: number;
+  completos: number;
+  abas: number;
+  pendentes: { grupo_id: number; grupo_nome: string; preenchidas: number }[];
+}
+
+export interface JanelaDeRentabilidade {
+  margem_minima: string;
+  margem_alvo: string;
+  origem: string;
+}
+
+export interface SimulacaoDoCliente {
+  pendentes: AbaDaAvaliacao[];
+  notas_antes: Record<string, string>;
+  notas_depois: Record<string, string>;
+  score_antes: string;
+  score_depois: string;
+  classe_antes: string;
+  classe_depois: string;
+  rentabilidade: RentabilidadeDoGrupo | null;
 }
 
 export interface RespostasDaAvaliacao {
@@ -677,6 +748,7 @@ export interface PorteDoGrupo extends DirecionadoresDePorte {
   porte: string | null;
   porte_definido_por: string | null;
   porte_definido_em: string | null;
+  porte_justificativa?: string | null;
 }
 
 export interface EdicaoDeNotas {
@@ -800,6 +872,8 @@ export interface ClassificacaoDaCarteira {
   distribuicao_por_classe: FaixaDeClasse[];
   itens: ItemDaCarteira[];
   avisos: string[];
+  periodo?: PeriodoDeAvaliacao | null;
+  janela?: JanelaDeRentabilidade | null;
 }
 
 export interface AnaliseDaCarteira {

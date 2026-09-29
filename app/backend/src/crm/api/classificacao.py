@@ -29,10 +29,11 @@ from crm.agente.config import ler_configuracao
 from crm.agente.erros import mensagem_de_falha
 from crm.agente.sdr import AgenteFalhou, Uso
 from crm.db.modelos import (
-    AnaliseDaCarteira, ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico, MixDeEquipe,
-    RevisaoDaCarteira, VersaoDeParametros,
+    AnaliseDaCarteira, AvaliacaoEmAndamento, ClassificacaoDoGrupo, Contrato, Empresa, GrupoEconomico, MixDeEquipe,
+    PeriodoDeAvaliacao, RevisaoDaCarteira, VersaoDeParametros,
 )
 from crm.db.base import agora
+from crm.domain import avaliacao as regra_de_avaliacao
 from crm.domain import classificacao as regra
 from crm.domain import parametros as regra_de_parametros
 from crm.domain import porte as regras_de_porte
@@ -41,6 +42,11 @@ from crm.domain.rentabilidade import PARAMETROS_DE_RENTABILIDADE
 from crm.relatorios.exportacao_da_carteira import (
     EmpresaDaExportacao, LinhaDeHistorico, ParametrosDaPlanilha, gerar_planilha,
 )
+
+JANELA_PADRAO = (Decimal("0.6000"), Decimal("0.7000"))
+"""Mínima e alvo do primeiro período, antes de alguém definir outras (pedido de 29/09/2026)."""
+
+PORTES_VALIDOS = {p.value for p in regras_de_porte.Porte}
 
 AVISO_DA_PLANILHA = (
     "A nota de rentabilidade vem da planilha de saúde da carteira, sem recálculo: a regra de atrito/disciplina "
@@ -121,6 +127,7 @@ class PorteDoGrupo(VolumetriaEntrada):
     porte: str | None
     porte_definido_por: str | None
     porte_definido_em: datetime | None
+    porte_justificativa: str | None = None
 
 
 class RespostasDeDisciplina(BaseModel):
@@ -152,6 +159,27 @@ class AvaliacaoGravada(BaseModel):
     atribuido_por: str | None
 
 
+class RentabilidadeDoGrupoResposta(BaseModel):
+    """Margem com o honorário praticado e o honorário que daria a margem alvo do período
+    (`crm.domain.avaliacao.rentabilidade_do_grupo`), no nível do grupo."""
+
+    porte: str
+    horas: Decimal
+    custo_de_servir: Decimal
+    honorario_praticado: Decimal
+    margem: Decimal | None
+    honorario_calculado: Decimal
+    defasagem: Decimal | None
+    revisao_de_honorarios: bool
+
+
+class RascunhoResposta(BaseModel):
+    respostas: dict
+    preenchidas: list[str]
+    atualizado_em: datetime
+    atualizado_por: str
+
+
 class ItemDaCarteira(BaseModel):
     grupo_id: int
     grupo_nome: str
@@ -172,6 +200,10 @@ class ItemDaCarteira(BaseModel):
     avaliacao: AvaliacaoGravada | None = None
     """As respostas da avaliação mais recente que as gravou — nem sempre a leitura mostrada,
     porque uma carga ou um recálculo posterior grava leitura nova sem respostas."""
+    rascunho: RascunhoResposta | None = None
+    """O rascunho do período aberto, se houver."""
+    rentabilidade_do_grupo: RentabilidadeDoGrupoResposta | None = None
+    """`None` quando o grupo ainda não tem porte confirmado."""
 
 
 class IscResposta(BaseModel):
@@ -202,6 +234,34 @@ class FaixaDeClasseResposta(BaseModel):
     dentro_da_meta: bool
 
 
+class PendenciaDoPeriodo(BaseModel):
+    grupo_id: int
+    grupo_nome: str
+    preenchidas: int
+
+
+class PeriodoResposta(BaseModel):
+    id: int
+    mes_de_referencia: date
+    aberto_em: datetime
+    aberto_por: str
+    margem_minima: Decimal
+    margem_alvo: Decimal
+    calculado_em: datetime | None
+    calculado_por: str | None
+    grupos: int
+    completos: int
+    abas: int
+    pendentes: list[PendenciaDoPeriodo]
+
+
+class JanelaResposta(BaseModel):
+    margem_minima: Decimal
+    margem_alvo: Decimal
+    origem: str
+    """"período aberto", "último período" ou "padrão" (nenhum período ainda)."""
+
+
 class ClassificacaoDaCarteira(BaseModel):
     referencia: date | None
     versao_dos_parametros: str | None
@@ -211,6 +271,8 @@ class ClassificacaoDaCarteira(BaseModel):
     distribuicao_por_classe: list[FaixaDeClasseResposta]
     itens: list[ItemDaCarteira]
     avisos: list[str]
+    periodo: PeriodoResposta | None = None
+    janela: JanelaResposta | None = None
 
 
 def _notas(c: ClassificacaoDoGrupo, rentabilidade_planilha: Decimal | None = None) -> NotasDoGrupo:
@@ -234,6 +296,7 @@ def _porte(g: GrupoEconomico) -> PorteDoGrupo:
         servicos_contratados_alem_do_primeiro=g.servicos_contratados_alem_do_primeiro,
         tem_consolidacao_de_grupo=g.tem_consolidacao_de_grupo, e_auditada=g.e_auditada,
         porte=g.porte, porte_definido_por=g.porte_definido_por, porte_definido_em=g.porte_definido_em,
+        porte_justificativa=g.porte_justificativa,
     )
 
 
@@ -262,6 +325,64 @@ class EdicaoDeNotas(BaseModel):
     semaforo: int | None = Field(default=None, ge=1, le=3)
     churn: int | None = Field(default=None, ge=1, le=5)
     respostas: RespostasDaAvaliacao | None = None
+
+
+MES = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$", description="AAAA-MM")
+
+
+class JanelaEntrada(BaseModel):
+    margem_minima: Decimal = Field(gt=0, lt=1)
+    margem_alvo: Decimal = Field(gt=0, lt=1)
+
+
+class AbrirPeriodo(BaseModel):
+    autor: str = Field(min_length=2, max_length=120)
+    mes: str = MES
+    margem_minima: Decimal | None = Field(default=None, gt=0, lt=1)
+    margem_alvo: Decimal | None = Field(default=None, gt=0, lt=1)
+    """Sem as duas, repete a janela do período anterior (ou 60% e 70% no primeiro)."""
+
+
+class EdicaoDaJanela(JanelaEntrada):
+    autor: str = Field(min_length=2, max_length=120)
+
+
+class RespostasDePorte(VolumetriaEntrada):
+    porte: str = Field(min_length=1, max_length=20)
+    justificativa: str | None = Field(default=None, max_length=500)
+
+
+class RascunhoEntrada(BaseModel):
+    """Só as abas que vierem mudam; as outras ficam como estavam no rascunho."""
+
+    autor: str = Field(min_length=2, max_length=120)
+    complexidade: list[str] | None = Field(default=None, max_length=20)
+    risco: list[str] | None = Field(default=None, max_length=20)
+    cross_sell: list[str] | None = Field(default=None, max_length=20)
+    disciplina: RespostasDeDisciplina | None = None
+    inadimplencia: RespostasDeInadimplencia | None = None
+    porte: RespostasDePorte | None = None
+
+
+class CalcularCarteira(BaseModel):
+    autor: str = Field(min_length=2, max_length=120)
+
+
+class SimulacaoResposta(BaseModel):
+    pendentes: list[str]
+    """Abas sem rascunho neste período: entram com a nota atual da carteira."""
+    notas_antes: dict[str, Decimal]
+    notas_depois: dict[str, Decimal]
+    score_antes: Decimal
+    score_depois: Decimal
+    classe_antes: str
+    classe_depois: str
+    rentabilidade: RentabilidadeDoGrupoResposta | None
+
+
+class ResultadoDoCalculo(BaseModel):
+    periodo: PeriodoResposta
+    grupos_calculados: int
 
 
 class ResultadoDaEdicao(BaseModel):
@@ -453,8 +574,9 @@ def roteador(
 ) -> APIRouter:
     r = APIRouter(prefix="/api/carteira", tags=["carteira"])
 
-    @r.get("/classificacao", response_model=ClassificacaoDaCarteira)
-    def classificacao(sessao: Session = Depends(obter_sessao)) -> ClassificacaoDaCarteira:
+    def _leituras(sessao: Session) -> tuple[list, list]:
+        """Todas as leituras (da mais recente para a mais antiga) e a mais recente de cada grupo
+        não fundido — a carteira."""
         todas = sessao.execute(
             sa.select(ClassificacaoDoGrupo, GrupoEconomico.nome)
             .join(GrupoEconomico, GrupoEconomico.id == ClassificacaoDoGrupo.grupo_id)
@@ -468,9 +590,85 @@ def roteador(
                 vistos.add(c.grupo_id)
                 linhas.append((c, nome))
         linhas.sort(key=lambda x: x[0].receita_mensal, reverse=True)
+        return todas, linhas
+
+    def _periodo_aberto(sessao: Session) -> PeriodoDeAvaliacao | None:
+        return sessao.scalars(
+            sa.select(PeriodoDeAvaliacao).where(PeriodoDeAvaliacao.calculado_em.is_(None))
+        ).first()
+
+    def _q4(v: Decimal) -> Decimal:
+        # O mesmo texto ("0.7000") no SQLite dos testes e no PostgreSQL.
+        return Decimal(v).quantize(Decimal("0.0001"))
+
+    def _janela(sessao: Session) -> JanelaResposta:
+        aberto = _periodo_aberto(sessao)
+        if aberto is not None:
+            return JanelaResposta(margem_minima=_q4(aberto.margem_minima), margem_alvo=_q4(aberto.margem_alvo), origem="período aberto")
+        ultimo = sessao.scalars(
+            sa.select(PeriodoDeAvaliacao).order_by(PeriodoDeAvaliacao.mes_de_referencia.desc()).limit(1)
+        ).first()
+        if ultimo is not None:
+            return JanelaResposta(margem_minima=_q4(ultimo.margem_minima), margem_alvo=_q4(ultimo.margem_alvo), origem="último período")
+        return JanelaResposta(margem_minima=JANELA_PADRAO[0], margem_alvo=JANELA_PADRAO[1], origem="padrão")
+
+    def _rascunhos(sessao: Session, periodo: PeriodoDeAvaliacao | None) -> dict[int, AvaliacaoEmAndamento]:
+        if periodo is None:
+            return {}
+        return {a.grupo_id: a for a in sessao.scalars(
+            sa.select(AvaliacaoEmAndamento).where(AvaliacaoEmAndamento.periodo_id == periodo.id)
+        )}
+
+    def _rascunho_resposta(a: AvaliacaoEmAndamento) -> RascunhoResposta:
+        return RascunhoResposta(
+            respostas=a.respostas, preenchidas=regra_de_avaliacao.abas_preenchidas(a.respostas),
+            atualizado_em=a.atualizado_em, atualizado_por=a.atualizado_por,
+        )
+
+    def _periodo_resposta(sessao: Session, periodo: PeriodoDeAvaliacao, linhas: list | None = None) -> PeriodoResposta:
+        if linhas is None:
+            _, linhas = _leituras(sessao)
+        rascunhos = _rascunhos(sessao, periodo)
+        total = len(regra_de_avaliacao.ABAS)
+        pendentes = []
+        for c, nome in sorted(linhas, key=lambda x: x[1]):
+            feitas = len(regra_de_avaliacao.abas_preenchidas(rascunhos[c.grupo_id].respostas)) if c.grupo_id in rascunhos else 0
+            if feitas < total:
+                pendentes.append(PendenciaDoPeriodo(grupo_id=c.grupo_id, grupo_nome=nome, preenchidas=feitas))
+        return PeriodoResposta(
+            id=periodo.id, mes_de_referencia=periodo.mes_de_referencia, aberto_em=periodo.aberto_em,
+            aberto_por=periodo.aberto_por, margem_minima=_q4(periodo.margem_minima), margem_alvo=_q4(periodo.margem_alvo),
+            calculado_em=periodo.calculado_em, calculado_por=periodo.calculado_por,
+            grupos=len(linhas), completos=len(linhas) - len(pendentes), abas=total, pendentes=pendentes,
+        )
+
+    def _rentabilidade(
+        honorario: Decimal, porte: str | None, complexidade: Decimal, disciplina: Decimal, risco: Decimal,
+        janela: JanelaResposta, p_rent: regra_de_parametros.ParametrosDeRentabilidade,
+    ) -> RentabilidadeDoGrupoResposta | None:
+        if not porte or porte not in p_rent.horas_base:
+            return None
+        res = regra_de_avaliacao.rentabilidade_do_grupo(
+            honorario=honorario, porte=porte, complexidade=complexidade, disciplina=disciplina, risco=risco,
+            margem_minima=janela.margem_minima, margem_alvo=janela.margem_alvo, p=p_rent,
+        )
+        return RentabilidadeDoGrupoResposta(
+            porte=porte, horas=res.horas, custo_de_servir=res.custo_de_servir, honorario_praticado=honorario,
+            margem=res.margem, honorario_calculado=res.honorario_calculado, defasagem=res.defasagem,
+            revisao_de_honorarios=res.revisao_de_honorarios,
+        )
+
+    @r.get("/classificacao", response_model=ClassificacaoDaCarteira)
+    def classificacao(sessao: Session = Depends(obter_sessao)) -> ClassificacaoDaCarteira:
+        todas, linhas = _leituras(sessao)
+        vistos = {c.grupo_id for c, _ in linhas}
+        periodo = _periodo_aberto(sessao)
+        janela = _janela(sessao)
         if not linhas:
             return ClassificacaoDaCarteira(referencia=None, versao_dos_parametros=None, isc=None, retrato=None,
-                                           por_classe={}, distribuicao_por_classe=[], itens=[], avisos=[])
+                                           por_classe={}, distribuicao_por_classe=[], itens=[], avisos=[],
+                                           periodo=_periodo_resposta(sessao, periodo, linhas) if periodo else None,
+                                           janela=janela)
         ativos = set(sessao.scalars(
             sa.select(Contrato.grupo_id).where(Contrato.situacao.in_([SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO]))
         ))
@@ -502,6 +700,13 @@ def roteador(
                     respostas=RespostasDaAvaliacao.model_validate(c.respostas_da_avaliacao),
                     registrado_em=c.registrado_em, atribuido_por=c.atribuido_por,
                 )
+        rascunhos = _rascunhos(sessao, periodo)
+        _, p_rent = _parametros_vigentes(sessao)
+        rentabilidade_por_grupo = {
+            c.grupo_id: _rentabilidade(c.receita_mensal, grupos_por_id[c.grupo_id].porte, c.complexidade,
+                                       c.disciplina, c.risco_tecnico, janela, p_rent)
+            for c, _ in linhas
+        }
         rentabilidade_planilha_por_grupo = {
             c.grupo_id: c.nota_rentabilidade
             for c, _ in todas
@@ -516,6 +721,8 @@ def roteador(
                 notas=_notas(c, rentabilidade_planilha_por_grupo.get(c.grupo_id)),
                 porte=_porte(grupos_por_id[c.grupo_id]),
                 avaliacao=avaliacao_por_grupo.get(c.grupo_id),
+                rascunho=_rascunho_resposta(rascunhos[c.grupo_id]) if c.grupo_id in rascunhos else None,
+                rentabilidade_do_grupo=rentabilidade_por_grupo[c.grupo_id],
             )
             for c, nome in linhas
         ]
@@ -551,6 +758,7 @@ def roteador(
             isc=IscResposta(**{k: getattr(calculado, k) for k in IscResposta.model_fields}) if calculado else None,
             retrato=RetratoResposta(**{k: getattr(retrato, k) for k in RetratoResposta.model_fields}) if retrato else None,
             por_classe=dict(sorted(por_classe.items())), distribuicao_por_classe=distribuicao, itens=itens, avisos=avisos,
+            periodo=_periodo_resposta(sessao, periodo, linhas) if periodo else None, janela=janela,
         )
 
     def _ultima(sessao: Session, grupo_id: int) -> ClassificacaoDoGrupo | None:
@@ -624,6 +832,41 @@ def roteador(
         sessao.refresh(nova)
         return _parametros_resposta(nova)
 
+    def _notas_novas(anterior: ClassificacaoDoGrupo, mudou: dict) -> regra.Notas:
+        return regra.Notas(
+            receita=anterior.nota_receita, rentabilidade=anterior.nota_rentabilidade,
+            complexidade=mudou.get("complexidade", anterior.complexidade), disciplina=mudou.get("disciplina", anterior.disciplina),
+            risco=mudou.get("risco", anterior.risco_tecnico), cross_sell=mudou.get("cross_sell", anterior.cross_sell),
+            adimplencia=mudou.get("adimplencia", anterior.adimplencia), semaforo=mudou.get("semaforo", anterior.semaforo),
+            churn=mudou.get("churn", anterior.churn),
+        )
+
+    def _nova_leitura(
+        sessao: Session, anterior: ClassificacaoDoGrupo, mudou: dict, parametros: regra.Parametros, *,
+        fonte: str, autor: str, motivo: str, respostas: dict | None,
+    ) -> ClassificacaoDoGrupo:
+        """Leitura nova com as notas de `mudou`; o resto copia da anterior (snapshot imutável)."""
+        novas = _notas_novas(anterior, mudou)
+        hoje = date.today()
+        revisao = 1 + (sessao.scalar(
+            sa.select(sa.func.max(ClassificacaoDoGrupo.revisao)).where(
+                ClassificacaoDoGrupo.grupo_id == anterior.grupo_id, ClassificacaoDoGrupo.referencia == hoje)
+        ) or 0)
+        pontos = regra.score(novas, p=parametros)
+        letra = regra.classe(pontos, p=parametros)
+        return ClassificacaoDoGrupo(
+            grupo_id=anterior.grupo_id, referencia=hoje, revisao=revisao, fonte=fonte,
+            versao_dos_parametros=parametros.versao, atribuido_por=autor.strip(), motivo=motivo.strip(),
+            receita_mensal=anterior.receita_mensal, margem=anterior.margem, horas_por_mes=anterior.horas_por_mes,
+            rentabilidade_da_planilha=anterior.rentabilidade_da_planilha,
+            nota_receita=novas.receita, nota_rentabilidade=novas.rentabilidade, complexidade=novas.complexidade,
+            disciplina=novas.disciplina, risco_tecnico=novas.risco, cross_sell=novas.cross_sell, adimplencia=novas.adimplencia,
+            semaforo=novas.semaforo, churn=novas.churn, score=pontos.quantize(Decimal("0.0001")), classe=letra,
+            classe_efetiva=regra.classe_efetiva(letra, novas, p=parametros), alerta_de_churn=regra.alerta_de_churn(letra, novas, p=parametros),
+            em_cobranca=regra.cobranca(novas, p=parametros), eixo_de_acao=regra.eixo_de_acao(letra, novas, p=parametros),
+            respostas_da_avaliacao=respostas,
+        )
+
     @r.post("/grupos/{grupo_id}/notas", response_model=ResultadoDaEdicao, status_code=201)
     def editar_notas(grupo_id: int, corpo: EdicaoDeNotas, sessao: Session = Depends(obter_sessao)) -> ResultadoDaEdicao:
         """Grava uma **nova leitura** com as notas alteradas; a anterior não é tocada (snapshot imutável).
@@ -642,34 +885,11 @@ def roteador(
         mudou = corpo.model_dump(exclude={"autor", "motivo", "respostas"}, exclude_none=True)
         if not mudou:
             raise HTTPException(422, "informe ao menos uma nota para alterar")
-        novas = regra.Notas(
-            receita=anterior.nota_receita, rentabilidade=anterior.nota_rentabilidade,
-            complexidade=mudou.get("complexidade", anterior.complexidade), disciplina=mudou.get("disciplina", anterior.disciplina),
-            risco=mudou.get("risco", anterior.risco_tecnico), cross_sell=mudou.get("cross_sell", anterior.cross_sell),
-            adimplencia=mudou.get("adimplencia", anterior.adimplencia), semaforo=mudou.get("semaforo", anterior.semaforo),
-            churn=mudou.get("churn", anterior.churn),
-        )
-        hoje = date.today()
-        revisao = 1 + (sessao.scalar(
-            sa.select(sa.func.max(ClassificacaoDoGrupo.revisao)).where(
-                ClassificacaoDoGrupo.grupo_id == grupo_id, ClassificacaoDoGrupo.referencia == hoje)
-        ) or 0)
         parametros, _ = _parametros_vigentes(sessao)
-        pontos = regra.score(novas, p=parametros)
-        letra = regra.classe(pontos, p=parametros)
-        nova = ClassificacaoDoGrupo(
-            grupo_id=grupo_id, referencia=hoje, revisao=revisao, fonte="Edição manual no CRM",
-            versao_dos_parametros=parametros.versao, atribuido_por=corpo.autor.strip(), motivo=corpo.motivo.strip(),
-            receita_mensal=anterior.receita_mensal, margem=anterior.margem, horas_por_mes=anterior.horas_por_mes,
-            rentabilidade_da_planilha=anterior.rentabilidade_da_planilha,
-            nota_receita=novas.receita, nota_rentabilidade=novas.rentabilidade, complexidade=novas.complexidade,
-            disciplina=novas.disciplina, risco_tecnico=novas.risco, cross_sell=novas.cross_sell, adimplencia=novas.adimplencia,
-            semaforo=novas.semaforo, churn=novas.churn, score=pontos.quantize(Decimal("0.0001")), classe=letra,
-            classe_efetiva=regra.classe_efetiva(letra, novas, p=parametros), alerta_de_churn=regra.alerta_de_churn(letra, novas, p=parametros),
-            em_cobranca=regra.cobranca(novas, p=parametros), eixo_de_acao=regra.eixo_de_acao(letra, novas, p=parametros),
-            respostas_da_avaliacao=corpo.respostas.model_dump() if corpo.respostas else None,
-        )
-        sessao.add(nova)
+        sessao.add(_nova_leitura(
+            sessao, anterior, mudou, parametros, fonte="Edição manual no CRM", autor=corpo.autor, motivo=corpo.motivo,
+            respostas=corpo.respostas.model_dump() if corpo.respostas else None,
+        ))
         sessao.commit()
         avisos = []
         if {"complexidade", "disciplina", "risco"} & mudou.keys():
@@ -677,6 +897,154 @@ def roteador(
         atual = classificacao(sessao)
         item = next(i for i in atual.itens if i.grupo_id == grupo_id)
         return ResultadoDaEdicao(item=item, isc=atual.isc, avisos=avisos)
+
+    def _validar_janela(sessao: Session, minima: Decimal, alvo: Decimal) -> None:
+        _, p_rent = _parametros_vigentes(sessao)
+        if minima > alvo:
+            raise HTTPException(422, "a margem mínima não pode passar da margem alvo")
+        if alvo + p_rent.imposto >= 1:
+            raise HTTPException(422, f"margem alvo + imposto ({p_rent.imposto:.0%}) precisa ficar abaixo de 100%")
+
+    def _exigir_periodo_aberto(sessao: Session) -> PeriodoDeAvaliacao:
+        periodo = _periodo_aberto(sessao)
+        if periodo is None:
+            raise HTTPException(409, "nenhum período de avaliação aberto: abra um na Carteira")
+        return periodo
+
+    def _grupo_da_carteira(sessao: Session, grupo_id: int) -> tuple[GrupoEconomico, ClassificacaoDoGrupo]:
+        grupo = sessao.get(GrupoEconomico, grupo_id)
+        if grupo is None:
+            raise HTTPException(404, "grupo não encontrado")
+        if grupo.fundido_em_id is not None:
+            raise HTTPException(409, "grupo fundido em outro: avalie o grupo que ficou")
+        anterior = _ultima(sessao, grupo_id)
+        if anterior is None:
+            raise HTTPException(409, "o grupo ainda não tem classificação carregada")
+        return grupo, anterior
+
+    @r.get("/periodo", response_model=PeriodoResposta | None)
+    def periodo_aberto(sessao: Session = Depends(obter_sessao)) -> PeriodoResposta | None:
+        periodo = _periodo_aberto(sessao)
+        return _periodo_resposta(sessao, periodo) if periodo else None
+
+    @r.post("/periodo", response_model=PeriodoResposta, status_code=201)
+    def abrir_periodo(corpo: AbrirPeriodo, sessao: Session = Depends(obter_sessao)) -> PeriodoResposta:
+        if _periodo_aberto(sessao) is not None:
+            raise HTTPException(409, "já há um período aberto: calcule a carteira dele antes de abrir outro")
+        ano, mes = (int(x) for x in corpo.mes.split("-"))
+        inicio = date(ano, mes, 1)
+        if sessao.scalar(sa.select(PeriodoDeAvaliacao.id).where(PeriodoDeAvaliacao.mes_de_referencia == inicio)):
+            raise HTTPException(409, f"o período {mes:02d}/{ano} já existe")
+        anterior = _janela(sessao)
+        minima = corpo.margem_minima if corpo.margem_minima is not None else anterior.margem_minima
+        alvo = corpo.margem_alvo if corpo.margem_alvo is not None else anterior.margem_alvo
+        _validar_janela(sessao, minima, alvo)
+        periodo = PeriodoDeAvaliacao(
+            mes_de_referencia=inicio, aberto_por=corpo.autor.strip(), margem_minima=minima, margem_alvo=alvo,
+        )
+        sessao.add(periodo)
+        sessao.commit()
+        return _periodo_resposta(sessao, periodo)
+
+    @r.patch("/periodo/janela", response_model=PeriodoResposta)
+    def editar_janela(corpo: EdicaoDaJanela, sessao: Session = Depends(obter_sessao)) -> PeriodoResposta:
+        periodo = _exigir_periodo_aberto(sessao)
+        _validar_janela(sessao, corpo.margem_minima, corpo.margem_alvo)
+        periodo.margem_minima, periodo.margem_alvo = corpo.margem_minima, corpo.margem_alvo
+        sessao.commit()
+        return _periodo_resposta(sessao, periodo)
+
+    @r.put("/periodo/grupos/{grupo_id}/rascunho", response_model=RascunhoResposta)
+    def salvar_rascunho(grupo_id: int, corpo: RascunhoEntrada, sessao: Session = Depends(obter_sessao)) -> RascunhoResposta:
+        """Grava o que vier, aba por aba, sem mexer no Score. Aba ausente continua como estava."""
+        periodo = _exigir_periodo_aberto(sessao)
+        _grupo_da_carteira(sessao, grupo_id)
+        novas = corpo.model_dump(exclude={"autor"}, exclude_none=True)
+        if not novas:
+            raise HTTPException(422, "informe ao menos uma aba")
+        if "porte" in novas:
+            porte = novas["porte"]
+            if porte["porte"] not in PORTES_VALIDOS:
+                raise HTTPException(422, f"porte desconhecido: {porte['porte']}")
+            volumetria = {k: v for k, v in porte.items() if k in VolumetriaEntrada.model_fields}
+            sugestao = regras_de_porte.sugerir_porte(regras_de_porte.Volumetria(**volumetria))
+            difere = sugestao.porte is not None and sugestao.porte.value != porte["porte"]
+            if difere and not (porte.get("justificativa") or "").strip():
+                raise HTTPException(
+                    422, f"justificativa obrigatória: o porte {porte['porte']} difere da sugestão do questionário "
+                         f"({sugestao.porte.value})",
+                )
+            porte["justificativa"] = (porte.get("justificativa") or "").strip() or None
+        rascunho = sessao.scalars(sa.select(AvaliacaoEmAndamento).where(
+            AvaliacaoEmAndamento.periodo_id == periodo.id, AvaliacaoEmAndamento.grupo_id == grupo_id)).first()
+        if rascunho is None:
+            rascunho = AvaliacaoEmAndamento(periodo_id=periodo.id, grupo_id=grupo_id, respostas={},
+                                            atualizado_por=corpo.autor.strip())
+            sessao.add(rascunho)
+        rascunho.respostas = {**(rascunho.respostas or {}), **novas}  # dict novo: o JSON só grava se o objeto muda
+        rascunho.atualizado_por = corpo.autor.strip()
+        rascunho.atualizado_em = agora()
+        sessao.commit()
+        return _rascunho_resposta(rascunho)
+
+    @r.post("/periodo/grupos/{grupo_id}/simulacao", response_model=SimulacaoResposta)
+    def simular(grupo_id: int, sessao: Session = Depends(obter_sessao)) -> SimulacaoResposta:
+        """"Calcular este cliente": o resultado de um grupo com o rascunho atual. **Não grava nada**;
+        a carteira só muda no "Calcular carteira"."""
+        periodo = _exigir_periodo_aberto(sessao)
+        grupo, anterior = _grupo_da_carteira(sessao, grupo_id)
+        rascunho = _rascunhos(sessao, periodo).get(grupo_id)
+        respostas = rascunho.respostas if rascunho else {}
+        parametros, p_rent = _parametros_vigentes(sessao)
+        depois = _notas_novas(anterior, regra_de_avaliacao.notas_das_respostas(respostas))
+        pontos = regra.score(depois, p=parametros)
+        letra = regra.classe(pontos, p=parametros)
+        chaves = ("complexidade", "risco", "disciplina", "cross_sell", "adimplencia")
+        porte = respostas["porte"]["porte"] if "porte" in respostas else grupo.porte
+        return SimulacaoResposta(
+            pendentes=[a for a in regra_de_avaliacao.ABAS if a not in respostas],
+            notas_antes={k: Decimal(getattr(anterior, "risco_tecnico" if k == "risco" else k)) for k in chaves},
+            notas_depois={k: Decimal(getattr(depois, k)) for k in chaves},
+            score_antes=anterior.score, score_depois=pontos.quantize(Decimal("0.0001")),
+            classe_antes=anterior.classe_efetiva, classe_depois=regra.classe_efetiva(letra, depois, p=parametros),
+            rentabilidade=_rentabilidade(anterior.receita_mensal, porte, depois.complexidade, depois.disciplina,
+                                         depois.risco, _janela(sessao), p_rent),
+        )
+
+    @r.post("/periodo/calcular", response_model=ResultadoDoCalculo)
+    def calcular_carteira(corpo: CalcularCarteira, sessao: Session = Depends(obter_sessao)) -> ResultadoDoCalculo:
+        """Aplica os rascunhos de **todos** os grupos de uma vez e fecha o período. Recusa enquanto
+        faltar qualquer aba de qualquer grupo (decisão de 29/09/2026)."""
+        periodo = _exigir_periodo_aberto(sessao)
+        _, linhas = _leituras(sessao)
+        situacao = _periodo_resposta(sessao, periodo, linhas)
+        if situacao.pendentes:
+            nomes = ", ".join(p.grupo_nome for p in situacao.pendentes[:10])
+            mais = f" e mais {len(situacao.pendentes) - 10}" if len(situacao.pendentes) > 10 else ""
+            raise HTTPException(409, f"faltam {len(situacao.pendentes)} de {situacao.grupos} grupos: {nomes}{mais}")
+        rascunhos = _rascunhos(sessao, periodo)
+        parametros, _ = _parametros_vigentes(sessao)
+        rotulo = f"{periodo.mes_de_referencia:%m/%Y}"
+        autor = corpo.autor.strip()
+        for c, _nome in linhas:
+            respostas = rascunhos[c.grupo_id].respostas
+            grupo = sessao.get(GrupoEconomico, c.grupo_id)
+            porte = respostas["porte"]
+            novo_porte = porte["porte"]
+            grupo.porte_justificativa = porte.get("justificativa")
+            for campo in VolumetriaEntrada.model_fields:  # ausente no rascunho = apagado na tela
+                setattr(grupo, campo, porte.get(campo))
+            if grupo.porte != novo_porte:
+                grupo.porte, grupo.porte_definido_por, grupo.porte_definido_em = novo_porte, autor, agora()
+            sessao.add(_nova_leitura(
+                sessao, c, regra_de_avaliacao.notas_das_respostas(respostas), parametros,
+                fonte=f"Cálculo da carteira, período {rotulo}", autor=autor,
+                motivo=f"Avaliação do período {rotulo}, calculada para a carteira inteira",
+                respostas={k: v for k, v in respostas.items() if k != "porte"},
+            ))
+        periodo.calculado_em, periodo.calculado_por = agora(), autor
+        sessao.commit()
+        return ResultadoDoCalculo(periodo=_periodo_resposta(sessao, periodo), grupos_calculados=len(linhas))
 
     @r.post("/porte/sugestao", response_model=SugestaoDePorteResposta)
     def sugestao_de_porte(corpo: VolumetriaEntrada) -> SugestaoDePorteResposta:

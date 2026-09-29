@@ -274,7 +274,7 @@ def test_classificacao_expoe_o_porte_ja_salvo_do_grupo(cliente, sessao: Session)
         "contas_bancarias": None, "conciliacoes_cartao_mes": None, "empregados_clt": None,
         "admissoes_desligamentos_mes": None, "cnpjs_no_escopo": None, "tomadores_de_servico": None,
         "servicos_contratados_alem_do_primeiro": 0, "tem_consolidacao_de_grupo": False, "e_auditada": False,
-        "porte": None, "porte_definido_por": None, "porte_definido_em": None,
+        "porte": None, "porte_definido_por": None, "porte_definido_em": None, "porte_justificativa": None,
     }
 
     cliente.post(f"/api/carteira/grupos/{g.id}/porte", json={

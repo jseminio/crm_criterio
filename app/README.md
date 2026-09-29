@@ -605,9 +605,18 @@ Na tela, **Configurações** faz o mesmo: baixar o backup, conferir o arquivo e 
   túnel (ngrok) ou host que não seja `localhost`, porque o arquivo tem todos os dados
   de cliente e a API não tem login.
 - **Sem criptografia.** Guarde fora do repositório e de pastas compartilhadas.
-- **Limite de conferência:** a importação em PostgreSQL (acerto das sequências) não foi
-  testada num banco descartável — a máquina não permitiu criar um. Teste num destino
-  vazio antes de depender dela.
+- **Grupos juntados (29/09/2026):** a importação quebrava com "Erro 500" quando um grupo
+  fundido tinha número menor que o principal (o caso comum depois de "Juntar grupos"). Agora
+  o apontamento da fusão é gravado depois que todos os grupos existem, com a data de
+  atualização original preservada.
+- **Erro com explicação:** se algum registro do arquivo não puder ser gravado (por exemplo,
+  um valor que esta versão do CRM não conhece), a tela diz qual tabela e por quê, em vez de
+  "Erro 500". Nada fica gravado pela metade.
+- **Banco recém-criado não é vazio:** as migrações gravam os parâmetros iniciais
+  (`versao_de_parametros`, `mix_de_equipe`), então importar num banco novo também pede
+  `--substituir` (na tela, a confirmação de substituir).
+- **Conferido no PostgreSQL** (29/09/2026), em bancos descartáveis: ida e volta com grupo
+  fundido, dados idênticos e a sequência de ids continuando certa depois da importação.
 
 Subir tudo com um comando (a API e a tela, cada uma no seu processo; Ctrl+C
 derruba as duas):

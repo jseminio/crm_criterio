@@ -165,6 +165,43 @@ def verificar(origem: Path | BinaryIO) -> ResumoDeBackup:
 
 # ----------------------------------------------------------------- importar
 
+def _carregar_tabela(conexao: sa.Connection, tabela: sa.Table, conteudo: bytes) -> None:
+    """Grava os registros de uma tabela.
+
+    Coluna que aponta para a própria tabela (grupo fundido → grupo principal) entra vazia e é
+    completada depois: o registro apontado pode vir mais adiante no arquivo."""
+    colunas = {c.name: c for c in tabela.columns}
+    auto = [fk.parent.name for fk in tabela.foreign_keys if fk.column.table is tabela]
+    pk = [c.name for c in tabela.primary_key.columns]
+    # O UPDATE de depois dispararia o `onupdate` (ex. atualizado_em = agora); regrava o original.
+    carimbos = [c.name for c in tabela.columns if c.onupdate is not None]
+    pendentes: list[dict] = []
+    lote: list[dict] = []
+    for bruto in conteudo.splitlines():
+        obj = json.loads(bruto)
+        registro = {k: _do_json(colunas[k], v) for k, v in obj.items() if k in colunas}
+        adiado = {k: registro[k] for k in auto if registro.get(k) is not None}
+        if adiado:
+            pendentes.append({
+                **{f"_pk_{k}": registro[k] for k in pk},
+                **adiado,
+                **{k: registro[k] for k in carimbos if k in registro},
+            })
+            registro.update(dict.fromkeys(adiado))
+        lote.append(registro)
+        if len(lote) >= _LOTE:
+            conexao.execute(sa.insert(tabela), lote)
+            lote = []
+    if lote:
+        conexao.execute(sa.insert(tabela), lote)
+    for p in pendentes:
+        conexao.execute(
+            sa.update(tabela)
+            .where(*(tabela.c[k] == p[f"_pk_{k}"] for k in pk))
+            .values({k: v for k, v in p.items() if not k.startswith("_pk_")})
+        )
+
+
 def importar(engine: sa.Engine, origem: Path | BinaryIO, *, substituir: bool = False) -> ResumoDeBackup:
     """Carrega o backup. Tudo ou nada: qualquer erro desfaz a importação inteira.
 
@@ -205,16 +242,13 @@ def importar(engine: sa.Engine, origem: Path | BinaryIO, *, substituir: bool = F
             nome = tabela.name
             if nome not in manifesto["tabelas"]:
                 continue
-            colunas = {c.name: c for c in tabela.columns}
-            lote: list[dict] = []
-            for bruto in zf.read(f"dados/{nome}.jsonl").splitlines():
-                obj = json.loads(bruto)
-                lote.append({k: _do_json(colunas[k], v) for k, v in obj.items() if k in colunas})
-                if len(lote) >= _LOTE:
-                    conexao.execute(sa.insert(tabela), lote)
-                    lote = []
-            if lote:
-                conexao.execute(sa.insert(tabela), lote)
+            try:
+                _carregar_tabela(conexao, tabela, zf.read(f"dados/{nome}.jsonl"))
+            except (sa.exc.DBAPIError, ValueError) as erro:
+                detalhe = getattr(erro, "orig", None) or erro
+                raise ErroDeBackup(
+                    f"Não foi possível gravar a tabela {nome}: {detalhe}. Nada foi importado."
+                ) from erro
 
         if conexao.dialect.name == "postgresql":
             for t in tabelas:

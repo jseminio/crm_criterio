@@ -132,8 +132,38 @@ def test_falha_no_meio_nao_deixa_importacao_pela_metade(com_dados):
         zo.writestr("manifesto.json", json.dumps(manifesto))
     quebrado.seek(0)
     destino = _motor_vazio()
-    with pytest.raises(sa.exc.IntegrityError):
+    with pytest.raises(ErroDeBackup, match="tabela oportunidade"):
         importar(destino, quebrado)
+    with destino.connect() as c:
+        assert c.execute(sa.select(sa.func.count()).select_from(GrupoEconomico)).scalar() == 0
+
+
+def _com_tabela_trocada(engine, tabela: str, trocar) -> io.BytesIO:
+    """Reescreve uma tabela do backup e acerta a impressão digital, como se o arquivo viesse assim."""
+    import hashlib, json
+
+    saida = io.BytesIO()
+    with zipfile.ZipFile(_zip(engine)) as zi, zipfile.ZipFile(saida, "w") as zo:
+        manifesto = json.loads(zi.read("manifesto.json"))
+        for item in zi.namelist():
+            if item == "manifesto.json":
+                continue
+            dados = zi.read(item)
+            if item == f"dados/{tabela}.jsonl":
+                dados = b"".join((json.dumps(trocar(json.loads(l))) + "\n").encode() for l in dados.splitlines())
+                manifesto["tabelas"][tabela]["sha256"] = hashlib.sha256(dados).hexdigest()
+            zo.writestr(item, dados)
+        zo.writestr("manifesto.json", json.dumps(manifesto))
+    saida.seek(0)
+    return saida
+
+
+def test_valor_que_este_crm_nao_conhece_explica_em_vez_de_quebrar(com_dados):
+    """Backup de uma versão mais nova do CRM pode trazer uma situação que esta não tem."""
+    arquivo = _com_tabela_trocada(com_dados, "oportunidade", lambda o: {**o, "situacao": "Situação do futuro"})
+    destino = _motor_vazio()
+    with pytest.raises(ErroDeBackup, match="tabela oportunidade.*Situação do futuro"):
+        importar(destino, arquivo)
     with destino.connect() as c:
         assert c.execute(sa.select(sa.func.count()).select_from(GrupoEconomico)).scalar() == 0
 
@@ -203,3 +233,31 @@ def test_endereco_da_empresa_faz_ida_e_volta(com_dados, sessao):
     with Session(destino) as s:
         e = s.scalars(sa.select(Empresa)).one()
         assert (e.logradouro, e.numero, e.complemento, e.bairro, e.cep) == ("Rua Ação", "10", "sala 2", "Centro", "20040020")
+
+
+def test_grupo_fundido_num_principal_criado_depois_faz_ida_e_volta(engine, sessao: Session):
+    """A fusão aponta o grupo absorvido para o principal. Se o absorvido tem id menor, ele vem
+    antes no arquivo — e gravar na ordem do arquivo esbarra na chave estrangeira."""
+    absorvido = GrupoEconomico(nome="Antigo")
+    sessao.add(absorvido)
+    sessao.flush()
+    principal = GrupoEconomico(nome="Principal")
+    sessao.add(principal)
+    sessao.flush()
+    absorvido.fundido_em_id = principal.id
+    sessao.commit()
+
+    destino = _motor_vazio()
+    importar(destino, _zip(engine))
+    assert _tudo(destino) == _tudo(engine)
+
+
+
+def test_rota_importar_com_dado_invalido_explica_em_vez_de_erro_500(cliente, com_dados):
+    arquivo = _com_tabela_trocada(com_dados, "oportunidade", lambda o: {**o, "situacao": "Situação do futuro"})
+    r = cliente.post(
+        "/api/backup/importar?substituir=true", content=arquivo.getvalue(), headers={"X-Confirmacao": "SUBSTITUIR"}
+    )
+    assert r.status_code == 409
+    assert "tabela oportunidade" in r.json()["detail"]
+    assert cliente.get("/api/backup/exportar").status_code == 200  # os dados de antes continuam lá

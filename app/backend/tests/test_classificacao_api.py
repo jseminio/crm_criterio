@@ -155,6 +155,45 @@ def test_editar_notas_grava_leitura_nova_e_preserva_a_anterior(cliente, sessao: 
     assert cliente.get("/api/carteira/classificacao").json()["itens"][0]["notas"]["churn"] == 5
 
 
+RESPOSTAS = {
+    "complexidade": ["holding", "auditoria"], "risco": ["certificado_vencendo"], "cross_sell": [],
+    "disciplina": {"meses_no_prazo": 2, "cobranca_dobrada": True, "atraso_recorrente": False},
+    "inadimplencia": {"meses_em_dia": 3, "em_negociacao": False, "ja_suspenso": False},
+}
+
+
+def test_respostas_da_avaliacao_ficam_gravadas_e_voltam_na_carteira(cliente, sessao: Session):
+    g = _grupo_classificado(sessao)
+    assert cliente.get("/api/carteira/classificacao").json()["itens"][0]["avaliacao"] is None
+    r = cliente.post(f"/api/carteira/grupos/{g.id}/notas", json={**AUTOR, "complexidade": 2, "respostas": RESPOSTAS})
+    assert r.status_code == 201, r.text
+    avaliacao = cliente.get("/api/carteira/classificacao").json()["itens"][0]["avaliacao"]
+    assert avaliacao["respostas"] == RESPOSTAS
+    assert avaliacao["atribuido_por"] == "Eduardo Luiz" and avaliacao["registrado_em"]
+
+
+def test_leitura_nova_sem_respostas_nao_apaga_as_ultimas_gravadas(cliente, sessao: Session):
+    g = _grupo_classificado(sessao)
+    cliente.post(f"/api/carteira/grupos/{g.id}/notas", json={**AUTOR, "complexidade": 2, "respostas": RESPOSTAS})
+    cliente.post(f"/api/carteira/grupos/{g.id}/notas", json={**AUTOR, "churn": 2})  # ex.: ajuste sem o painel
+    item = cliente.get("/api/carteira/classificacao").json()["itens"][0]
+    assert item["notas"]["churn"] == 2
+    assert item["avaliacao"]["respostas"] == RESPOSTAS
+
+
+def test_so_respostas_sem_nota_nao_conta_como_alteracao(cliente, sessao: Session):
+    g = _grupo_classificado(sessao)
+    r = cliente.post(f"/api/carteira/grupos/{g.id}/notas", json={**AUTOR, "respostas": RESPOSTAS})
+    assert r.status_code == 422
+
+
+def test_respostas_fora_da_faixa_sao_recusadas(cliente, sessao: Session):
+    g = _grupo_classificado(sessao)
+    ruim = {**RESPOSTAS, "disciplina": {**RESPOSTAS["disciplina"], "meses_no_prazo": 4}}
+    r = cliente.post(f"/api/carteira/grupos/{g.id}/notas", json={**AUTOR, "complexidade": 2, "respostas": ruim})
+    assert r.status_code == 422
+
+
 def test_editar_recalcula_o_isc(cliente, sessao: Session):
     g = _grupo_classificado(sessao)
     antes = Decimal(cliente.get("/api/carteira/classificacao").json()["isc"]["valor"])

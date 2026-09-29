@@ -10,7 +10,8 @@
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { NotasDoGrupo, PorteDoGrupo, SugestaoDePorte, VolumetriaEntrada } from "../api/tipos";
+import type { AvaliacaoGravada, NotasDoGrupo, PorteDoGrupo, SugestaoDePorte, VolumetriaEntrada } from "../api/tipos";
+import { dataHora } from "../formato";
 import { DIRECIONADORES_DE_PORTE } from "./direcionadoresDePorte";
 import { PainelLateral } from "./PainelLateral";
 
@@ -122,26 +123,30 @@ const ABAS = [
 type Aba = (typeof ABAS)[number]["chave"];
 
 export function AvaliacaoDeNotas({
-  grupoId, grupoNome, notasAtuais, porteAtual, portes, aoFechar, aoSalvar,
+  grupoId, grupoNome, notasAtuais, porteAtual, avaliacaoGravada = null, portes, aoFechar, aoSalvar,
 }: {
   grupoId: number;
   grupoNome: string;
   notasAtuais: NotasDoGrupo;
   porteAtual: PorteDoGrupo;
+  avaliacaoGravada?: AvaliacaoGravada | null;
   portes: string[];
   aoFechar: () => void;
   aoSalvar: () => void;
 }) {
   const [aba, definirAba] = useState<Aba>("complexidade");
-  const [complexidadeMarcada, definirComplexidadeMarcada] = useState<Set<string>>(new Set());
-  const [riscoMarcado, definirRiscoMarcado] = useState<Set<string>>(new Set());
-  const [crossSellMarcado, definirCrossSellMarcado] = useState<Set<string>>(new Set());
-  const [mesesNoPrazo, definirMesesNoPrazo] = useState(3);
-  const [cobrancaDobrada, definirCobrancaDobrada] = useState(false);
-  const [atrasoRecorrente, definirAtrasoRecorrente] = useState(false);
-  const [mesesEmDia, definirMesesEmDia] = useState(3);
-  const [emNegociacao, definirEmNegociacao] = useState(false);
-  const [jaSuspenso, definirJaSuspenso] = useState(false);
+  // Reabre com o que foi marcado na última avaliação gravada; sem isto o painel voltava em
+  // branco e gravar de novo trocava as notas boas pelas do painel vazio.
+  const gravadas = avaliacaoGravada?.respostas;
+  const [complexidadeMarcada, definirComplexidadeMarcada] = useState<Set<string>>(() => new Set(gravadas?.complexidade));
+  const [riscoMarcado, definirRiscoMarcado] = useState<Set<string>>(() => new Set(gravadas?.risco));
+  const [crossSellMarcado, definirCrossSellMarcado] = useState<Set<string>>(() => new Set(gravadas?.cross_sell));
+  const [mesesNoPrazo, definirMesesNoPrazo] = useState(gravadas?.disciplina.meses_no_prazo ?? 3);
+  const [cobrancaDobrada, definirCobrancaDobrada] = useState(gravadas?.disciplina.cobranca_dobrada ?? false);
+  const [atrasoRecorrente, definirAtrasoRecorrente] = useState(gravadas?.disciplina.atraso_recorrente ?? false);
+  const [mesesEmDia, definirMesesEmDia] = useState(gravadas?.inadimplencia.meses_em_dia ?? 3);
+  const [emNegociacao, definirEmNegociacao] = useState(gravadas?.inadimplencia.em_negociacao ?? false);
+  const [jaSuspenso, definirJaSuspenso] = useState(gravadas?.inadimplencia.ja_suspenso ?? false);
   const [volumetria, definirVolumetria] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       DIRECIONADORES_DE_PORTE.map((d) => {
@@ -222,6 +227,11 @@ export function AvaliacaoDeNotas({
         autor: autor.trim(), motivo: motivo(),
         complexidade: notaComplexidade, disciplina: notaDisciplina, risco: notaRisco,
         cross_sell: notaCrossSell, adimplencia: notaInadimplencia,
+        respostas: {
+          complexidade: [...complexidadeMarcada], risco: [...riscoMarcado], cross_sell: [...crossSellMarcado],
+          disciplina: { meses_no_prazo: mesesNoPrazo, cobranca_dobrada: cobrancaDobrada, atraso_recorrente: atrasoRecorrente },
+          inadimplencia: { meses_em_dia: mesesEmDia, em_negociacao: emNegociacao, ja_suspenso: jaSuspenso },
+        },
       });
       await api.editarPorte(grupoId, {
         autor: autor.trim(), ...volumetriaEntrada(),
@@ -269,6 +279,18 @@ export function AvaliacaoDeNotas({
         <div className="estado estado-erro" role="alert">
           <p className="estado-texto">{erro}</p>
         </div>
+      )}
+
+      {avaliacaoGravada ? (
+        <p className="campo-ajuda">
+          Respostas da última avaliação, gravada em {dataHora(avaliacaoGravada.registrado_em)}
+          {avaliacaoGravada.atribuido_por ? ` por ${avaliacaoGravada.atribuido_por}` : ""}. Altere só o que mudou.
+        </p>
+      ) : (
+        <p className="recado">
+          Este grupo ainda não tem respostas gravadas: as notas atuais vieram da planilha ou de uma
+          avaliação feita antes de 29/09/2026. Marque os itens de todas as abas antes de salvar.
+        </p>
       )}
 
       <div className="abas abas-avaliacao" role="tablist" aria-label="Componentes do Score e porte">

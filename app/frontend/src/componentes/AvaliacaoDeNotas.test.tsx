@@ -154,6 +154,11 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
       motivo: "Complexidade 2 (1/6: holding). Risco técnico 4 (1/5: auto de infração). Disciplina 5 (3/3 meses no prazo). "
         + "Cross-sell 1 (0/5). Inadimplência 5 (3/3 meses em dia)",
       complexidade: 2, disciplina: 5, risco: 4, cross_sell: 1, adimplencia: 5,
+      respostas: {
+        complexidade: ["holding"], risco: ["auto_de_infracao"], cross_sell: [],
+        disciplina: { meses_no_prazo: 3, cobranca_dobrada: false, atraso_recorrente: false },
+        inadimplencia: { meses_em_dia: 3, em_negociacao: false, ja_suspenso: false },
+      },
     });
     expect(api.editarPorte).toHaveBeenCalledWith(1, {
       autor: "Eduardo Luiz", porte: undefined,
@@ -204,6 +209,43 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
     await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Eduardo Luiz");
     await userEvent.click(screen.getByRole("button", { name: "Salvar avaliação" }));
     expect(await screen.findByText("Falha ao salvar a avaliação.")).toBeInTheDocument();
+  });
+
+  it("reabre com as respostas da última avaliação gravada, e não em branco", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({
+      itens: [item({
+        avaliacao: {
+          registrado_em: "2026-09-29T14:30:00",
+          atribuido_por: "Eduardo Luiz",
+          respostas: {
+            complexidade: ["holding", "auditoria"], risco: ["certificado_vencendo"], cross_sell: ["mais_de_uma_linha"],
+            disciplina: { meses_no_prazo: 2, cobranca_dobrada: true, atraso_recorrente: false },
+            inadimplencia: { meses_em_dia: 1, em_negociacao: true, ja_suspenso: false },
+          },
+        },
+      })],
+    }));
+    render(<Carteira listas={LISTAS} />);
+    await screen.findByText(/▸ Alfa/);
+    await userEvent.click(screen.getByRole("button", { name: "Avaliar" }));
+
+    expect(screen.getByText(/Respostas da última avaliação, gravada em 29\/09\/2026 às 14:30 por Eduardo Luiz/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Holding com consolidação/)).toBeChecked();
+    expect(screen.getByLabelText(/Auditoria externa/)).toBeChecked();
+    expect(screen.getByText(nota("Nota calculada: 3 (2 de 6 marcados)"))).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Risco técnico" }));
+    expect(screen.getByLabelText(/Certificado digital vencendo/)).toBeChecked();
+    await userEvent.click(screen.getByRole("tab", { name: "Disciplina" }));
+    expect(screen.getByLabelText(/quantos o cliente entregou tudo no prazo/)).toHaveValue("2");
+    expect(screen.getByLabelText(/mais de uma cobrança/)).toBeChecked();
+    await userEvent.click(screen.getByRole("tab", { name: "Inadimplência" }));
+    expect(screen.getByLabelText(/quantos o cliente pagou em dia/)).toHaveValue("1");
+    expect(screen.getByLabelText(/negociação ou cobrança agora/)).toBeChecked();
+  });
+
+  it("sem respostas gravadas, avisa que é preciso marcar tudo antes de salvar", async () => {
+    await abrir();
+    expect(screen.getByText(/ainda não tem respostas gravadas/)).toBeInTheDocument();
   });
 
   it("cancelar fecha o painel sem chamar a API", async () => {

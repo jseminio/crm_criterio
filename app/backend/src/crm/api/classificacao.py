@@ -123,6 +123,35 @@ class PorteDoGrupo(VolumetriaEntrada):
     porte_definido_em: datetime | None
 
 
+class RespostasDeDisciplina(BaseModel):
+    meses_no_prazo: int = Field(ge=0, le=3)
+    cobranca_dobrada: bool
+    atraso_recorrente: bool
+
+
+class RespostasDeInadimplencia(BaseModel):
+    meses_em_dia: int = Field(ge=0, le=3)
+    em_negociacao: bool
+    ja_suspenso: bool
+
+
+class RespostasDaAvaliacao(BaseModel):
+    """O que foi marcado no painel Avaliar. Os ids dos itens são os da tela; o que ela não
+    reconhecer mais (item renomeado ou retirado) simplesmente não volta marcado."""
+
+    complexidade: list[str] = Field(default_factory=list, max_length=20)
+    risco: list[str] = Field(default_factory=list, max_length=20)
+    cross_sell: list[str] = Field(default_factory=list, max_length=20)
+    disciplina: RespostasDeDisciplina
+    inadimplencia: RespostasDeInadimplencia
+
+
+class AvaliacaoGravada(BaseModel):
+    respostas: RespostasDaAvaliacao
+    registrado_em: datetime
+    atribuido_por: str | None
+
+
 class ItemDaCarteira(BaseModel):
     grupo_id: int
     grupo_nome: str
@@ -140,6 +169,9 @@ class ItemDaCarteira(BaseModel):
     empresas: list[EmpresaDoGrupo] = []
     notas: NotasDoGrupo
     porte: PorteDoGrupo
+    avaliacao: AvaliacaoGravada | None = None
+    """As respostas da avaliação mais recente que as gravou — nem sempre a leitura mostrada,
+    porque uma carga ou um recálculo posterior grava leitura nova sem respostas."""
 
 
 class IscResposta(BaseModel):
@@ -229,6 +261,7 @@ class EdicaoDeNotas(BaseModel):
     adimplencia: Decimal | None = Field(default=None, ge=1, le=5)
     semaforo: int | None = Field(default=None, ge=1, le=3)
     churn: int | None = Field(default=None, ge=1, le=5)
+    respostas: RespostasDaAvaliacao | None = None
 
 
 class ResultadoDaEdicao(BaseModel):
@@ -462,6 +495,13 @@ def roteador(
         # A rentabilidade "da planilha/deck" é sempre a revisão 1 da mesma referência — mesmo quando
         # a revisão mostrada (a mais recente) já foi recalculada pelo defeito 7.2.
         referencia_por_grupo = {c.grupo_id: c.referencia for c, _ in linhas}
+        avaliacao_por_grupo: dict[int, AvaliacaoGravada] = {}
+        for c, _ in todas:  # `todas` vem da mais recente para a mais antiga
+            if c.respostas_da_avaliacao and c.grupo_id not in avaliacao_por_grupo:
+                avaliacao_por_grupo[c.grupo_id] = AvaliacaoGravada(
+                    respostas=RespostasDaAvaliacao.model_validate(c.respostas_da_avaliacao),
+                    registrado_em=c.registrado_em, atribuido_por=c.atribuido_por,
+                )
         rentabilidade_planilha_por_grupo = {
             c.grupo_id: c.nota_rentabilidade
             for c, _ in todas
@@ -475,6 +515,7 @@ def roteador(
                 empresas=empresas.get(c.grupo_id, []),
                 notas=_notas(c, rentabilidade_planilha_por_grupo.get(c.grupo_id)),
                 porte=_porte(grupos_por_id[c.grupo_id]),
+                avaliacao=avaliacao_por_grupo.get(c.grupo_id),
             )
             for c, nome in linhas
         ]
@@ -598,7 +639,7 @@ def roteador(
         anterior = _ultima(sessao, grupo_id)
         if anterior is None:
             raise HTTPException(409, "o grupo ainda não tem classificação carregada")
-        mudou = corpo.model_dump(exclude={"autor", "motivo"}, exclude_none=True)
+        mudou = corpo.model_dump(exclude={"autor", "motivo", "respostas"}, exclude_none=True)
         if not mudou:
             raise HTTPException(422, "informe ao menos uma nota para alterar")
         novas = regra.Notas(
@@ -626,6 +667,7 @@ def roteador(
             semaforo=novas.semaforo, churn=novas.churn, score=pontos.quantize(Decimal("0.0001")), classe=letra,
             classe_efetiva=regra.classe_efetiva(letra, novas, p=parametros), alerta_de_churn=regra.alerta_de_churn(letra, novas, p=parametros),
             em_cobranca=regra.cobranca(novas, p=parametros), eixo_de_acao=regra.eixo_de_acao(letra, novas, p=parametros),
+            respostas_da_avaliacao=corpo.respostas.model_dump() if corpo.respostas else None,
         )
         sessao.add(nova)
         sessao.commit()

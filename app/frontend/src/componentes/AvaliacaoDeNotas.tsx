@@ -51,12 +51,11 @@ function notaDeComplexidade(sims: number): number {
   return 5;
 }
 
+/** Mais fator de risco = nota mais alta, como na Complexidade: o Score inverte (6 − nota) e o atrito
+ * cresce com a nota. Até 29/09/2026 a contagem saía invertida (0 fatores = 5) e a inversão do Score
+ * vinha por cima — cliente sem risco nenhum era tratado como risco máximo. */
 function notaDeRisco(sims: number): number {
-  if (sims === 0) return 5;
-  if (sims === 1) return 4;
-  if (sims === 2) return 3;
-  if (sims === 3) return 2;
-  return 1;
+  return Math.min(5, 1 + sims);
 }
 
 function notaDeCrossSell(sims: number): number {

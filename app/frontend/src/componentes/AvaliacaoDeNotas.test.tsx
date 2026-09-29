@@ -93,11 +93,11 @@ async function abrir() {
 describe("Avaliação de complexidade, risco e disciplina por checklist", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("abre com nota 1 em complexidade e 5 em risco, sem nenhum fator marcado", async () => {
+  it("abre com nota 1 em complexidade e em risco, sem nenhum fator marcado", async () => {
     await abrir();
     expect(screen.getByText(nota("Nota calculada: 1 (0 de 6 marcados)"))).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: /^Risco técnico/ }));
-    expect(screen.getByText(nota("Nota calculada: 5 (0 de 5 marcados)"))).toBeInTheDocument();
+    expect(screen.getByText(nota("Nota calculada: 1 (0 de 5 marcados)"))).toBeInTheDocument();
   });
 
   it("pré-preenche o porte com o que já foi salvo do grupo, em vez de abrir em branco", async () => {
@@ -133,11 +133,11 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
     expect(screen.getByText(nota("Nota calculada: 3 (3 de 6 marcados)"))).toBeInTheDocument();
   });
 
-  it("marcar fatores de risco desce a nota (0→5, 1→4 … 4-5→1)", async () => {
+  it("marcar fatores de risco sobe a nota, como na complexidade (0→1, 1→2 … 4-5→5)", async () => {
     await abrir();
     await userEvent.click(screen.getByRole("tab", { name: /^Risco técnico/ }));
     await userEvent.click(screen.getByLabelText(/Auto de infração/));
-    expect(screen.getByText(nota("Nota calculada: 4 (1 de 5 marcados)"))).toBeInTheDocument();
+    expect(screen.getByText(nota("Nota calculada: 2 (1 de 5 marcados)"))).toBeInTheDocument();
   });
 
   it("disciplina: 3 meses no prazo e sem furo extra é nota 5; cada furo desce um ponto", async () => {

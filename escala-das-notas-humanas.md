@@ -68,16 +68,18 @@ mais os dois campos de risco de `anexo-tecnico.md` (linha 206-213):
 
 | Total de "sim" | Nota |
 |---|---|
-| 0 | 5 |
-| 1 | 4 |
+| 0 | 1 |
+| 1 | 2 |
 | 2 | 3 |
-| 3 | 2 |
-| 4–5 | 1 |
+| 3 | 4 |
+| 4–5 | 5 |
 
-(Note que aqui a contagem **já sai na escala certa** — mais risco encontrado
-= nota mais baixa — sem precisar da inversão `6 − nota` que o Score aplica de
-novo. Isso é proposital: a inversão do Score existe para o cálculo, não para
-quem preenche o checklist. Confirmar se isso gera confusão na tela.)
+**Corrigido em 29/09/2026, com autorização de Eduardo.** A versão anterior
+desta tabela saía invertida (0 fatores = nota 5), e o Score aplicava a inversão
+`6 − nota` por cima, assim como a tabela de atrito da rentabilidade trata 5
+como o risco mais alto. Resultado: cliente sem risco nenhum era tratado como
+risco máximo — Score mais baixo e 50% a mais de horas. Agora a nota anda como
+a de Complexidade: mais risco encontrado = nota mais alta.
 
 **Cadência: revisão trimestral pela área técnica.** Nenhum destes fatores
 muda mês a mês; revisar toda semana só cansa sem ganhar precisão.

@@ -50,7 +50,9 @@ def nota_de_complexidade(sims: int) -> int:
 
 
 def nota_de_risco(sims: int) -> int:
-    return max(1, 5 - sims)
+    """Mais fator = nota mais alta, como na Complexidade: o Score inverte (6 − nota) e o atrito cresce
+    com a nota. Até 29/09/2026 saía invertida (0 fatores = 5), e a inversão do Score vinha por cima."""
+    return min(5, 1 + sims)
 
 
 def nota_de_cross_sell(sims: int) -> int:

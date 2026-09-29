@@ -267,6 +267,45 @@ versionada como pesos e cortes do Score (`Parametros.meta_distribuicao_de_classe
 `crm.domain.classificacao.distribuicao_por_classe()` (pura, testada) e exposta em
 `GET /api/carteira/classificacao` no campo `distribuicao_por_classe`.
 
+## Carteira: período de avaliação, rascunho e cálculo da carteira (29/09/2026)
+
+Pedido de Eduardo: as informações da avaliação vêm de vários setores, então gravar tem que ser
+possível aos poucos, e a carteira só muda quando todos os grupos estiverem avaliados.
+
+- **Período de avaliação** (`periodo_de_avaliacao`): aberto na Carteira ("Abrir período", mês +
+  quem abre). Um aberto por vez. Cada período tem a sua **janela de rentabilidade** (margem mínima
+  e alvo); o primeiro começa em 60% e 70%, os seguintes repetem a do anterior. Editável em
+  **Parâmetros de cálculo → Janela de rentabilidade desejada** enquanto o período está aberto.
+- **Rascunho por grupo** (`avaliacao_em_andamento`): no painel Avaliar, **"Salvar rascunho"** grava
+  só as abas revistas (a que se abriu, se mexeu ou está na tela ao salvar — "nada se aplica" também
+  conta) e **não mexe no Score**. O painel reabre com o rascunho; sem rascunho, com a última
+  avaliação gravada, para só revisar. Cada aba mostra "✓ preenchida", "✎ não salva" ou "· pendente".
+- **Botão Avaliar com status** quando há período aberto: verde "✓ completo" (6 abas), amarelo
+  "n de 6", vermelho "vazio" — sempre com o texto, não só a cor (PAD-002).
+- **"Calcular este cliente"**: salva o que está na tela e mostra o resultado só daquele grupo
+  (Score e classe antes → depois, horas, margem, honorário calculado, defasagem, revisão de
+  honorários). Aba pendente usa a nota atual. **A carteira não muda.**
+- **"Calcular carteira"**: só libera com **todos** os grupos completos; antes disso a faixa diz
+  quantos faltam e quais. Pede confirmação, grava uma leitura nova por grupo (fonte "Cálculo da
+  carteira, período MM/AAAA", com as respostas), aplica o porte do rascunho no grupo e fecha o
+  período. O "Registrar revisão" continua sendo a foto do mês.
+- **Porte com justificativa**: a sugestão vem do questionário de porte (os nove direcionadores).
+  Porte confirmado diferente da sugestão só grava com justificativa (`GrupoEconomico.porte_justificativa`).
+- **Receita praticada × calculada** (colunas novas): honorário calculado = custo ÷ (1 − imposto −
+  alvo), com custo = horas-base do porte do grupo × (1 + atrito das notas de complexidade,
+  disciplina invertida e risco) × custo/hora do porte (`crm.domain.avaliacao`). **Nível do grupo**,
+  por decisão de Eduardo: difere da planilha de rentabilidade, que soma horas empresa por empresa.
+  Defasagem = (praticada − calculada) ÷ calculada; acima está tudo bem. Sem porte confirmado, "sem porte".
+- **Filtro "Revisão de honorários"** no campo Eixo de ação: grupos com margem, pelo honorário
+  praticado, abaixo da mínima da janela. É filtro a mais; o grupo continua no seu eixo.
+- A aba "Inadimplência" passou a se chamar **"Adimplência"** (nota alta = paga em dia).
+- As regras de nota das respostas agora existem também no backend (`crm.domain.avaliacao`), iguais
+  às da tela: a tela mostra ao vivo, o backend é quem vale no cálculo. Mudou uma, muda a outra.
+- Migração `8f8c7f3862e8` (só acrescenta duas tabelas e uma coluna). **Rode `alembic upgrade head`.**
+
+**Limite conferido:** a nota de Rentabilidade do Score (25%) continua a da planilha; a margem
+calculada aqui serve ao honorário, à defasagem e ao filtro, e não altera o Score.
+
 ## Carteira: avaliação dos sete componentes do Score, em abas (27/09/2026, ampliado 28/09/2026)
 
 Régua em `escala-das-notas-humanas.md`, agora com tela. Cada grupo ganha o botão **"Avaliar"**, que

@@ -1,8 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
-import type { ClassificacaoDaCarteira, ItemDaCarteira, Listas, NotasDoGrupo, PorteDoGrupo } from "../api/tipos";
+import type { ClassificacaoDaCarteira, ItemDaCarteira, Listas, NotasDoGrupo, PeriodoDeAvaliacao, PorteDoGrupo } from "../api/tipos";
 import { Carteira } from "../telas/Carteira";
 
 vi.mock("../api/cliente", async () => {
@@ -19,6 +19,11 @@ vi.mock("../api/cliente", async () => {
       editarNotasDaCarteira: vi.fn(),
       sugestaoDePorte: vi.fn(),
       editarPorte: vi.fn(),
+      salvarRascunho: vi.fn(),
+      simularCliente: vi.fn(),
+      abrirPeriodo: vi.fn(),
+      calcularCarteira: vi.fn(),
+      editarJanela: vi.fn(),
     },
   };
 });
@@ -65,6 +70,19 @@ function nota(texto: string) {
     elemento?.tagName === "P" && (elemento.textContent ?? "").replace(/\s+/g, " ").trim() === texto;
 }
 
+const PERIODO: PeriodoDeAvaliacao = {
+  id: 1, mes_de_referencia: "2026-10-01", aberto_em: "2026-10-01T09:00:00", aberto_por: "Eduardo Luiz",
+  margem_minima: "0.6000", margem_alvo: "0.7000", calculado_em: null, calculado_por: null,
+  grupos: 1, completos: 0, abas: 6, pendentes: [{ grupo_id: 1, grupo_nome: "Alfa", preenchidas: 0 }],
+};
+
+async function abrirComPeriodo() {
+  vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({ periodo: PERIODO }));
+  render(<Carteira listas={LISTAS} />);
+  await screen.findByText(/▸ Alfa/);
+  await userEvent.click(screen.getByRole("button", { name: "Avaliar · vazio" }));
+}
+
 async function abrir() {
   vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
   render(<Carteira listas={LISTAS} />);
@@ -78,7 +96,7 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
   it("abre com nota 1 em complexidade e 5 em risco, sem nenhum fator marcado", async () => {
     await abrir();
     expect(screen.getByText(nota("Nota calculada: 1 (0 de 6 marcados)"))).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: "Risco técnico" }));
+    await userEvent.click(screen.getByRole("tab", { name: /^Risco técnico/ }));
     expect(screen.getByText(nota("Nota calculada: 5 (0 de 5 marcados)"))).toBeInTheDocument();
   });
 
@@ -95,7 +113,7 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
     render(<Carteira listas={LISTAS} />);
     await screen.findByText(/▸ Alfa/);
     await userEvent.click(screen.getByRole("button", { name: "Avaliar" }));
-    await userEvent.click(screen.getByRole("tab", { name: "Porte" }));
+    await userEvent.click(screen.getByRole("tab", { name: /^Porte/ }));
 
     expect(screen.getByLabelText("CNPJs no escopo")).toHaveValue(4);
     expect(screen.getByLabelText("Empregados CLT")).toHaveValue(30);
@@ -117,14 +135,14 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
 
   it("marcar fatores de risco desce a nota (0→5, 1→4 … 4-5→1)", async () => {
     await abrir();
-    await userEvent.click(screen.getByRole("tab", { name: "Risco técnico" }));
+    await userEvent.click(screen.getByRole("tab", { name: /^Risco técnico/ }));
     await userEvent.click(screen.getByLabelText(/Auto de infração/));
     expect(screen.getByText(nota("Nota calculada: 4 (1 de 5 marcados)"))).toBeInTheDocument();
   });
 
   it("disciplina: 3 meses no prazo e sem furo extra é nota 5; cada furo desce um ponto", async () => {
     await abrir();
-    await userEvent.click(screen.getByRole("tab", { name: "Disciplina" }));
+    await userEvent.click(screen.getByRole("tab", { name: /^Disciplina/ }));
     expect(screen.getByText(nota("Nota calculada: 5"))).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText(/quantos o cliente entregou tudo no prazo/), "1");
     expect(screen.getByText(nota("Nota calculada: 3"))).toBeInTheDocument(); // 2 furos de mês
@@ -132,41 +150,88 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
     expect(screen.getByText(nota("Nota calculada: 2"))).toBeInTheDocument();
   });
 
-  it("não deixa salvar sem o nome de quem avaliou", async () => {
+  it("sem período aberto, não deixa salvar nem calcular e diz o motivo", async () => {
     await abrir();
-    expect(screen.getByRole("button", { name: "Salvar avaliação" })).toBeDisabled();
-    await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Eduardo Luiz");
-    expect(screen.getByRole("button", { name: "Salvar avaliação" })).toBeEnabled();
+    expect(screen.getByText(/Nenhum período de avaliação aberto/)).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Karine");
+    expect(screen.getByRole("button", { name: "Salvar rascunho" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Calcular este cliente" })).toBeDisabled();
   });
 
-  it("salva as três notas calculadas e o porte, com motivo descrevendo o que foi marcado", async () => {
-    vi.mocked(api.editarNotasDaCarteira).mockResolvedValue({ item: item(), isc: null, avisos: [] });
-    vi.mocked(api.editarPorte).mockResolvedValue(PORTE_VAZIO);
-    await abrir();
-    await userEvent.click(screen.getByLabelText(/Holding com consolidação/));
-    await userEvent.click(screen.getByRole("tab", { name: "Risco técnico" }));
-    await userEvent.click(screen.getByLabelText(/Auto de infração/));
-    await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Eduardo Luiz");
-    await userEvent.click(screen.getByRole("button", { name: "Salvar avaliação" }));
+  it("com período, só libera salvar com o nome de quem avalia", async () => {
+    await abrirComPeriodo();
+    expect(screen.getByRole("button", { name: "Salvar rascunho" })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Karine");
+    expect(screen.getByRole("button", { name: "Salvar rascunho" })).toBeEnabled();
+  });
 
-    expect(api.editarNotasDaCarteira).toHaveBeenCalledWith(1, {
-      autor: "Eduardo Luiz",
-      motivo: "Complexidade 2 (1/6: holding). Risco técnico 4 (1/5: auto de infração). Disciplina 5 (3/3 meses no prazo). "
-        + "Cross-sell 1 (0/5). Inadimplência 5 (3/3 meses em dia)",
-      complexidade: 2, disciplina: 5, risco: 4, cross_sell: 1, adimplencia: 5,
-      respostas: {
-        complexidade: ["holding"], risco: ["auto_de_infracao"], cross_sell: [],
-        disciplina: { meses_no_prazo: 3, cobranca_dobrada: false, atraso_recorrente: false },
-        inadimplencia: { meses_em_dia: 3, em_negociacao: false, ja_suspenso: false },
+  it("salvar rascunho grava só as abas revistas, sem fechar o painel", async () => {
+    vi.mocked(api.salvarRascunho).mockResolvedValue({
+      respostas: {}, preenchidas: ["complexidade", "risco"], atualizado_em: "2026-10-02T10:00:00", atualizado_por: "Karine",
+    });
+    await abrirComPeriodo();
+    await userEvent.click(screen.getByLabelText(/Holding com consolidação/));
+    await userEvent.click(screen.getByRole("tab", { name: /^Risco técnico/ }));
+    await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Karine");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+
+    expect(api.salvarRascunho).toHaveBeenCalledWith(1, { autor: "Karine", complexidade: ["holding"], risco: [] });
+    expect(api.editarNotasDaCarteira).not.toHaveBeenCalled();
+    expect(await screen.findByRole("tab", { name: /^Complexidade✓ preenchida/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Disciplina· pendente/ })).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Componentes do Score e porte" })).toBeInTheDocument();
+    expect(api.classificacaoDaCarteira).toHaveBeenCalledTimes(2); // a lista recarrega para atualizar o botão Avaliar
+  });
+
+  it("calcular este cliente salva o que está na tela e mostra o resultado sem mudar a carteira", async () => {
+    vi.mocked(api.salvarRascunho).mockResolvedValue({
+      respostas: {}, preenchidas: ["complexidade"], atualizado_em: "2026-10-02T10:00:00", atualizado_por: "Karine",
+    });
+    vi.mocked(api.simularCliente).mockResolvedValue({
+      pendentes: ["risco", "disciplina", "cross_sell", "inadimplencia", "porte"],
+      notas_antes: {}, notas_depois: {}, score_antes: "3.4100", score_depois: "3.5200",
+      classe_antes: "B2", classe_depois: "B2",
+      rentabilidade: {
+        porte: "Médio", horas: "16.80", custo_de_servir: "669.90", honorario_praticado: "1900.00", margem: "0.5374",
+        honorario_calculado: "3525.79", defasagem: "-0.4611", revisao_de_honorarios: true,
       },
     });
-    expect(api.editarPorte).toHaveBeenCalledWith(1, {
-      autor: "Eduardo Luiz", porte: undefined,
-      servicos_contratados_alem_do_primeiro: 0, tem_consolidacao_de_grupo: false, e_auditada: false,
+    await abrirComPeriodo();
+    await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Karine");
+    await userEvent.click(screen.getByRole("button", { name: "Calcular este cliente" }));
+
+    expect(api.salvarRascunho).toHaveBeenCalledWith(1, { autor: "Karine", complexidade: [] });
+    const resultado = await screen.findByRole("region", { name: "Resultado deste cliente" });
+    expect(resultado).toHaveTextContent("A carteira não muda");
+    expect(resultado).toHaveTextContent("3,41 → 3,52");
+    expect(resultado).toHaveTextContent("53,7%");
+    expect(resultado).toHaveTextContent("−46,1% abaixo");
+    expect(resultado).toHaveTextContent("Sim, abaixo da mínima");
+  });
+
+  it("aba Porte sem porte confirmado não é salva", async () => {
+    await abrirComPeriodo();
+    await userEvent.click(screen.getByRole("tab", { name: /^Porte/ }));
+    await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Karine");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    expect(await screen.findByText("Escolha o porte confirmado antes de salvar a aba Porte.")).toBeInTheDocument();
+    expect(api.salvarRascunho).not.toHaveBeenCalled();
+  });
+
+  it("porte com justificativa vai no rascunho", async () => {
+    vi.mocked(api.salvarRascunho).mockResolvedValue({
+      respostas: {}, preenchidas: ["complexidade", "porte"], atualizado_em: "2026-10-02T10:00:00", atualizado_por: "Karine",
     });
-    // fecha o painel e recarrega a lista depois de salvar
-    await waitFor(() => expect(screen.queryByRole("tablist", { name: "Componentes do Score e porte" })).toBeNull());
-    expect(api.classificacaoDaCarteira).toHaveBeenCalledTimes(2);
+    await abrirComPeriodo();
+    await userEvent.click(screen.getByRole("tab", { name: /^Porte/ }));
+    await userEvent.selectOptions(screen.getByLabelText("Porte confirmado"), "Médio");
+    await userEvent.type(screen.getByLabelText(/^Justificativa/), "Folha em três estados.");
+    await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Karine");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    expect(api.salvarRascunho).toHaveBeenCalledWith(1, expect.objectContaining({
+      complexidade: [],
+      porte: expect.objectContaining({ porte: "Médio", justificativa: "Folha em três estados." }),
+    }));
   });
 
   it("porte: calcula a sugestão sob demanda e oferece usá-la", async () => {
@@ -174,7 +239,7 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
       calculavel: true, pontuacao: "0.00", porte: "Micro", horas_base: 5, direcionadores_aplicados: 1,
     });
     await abrir();
-    await userEvent.click(screen.getByRole("tab", { name: "Porte" }));
+    await userEvent.click(screen.getByRole("tab", { name: /^Porte/ }));
     await userEvent.type(screen.getByLabelText("CNPJs no escopo"), "1");
     await userEvent.click(screen.getByRole("button", { name: "Ver sugestão" }));
 
@@ -182,8 +247,8 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
       cnpjs_no_escopo: 1, servicos_contratados_alem_do_primeiro: 0,
       tem_consolidacao_de_grupo: false, e_auditada: false,
     });
-    expect(await screen.findByText(/Sugestão da régua:/)).toHaveTextContent(
-      "Sugestão da régua: Micro — pontuação 0,00, 5h base/mês, 1 de 9 direcionadores preenchidos.",
+    expect(await screen.findByText(/Sugestão pelo questionário de porte:/)).toHaveTextContent(
+      "Sugestão pelo questionário de porte: Micro — pontuação 0,00, 5h base/mês, 1 de 9 direcionadores preenchidos.",
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Usar sugestão (Micro)" }));
@@ -197,22 +262,23 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
       calculavel: false, pontuacao: null, porte: null, horas_base: null, direcionadores_aplicados: 0,
     });
     await abrir();
-    await userEvent.click(screen.getByRole("tab", { name: "Porte" }));
+    await userEvent.click(screen.getByRole("tab", { name: /^Porte/ }));
     await userEvent.click(screen.getByRole("button", { name: "Ver sugestão" }));
     expect(await screen.findByText("Sugestão da régua: não calculável — nenhum direcionador preenchido ainda.")).toBeInTheDocument();
     expect(screen.queryByText(/Usar sugestão/)).toBeNull();
   });
 
   it("mostra o erro da API sem travar a tela", async () => {
-    vi.mocked(api.editarNotasDaCarteira).mockRejectedValue(new Error("falhou"));
-    await abrir();
-    await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Eduardo Luiz");
-    await userEvent.click(screen.getByRole("button", { name: "Salvar avaliação" }));
-    expect(await screen.findByText("Falha ao salvar a avaliação.")).toBeInTheDocument();
+    vi.mocked(api.salvarRascunho).mockRejectedValue(new Error("falhou"));
+    await abrirComPeriodo();
+    await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Karine");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    expect(await screen.findByText("Falha ao salvar o rascunho.")).toBeInTheDocument();
   });
 
   it("reabre com as respostas da última avaliação gravada, e não em branco", async () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({
+      periodo: PERIODO,
       itens: [item({
         avaliacao: {
           registrado_em: "2026-09-29T14:30:00",
@@ -227,31 +293,58 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
     }));
     render(<Carteira listas={LISTAS} />);
     await screen.findByText(/▸ Alfa/);
-    await userEvent.click(screen.getByRole("button", { name: "Avaliar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Avaliar · vazio" }));
 
-    expect(screen.getByText(/Respostas da última avaliação, gravada em 29\/09\/2026 às 14:30 por Eduardo Luiz/)).toBeInTheDocument();
+    expect(screen.getByText(/Os itens já marcados vêm da última avaliação \(29\/09\/2026 às 14:30, por Eduardo Luiz\)/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Holding com consolidação/)).toBeChecked();
     expect(screen.getByLabelText(/Auditoria externa/)).toBeChecked();
     expect(screen.getByText(nota("Nota calculada: 3 (2 de 6 marcados)"))).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: "Risco técnico" }));
+    await userEvent.click(screen.getByRole("tab", { name: /^Risco técnico/ }));
     expect(screen.getByLabelText(/Certificado digital vencendo/)).toBeChecked();
-    await userEvent.click(screen.getByRole("tab", { name: "Disciplina" }));
+    await userEvent.click(screen.getByRole("tab", { name: /^Disciplina/ }));
     expect(screen.getByLabelText(/quantos o cliente entregou tudo no prazo/)).toHaveValue("2");
     expect(screen.getByLabelText(/mais de uma cobrança/)).toBeChecked();
-    await userEvent.click(screen.getByRole("tab", { name: "Inadimplência" }));
+    await userEvent.click(screen.getByRole("tab", { name: /^Adimplência/ }));
     expect(screen.getByLabelText(/quantos o cliente pagou em dia/)).toHaveValue("1");
     expect(screen.getByLabelText(/negociação ou cobrança agora/)).toBeChecked();
   });
 
-  it("sem respostas gravadas, avisa que é preciso marcar tudo antes de salvar", async () => {
+  it("sem período e sem respostas, o aviso é o do período", async () => {
     await abrir();
-    expect(screen.getByText(/ainda não tem respostas gravadas/)).toBeInTheDocument();
+    expect(screen.getByText(/Nenhum período de avaliação aberto/)).toBeInTheDocument();
   });
 
-  it("cancelar fecha o painel sem chamar a API", async () => {
+  it("o rascunho do período tem prioridade sobre a última avaliação", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({
+      periodo: PERIODO,
+      itens: [item({
+        avaliacao: {
+          registrado_em: "2026-09-29T14:30:00", atribuido_por: "Eduardo Luiz",
+          respostas: {
+            complexidade: ["holding"], risco: [], cross_sell: [],
+            disciplina: { meses_no_prazo: 3, cobranca_dobrada: false, atraso_recorrente: false },
+            inadimplencia: { meses_em_dia: 3, em_negociacao: false, ja_suspenso: false },
+          },
+        },
+        rascunho: {
+          respostas: { complexidade: ["auditoria", "regimes"] }, preenchidas: ["complexidade"],
+          atualizado_em: "2026-10-02T09:00:00", atualizado_por: "Karine",
+        },
+      })],
+    }));
+    render(<Carteira listas={LISTAS} />);
+    await screen.findByText(/▸ Alfa/);
+    await userEvent.click(screen.getByRole("button", { name: "Avaliar · 1 de 6" }));
+    expect(screen.getByText(/Rascunho salvo em 02\/10\/2026 às 09:00 por Karine/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Auditoria externa/)).toBeChecked();
+    expect(screen.getByLabelText(/Holding com consolidação/)).not.toBeChecked();
+    expect(screen.getByRole("tab", { name: /^Complexidade✓ preenchida/ })).toBeInTheDocument();
+  });
+
+  it("fechar o painel não chama a API", async () => {
     await abrir();
-    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Fechar painel" }));
     expect(screen.queryByRole("tablist", { name: "Componentes do Score e porte" })).toBeNull();
-    expect(api.editarNotasDaCarteira).not.toHaveBeenCalled();
+    expect(api.salvarRascunho).not.toHaveBeenCalled();
   });
 });

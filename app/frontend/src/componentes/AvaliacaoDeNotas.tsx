@@ -10,8 +10,11 @@
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { AvaliacaoGravada, NotasDoGrupo, PorteDoGrupo, SugestaoDePorte, VolumetriaEntrada } from "../api/tipos";
-import { dataHora } from "../formato";
+import type {
+  AbaDaAvaliacao, AvaliacaoGravada, NotasDoGrupo, PeriodoDeAvaliacao, PorteDoGrupo, RascunhoDaAvaliacao,
+  RespostasDoRascunho, SimulacaoDoCliente, SugestaoDePorte, VolumetriaEntrada,
+} from "../api/tipos";
+import { dataHora, defasagem, dinheiro, fracaoEmPercentual } from "../formato";
 import { DIRECIONADORES_DE_PORTE } from "./direcionadoresDePorte";
 import { PainelLateral } from "./PainelLateral";
 
@@ -117,55 +120,114 @@ const ABAS = [
   { chave: "risco", rotulo: "Risco técnico" },
   { chave: "disciplina", rotulo: "Disciplina" },
   { chave: "cross_sell", rotulo: "Cross-sell" },
-  { chave: "inadimplencia", rotulo: "Inadimplência" },
+  { chave: "inadimplencia", rotulo: "Adimplência" },
   { chave: "porte", rotulo: "Porte" },
 ] as const;
 type Aba = (typeof ABAS)[number]["chave"];
+const DE_PREENCHER: readonly AbaDaAvaliacao[] = ["complexidade", "risco", "disciplina", "cross_sell", "inadimplencia", "porte"];
+const preenchivel = (a: Aba): a is AbaDaAvaliacao => (DE_PREENCHER as readonly string[]).includes(a);
+const MES = (iso: string) => `${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+
+function ResultadoDoCliente({ r }: { r: SimulacaoDoCliente }) {
+  const rent = r.rentabilidade;
+  const rotulos: Record<string, string> = { disciplina: "Disciplina", cross_sell: "Cross-sell", inadimplencia: "Adimplência", porte: "Porte", complexidade: "Complexidade", risco: "Risco técnico" };
+  return (
+    <section className="resultado-do-cliente" aria-label="Resultado deste cliente">
+      <strong>Resultado só deste grupo{r.pendentes.length ? `, com ${r.pendentes.length} aba${r.pendentes.length > 1 ? "s" : ""} pendente${r.pendentes.length > 1 ? "s" : ""}` : ""}</strong>
+      <p className="campo-ajuda">
+        {r.pendentes.length > 0 && <>Pendentes ({r.pendentes.map((a) => rotulos[a]).join(", ")}): usada a nota atual da carteira. </>}
+        <strong>A carteira não muda</strong>; ela só é atualizada no "Calcular carteira".
+      </p>
+      <table>
+        <tbody>
+          <tr><td>Score</td><td>{Number(r.score_antes).toFixed(2).replace(".", ",")} → {Number(r.score_depois).toFixed(2).replace(".", ",")}</td></tr>
+          <tr><td>Classe</td><td>{r.classe_antes} → {r.classe_depois}</td></tr>
+          {rent ? (
+            <>
+              <tr><td>Horas/mês ({rent.porte})</td><td>{Number(rent.horas).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} h</td></tr>
+              <tr><td>Margem com o honorário praticado</td><td className={rent.revisao_de_honorarios ? "texto-revisao" : undefined}>{fracaoEmPercentual(rent.margem)}</td></tr>
+              <tr><td>Honorário calculado (alvo)</td><td>{dinheiro(rent.honorario_calculado)}</td></tr>
+              <tr><td>Honorário praticado</td><td>{dinheiro(rent.honorario_praticado)}</td></tr>
+              <tr><td>Defasagem</td><td>{defasagem(rent.defasagem)}</td></tr>
+              <tr><td>Revisão de honorários?</td><td className={rent.revisao_de_honorarios ? "texto-revisao" : undefined}>{rent.revisao_de_honorarios ? "Sim, abaixo da mínima" : "Não"}</td></tr>
+            </>
+          ) : (
+            <tr><td colSpan={2}>Sem porte confirmado: não dá para calcular a margem nem o honorário.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </section>
+  );
+}
 
 export function AvaliacaoDeNotas({
-  grupoId, grupoNome, notasAtuais, porteAtual, avaliacaoGravada = null, portes, aoFechar, aoSalvar,
+  grupoId, grupoNome, notasAtuais, porteAtual, avaliacaoGravada = null, rascunho = null, periodo = null,
+  portes, aoFechar, aoMudar,
 }: {
   grupoId: number;
   grupoNome: string;
   notasAtuais: NotasDoGrupo;
   porteAtual: PorteDoGrupo;
   avaliacaoGravada?: AvaliacaoGravada | null;
+  rascunho?: RascunhoDaAvaliacao | null;
+  periodo?: PeriodoDeAvaliacao | null;
   portes: string[];
   aoFechar: () => void;
-  aoSalvar: () => void;
+  /** Depois de salvar: recarrega a lista (status do botão Avaliar) sem fechar o painel. */
+  aoMudar: () => void;
 }) {
   const [aba, definirAba] = useState<Aba>("complexidade");
-  // Reabre com o que foi marcado na última avaliação gravada; sem isto o painel voltava em
-  // branco e gravar de novo trocava as notas boas pelas do painel vazio.
-  const gravadas = avaliacaoGravada?.respostas;
-  const [complexidadeMarcada, definirComplexidadeMarcada] = useState<Set<string>>(() => new Set(gravadas?.complexidade));
-  const [riscoMarcado, definirRiscoMarcado] = useState<Set<string>>(() => new Set(gravadas?.risco));
-  const [crossSellMarcado, definirCrossSellMarcado] = useState<Set<string>>(() => new Set(gravadas?.cross_sell));
-  const [mesesNoPrazo, definirMesesNoPrazo] = useState(gravadas?.disciplina.meses_no_prazo ?? 3);
-  const [cobrancaDobrada, definirCobrancaDobrada] = useState(gravadas?.disciplina.cobranca_dobrada ?? false);
-  const [atrasoRecorrente, definirAtrasoRecorrente] = useState(gravadas?.disciplina.atraso_recorrente ?? false);
-  const [mesesEmDia, definirMesesEmDia] = useState(gravadas?.inadimplencia.meses_em_dia ?? 3);
-  const [emNegociacao, definirEmNegociacao] = useState(gravadas?.inadimplencia.em_negociacao ?? false);
-  const [jaSuspenso, definirJaSuspenso] = useState(gravadas?.inadimplencia.ja_suspenso ?? false);
+  // Abre com o rascunho do período; na falta dele, com a última avaliação gravada (para só revisar).
+  const r = rascunho?.respostas;
+  const g = avaliacaoGravada?.respostas;
+  const porteInicial = r?.porte;
+  const [complexidadeMarcada, definirComplexidadeMarcada] = useState<Set<string>>(() => new Set(r?.complexidade ?? g?.complexidade));
+  const [riscoMarcado, definirRiscoMarcado] = useState<Set<string>>(() => new Set(r?.risco ?? g?.risco));
+  const [crossSellMarcado, definirCrossSellMarcado] = useState<Set<string>>(() => new Set(r?.cross_sell ?? g?.cross_sell));
+  const disc = r?.disciplina ?? g?.disciplina;
+  const adim = r?.inadimplencia ?? g?.inadimplencia;
+  const [mesesNoPrazo, definirMesesNoPrazo] = useState(disc?.meses_no_prazo ?? 3);
+  const [cobrancaDobrada, definirCobrancaDobrada] = useState(disc?.cobranca_dobrada ?? false);
+  const [atrasoRecorrente, definirAtrasoRecorrente] = useState(disc?.atraso_recorrente ?? false);
+  const [mesesEmDia, definirMesesEmDia] = useState(adim?.meses_em_dia ?? 3);
+  const [emNegociacao, definirEmNegociacao] = useState(adim?.em_negociacao ?? false);
+  const [jaSuspenso, definirJaSuspenso] = useState(adim?.ja_suspenso ?? false);
+  const origemDoPorte: Partial<PorteDoGrupo> = porteInicial ?? porteAtual;
   const [volumetria, definirVolumetria] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       DIRECIONADORES_DE_PORTE.map((d) => {
-        const valor = porteAtual[d.id as keyof PorteDoGrupo];
+        const valor = origemDoPorte[d.id as keyof PorteDoGrupo];
         return [d.id, valor === null || valor === undefined ? "" : String(valor)];
       }),
     ),
   );
-  const [servicosAlem, definirServicosAlem] = useState(porteAtual.servicos_contratados_alem_do_primeiro ?? 0);
-  const [consolidacaoDeGrupo, definirConsolidacaoDeGrupo] = useState(porteAtual.tem_consolidacao_de_grupo ?? false);
-  const [auditada, definirAuditada] = useState(porteAtual.e_auditada ?? false);
-  const [porteConfirmado, definirPorteConfirmado] = useState(porteAtual.porte ?? "");
+  const [servicosAlem, definirServicosAlem] = useState(origemDoPorte.servicos_contratados_alem_do_primeiro ?? 0);
+  const [consolidacaoDeGrupo, definirConsolidacaoDeGrupo] = useState(origemDoPorte.tem_consolidacao_de_grupo ?? false);
+  const [auditada, definirAuditada] = useState(origemDoPorte.e_auditada ?? false);
+  const [porteConfirmado, definirPorteConfirmado] = useState(porteInicial?.porte ?? porteAtual.porte ?? "");
+  const [justificativa, definirJustificativa] = useState(porteInicial?.justificativa ?? porteAtual.porte_justificativa ?? "");
   const [sugestao, definirSugestao] = useState<SugestaoDePorte | null>(null);
   const [buscandoSugestao, definirBuscandoSugestao] = useState(false);
   const [autor, definirAutor] = useState("");
-  const [salvando, definirSalvando] = useState(false);
+  const [trabalhando, definirTrabalhando] = useState<"salvando" | "calculando" | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
+  const [salvoEm, definirSalvoEm] = useState<string | null>(null);
+  const [salvas, definirSalvas] = useState<Set<AbaDaAvaliacao>>(() => new Set(rascunho?.preenchidas ?? []));
+  const [tocadas, definirTocadas] = useState<Set<AbaDaAvaliacao>>(new Set());
+  const [resultado, definirResultado] = useState<SimulacaoDoCliente | null>(null);
+
+  // Uma aba vista (saiu dela, mexeu nela ou está aberta ao salvar) conta como revisada, mesmo sem
+  // nada marcado: "nada se aplica" também é resposta.
+  const tocar = (a: Aba) => {
+    if (preenchivel(a)) definirTocadas((antes) => (antes.has(a) ? antes : new Set(antes).add(a)));
+  };
+  const irPara = (nova: Aba) => {
+    tocar(aba);
+    definirAba(nova);
+  };
 
   const alternar = (grupo: "complexidade" | "risco" | "cross_sell") => (id: string) => {
+    tocar(grupo);
     const definir = grupo === "complexidade" ? definirComplexidadeMarcada : grupo === "risco" ? definirRiscoMarcado : definirCrossSellMarcado;
     definir((antes) => {
       const novo = new Set(antes);
@@ -178,23 +240,7 @@ export function AvaliacaoDeNotas({
   const notaRisco = notaDeRisco(riscoMarcado.size);
   const notaDisciplina = notaDeDisciplina(mesesNoPrazo, cobrancaDobrada, atrasoRecorrente);
   const notaCrossSell = notaDeCrossSell(crossSellMarcado.size);
-  const notaInadimplencia = notaDeInadimplencia(mesesEmDia, emNegociacao, jaSuspenso);
-
-  const motivo = () => {
-    const partes = [
-      `Complexidade ${notaComplexidade} (${complexidadeMarcada.size}/${FATORES_COMPLEXIDADE.length}` +
-        (complexidadeMarcada.size ? ": " + FATORES_COMPLEXIDADE.filter((f) => complexidadeMarcada.has(f.id)).map((f) => f.curto).join("; ") : "") + ")",
-      `Risco técnico ${notaRisco} (${riscoMarcado.size}/${FATORES_RISCO.length}` +
-        (riscoMarcado.size ? ": " + FATORES_RISCO.filter((f) => riscoMarcado.has(f.id)).map((f) => f.curto).join("; ") : "") + ")",
-      `Disciplina ${notaDisciplina} (${mesesNoPrazo}/3 meses no prazo` +
-        (cobrancaDobrada ? ", com cobrança dobrada" : "") + (atrasoRecorrente ? ", com atraso recorrente" : "") + ")",
-      `Cross-sell ${notaCrossSell} (${crossSellMarcado.size}/${FATORES_CROSS_SELL.length}` +
-        (crossSellMarcado.size ? ": " + FATORES_CROSS_SELL.filter((f) => crossSellMarcado.has(f.id)).map((f) => f.curto).join("; ") : "") + ")",
-      `Inadimplência ${notaInadimplencia} (${mesesEmDia}/3 meses em dia` +
-        (emNegociacao ? ", em negociação/cobrança" : "") + (jaSuspenso ? ", já teve contrato suspenso" : "") + ")",
-    ];
-    return partes.join(". ").slice(0, 500);
-  };
+  const notaAdimplencia = notaDeInadimplencia(mesesEmDia, emNegociacao, jaSuspenso);
 
   const numeroOuVazio = (v: string): number | undefined => (v.trim() === "" ? undefined : Number(v));
 
@@ -219,36 +265,86 @@ export function AvaliacaoDeNotas({
     }
   };
 
-  const salvar = async () => {
-    definirSalvando(true);
+  const abasParaSalvar = (): Set<AbaDaAvaliacao> => {
+    const todas = new Set(tocadas);
+    if (preenchivel(aba)) todas.add(aba);
+    return todas;
+  };
+
+  const montarRascunho = (abas: Set<AbaDaAvaliacao>): RespostasDoRascunho => ({
+    ...(abas.has("complexidade") && { complexidade: [...complexidadeMarcada] }),
+    ...(abas.has("risco") && { risco: [...riscoMarcado] }),
+    ...(abas.has("cross_sell") && { cross_sell: [...crossSellMarcado] }),
+    ...(abas.has("disciplina") && {
+      disciplina: { meses_no_prazo: mesesNoPrazo, cobranca_dobrada: cobrancaDobrada, atraso_recorrente: atrasoRecorrente },
+    }),
+    ...(abas.has("inadimplencia") && {
+      inadimplencia: { meses_em_dia: mesesEmDia, em_negociacao: emNegociacao, ja_suspenso: jaSuspenso },
+    }),
+    ...(abas.has("porte") && {
+      porte: { ...volumetriaEntrada(), porte: porteConfirmado, justificativa: justificativa.trim() || null },
+    }),
+  });
+
+  /** Grava o que foi revisto; devolve false se não deu. */
+  const gravar = async (): Promise<boolean> => {
+    const abas = abasParaSalvar();
+    if (abas.has("porte") && !porteConfirmado) {
+      definirErro("Escolha o porte confirmado antes de salvar a aba Porte.");
+      return false;
+    }
+    const salvo = await api.salvarRascunho(grupoId, { autor: autor.trim(), ...montarRascunho(abas) });
+    definirSalvas(new Set(salvo.preenchidas));
+    definirTocadas(new Set());
+    definirSalvoEm(salvo.atualizado_em);
+    aoMudar();
+    return true;
+  };
+
+  const salvarRascunho = async () => {
+    definirTrabalhando("salvando");
     definirErro(null);
     try {
-      await api.editarNotasDaCarteira(grupoId, {
-        autor: autor.trim(), motivo: motivo(),
-        complexidade: notaComplexidade, disciplina: notaDisciplina, risco: notaRisco,
-        cross_sell: notaCrossSell, adimplencia: notaInadimplencia,
-        respostas: {
-          complexidade: [...complexidadeMarcada], risco: [...riscoMarcado], cross_sell: [...crossSellMarcado],
-          disciplina: { meses_no_prazo: mesesNoPrazo, cobranca_dobrada: cobrancaDobrada, atraso_recorrente: atrasoRecorrente },
-          inadimplencia: { meses_em_dia: mesesEmDia, em_negociacao: emNegociacao, ja_suspenso: jaSuspenso },
-        },
-      });
-      await api.editarPorte(grupoId, {
-        autor: autor.trim(), ...volumetriaEntrada(),
-        porte: porteConfirmado || undefined,
-      });
-      aoSalvar();
+      await gravar();
     } catch (falha) {
-      definirErro(falha instanceof ErroDaApi ? falha.message : "Falha ao salvar a avaliação.");
+      definirErro(falha instanceof ErroDaApi ? falha.message : "Falha ao salvar o rascunho.");
     } finally {
-      definirSalvando(false);
+      definirTrabalhando(null);
     }
   };
+
+  const calcularCliente = async () => {
+    definirTrabalhando("calculando");
+    definirErro(null);
+    try {
+      // O cálculo usa o rascunho gravado: o que está na tela e ainda não foi salvo vai junto.
+      if (!(await gravar())) return;
+      definirResultado(await api.simularCliente(grupoId));
+    } catch (falha) {
+      definirErro(falha instanceof ErroDaApi ? falha.message : "Falha ao calcular este cliente.");
+    } finally {
+      definirTrabalhando(null);
+    }
+  };
+
+  const status = (a: AbaDaAvaliacao) =>
+    salvas.has(a) && !tocadas.has(a)
+      ? <span className="aba-status aba-status-ok">✓ preenchida</span>
+      : tocadas.has(a)
+        ? <span className="aba-status aba-status-pendente">✎ não salva</span>
+        : <span className="aba-status aba-status-pendente">· pendente</span>;
+
+  const semPeriodo = periodo === null;
+  const podeGravar = !semPeriodo && trabalhando === null && autor.trim().length >= 2;
 
   return (
     <PainelLateral
       titulo={grupoNome}
-      subtitulo="Avalie os sete componentes do Score, um de cada vez, e o porte"
+      subtitulo={
+        periodo
+          ? `${MES(periodo.mes_de_referencia)} · ${salvas.size} de ${DE_PREENCHER.length} abas preenchidas`
+          : "Avalie os sete componentes do Score, um de cada vez, e o porte"
+      }
       aoFechar={aoFechar}
       rodape={
         <>
@@ -261,16 +357,11 @@ export function AvaliacaoDeNotas({
               placeholder="Nome de quem preencheu"
             />
           </label>
-          <button type="button" className="botao botao-secundario" onClick={aoFechar}>
-            Cancelar
+          <button type="button" className="botao botao-secundario" onClick={salvarRascunho} disabled={!podeGravar}>
+            {trabalhando === "salvando" ? "Salvando…" : "Salvar rascunho"}
           </button>
-          <button
-            type="button"
-            className="botao botao-primario"
-            onClick={salvar}
-            disabled={salvando || autor.trim().length < 2}
-          >
-            {salvando ? "Salvando…" : "Salvar avaliação"}
+          <button type="button" className="botao botao-primario" onClick={calcularCliente} disabled={!podeGravar}>
+            {trabalhando === "calculando" ? "Calculando…" : "Calcular este cliente"}
           </button>
         </>
       }
@@ -281,15 +372,23 @@ export function AvaliacaoDeNotas({
         </div>
       )}
 
-      {avaliacaoGravada ? (
+      {semPeriodo ? (
+        <p className="recado">
+          Nenhum período de avaliação aberto. Abra um na Carteira para salvar o rascunho e calcular.
+        </p>
+      ) : salvoEm || rascunho ? (
         <p className="campo-ajuda">
-          Respostas da última avaliação, gravada em {dataHora(avaliacaoGravada.registrado_em)}
-          {avaliacaoGravada.atribuido_por ? ` por ${avaliacaoGravada.atribuido_por}` : ""}. Altere só o que mudou.
+          Rascunho salvo em {dataHora(salvoEm ?? rascunho!.atualizado_em)}
+          {!salvoEm && rascunho ? ` por ${rascunho.atualizado_por}` : ""}. Nada aqui muda a carteira até o "Calcular carteira".
+        </p>
+      ) : avaliacaoGravada ? (
+        <p className="campo-ajuda">
+          Os itens já marcados vêm da última avaliação ({dataHora(avaliacaoGravada.registrado_em)}
+          {avaliacaoGravada.atribuido_por ? `, por ${avaliacaoGravada.atribuido_por}` : ""}). Revise cada aba e salve.
         </p>
       ) : (
         <p className="recado">
-          Este grupo ainda não tem respostas gravadas: as notas atuais vieram da planilha ou de uma
-          avaliação feita antes de 29/09/2026. Marque os itens de todas as abas antes de salvar.
+          Este grupo ainda não tem respostas gravadas. Revise e marque cada aba; salve o rascunho quantas vezes precisar.
         </p>
       )}
 
@@ -301,9 +400,10 @@ export function AvaliacaoDeNotas({
             role="tab"
             className="aba"
             aria-selected={aba === a.chave}
-            onClick={() => definirAba(a.chave)}
+            onClick={() => irPara(a.chave)}
           >
             {a.rotulo}
+            {preenchivel(a.chave) ? status(a.chave) : <span className="aba-status">calculada</span>}
           </button>
         ))}
       </div>
@@ -359,7 +459,7 @@ export function AvaliacaoDeNotas({
             <span className="campo-rotulo">
               Nos últimos 3 meses, quantos o cliente entregou tudo no prazo combinado?
             </span>
-            <select className="selecao" value={mesesNoPrazo} onChange={(e) => definirMesesNoPrazo(Number(e.target.value))}>
+            <select className="selecao" value={mesesNoPrazo} onChange={(e) => { tocar("disciplina"); definirMesesNoPrazo(Number(e.target.value)); }}>
               <option value={3}>3 — todos no prazo</option>
               <option value={2}>2</option>
               <option value={1}>1</option>
@@ -367,11 +467,11 @@ export function AvaliacaoDeNotas({
             </select>
           </label>
           <label className="avaliacao-item">
-            <input type="checkbox" checked={cobrancaDobrada} onChange={(e) => definirCobrancaDobrada(e.target.checked)} />
+            <input type="checkbox" checked={cobrancaDobrada} onChange={(e) => { tocar("disciplina"); definirCobrancaDobrada(e.target.checked); }} />
             Algum documento precisou de mais de uma cobrança para chegar
           </label>
           <label className="avaliacao-item">
-            <input type="checkbox" checked={atrasoRecorrente} onChange={(e) => definirAtrasoRecorrente(e.target.checked)} />
+            <input type="checkbox" checked={atrasoRecorrente} onChange={(e) => { tocar("disciplina"); definirAtrasoRecorrente(e.target.checked); }} />
             O mesmo documento atrasou mais de uma vez
           </label>
           <p className="recado">
@@ -391,16 +491,16 @@ export function AvaliacaoDeNotas({
 
       {aba === "inadimplencia" && (
         <section className="avaliacao-secao">
-          <h3>Inadimplência (15% do Score, trava a classe se ≤ 2)</h3>
+          <h3>Adimplência (15% do Score, trava a classe se ≤ 2)</h3>
           <p className="campo-ajuda" style={{ marginTop: 0 }}>
-            Interina (proposta de 27/09/2026): o CRM ainda não registra atraso de pagamento, então mede
-            por três perguntas, mesma lógica da Disciplina — até existir o registro automático.
+            Nota alta = paga em dia. Interina (proposta de 27/09/2026): o CRM ainda não registra atraso de
+            pagamento, então mede por três perguntas, mesma lógica da Disciplina — até existir o registro automático.
           </p>
           <label className="campo-bloco">
             <span className="campo-rotulo">
               Dos últimos 3 meses, quantos o cliente pagou em dia?
             </span>
-            <select className="selecao" value={mesesEmDia} onChange={(e) => definirMesesEmDia(Number(e.target.value))}>
+            <select className="selecao" value={mesesEmDia} onChange={(e) => { tocar("inadimplencia"); definirMesesEmDia(Number(e.target.value)); }}>
               <option value={3}>3 — todos em dia</option>
               <option value={2}>2</option>
               <option value={1}>1</option>
@@ -408,16 +508,16 @@ export function AvaliacaoDeNotas({
             </select>
           </label>
           <label className="avaliacao-item">
-            <input type="checkbox" checked={emNegociacao} onChange={(e) => definirEmNegociacao(e.target.checked)} />
+            <input type="checkbox" checked={emNegociacao} onChange={(e) => { tocar("inadimplencia"); definirEmNegociacao(e.target.checked); }} />
             Está em negociação ou cobrança agora
           </label>
           <label className="avaliacao-item">
-            <input type="checkbox" checked={jaSuspenso} onChange={(e) => definirJaSuspenso(e.target.checked)} />
+            <input type="checkbox" checked={jaSuspenso} onChange={(e) => { tocar("inadimplencia"); definirJaSuspenso(e.target.checked); }} />
             Já teve contrato suspenso por inadimplência alguma vez
           </label>
           <p className="recado">
-            Nota calculada: <strong>{notaInadimplencia}</strong>
-            {notaInadimplencia <= 2 && " — trava a classe e marca $$$ (cobrança)"}
+            Nota calculada: <strong>{notaAdimplencia}</strong>
+            {notaAdimplencia <= 2 && " — trava a classe e marca $$$ (cobrança)"}
           </p>
         </section>
       )}
@@ -426,8 +526,8 @@ export function AvaliacaoDeNotas({
         <section className="avaliacao-secao">
           <h3>Porte</h3>
           <p className="campo-ajuda" style={{ marginTop: 0 }}>
-            Os nove direcionadores da régua de volume. Em branco, o campo não entra na média — não é
-            "zero". A régua sugere; o porte confirmado abaixo é o que vale.
+            Os nove direcionadores do questionário de porte. Em branco, o campo não entra na média — não é
+            "zero". A régua sugere; o porte confirmado abaixo é o que vale, e diferente da sugestão pede justificativa.
           </p>
           <div className="formulario-duplo">
             {DIRECIONADORES_DE_PORTE.map((d) => (
@@ -439,7 +539,7 @@ export function AvaliacaoDeNotas({
                   min={0}
                   placeholder={d.placeholder}
                   value={volumetria[d.id] ?? ""}
-                  onChange={(e) => definirVolumetria((antes) => ({ ...antes, [d.id]: e.target.value }))}
+                  onChange={(e) => { tocar("porte"); definirVolumetria((antes) => ({ ...antes, [d.id]: e.target.value })); }}
                 />
               </label>
             ))}
@@ -450,17 +550,17 @@ export function AvaliacaoDeNotas({
               <span className="campo-rotulo">Serviços contratados além do primeiro</span>
               <input
                 className="entrada" type="number" min={0} value={servicosAlem}
-                onChange={(e) => definirServicosAlem(Number(e.target.value))}
+                onChange={(e) => { tocar("porte"); definirServicosAlem(Number(e.target.value)); }}
               />
             </label>
             <div className="campo-bloco">
               <span className="campo-rotulo">Ajustes</span>
               <label className="avaliacao-item">
-                <input type="checkbox" checked={consolidacaoDeGrupo} onChange={(e) => definirConsolidacaoDeGrupo(e.target.checked)} />
+                <input type="checkbox" checked={consolidacaoDeGrupo} onChange={(e) => { tocar("porte"); definirConsolidacaoDeGrupo(e.target.checked); }} />
                 Há consolidação de grupo
               </label>
               <label className="avaliacao-item">
-                <input type="checkbox" checked={auditada} onChange={(e) => definirAuditada(e.target.checked)} />
+                <input type="checkbox" checked={auditada} onChange={(e) => { tocar("porte"); definirAuditada(e.target.checked); }} />
                 Empresa auditada
               </label>
             </div>
@@ -474,7 +574,7 @@ export function AvaliacaoDeNotas({
             <p className="recado">
               {sugestao.calculavel ? (
                 <>
-                  Sugestão da régua: <strong>{sugestao.porte}</strong> — pontuação{" "}
+                  Sugestão pelo questionário de porte: <strong>{sugestao.porte}</strong> — pontuação{" "}
                   {sugestao.pontuacao?.replace(".", ",")}, {sugestao.horas_base}h base/mês,{" "}
                   {sugestao.direcionadores_aplicados} de 9 direcionadores preenchidos.
                 </>
@@ -486,7 +586,7 @@ export function AvaliacaoDeNotas({
 
           <label className="campo-bloco">
             <span className="campo-rotulo">Porte confirmado</span>
-            <select className="selecao" value={porteConfirmado} onChange={(e) => definirPorteConfirmado(e.target.value)}>
+            <select className="selecao" value={porteConfirmado} onChange={(e) => { tocar("porte"); definirPorteConfirmado(e.target.value); }}>
               <option value="">— não confirmado —</option>
               {portes.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
@@ -494,13 +594,25 @@ export function AvaliacaoDeNotas({
           {sugestao?.calculavel && porteConfirmado !== sugestao.porte && (
             <button
               type="button" className="botao botao-secundario"
-              onClick={() => definirPorteConfirmado(sugestao.porte ?? "")}
+              onClick={() => { tocar("porte"); definirPorteConfirmado(sugestao.porte ?? ""); }}
             >
               Usar sugestão ({sugestao.porte})
             </button>
           )}
+          <label className="campo-bloco">
+            <span className="campo-rotulo">Justificativa (obrigatória se o porte for diferente da sugestão do questionário)</span>
+            <textarea
+              className="entrada"
+              rows={3}
+              maxLength={500}
+              value={justificativa}
+              onChange={(e) => { tocar("porte"); definirJustificativa(e.target.value); }}
+            />
+          </label>
         </section>
       )}
+
+      {resultado && <ResultadoDoCliente r={resultado} />}
     </PainelLateral>
   );
 }

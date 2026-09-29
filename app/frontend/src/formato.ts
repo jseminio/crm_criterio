@@ -70,3 +70,18 @@ export function cnpj(valor: string | null | undefined): string {
   if (d.length !== 14) return valor;
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
 }
+
+/** Fração da API ("0.7428") vira porcentagem ("74,3%"). */
+export function fracaoEmPercentual(valor: string | null | undefined, casas = 1): string {
+  if (valor === null || valor === undefined || valor === "") return "—";
+  return `${(Number(valor) * 100).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas })}%`;
+}
+
+/** Defasagem da receita praticada contra a calculada: "+29,0% acima" ou "−17,5% abaixo". Com a
+ * palavra junto, e não só a cor, para ninguém depender de distinguir verde de vermelho. */
+export function defasagem(valor: string | null | undefined): string {
+  if (valor === null || valor === undefined || valor === "") return "—";
+  const n = Number(valor) * 100;
+  const texto = Math.abs(n).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return n >= 0 ? `+${texto}% acima` : `−${texto}% abaixo`;
+}

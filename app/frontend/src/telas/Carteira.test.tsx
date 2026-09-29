@@ -2,7 +2,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
-import type { ClassificacaoDaCarteira, ItemDaCarteira, NotasDoGrupo, Parametros, PorteDoGrupo } from "../api/tipos";
+import type {
+  ClassificacaoDaCarteira, ItemDaCarteira, NotasDoGrupo, Parametros, PeriodoDeAvaliacao, PorteDoGrupo, RentabilidadeDoGrupo,
+} from "../api/tipos";
 import { Carteira } from "./Carteira";
 
 vi.mock("../api/cliente", async () => {
@@ -18,6 +20,9 @@ vi.mock("../api/cliente", async () => {
       editarMesDaRevisao: vi.fn(),
       parametrosAtuais: vi.fn(),
       editarParametros: vi.fn(),
+      abrirPeriodo: vi.fn(),
+      calcularCarteira: vi.fn(),
+      editarJanela: vi.fn(),
     },
   };
 });
@@ -325,5 +330,84 @@ describe("Carteira", () => {
     render(<Carteira listas={null} />);
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /tentar de novo/i })).toBeInTheDocument();
+  });
+});
+
+describe("Carteira: período de avaliação e revisão de honorários", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const periodo = (o: Partial<PeriodoDeAvaliacao> = {}): PeriodoDeAvaliacao => ({
+    id: 1, mes_de_referencia: "2026-10-01", aberto_em: "2026-10-01T09:00:00", aberto_por: "Eduardo Luiz",
+    margem_minima: "0.6000", margem_alvo: "0.7000", calculado_em: null, calculado_por: null,
+    grupos: 3, completos: 1, abas: 6,
+    pendentes: [{ grupo_id: 2, grupo_nome: "Beta", preenchidas: 5 }, { grupo_id: 3, grupo_nome: "Gama", preenchidas: 0 }], ...o,
+  });
+  const rent = (o: Partial<RentabilidadeDoGrupo> = {}): RentabilidadeDoGrupo => ({
+    porte: "Médio", horas: "20.8", custo_de_servir: "829.40", honorario_praticado: "5200.00", margem: "0.7428",
+    honorario_calculado: "4029.47", defasagem: "0.2905", revisao_de_honorarios: false, ...o,
+  });
+  const itens = () => [
+    item({ grupo_id: 1, grupo_nome: "Alfa", rentabilidade_do_grupo: rent(),
+      rascunho: { respostas: {}, preenchidas: ["complexidade", "risco", "disciplina", "cross_sell", "inadimplencia", "porte"], atualizado_em: "2026-10-02T10:00:00", atualizado_por: "Karine" } }),
+    item({ grupo_id: 2, grupo_nome: "Beta", rentabilidade_do_grupo: rent({ margem: "0.6596", defasagem: "-0.1753", honorario_calculado: "2303.78" }),
+      rascunho: { respostas: {}, preenchidas: ["complexidade", "risco", "disciplina", "cross_sell", "inadimplencia"], atualizado_em: "2026-10-02T10:00:00", atualizado_por: "Karine" } }),
+    item({ grupo_id: 3, grupo_nome: "Gama", rentabilidade_do_grupo: rent({ margem: "0.4828", defasagem: "-0.5334", honorario_calculado: "16075.00", revisao_de_honorarios: true }) }),
+  ];
+
+  it("mostra quantos faltam, quais são, e só libera o cálculo com todos completos", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({ periodo: periodo(), itens: itens() }));
+    render(<Carteira listas={null} />);
+    expect(await screen.findByText("Faltam 2 de 3 grupos: Beta (5 de 6), Gama (vazio)")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Quem está fazendo"), "Eduardo Luiz");
+    expect(screen.getByRole("button", { name: "Calcular carteira" })).toBeDisabled();
+  });
+
+  it("o botão Avaliar diz o status do grupo, não só pela cor", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({ periodo: periodo(), itens: itens() }));
+    render(<Carteira listas={null} />);
+    expect(await screen.findByRole("button", { name: "Avaliar ✓ completo" })).toHaveClass("avaliar-ok");
+    expect(screen.getByRole("button", { name: "Avaliar · 5 de 6" })).toHaveClass("avaliar-parcial");
+    expect(screen.getByRole("button", { name: "Avaliar · vazio" })).toHaveClass("avaliar-vazio");
+  });
+
+  it("com todos completos, calcula a carteira depois de confirmar", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({
+      periodo: periodo({ completos: 3, pendentes: [] }), itens: itens(),
+    }));
+    vi.mocked(api.calcularCarteira).mockResolvedValue({ periodo: periodo({ calculado_em: "2026-10-05T10:00:00" }), grupos_calculados: 3 });
+    render(<Carteira listas={null} />);
+    expect(await screen.findByText("✓ Todos os 3 grupos completos")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Quem está fazendo"), "Eduardo Luiz");
+    await userEvent.click(screen.getByRole("button", { name: "Calcular carteira" }));
+    expect(api.calcularCarteira).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar: recalcular os 3 grupos" }));
+    expect(api.calcularCarteira).toHaveBeenCalledWith("Eduardo Luiz");
+  });
+
+  it("sem período, oferece abrir um", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({
+      periodo: null, janela: { margem_minima: "0.6000", margem_alvo: "0.7000", origem: "padrão" }, itens: itens(),
+    }));
+    vi.mocked(api.abrirPeriodo).mockResolvedValue(periodo());
+    render(<Carteira listas={null} />);
+    expect(await screen.findByText("Nenhum período aberto")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Quem está fazendo"), "Eduardo Luiz");
+    await userEvent.click(screen.getByRole("button", { name: "Abrir período" }));
+    expect(api.abrirPeriodo).toHaveBeenCalledWith(expect.objectContaining({ autor: "Eduardo Luiz" }));
+    expect(screen.getAllByRole("button", { name: "Avaliar" })).toHaveLength(3); // sem período, sem cor
+  });
+
+  it("mostra receita calculada e defasagem, e o filtro Revisão de honorários deixa só quem está abaixo da mínima", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({ periodo: periodo(), itens: itens() }));
+    render(<Carteira listas={null} />);
+    expect(await screen.findByText("+29,0% acima")).toBeInTheDocument();
+    expect(screen.getByText("−17,5% abaixo")).toBeInTheDocument();
+    expect(screen.getByText(/−53,3% abaixo/)).toHaveTextContent("−53,3% abaixo · revisão");
+    expect(screen.getByText("R$ 16.075,00")).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText("Eixo de ação"), "Revisão de honorários");
+    expect(screen.getByText(/▸ Gama/)).toBeInTheDocument();
+    expect(screen.queryByText(/▸ Alfa/)).toBeNull();
+    expect(screen.queryByText(/▸ Beta/)).toBeNull();
   });
 });

@@ -130,6 +130,9 @@ class GrupoEconomico(CarimboMixin, Base):
     """120, não 10 como em `Oportunidade.porte_definido_por` — lá é iniciais; aqui é o mesmo
     campo de nome completo que `ClassificacaoDoGrupo.atribuido_por` e o painel de avaliação usam."""
     porte_definido_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    porte_justificativa: Mapped[str | None] = mapped_column(sa.String(500))
+    """Por que o porte confirmado difere da sugestão do questionário (29/09/2026: obrigatória
+    nesse caso). Vazia quando o porte seguiu a sugestão."""
 
     fundido_em_id: Mapped[int | None] = mapped_column(
         sa.ForeignKey("grupo_economico.id"), index=True
@@ -1009,6 +1012,42 @@ class AnaliseDaCarteira(Base):
     custo_usd: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 4))
     """Estimado pela tabela de preços do código. Nulo para modelo sem preço conhecido."""
 
+
+
+class PeriodoDeAvaliacao(Base):
+    """Um ciclo de avaliação da carteira (29/09/2026, pedido de Eduardo).
+
+    Aberto por alguém, recebe os rascunhos de cada grupo (`AvaliacaoEmAndamento`) e só muda a
+    carteira no "Calcular carteira", que exige todos os grupos completos. A janela de rentabilidade
+    (mínima e alvo) é do período: pode variar de um para outro. Um aberto por vez."""
+
+    __tablename__ = "periodo_de_avaliacao"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mes_de_referencia: Mapped[date] = mapped_column(sa.Date, nullable=False, unique=True)
+    """O primeiro dia do mês civil do período."""
+    aberto_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+    aberto_por: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    margem_minima: Mapped[Decimal] = mapped_column(sa.Numeric(6, 4), nullable=False)
+    margem_alvo: Mapped[Decimal] = mapped_column(sa.Numeric(6, 4), nullable=False)
+    calculado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    """Preenchido pelo "Calcular carteira": daí em diante o período está fechado."""
+    calculado_por: Mapped[str | None] = mapped_column(sa.String(120))
+
+
+class AvaliacaoEmAndamento(Base):
+    """O rascunho da avaliação de um grupo num período. Cada setor grava o que tem; nada aqui
+    mexe no Score até o "Calcular carteira". Aba presente em `respostas` = revista."""
+
+    __tablename__ = "avaliacao_em_andamento"
+    __table_args__ = (sa.UniqueConstraint("periodo_id", "grupo_id", name="uq_avaliacao_periodo_grupo"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    periodo_id: Mapped[int] = mapped_column(sa.ForeignKey("periodo_de_avaliacao.id"), nullable=False, index=True)
+    grupo_id: Mapped[int] = mapped_column(sa.ForeignKey("grupo_economico.id"), nullable=False, index=True)
+    respostas: Mapped[dict] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+    atualizado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+    atualizado_por: Mapped[str] = mapped_column(sa.String(120), nullable=False)
 
 
 class RevisaoDaCarteira(Base):

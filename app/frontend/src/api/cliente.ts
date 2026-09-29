@@ -18,6 +18,10 @@ import type {
   EdicaoDeNotas,
   EdicaoDeParametros,
   EdicaoDePorte,
+  PeriodoDeAvaliacao,
+  RascunhoDaAvaliacao,
+  RespostasDoRascunho,
+  SimulacaoDoCliente,
   Parametros,
   PorteDoGrupo,
   ResultadoDaEdicao,
@@ -182,6 +186,18 @@ export const api = {
     pedir<SugestaoDePorte>("/api/carteira/porte/sugestao", { method: "POST", body: JSON.stringify(corpo) }),
   editarPorte: (grupoId: number, corpo: EdicaoDePorte) =>
     pedir<PorteDoGrupo>(`/api/carteira/grupos/${grupoId}/porte`, { method: "POST", body: JSON.stringify(corpo) }),
+  abrirPeriodo: (corpo: { autor: string; mes: string; margem_minima?: number; margem_alvo?: number }) =>
+    pedir<PeriodoDeAvaliacao>("/api/carteira/periodo", { method: "POST", body: JSON.stringify(corpo) }),
+  editarJanela: (corpo: { autor: string; margem_minima: number; margem_alvo: number }) =>
+    pedir<PeriodoDeAvaliacao>("/api/carteira/periodo/janela", { method: "PATCH", body: JSON.stringify(corpo) }),
+  salvarRascunho: (grupoId: number, corpo: RespostasDoRascunho & { autor: string }) =>
+    pedir<RascunhoDaAvaliacao>(`/api/carteira/periodo/grupos/${grupoId}/rascunho`, { method: "PUT", body: JSON.stringify(corpo) }),
+  simularCliente: (grupoId: number) =>
+    pedir<SimulacaoDoCliente>(`/api/carteira/periodo/grupos/${grupoId}/simulacao`, { method: "POST" }),
+  calcularCarteira: (autor: string) =>
+    pedir<{ periodo: PeriodoDeAvaliacao; grupos_calculados: number }>("/api/carteira/periodo/calcular", {
+      method: "POST", body: JSON.stringify({ autor }),
+    }),
   parametrosAtuais: () => pedir<Parametros>("/api/carteira/parametros"),
   editarParametros: (corpo: EdicaoDeParametros) =>
     pedir<Parametros>("/api/carteira/parametros", { method: "POST", body: JSON.stringify(corpo) }),

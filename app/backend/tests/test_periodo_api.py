@@ -147,7 +147,7 @@ class TestCalcularEsteCliente:
     def test_mostra_o_resultado_sem_gravar_e_usa_a_nota_atual_nas_abas_pendentes(self, cliente, sessao):
         g = _grupo(sessao, "Alfa", receita="3200", porte="Médio")
         _abrir(cliente)
-        _rascunho(cliente, g.id, complexidade=[], risco=[])  # complexidade 1, risco 5
+        _rascunho(cliente, g.id, complexidade=[], risco=[])  # complexidade 1, risco 1
         r = cliente.post(f"/api/carteira/periodo/grupos/{g.id}/simulacao")
         assert r.status_code == 200, r.text
         s = r.json()
@@ -188,7 +188,7 @@ class TestCalcularCarteira:
         assert cliente.get("/api/carteira/periodo").json() is None
         itens = {i["grupo_nome"]: i for i in cliente.get("/api/carteira/classificacao").json()["itens"]}
         alfa = itens["Alfa"]
-        assert alfa["notas"]["complexidade"] == "2.00" and alfa["notas"]["risco"] == "5.00" and alfa["notas"]["cross_sell"] == "2.00"
+        assert alfa["notas"]["complexidade"] == "2.00" and alfa["notas"]["risco"] == "1.00" and alfa["notas"]["cross_sell"] == "2.00"
         assert alfa["porte"]["porte"] == _porte_sugerido() and alfa["porte"]["porte_definido_por"] == AUTOR
         assert alfa["avaliacao"]["respostas"]["complexidade"] == ["holding"]
         assert alfa["rascunho"] is None

@@ -299,6 +299,11 @@ possível aos poucos, e a carteira só muda quando todos os grupos estiverem ava
 - **Filtro "Revisão de honorários"** no campo Eixo de ação: grupos com margem, pelo honorário
   praticado, abaixo da mínima da janela. É filtro a mais; o grupo continua no seu eixo.
 - A aba "Inadimplência" passou a se chamar **"Adimplência"** (nota alta = paga em dia).
+- **Risco técnico corrigido (29/09/2026, autorizado por Eduardo):** a nota das respostas saía
+  invertida (0 fatores = 5) e o Score invertia de novo, tratando cliente sem risco como risco
+  máximo. Agora 0 fatores = 1 e 4 ou mais = 5, como na Complexidade (`escala-das-notas-humanas.md`,
+  seção 3). Leituras gravadas antes disso ficam como estão (snapshot imutável); o próximo
+  "Calcular carteira" recalcula a nota a partir das respostas.
 - As regras de nota das respostas agora existem também no backend (`crm.domain.avaliacao`), iguais
   às da tela: a tela mostra ao vivo, o backend é quem vale no cálculo. Mudou uma, muda a outra.
 - Migração `8f8c7f3862e8` (só acrescenta duas tabelas e uma coluna). **Rode `alembic upgrade head`.**

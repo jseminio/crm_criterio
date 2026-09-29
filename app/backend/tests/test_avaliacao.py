@@ -11,7 +11,7 @@ def test_complexidade_igual_a_tela(sims, nota):
     assert a.nota_de_complexidade(sims) == nota
 
 
-@pytest.mark.parametrize("sims,nota", [(0, 5), (1, 4), (2, 3), (3, 2), (4, 1), (5, 1)])
+@pytest.mark.parametrize("sims,nota", [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 5)])
 def test_risco_igual_a_tela(sims, nota):
     assert a.nota_de_risco(sims) == nota
 
@@ -40,7 +40,7 @@ def test_notas_so_das_abas_preenchidas_e_ids_desconhecidos_nao_contam():
 
 def test_aba_revista_sem_nada_marcado_conta_como_preenchida():
     assert a.abas_preenchidas({"risco": []}) == ["risco"]
-    assert a.notas_das_respostas({"risco": []}) == {"risco": 5}
+    assert a.notas_das_respostas({"risco": []}) == {"risco": 1}
     assert a.abas_preenchidas(None) == []
 
 
@@ -85,3 +85,15 @@ def test_sem_honorario_nao_ha_margem_nem_revisao():
 def test_alvo_mais_imposto_nao_pode_chegar_a_100_por_cento():
     with pytest.raises(ValueError):
         _r("1000", "Médio", 3, 3, 3, alvo="0.89")
+
+
+def test_sem_fator_de_risco_e_o_melhor_caso_no_score_e_no_atrito():
+    """A nota de risco e o Score andam na mesma direção: sem risco marcado, menos atrito e mais Score."""
+    from crm.domain import classificacao as regra
+
+    sem = a.notas_das_respostas({"risco": []})["risco"]
+    com = a.notas_das_respostas({"risco": sorted(a.FATORES_RISCO)})["risco"]
+    base = dict(receita=3, rentabilidade=3, complexidade=3, disciplina=3, cross_sell=3, adimplencia=5, semaforo=1, churn=1)
+    assert regra.score(regra.Notas(risco=sem, **base)) > regra.score(regra.Notas(risco=com, **base))
+    assert P.fator_de_atrito[sem] == 0 and P.fator_de_atrito[com] == max(P.fator_de_atrito.values())
+    assert _r("3200", "Médio", 3, 3, sem).margem > _r("3200", "Médio", 3, 3, com).margem

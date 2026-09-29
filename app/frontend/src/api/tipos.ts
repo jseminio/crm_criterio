@@ -591,6 +591,22 @@ export interface ItemDaCarteira {
   empresas: EmpresaDoGrupo[];
   notas: NotasDoGrupo;
   porte: PorteDoGrupo;
+  /** Respostas da avaliação mais recente que as gravou (pode ser anterior à leitura mostrada). */
+  avaliacao?: AvaliacaoGravada | null;
+}
+
+export interface RespostasDaAvaliacao {
+  complexidade: string[];
+  risco: string[];
+  cross_sell: string[];
+  disciplina: { meses_no_prazo: number; cobranca_dobrada: boolean; atraso_recorrente: boolean };
+  inadimplencia: { meses_em_dia: number; em_negociacao: boolean; ja_suspenso: boolean };
+}
+
+export interface AvaliacaoGravada {
+  respostas: RespostasDaAvaliacao;
+  registrado_em: string;
+  atribuido_por: string | null;
 }
 
 export interface IscDaCarteira {
@@ -673,6 +689,7 @@ export interface EdicaoDeNotas {
   adimplencia?: number;
   semaforo?: number;
   churn?: number;
+  respostas?: RespostasDaAvaliacao;
 }
 
 export interface ResultadoDaEdicao {

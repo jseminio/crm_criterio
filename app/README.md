@@ -293,6 +293,13 @@ abre um painel com uma aba por componente do Score, mais Porte — oito no total
   upsell)"), sem exigir texto livre de quem avalia. Salva as cinco notas de uma vez, reaproveitando
   `POST /api/carteira/grupos/{id}/notas` (que já aceitava `cross_sell`/`adimplencia`, sem tela até
   agora).
+  **Correção de 29/09/2026 (grupo INMD):** o painel reabria em branco depois de gravar. As notas
+  ficavam salvas, mas as respostas que as geraram só existiam como texto no motivo, e gravar de
+  novo trocava as notas boas pelas do painel vazio. Agora as respostas vão junto
+  (`respostas_da_avaliacao`, coluna JSON em `classificacao_do_grupo`, migração `e270619bf426`,
+  que só acrescenta) e o painel reabre com as da última avaliação que as gravou, dizendo quando
+  e por quem. Grupo sem respostas gravadas (avaliado antes desta data, ou só da planilha) abre
+  com o aviso para marcar todas as abas antes de salvar. **Rode `alembic upgrade head`.**
 - **Porte**: os nove direcionadores da régua de volume (`crm.domain.porte`, a mesma que já roda
   na Oportunidade — rótulos compartilhados em `componentes/direcionadoresDePorte.ts`), um botão
   "Ver sugestão" que calcula sem gravar (`POST /api/carteira/porte/sugestao`) e um "Porte

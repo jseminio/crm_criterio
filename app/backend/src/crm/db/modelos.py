@@ -546,6 +546,10 @@ class ClassificacaoDoGrupo(Base):
     em_cobranca: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
     eixo_de_acao: Mapped[str] = mapped_column(sa.String(60), nullable=False, index=True)
 
+    respostas_da_avaliacao: Mapped[dict | None] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"))
+    """O que foi marcado no painel Avaliar e produziu as notas humanas (29/09/2026). Sem isto o
+    painel reabria em branco, e gravar de novo trocava as notas boas pelas do painel vazio."""
+
     grupo: Mapped[GrupoEconomico] = relationship()
 
 

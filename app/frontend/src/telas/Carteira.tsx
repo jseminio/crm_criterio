@@ -447,6 +447,7 @@ export function Carteira({ listas }: { listas: Listas | null }) {
           grupoNome={avaliando.grupo_nome}
           notasAtuais={avaliando.notas}
           porteAtual={avaliando.porte}
+          avaliacaoGravada={avaliando.avaliacao ?? null}
           portes={listas?.portes ?? []}
           aoFechar={() => definirAvaliando(null)}
           aoSalvar={() => { definirAvaliando(null); recarregar(); }}

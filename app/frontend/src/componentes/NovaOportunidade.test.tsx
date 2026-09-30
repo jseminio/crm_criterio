@@ -36,6 +36,7 @@ const LISTAS: Listas = {
   captadores: ["EL", "BO"],
   portes: [],
   servicos: [],
+  indices_de_reajuste: ["IPCA (IBGE)", "IGP-M (FGV)", "Sem reajuste"],
 };
 
 describe("NovaOportunidade", () => {
@@ -131,6 +132,25 @@ describe("NovaOportunidade", () => {
     const [corpo] = vi.mocked(api.criarOportunidade).mock.calls[0];
     expect(corpo).toMatchObject({ preco_anual: "4000" });
     expect(corpo).not.toHaveProperty("quantidade_parcelas");
+  });
+
+  it("o reajuste lista os índices e vai no pedido", async () => {
+    vi.mocked(api.criarOportunidade).mockResolvedValue({} as OportunidadeDetalhe);
+    render(<NovaOportunidade listas={LISTAS} aoFechar={() => {}} aoCriar={() => {}} />);
+
+    const reajuste = screen.getByLabelText("Reajuste");
+    expect([...reajuste.querySelectorAll("option")].map((o) => o.textContent)).toEqual([
+      "Não informado",
+      "IPCA (IBGE)",
+      "IGP-M (FGV)",
+      "Sem reajuste",
+    ]);
+    await userEvent.type(screen.getByLabelText("Nome da oportunidade"), "Delta");
+    await userEvent.selectOptions(reajuste, "IPCA (IBGE)");
+    await userEvent.click(screen.getByRole("button", { name: /criar oportunidade/i }));
+
+    await waitFor(() => expect(api.criarOportunidade).toHaveBeenCalledOnce());
+    expect(vi.mocked(api.criarOportunidade).mock.calls[0][0]).toMatchObject({ reajuste: "IPCA (IBGE)" });
   });
 
   it("a conta das parcelas é feita em centavos", () => {

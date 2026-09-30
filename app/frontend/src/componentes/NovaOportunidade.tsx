@@ -7,6 +7,10 @@
  * Serviço recorrente (C1) pede a quantidade de parcelas, e o preço anual
  * passa a ser mensal × parcelas, travado. Pedido de Karine em 30/09/2026; o
  * servidor refaz a conta e ignora qualquer anual digitado.
+ *
+ * Reajuste: o índice do contrato (IPCA, IGP-M ou sem reajuste), para
+ * qualquer serviço. Só registra o índice; não calcula. Pedido de Karine em
+ * 30/09/2026.
  */
 
 import { useState } from "react";
@@ -32,6 +36,7 @@ const CAMPOS_VAZIOS = {
   preco_mensal: "",
   preco_anual: "",
   quantidade_parcelas: "",
+  reajuste: "",
   captador: "",
   temperatura: "",
   tipo_canal: "",
@@ -199,6 +204,8 @@ export function NovaOportunidade({
             {campo("preco_anual", "Preço anual", { type: "number", step: "0.01", min: "0" })}
           </div>
         )}
+
+        {seletor("reajuste", "Reajuste", listas?.indices_de_reajuste, "Não informado")}
 
         {campo("data_colocacao", "Data de originação", { type: "date" })}
 

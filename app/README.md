@@ -1165,6 +1165,19 @@ Pedido de Karine: em "Nova oportunidade", quando o serviço escolhido é
   valor mostrado bater com o gravado.
 - Vale só para a criação. A edição de preço no detalhe não mudou.
 
+### Reajuste na nova oportunidade (30/09/2026)
+
+Pedido de Karine: "Nova oportunidade" ganhou o seletor **Reajuste**, para
+qualquer serviço, com as opções **IPCA (IBGE)**, **IGP-M (FGV)** e **Sem
+reajuste**. Em branco fica "Não informado".
+
+- Só registra o índice escolhido; o CRM não calcula reajuste.
+- A lista vive em `IndiceDeReajuste` (`crm/domain/listas.py`) e chega à tela
+  por `GET /api/listas` (`indices_de_reajuste`). Incluir um índice novo é
+  acrescentar um item ali, sem migração, porque a coluna guarda texto.
+- Fica em `oportunidade.reajuste` (migração `7c4e2a91d6b0`); valor fora da
+  lista dá 422.
+
 ## A régua de porte — sugestão, nunca decisão (23/09/2026)
 
 Especificada em `../regua-de-porte-e-plano-de-teste.md`. O próprio documento

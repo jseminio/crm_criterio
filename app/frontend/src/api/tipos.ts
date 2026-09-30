@@ -42,6 +42,7 @@ export interface OportunidadeResumo {
   preco_anual: string | null;
   /** Só em serviço recorrente: o anual é mensal × parcelas. */
   quantidade_parcelas?: number | null;
+  reajuste?: string | null;
   proxima_acao: string | null;
   proxima_acao_em: string | null;
 }
@@ -146,6 +147,8 @@ export interface Listas {
   situacoes: string[];
   situacoes_de_lead: string[];
   temperaturas: string[];
+  /** Índices de reajuste do contrato (IPCA, IGP-M, Sem reajuste). */
+  indices_de_reajuste?: string[];
   tipos_de_canal: string[];
   tipos_de_canal_em_operacao: string[];
   motivos_de_recusa: string[];

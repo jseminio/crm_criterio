@@ -31,6 +31,7 @@ from crm.domain.listas import (
     CanalDeAbordagem,
     DesfechoDaConversa,
     DestinoDoTransbordo,
+    IndiceDeReajuste,
     LinhaServico,
     MotivoDeDescarte,
     MotivoDeTransbordo,
@@ -374,6 +375,7 @@ class Oportunidade(CarimboMixin, Base):
     quantidade_parcelas: Mapped[int | None] = mapped_column(sa.SmallInteger)
     """Só em serviço recorrente (C1): o preço anual é mensal × parcelas, sem ajuste à mão.
     Pedido de Karine em 30/09/2026."""
+    reajuste: Mapped[IndiceDeReajuste | None] = mapped_column(coluna_lista(IndiceDeReajuste))
     valor_mensalizado: Mapped[Decimal | None] = mapped_column(DINHEIRO)
 
     proxima_acao: Mapped[str | None] = mapped_column(sa.String(200))

@@ -17,6 +17,7 @@ from crm.domain.listas import (
     CanalDeAbordagem,
     DesfechoDaConversa,
     DestinoDoTransbordo,
+    IndiceDeReajuste,
     MotivoDeDescarte,
     MotivoDeTransbordo,
     Tom,
@@ -224,6 +225,7 @@ class OportunidadeResumo(Base):
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
     quantidade_parcelas: int | None = None
+    reajuste: IndiceDeReajuste | None = None
     proxima_acao: str | None = None
     proxima_acao_em: date | None = None
 
@@ -366,6 +368,7 @@ class OportunidadeNova(BaseModel):
     preco_anual: Decimal | None = None
     quantidade_parcelas: int | None = Field(default=None, ge=1, le=120)
     """Só vale em serviço recorrente (C1): lá o preço anual é mensal × parcelas."""
+    reajuste: IndiceDeReajuste | None = None
     captador: str | None = Field(default=None, max_length=10)
     temperatura: Temperatura | None = None
     tipo_canal: TipoCanal | None = None
@@ -788,6 +791,7 @@ class Listas(BaseModel):
     portes: list[str]
     servicos: list[str]
     motivos_de_descarte: list[str] = []
+    indices_de_reajuste: list[str] = []
 
 
 # ---------------------------------------------------------------- abordagens

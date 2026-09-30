@@ -353,6 +353,30 @@ class TestParcelasDaOportunidadeNova:
             assert resposta.status_code == 422
 
 
+class TestReajusteDaOportunidadeNova:
+    """Índice de reajuste, para qualquer serviço. Pedido de Karine em 30/09/2026."""
+
+    def test_grava_o_indice_escolhido(self, cliente: TestClient):
+        for servico, indice in (("BPO Financeiro", "IPCA (IBGE)"), ("Auditoria", "IGP-M (FGV)")):
+            corpo = cliente.post(
+                "/api/oportunidades", json={"nome": "Delta", "servico": servico, "reajuste": indice}
+            ).json()
+            assert corpo["reajuste"] == indice
+
+    def test_sem_indice_fica_em_branco(self, cliente: TestClient):
+        assert cliente.post("/api/oportunidades", json={"nome": "Delta"}).json()["reajuste"] is None
+
+    def test_indice_fora_da_lista_da_422(self, cliente: TestClient):
+        resposta = cliente.post("/api/oportunidades", json={"nome": "Delta", "reajuste": "INCC"})
+
+        assert resposta.status_code == 422
+
+    def test_listas_trazem_os_indices(self, cliente: TestClient):
+        indices = cliente.get("/api/listas").json()["indices_de_reajuste"]
+
+        assert indices == ["IPCA (IBGE)", "IGP-M (FGV)", "Sem reajuste"]
+
+
 class TestVolumetriaEPorte:
     """A régua de porte (E4, 23/09/2026) — sempre sugestão, nunca decisão.
     Ver `crm.domain.porte` e `regua-de-porte-e-plano-de-teste.md`."""

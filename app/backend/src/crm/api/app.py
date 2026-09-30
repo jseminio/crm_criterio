@@ -64,6 +64,7 @@ from crm.domain import porte as regras_de_porte
 from crm.domain.servicos import CATALOGO as CATALOGO_DE_SERVICOS, OUTRO, linha_do_servico, problema_na_descricao, problema_no_tema
 from crm.domain.listas import (
     ORIGEM_DA_MUDANCA_NO_CRM,
+    IndiceDeReajuste,
     IniciativaDoEncerramento,
     LinhaServico,
     MotivoDeDescarte,
@@ -229,6 +230,7 @@ def _registrar(api: FastAPI) -> None:
             portes=[p.value for p in regras_de_porte.Porte],
             servicos=list(servicos),
             motivos_de_descarte=_valores(MotivoDeDescarte),
+            indices_de_reajuste=_valores(IndiceDeReajuste),
         )
 
     @api.get("/api/servicos", response_model=list[e.ServicoDoCatalogo], tags=["listas"])
@@ -590,6 +592,7 @@ def _registrar(api: FastAPI) -> None:
             preco_mensal=corpo.preco_mensal,
             preco_anual=preco_anual,
             quantidade_parcelas=parcelas,
+            reajuste=corpo.reajuste,
             origem=Origem.CRM,
         )
         sessao.add(oportunidade)

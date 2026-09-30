@@ -237,6 +237,10 @@ export const api = {
       comParametros("/api/oportunidades", { ...filtros, limite: 1000 }),
     ),
 
+  /** Endereço (não pedido): a Grade em Excel, com os mesmos filtros. Vai num link de download. */
+  enderecoDaExportacaoDoFunil: (filtros: FiltrosDoFunil & { situacao?: string[] } = {}) =>
+    comParametros("/api/oportunidades/exportar", { ...filtros }),
+
   oportunidade: (id: number) => pedir<OportunidadeDetalhe>(`/api/oportunidades/${id}`),
   questionarioDaOportunidade: (id: number) =>
     pedir<QuestionarioDaOportunidade | null>(`/api/oportunidades/${id}/questionario`),

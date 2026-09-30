@@ -659,6 +659,19 @@ descartada pelo servidor, e a API recusa origem de campo que não seja direciona
 **Ainda fora:** a *lista do que falta para a proposta, com responsável e prazo* e a *geração do
 documento* — a primeira depende de definir os itens, a segunda do modelo oficial e do formato.
 
+## Grade do funil em Excel (28/09/2026)
+
+Na visão **Grade** do funil, o botão **Exportar para Excel** (ao lado da troca Kanban/Grade) baixa
+`funil-AAAA-MM-DD.xlsx` com as mesmas oito colunas da tabela — Cliente, Oportunidade, Situação,
+Temperatura, Captador, Originação, Mensal e Anual — e as mesmas oportunidades que os filtros da tela
+selecionam, inclusive Situação. Sem limite de página. Valor sai como número (R$) e Originação como
+data; cabeçalho congelado e filtro do Excel ligado.
+
+- Rota: `GET /api/oportunidades/exportar`, com os mesmos parâmetros de `GET /api/oportunidades`.
+- A ordem é a padrão da lista (originação mais recente primeiro). A ordenação clicada nas colunas da
+  tela não vai para a planilha: ordene lá, pelo filtro do Excel.
+- Só lê. Leva dado de cliente: guarde fora do repositório.
+
 ## Endereço da empresa
 
 A tabela `empresa` ganhou, em 25/09/2026, `logradouro`, `numero`, `complemento`,

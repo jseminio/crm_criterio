@@ -22,7 +22,7 @@ from datetime import date
 from typing import Callable, Iterator, Literal
 
 import sqlalchemy as sa
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -59,6 +59,7 @@ from crm.domain import agenda as regras_da_agenda
 from crm.domain import eventos_de_contrato as regras_de_eventos
 from crm.domain import mrr as regras_de_mrr
 from crm.domain import recortes as regras_de_recortes
+from crm.relatorios.exportacao_do_funil import LinhaDoFunil, gerar_planilha_do_funil
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
 from crm.domain.servicos import CATALOGO as CATALOGO_DE_SERVICOS, OUTRO, linha_do_servico, problema_na_descricao, problema_no_tema
@@ -521,6 +522,51 @@ def _registrar(api: FastAPI) -> None:
         return e.Pagina(
             total=total or 0,
             itens=[_resumo_de(o, nome) for o, nome in linhas],
+        )
+
+    # Antes de `/api/oportunidades/{oportunidade_id}`: senão "exportar" seria lido como id.
+    @api.get("/api/oportunidades/exportar", tags=["funil"])
+    def exportar_oportunidades(
+        sessao: Session = Depends(obter_sessao),
+        situacao: list[Situacao] | None = Query(default=None),
+        captador: list[str] | None = Query(default=None),
+        tipo_canal: list[TipoCanal] | None = Query(default=None),
+        temperatura: list[Temperatura] | None = Query(default=None),
+        grupo_id: int | None = None,
+        busca: str | None = None,
+        data_tipo: Literal["colocacao", "aceite"] | None = None,
+        data_de: date | None = None,
+        data_ate: date | None = None,
+        servico: list[str] | None = Query(default=None),
+    ) -> Response:
+        """A Grade em Excel: os mesmos filtros e a mesma ordem da lista, sem limite de página
+        (`crm.relatorios.exportacao_do_funil`)."""
+        consulta = _consulta_de_oportunidades(
+            situacao, captador, tipo_canal, temperatura, grupo_id, busca,
+            data_tipo, data_de, data_ate, servico,
+        )
+        linhas = sessao.execute(
+            consulta.order_by(
+                Oportunidade.data_colocacao.desc().nulls_last(), Oportunidade.id.desc()
+            )
+        ).all()
+        conteudo = gerar_planilha_do_funil([
+            LinhaDoFunil(
+                cliente=nome,
+                oportunidade=o.nome,
+                situacao=o.situacao.value,
+                temperatura=o.temperatura.value if o.temperatura else None,
+                captador=o.captador,
+                originacao=o.data_colocacao,
+                mensal=o.preco_mensal,
+                anual=o.preco_anual,
+            )
+            for o, nome in linhas
+        ])
+        return Response(
+            conteudo,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="funil-{date.today():%Y-%m-%d}.xlsx"'},
         )
 
     @api.post(

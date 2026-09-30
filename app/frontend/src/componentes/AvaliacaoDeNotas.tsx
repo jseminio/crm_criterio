@@ -141,6 +141,12 @@ function ResultadoDoCliente({ r }: { r: SimulacaoDoCliente }) {
         <tbody>
           <tr><td>Score</td><td>{Number(r.score_antes).toFixed(2).replace(".", ",")} → {Number(r.score_depois).toFixed(2).replace(".", ",")}</td></tr>
           <tr><td>Classe</td><td>{r.classe_antes} → {r.classe_depois}</td></tr>
+          {r.notas_antes.rentabilidade !== undefined && r.notas_depois.rentabilidade !== undefined && (
+            <tr>
+              <td>Nota de rentabilidade (pela margem do CRM)</td>
+              <td>{Number(r.notas_antes.rentabilidade).toLocaleString("pt-BR")} → {Number(r.notas_depois.rentabilidade).toLocaleString("pt-BR")}</td>
+            </tr>
+          )}
           {rent ? (
             <>
               <tr><td>Horas/mês ({rent.porte})</td><td>{Number(rent.horas).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} h</td></tr>
@@ -423,10 +429,10 @@ export function AvaliacaoDeNotas({
         <section className="avaliacao-secao">
           <h3>Rentabilidade (25% do Score)</h3>
           <p className="campo-ajuda" style={{ marginTop: 0 }}>
-            Calculada a partir da margem (honorário menos custo de servir, pelo porte e pelo atrito de
-            complexidade/disciplina/risco). {notasAtuais.rentabilidade_da_planilha
-              ? "Esta unidade ainda usa a nota da planilha de saúde da carteira (os honorários por empresa não fecham com a receita oficial)."
-              : "Recalculada pelo CRM, com a disciplina invertida (correção do defeito 7.2)."}
+            Calculada a partir da margem (honorário menos imposto e custo de servir, pelo porte do grupo e pelo
+            atrito de complexidade/disciplina/risco). Até o próximo "Calcular carteira" vale a nota abaixo
+            {notasAtuais.rentabilidade_da_planilha ? ", que veio da planilha de saúde da carteira" : ""}; a partir
+            dele, a nota sai da margem calculada pelo CRM, pela régua de margem dos Parâmetros.
           </p>
           <NotaCalculada valor={notasAtuais.rentabilidade} />
         </section>

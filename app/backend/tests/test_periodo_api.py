@@ -222,3 +222,48 @@ class TestRentabilidadeNaCarteira:
     def test_sem_porte_nao_ha_calculo(self, cliente, sessao):
         _grupo(sessao, "Alfa")
         assert cliente.get("/api/carteira/classificacao").json()["itens"][0]["rentabilidade_do_grupo"] is None
+
+
+class TestRentabilidadeCalculadaNoScore:
+    """Decisão de Eduardo em 29/09/2026: a partir do "Calcular carteira", a nota de Rentabilidade do Score
+    vem da margem calculada no CRM; antes disso, continua a da planilha."""
+
+    def _esperada(self, receita: str, porte: str):
+        from crm.domain import avaliacao as regra_de_avaliacao
+        from crm.domain.rentabilidade import PARAMETROS_DE_RENTABILIDADE
+
+        notas = regra_de_avaliacao.notas_das_respostas(ABAS_COMPLETAS)
+        return regra_de_avaliacao.nota_de_rentabilidade_do_grupo(
+            honorario=Decimal(receita), porte=porte, complexidade=Decimal(notas["complexidade"]),
+            disciplina=Decimal(notas["disciplina"]), risco=Decimal(notas["risco"]), p=PARAMETROS_DE_RENTABILIDADE,
+        )
+
+    def test_antes_do_calculo_vale_a_da_planilha_e_depois_a_do_crm(self, cliente, sessao):
+        g = _grupo(sessao, "Alfa", receita="1900")
+        antes = cliente.get("/api/carteira/classificacao").json()
+        assert antes["itens"][0]["notas"]["rentabilidade_planilha"] == "3.00"
+        _abrir(cliente)
+        _completar(cliente, g.id)
+        assert cliente.post("/api/carteira/periodo/calcular", json={"autor": AUTOR}).status_code == 200
+
+        esperada = self._esperada("1900", _porte_sugerido())
+        assert esperada.nota is not None and esperada.nota != 3
+        depois = cliente.get("/api/carteira/classificacao").json()
+        notas = depois["itens"][0]["notas"]
+        assert Decimal(notas["rentabilidade"]) == esperada.nota
+        assert Decimal(notas["rentabilidade_planilha"]) == esperada.nota  # a coluna passa a mostrar a do CRM
+        assert notas["rentabilidade_da_planilha"] is False
+        assert any("calculada pelo CRM" in a for a in depois["avisos"])
+        leitura = sessao.scalars(sa.select(ClassificacaoDoGrupo).where(ClassificacaoDoGrupo.grupo_id == g.id)
+                                 .order_by(ClassificacaoDoGrupo.id.desc())).first()
+        sessao.refresh(leitura)
+        assert leitura.margem == esperada.margem and leitura.horas_por_mes == esperada.horas
+
+    def test_calcular_este_cliente_ja_mostra_a_rentabilidade_do_crm(self, cliente, sessao):
+        g = _grupo(sessao, "Alfa", receita="1900")
+        _abrir(cliente)
+        _completar(cliente, g.id)
+        s = cliente.post(f"/api/carteira/periodo/grupos/{g.id}/simulacao").json()
+        assert s["notas_antes"]["rentabilidade"] == "3.00"
+        assert Decimal(s["notas_depois"]["rentabilidade"]) == self._esperada("1900", _porte_sugerido()).nota
+        assert _leituras(sessao, g.id) == 1

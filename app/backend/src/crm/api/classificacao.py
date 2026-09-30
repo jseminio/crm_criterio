@@ -53,6 +53,15 @@ AVISO_DA_PLANILHA = (
     "ainda está pendente de validação (defeito 7.2)."
 )
 
+FONTE_DO_CALCULO = "Cálculo da carteira"
+"""Começo da `fonte` das leituras gravadas pelo "Calcular carteira": nelas a rentabilidade é a do CRM."""
+
+AVISO_DO_CRM = (
+    "{n} grupo(s) com a nota de rentabilidade calculada pelo CRM no \"Calcular carteira\": margem no nível do "
+    "grupo (horas pelo porte do grupo, atrito pelas notas), pela régua de margem dos parâmetros (decisão de "
+    "29/09/2026). Nas leituras anteriores, vale a nota da planilha."
+)
+
 AVISO_RECALCULADA = (
     "A rentabilidade foi recalculada no CRM com a disciplina invertida (6 − disciplina), corrigindo o defeito 7.2 "
     "da planilha (decisão de 26/09/2026). As demais notas vêm da planilha de saúde da carteira."
@@ -712,6 +721,10 @@ def roteador(
             for c, _ in todas
             if c.revisao == 1 and referencia_por_grupo.get(c.grupo_id) == c.referencia
         }
+        # Depois do "Calcular carteira", a nota que vale é a do CRM (decisão de 29/09/2026).
+        for c, _ in linhas:
+            if c.fonte.startswith(FONTE_DO_CALCULO):
+                rentabilidade_planilha_por_grupo[c.grupo_id] = c.nota_rentabilidade
         itens = [
             ItemDaCarteira(
                 grupo_id=c.grupo_id, grupo_nome=nome, receita_mensal=c.receita_mensal, score=c.score, classe=c.classe,
@@ -731,14 +744,19 @@ def roteador(
         por_classe: dict[str, int] = {}
         for i in itens:
             por_classe[i.classe] = por_classe.get(i.classe, 0) + 1
-        da_planilha = [nome for c, nome in linhas if c.rentabilidade_da_planilha]
-        if len(da_planilha) == len(linhas):
-            avisos = [AVISO_DA_PLANILHA]
-        else:
-            avisos = [AVISO_RECALCULADA]
+        do_crm = [c for c, _ in linhas if c.fonte.startswith(FONTE_DO_CALCULO)]
+        de_carga = [(c, nome) for c, nome in linhas if not c.fonte.startswith(FONTE_DO_CALCULO)]
+        da_planilha = [nome for c, nome in de_carga if c.rentabilidade_da_planilha]
+        avisos = []
+        if de_carga and len(da_planilha) == len(de_carga):
+            avisos.append(AVISO_DA_PLANILHA)
+        elif de_carga:
+            avisos.append(AVISO_RECALCULADA)
             if da_planilha:
                 avisos.append(f"{len(da_planilha)} grupo(s) mantiveram a nota de rentabilidade da planilha, porque os honorários "
                               "das empresas não fecham com a receita oficial: " + ", ".join(da_planilha) + ".")
+        if do_crm:
+            avisos.append(AVISO_DO_CRM.format(n=len(do_crm)))
         parados = [i.grupo_nome for i in itens if i.sem_contrato_ativo]
         if parados:
             avisos.append(f"{len(parados)} grupo(s) sem contrato ativo hoje continuam no snapshot da referência: "
@@ -834,16 +852,36 @@ def roteador(
 
     def _notas_novas(anterior: ClassificacaoDoGrupo, mudou: dict) -> regra.Notas:
         return regra.Notas(
-            receita=anterior.nota_receita, rentabilidade=anterior.nota_rentabilidade,
+            receita=anterior.nota_receita, rentabilidade=mudou.get("rentabilidade", anterior.nota_rentabilidade),
             complexidade=mudou.get("complexidade", anterior.complexidade), disciplina=mudou.get("disciplina", anterior.disciplina),
             risco=mudou.get("risco", anterior.risco_tecnico), cross_sell=mudou.get("cross_sell", anterior.cross_sell),
             adimplencia=mudou.get("adimplencia", anterior.adimplencia), semaforo=mudou.get("semaforo", anterior.semaforo),
             churn=mudou.get("churn", anterior.churn),
         )
 
+    def _notas_do_calculo(
+        anterior: ClassificacaoDoGrupo, respostas: dict, porte: str | None,
+        p_rent: regra_de_parametros.ParametrosDeRentabilidade,
+    ) -> tuple[dict, regra_de_avaliacao.NotaDeRentabilidadeDoGrupo | None]:
+        """As notas das respostas e, com porte e honorário, a nota de Rentabilidade pela margem do CRM.
+        Sem porte ou sem honorário, a rentabilidade fica a anterior."""
+        mudou = dict(regra_de_avaliacao.notas_das_respostas(respostas))
+        if not porte or porte not in p_rent.horas_base:
+            return mudou, None
+        parcial = _notas_novas(anterior, mudou)
+        rent = regra_de_avaliacao.nota_de_rentabilidade_do_grupo(
+            honorario=anterior.receita_mensal, porte=porte, complexidade=parcial.complexidade,
+            disciplina=parcial.disciplina, risco=parcial.risco, p=p_rent,
+        )
+        if rent.nota is None:
+            return mudou, None
+        mudou["rentabilidade"] = rent.nota
+        return mudou, rent
+
     def _nova_leitura(
         sessao: Session, anterior: ClassificacaoDoGrupo, mudou: dict, parametros: regra.Parametros, *,
         fonte: str, autor: str, motivo: str, respostas: dict | None,
+        rentabilidade: regra_de_avaliacao.NotaDeRentabilidadeDoGrupo | None = None,
     ) -> ClassificacaoDoGrupo:
         """Leitura nova com as notas de `mudou`; o resto copia da anterior (snapshot imutável)."""
         novas = _notas_novas(anterior, mudou)
@@ -857,8 +895,10 @@ def roteador(
         return ClassificacaoDoGrupo(
             grupo_id=anterior.grupo_id, referencia=hoje, revisao=revisao, fonte=fonte,
             versao_dos_parametros=parametros.versao, atribuido_por=autor.strip(), motivo=motivo.strip(),
-            receita_mensal=anterior.receita_mensal, margem=anterior.margem, horas_por_mes=anterior.horas_por_mes,
-            rentabilidade_da_planilha=anterior.rentabilidade_da_planilha,
+            receita_mensal=anterior.receita_mensal,
+            margem=rentabilidade.margem if rentabilidade else anterior.margem,
+            horas_por_mes=rentabilidade.horas if rentabilidade else anterior.horas_por_mes,
+            rentabilidade_da_planilha=False if rentabilidade else anterior.rentabilidade_da_planilha,
             nota_receita=novas.receita, nota_rentabilidade=novas.rentabilidade, complexidade=novas.complexidade,
             disciplina=novas.disciplina, risco_tecnico=novas.risco, cross_sell=novas.cross_sell, adimplencia=novas.adimplencia,
             semaforo=novas.semaforo, churn=novas.churn, score=pontos.quantize(Decimal("0.0001")), classe=letra,
@@ -996,14 +1036,16 @@ def roteador(
         rascunho = _rascunhos(sessao, periodo).get(grupo_id)
         respostas = rascunho.respostas if rascunho else {}
         parametros, p_rent = _parametros_vigentes(sessao)
-        depois = _notas_novas(anterior, regra_de_avaliacao.notas_das_respostas(respostas))
+        porte = respostas["porte"]["porte"] if "porte" in respostas else grupo.porte
+        mudou, _ = _notas_do_calculo(anterior, respostas, porte, p_rent)
+        depois = _notas_novas(anterior, mudou)
         pontos = regra.score(depois, p=parametros)
         letra = regra.classe(pontos, p=parametros)
-        chaves = ("complexidade", "risco", "disciplina", "cross_sell", "adimplencia")
-        porte = respostas["porte"]["porte"] if "porte" in respostas else grupo.porte
+        chaves = ("rentabilidade", "complexidade", "risco", "disciplina", "cross_sell", "adimplencia")
+        nome_na_leitura = {"risco": "risco_tecnico", "rentabilidade": "nota_rentabilidade"}
         return SimulacaoResposta(
             pendentes=[a for a in regra_de_avaliacao.ABAS if a not in respostas],
-            notas_antes={k: Decimal(getattr(anterior, "risco_tecnico" if k == "risco" else k)) for k in chaves},
+            notas_antes={k: Decimal(getattr(anterior, nome_na_leitura.get(k, k))) for k in chaves},
             notas_depois={k: Decimal(getattr(depois, k)) for k in chaves},
             score_antes=anterior.score, score_depois=pontos.quantize(Decimal("0.0001")),
             classe_antes=anterior.classe_efetiva, classe_depois=regra.classe_efetiva(letra, depois, p=parametros),
@@ -1023,7 +1065,7 @@ def roteador(
             mais = f" e mais {len(situacao.pendentes) - 10}" if len(situacao.pendentes) > 10 else ""
             raise HTTPException(409, f"faltam {len(situacao.pendentes)} de {situacao.grupos} grupos: {nomes}{mais}")
         rascunhos = _rascunhos(sessao, periodo)
-        parametros, _ = _parametros_vigentes(sessao)
+        parametros, p_rent = _parametros_vigentes(sessao)
         rotulo = f"{periodo.mes_de_referencia:%m/%Y}"
         autor = corpo.autor.strip()
         for c, _nome in linhas:
@@ -1036,11 +1078,12 @@ def roteador(
                 setattr(grupo, campo, porte.get(campo))
             if grupo.porte != novo_porte:
                 grupo.porte, grupo.porte_definido_por, grupo.porte_definido_em = novo_porte, autor, agora()
+            mudou, rent = _notas_do_calculo(c, respostas, novo_porte, p_rent)
             sessao.add(_nova_leitura(
-                sessao, c, regra_de_avaliacao.notas_das_respostas(respostas), parametros,
-                fonte=f"Cálculo da carteira, período {rotulo}", autor=autor,
+                sessao, c, mudou, parametros,
+                fonte=f"{FONTE_DO_CALCULO}, período {rotulo}", autor=autor,
                 motivo=f"Avaliação do período {rotulo}, calculada para a carteira inteira",
-                respostas={k: v for k, v in respostas.items() if k != "porte"},
+                respostas={k: v for k, v in respostas.items() if k != "porte"}, rentabilidade=rent,
             ))
         periodo.calculado_em, periodo.calculado_por = agora(), autor
         sessao.commit()

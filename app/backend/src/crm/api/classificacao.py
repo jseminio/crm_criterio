@@ -213,6 +213,28 @@ class ItemDaCarteira(BaseModel):
     """O rascunho do período aberto, se houver."""
     rentabilidade_do_grupo: RentabilidadeDoGrupoResposta | None = None
     """`None` quando o grupo ainda não tem porte confirmado."""
+    receita_em_contrato: Decimal | None = None
+    """Soma das mensalidades dos contratos ativos e suspensos (30/09/2026). É a receita praticada
+    comparada com a calculada; `None` quando o grupo não tem contrato com mensalidade no CRM, e aí
+    vale a receita da leitura (a da planilha)."""
+    contratos: int = 0
+    """Quantos contratos entraram na soma."""
+
+
+class ClienteNovo(BaseModel):
+    """Grupo com contrato ativo ou suspenso, com mensalidade, e sem nenhuma leitura de classificação
+    (30/09/2026). Entra na avaliação do período com 7 abas; a primeira leitura nasce no "Calcular carteira"."""
+    grupo_id: int
+    grupo_nome: str
+    desde: date | None
+    """Início do contrato mais antigo; `None` se nenhum tem data."""
+    receita_em_contrato: Decimal
+    contratos: int
+    empresas: list[EmpresaDoGrupo] = []
+    porte: PorteDoGrupo
+    rascunho: RascunhoResposta | None = None
+    rentabilidade_do_grupo: RentabilidadeDoGrupoResposta | None = None
+    """Com o porte e as notas de complexidade, disciplina e risco do rascunho; `None` enquanto faltar algum."""
 
 
 class IscResposta(BaseModel):
@@ -247,6 +269,9 @@ class PendenciaDoPeriodo(BaseModel):
     grupo_id: int
     grupo_nome: str
     preenchidas: int
+    abas: int = len(regra_de_avaliacao.ABAS)
+    """Total de abas do grupo: 7 para cliente novo (com a aba Saúde), 6 para os demais."""
+    novo: bool = False
 
 
 class PeriodoResposta(BaseModel):
@@ -282,6 +307,8 @@ class ClassificacaoDaCarteira(BaseModel):
     avisos: list[str]
     periodo: PeriodoResposta | None = None
     janela: JanelaResposta | None = None
+    novos: list[ClienteNovo] = []
+    """Clientes novos, ainda sem leitura: não entram no ISC, no retrato nem na distribuição por classe."""
 
 
 def _notas(c: ClassificacaoDoGrupo, rentabilidade_planilha: Decimal | None = None) -> NotasDoGrupo:
@@ -361,6 +388,13 @@ class RespostasDePorte(VolumetriaEntrada):
     justificativa: str | None = Field(default=None, max_length=500)
 
 
+class RespostasDeSaude(BaseModel):
+    """Aba "Saúde" do cliente novo (30/09/2026): quem já está na Carteira herda da leitura anterior."""
+
+    semaforo: int = Field(ge=1, le=3)
+    churn: int = Field(ge=1, le=5)
+
+
 class RascunhoEntrada(BaseModel):
     """Só as abas que vierem mudam; as outras ficam como estavam no rascunho."""
 
@@ -371,6 +405,8 @@ class RascunhoEntrada(BaseModel):
     disciplina: RespostasDeDisciplina | None = None
     inadimplencia: RespostasDeInadimplencia | None = None
     porte: RespostasDePorte | None = None
+    saude: RespostasDeSaude | None = None
+    """Só para cliente novo."""
 
 
 class CalcularCarteira(BaseModel):
@@ -379,14 +415,18 @@ class CalcularCarteira(BaseModel):
 
 class SimulacaoResposta(BaseModel):
     pendentes: list[str]
-    """Abas sem rascunho neste período: entram com a nota atual da carteira."""
-    notas_antes: dict[str, Decimal]
-    notas_depois: dict[str, Decimal]
-    score_antes: Decimal
-    score_depois: Decimal
-    classe_antes: str
-    classe_depois: str
+    """Abas sem rascunho neste período: entram com a nota atual da carteira (cliente novo não tem)."""
+    notas_antes: dict[str, Decimal] | None
+    """`None` para cliente novo, que não tem leitura anterior."""
+    notas_depois: dict[str, Decimal | None]
+    """Cliente novo: `None` na nota cuja aba ainda falta."""
+    score_antes: Decimal | None
+    score_depois: Decimal | None
+    """`None` para cliente novo enquanto faltar alguma aba."""
+    classe_antes: str | None
+    classe_depois: str | None
     rentabilidade: RentabilidadeDoGrupoResposta | None
+    novo: bool = False
 
 
 class ResultadoDoCalculo(BaseModel):
@@ -601,6 +641,30 @@ def roteador(
         linhas.sort(key=lambda x: x[0].receita_mensal, reverse=True)
         return todas, linhas
 
+    def _receita_em_contrato(sessao: Session) -> dict[int, tuple[Decimal, int, date | None]]:
+        """Grupo → (soma das mensalidades, contratos somados, início mais antigo), só contratos
+        ativos e suspensos com mensalidade — o mesmo critério do MRR (`crm.domain.mrr`)."""
+        return {
+            g: (v, n, desde) for g, v, n, desde in sessao.execute(
+                sa.select(Contrato.grupo_id, sa.func.sum(Contrato.preco_mensal), sa.func.count(Contrato.id),
+                          sa.func.min(Contrato.data_inicio))
+                .where(Contrato.situacao.in_([SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO]),
+                       Contrato.preco_mensal > 0)
+                .group_by(Contrato.grupo_id)
+            )
+        }
+
+    def _grupos_novos(sessao: Session, contratos: dict[int, tuple[Decimal, int, date | None]]) -> list[GrupoEconomico]:
+        """Com contrato valendo e sem nenhuma leitura: o cliente novo (decisão de 30/09/2026)."""
+        if not contratos:
+            return []
+        com_leitura = sa.select(ClassificacaoDoGrupo.id).where(ClassificacaoDoGrupo.grupo_id == GrupoEconomico.id).exists()
+        return list(sessao.scalars(
+            sa.select(GrupoEconomico)
+            .where(GrupoEconomico.id.in_(contratos), GrupoEconomico.fundido_em_id.is_(None), ~com_leitura)
+            .order_by(GrupoEconomico.nome)
+        ))
+
     def _periodo_aberto(sessao: Session) -> PeriodoDeAvaliacao | None:
         return sessao.scalars(
             sa.select(PeriodoDeAvaliacao).where(PeriodoDeAvaliacao.calculado_em.is_(None))
@@ -628,27 +692,34 @@ def roteador(
             sa.select(AvaliacaoEmAndamento).where(AvaliacaoEmAndamento.periodo_id == periodo.id)
         )}
 
-    def _rascunho_resposta(a: AvaliacaoEmAndamento) -> RascunhoResposta:
+    def _rascunho_resposta(a: AvaliacaoEmAndamento, *, novo: bool = False) -> RascunhoResposta:
         return RascunhoResposta(
-            respostas=a.respostas, preenchidas=regra_de_avaliacao.abas_preenchidas(a.respostas),
+            respostas=a.respostas, preenchidas=regra_de_avaliacao.abas_preenchidas(a.respostas, novo=novo),
             atualizado_em=a.atualizado_em, atualizado_por=a.atualizado_por,
         )
 
-    def _periodo_resposta(sessao: Session, periodo: PeriodoDeAvaliacao, linhas: list | None = None) -> PeriodoResposta:
+    def _periodo_resposta(
+        sessao: Session, periodo: PeriodoDeAvaliacao, linhas: list | None = None,
+        novos: list[GrupoEconomico] | None = None,
+    ) -> PeriodoResposta:
         if linhas is None:
             _, linhas = _leituras(sessao)
+        if novos is None:
+            novos = _grupos_novos(sessao, _receita_em_contrato(sessao))
         rascunhos = _rascunhos(sessao, periodo)
-        total = len(regra_de_avaliacao.ABAS)
+        grupos = [(c.grupo_id, nome, False) for c, nome in linhas] + [(g.id, g.nome, True) for g in novos]
         pendentes = []
-        for c, nome in sorted(linhas, key=lambda x: x[1]):
-            feitas = len(regra_de_avaliacao.abas_preenchidas(rascunhos[c.grupo_id].respostas)) if c.grupo_id in rascunhos else 0
+        for grupo_id, nome, novo in sorted(grupos, key=lambda x: x[1]):
+            total = len(regra_de_avaliacao.ABAS_DO_NOVO if novo else regra_de_avaliacao.ABAS)
+            feitas = len(regra_de_avaliacao.abas_preenchidas(rascunhos[grupo_id].respostas, novo=novo)) if grupo_id in rascunhos else 0
             if feitas < total:
-                pendentes.append(PendenciaDoPeriodo(grupo_id=c.grupo_id, grupo_nome=nome, preenchidas=feitas))
+                pendentes.append(PendenciaDoPeriodo(grupo_id=grupo_id, grupo_nome=nome, preenchidas=feitas, abas=total, novo=novo))
         return PeriodoResposta(
             id=periodo.id, mes_de_referencia=periodo.mes_de_referencia, aberto_em=periodo.aberto_em,
             aberto_por=periodo.aberto_por, margem_minima=_q4(periodo.margem_minima), margem_alvo=_q4(periodo.margem_alvo),
             calculado_em=periodo.calculado_em, calculado_por=periodo.calculado_por,
-            grupos=len(linhas), completos=len(linhas) - len(pendentes), abas=total, pendentes=pendentes,
+            grupos=len(grupos), completos=len(grupos) - len(pendentes), abas=len(regra_de_avaliacao.ABAS),
+            pendentes=pendentes,
         )
 
     def _rentabilidade(
@@ -667,21 +738,55 @@ def roteador(
             revisao_de_honorarios=res.revisao_de_honorarios,
         )
 
-    @r.get("/classificacao", response_model=ClassificacaoDaCarteira)
-    def classificacao(sessao: Session = Depends(obter_sessao)) -> ClassificacaoDaCarteira:
-        todas, linhas = _leituras(sessao)
-        vistos = {c.grupo_id for c, _ in linhas}
-        periodo = _periodo_aberto(sessao)
-        janela = _janela(sessao)
-        if not linhas:
-            return ClassificacaoDaCarteira(referencia=None, versao_dos_parametros=None, isc=None, retrato=None,
-                                           por_classe={}, distribuicao_por_classe=[], itens=[], avisos=[],
-                                           periodo=_periodo_resposta(sessao, periodo, linhas) if periodo else None,
-                                           janela=janela)
-        ativos = set(sessao.scalars(
-            sa.select(Contrato.grupo_id).where(Contrato.situacao.in_([SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO]))
-        ))
-        mensal = {
+    def _receita_praticada(c: ClassificacaoDoGrupo, contratos: dict) -> Decimal:
+        """O valor em contrato; sem contrato com mensalidade no CRM, a receita da leitura (da planilha)."""
+        return contratos[c.grupo_id][0] if c.grupo_id in contratos else c.receita_mensal
+
+    def _notas_do_novo(respostas: dict, porte: str | None) -> dict:
+        """As notas que o rascunho de um cliente novo já permite: as das abas e a de Receita pelo porte."""
+        notas = dict(regra_de_avaliacao.notas_das_respostas(respostas))
+        if porte in regra_de_avaliacao.NOTA_DE_RECEITA_POR_PORTE:
+            notas["receita"] = regra_de_avaliacao.NOTA_DE_RECEITA_POR_PORTE[porte]
+        return notas
+
+    def _porte_do_rascunho(respostas: dict, grupo: GrupoEconomico) -> str | None:
+        return respostas["porte"]["porte"] if "porte" in respostas else grupo.porte
+
+    def _clientes_novos(
+        sessao: Session, novos: list[GrupoEconomico], contratos: dict, periodo: PeriodoDeAvaliacao | None,
+        janela: JanelaResposta, p_rent: regra_de_parametros.ParametrosDeRentabilidade,
+    ) -> list[ClienteNovo]:
+        if not novos:
+            return []
+        rascunhos = _rascunhos(sessao, periodo)
+        mensal = _mensalidade_por_empresa(sessao)
+        empresas: dict[int, list[EmpresaDoGrupo]] = {}
+        for e in sessao.scalars(
+            sa.select(Empresa).where(Empresa.grupo_id.in_([g.id for g in novos])).order_by(Empresa.razao_social)
+        ):
+            empresas.setdefault(e.grupo_id, []).append(
+                EmpresaDoGrupo(id=e.id, razao_social=e.razao_social, cnpj=e.cnpj, mensalidade=mensal.get(e.id))
+            )
+        saida = []
+        for g in novos:
+            valor, n, desde = contratos[g.id]
+            rascunho = rascunhos.get(g.id)
+            respostas = rascunho.respostas if rascunho else {}
+            porte = _porte_do_rascunho(respostas, g)
+            notas = _notas_do_novo(respostas, porte)
+            rent = None
+            if {"complexidade", "disciplina", "risco"} <= notas.keys():
+                rent = _rentabilidade(valor, porte, Decimal(notas["complexidade"]), Decimal(notas["disciplina"]),
+                                      Decimal(notas["risco"]), janela, p_rent)
+            saida.append(ClienteNovo(
+                grupo_id=g.id, grupo_nome=g.nome, desde=desde, receita_em_contrato=valor, contratos=n,
+                empresas=empresas.get(g.id, []), porte=_porte(g),
+                rascunho=_rascunho_resposta(rascunho, novo=True) if rascunho else None, rentabilidade_do_grupo=rent,
+            ))
+        return saida
+
+    def _mensalidade_por_empresa(sessao: Session) -> dict[int, Decimal]:
+        return {
             e: v for e, v in sessao.execute(
                 sa.select(Contrato.empresa_id, sa.func.sum(Contrato.preco_mensal))
                 .where(Contrato.empresa_id.is_not(None),
@@ -689,6 +794,26 @@ def roteador(
                 .group_by(Contrato.empresa_id)
             )
         }
+
+    @r.get("/classificacao", response_model=ClassificacaoDaCarteira)
+    def classificacao(sessao: Session = Depends(obter_sessao)) -> ClassificacaoDaCarteira:
+        todas, linhas = _leituras(sessao)
+        vistos = {c.grupo_id for c, _ in linhas}
+        periodo = _periodo_aberto(sessao)
+        janela = _janela(sessao)
+        contratos = _receita_em_contrato(sessao)
+        grupos_novos = _grupos_novos(sessao, contratos)
+        _, p_rent = _parametros_vigentes(sessao)
+        novos = _clientes_novos(sessao, grupos_novos, contratos, periodo, janela, p_rent)
+        if not linhas:
+            return ClassificacaoDaCarteira(referencia=None, versao_dos_parametros=None, isc=None, retrato=None,
+                                           por_classe={}, distribuicao_por_classe=[], itens=[], avisos=[],
+                                           periodo=_periodo_resposta(sessao, periodo, linhas, grupos_novos) if periodo else None,
+                                           janela=janela, novos=novos)
+        ativos = set(sessao.scalars(
+            sa.select(Contrato.grupo_id).where(Contrato.situacao.in_([SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO]))
+        ))
+        mensal = _mensalidade_por_empresa(sessao)
         empresas: dict[int, list[EmpresaDoGrupo]] = {}
         for e in sessao.scalars(
             sa.select(Empresa).where(Empresa.grupo_id.in_(vistos)).order_by(Empresa.razao_social)
@@ -710,9 +835,8 @@ def roteador(
                     registrado_em=c.registrado_em, atribuido_por=c.atribuido_por,
                 )
         rascunhos = _rascunhos(sessao, periodo)
-        _, p_rent = _parametros_vigentes(sessao)
         rentabilidade_por_grupo = {
-            c.grupo_id: _rentabilidade(c.receita_mensal, grupos_por_id[c.grupo_id].porte, c.complexidade,
+            c.grupo_id: _rentabilidade(_receita_praticada(c, contratos), grupos_por_id[c.grupo_id].porte, c.complexidade,
                                        c.disciplina, c.risco_tecnico, janela, p_rent)
             for c, _ in linhas
         }
@@ -736,6 +860,8 @@ def roteador(
                 avaliacao=avaliacao_por_grupo.get(c.grupo_id),
                 rascunho=_rascunho_resposta(rascunhos[c.grupo_id]) if c.grupo_id in rascunhos else None,
                 rentabilidade_do_grupo=rentabilidade_por_grupo[c.grupo_id],
+                receita_em_contrato=contratos[c.grupo_id][0] if c.grupo_id in contratos else None,
+                contratos=contratos[c.grupo_id][1] if c.grupo_id in contratos else 0,
             )
             for c, nome in linhas
         ]
@@ -761,6 +887,9 @@ def roteador(
         if parados:
             avisos.append(f"{len(parados)} grupo(s) sem contrato ativo hoje continuam no snapshot da referência: "
                           + ", ".join(parados) + ".")
+        if novos:
+            avisos.append(f"{len(novos)} cliente(s) novo(s), com contrato e sem leitura, entram na Carteira no próximo "
+                          "\"Calcular carteira\": " + ", ".join(n.grupo_nome for n in novos) + ".")
         editados = [nome for c, nome in linhas if c.atribuido_por]
         if editados:
             avisos.append(f"{len(editados)} grupo(s) com nota editada à mão depois da carga: " + ", ".join(editados) + ".")
@@ -776,7 +905,8 @@ def roteador(
             isc=IscResposta(**{k: getattr(calculado, k) for k in IscResposta.model_fields}) if calculado else None,
             retrato=RetratoResposta(**{k: getattr(retrato, k) for k in RetratoResposta.model_fields}) if retrato else None,
             por_classe=dict(sorted(por_classe.items())), distribuicao_por_classe=distribuicao, itens=itens, avisos=avisos,
-            periodo=_periodo_resposta(sessao, periodo, linhas) if periodo else None, janela=janela,
+            periodo=_periodo_resposta(sessao, periodo, linhas, grupos_novos) if periodo else None, janela=janela,
+            novos=novos,
         )
 
     def _ultima(sessao: Session, grupo_id: int) -> ClassificacaoDoGrupo | None:
@@ -861,16 +991,17 @@ def roteador(
 
     def _notas_do_calculo(
         anterior: ClassificacaoDoGrupo, respostas: dict, porte: str | None,
-        p_rent: regra_de_parametros.ParametrosDeRentabilidade,
+        p_rent: regra_de_parametros.ParametrosDeRentabilidade, honorario: Decimal,
     ) -> tuple[dict, regra_de_avaliacao.NotaDeRentabilidadeDoGrupo | None]:
         """As notas das respostas e, com porte e honorário, a nota de Rentabilidade pela margem do CRM.
-        Sem porte ou sem honorário, a rentabilidade fica a anterior."""
+        Sem porte ou sem honorário, a rentabilidade fica a anterior. O honorário é o valor em contrato
+        (ou, sem contrato no CRM, a receita da leitura)."""
         mudou = dict(regra_de_avaliacao.notas_das_respostas(respostas))
         if not porte or porte not in p_rent.horas_base:
             return mudou, None
         parcial = _notas_novas(anterior, mudou)
         rent = regra_de_avaliacao.nota_de_rentabilidade_do_grupo(
-            honorario=anterior.receita_mensal, porte=porte, complexidade=parcial.complexidade,
+            honorario=honorario, porte=porte, complexidade=parcial.complexidade,
             disciplina=parcial.disciplina, risco=parcial.risco, p=p_rent,
         )
         if rent.nota is None:
@@ -881,9 +1012,10 @@ def roteador(
     def _nova_leitura(
         sessao: Session, anterior: ClassificacaoDoGrupo, mudou: dict, parametros: regra.Parametros, *,
         fonte: str, autor: str, motivo: str, respostas: dict | None,
-        rentabilidade: regra_de_avaliacao.NotaDeRentabilidadeDoGrupo | None = None,
+        rentabilidade: regra_de_avaliacao.NotaDeRentabilidadeDoGrupo | None = None, receita: Decimal | None = None,
     ) -> ClassificacaoDoGrupo:
-        """Leitura nova com as notas de `mudou`; o resto copia da anterior (snapshot imutável)."""
+        """Leitura nova com as notas de `mudou`; o resto copia da anterior (snapshot imutável).
+        `receita`, quando vem, é o valor em contrato e substitui a receita da anterior."""
         novas = _notas_novas(anterior, mudou)
         hoje = date.today()
         revisao = 1 + (sessao.scalar(
@@ -895,10 +1027,37 @@ def roteador(
         return ClassificacaoDoGrupo(
             grupo_id=anterior.grupo_id, referencia=hoje, revisao=revisao, fonte=fonte,
             versao_dos_parametros=parametros.versao, atribuido_por=autor.strip(), motivo=motivo.strip(),
-            receita_mensal=anterior.receita_mensal,
+            receita_mensal=receita if receita is not None else anterior.receita_mensal,
             margem=rentabilidade.margem if rentabilidade else anterior.margem,
             horas_por_mes=rentabilidade.horas if rentabilidade else anterior.horas_por_mes,
             rentabilidade_da_planilha=False if rentabilidade else anterior.rentabilidade_da_planilha,
+            nota_receita=novas.receita, nota_rentabilidade=novas.rentabilidade, complexidade=novas.complexidade,
+            disciplina=novas.disciplina, risco_tecnico=novas.risco, cross_sell=novas.cross_sell, adimplencia=novas.adimplencia,
+            semaforo=novas.semaforo, churn=novas.churn, score=pontos.quantize(Decimal("0.0001")), classe=letra,
+            classe_efetiva=regra.classe_efetiva(letra, novas, p=parametros), alerta_de_churn=regra.alerta_de_churn(letra, novas, p=parametros),
+            em_cobranca=regra.cobranca(novas, p=parametros), eixo_de_acao=regra.eixo_de_acao(letra, novas, p=parametros),
+            respostas_da_avaliacao=respostas,
+        )
+
+    def _primeira_leitura(
+        grupo_id: int, notas: dict, parametros: regra.Parametros, *, receita: Decimal,
+        rentabilidade: regra_de_avaliacao.NotaDeRentabilidadeDoGrupo, fonte: str, autor: str, motivo: str,
+        respostas: dict,
+    ) -> ClassificacaoDoGrupo:
+        """A primeira leitura de um cliente novo: todas as notas vêm do rascunho completo, a de Receita
+        pelo porte e a de Rentabilidade pela margem do CRM (decisão de 30/09/2026)."""
+        novas = regra.Notas(
+            receita=notas["receita"], rentabilidade=rentabilidade.nota, complexidade=notas["complexidade"],
+            disciplina=notas["disciplina"], risco=notas["risco"], cross_sell=notas["cross_sell"],
+            adimplencia=notas["adimplencia"], semaforo=notas["semaforo"], churn=notas["churn"],
+        )
+        pontos = regra.score(novas, p=parametros)
+        letra = regra.classe(pontos, p=parametros)
+        return ClassificacaoDoGrupo(
+            grupo_id=grupo_id, referencia=date.today(), revisao=1, fonte=fonte,
+            versao_dos_parametros=parametros.versao, atribuido_por=autor.strip(), motivo=motivo.strip(),
+            receita_mensal=receita, margem=rentabilidade.margem, horas_por_mes=rentabilidade.horas,
+            rentabilidade_da_planilha=False,
             nota_receita=novas.receita, nota_rentabilidade=novas.rentabilidade, complexidade=novas.complexidade,
             disciplina=novas.disciplina, risco_tecnico=novas.risco, cross_sell=novas.cross_sell, adimplencia=novas.adimplencia,
             semaforo=novas.semaforo, churn=novas.churn, score=pontos.quantize(Decimal("0.0001")), classe=letra,
@@ -951,16 +1110,20 @@ def roteador(
             raise HTTPException(409, "nenhum período de avaliação aberto: abra um na Carteira")
         return periodo
 
-    def _grupo_da_carteira(sessao: Session, grupo_id: int) -> tuple[GrupoEconomico, ClassificacaoDoGrupo]:
+    def _grupo_da_carteira(
+        sessao: Session, grupo_id: int,
+    ) -> tuple[GrupoEconomico, ClassificacaoDoGrupo | None, tuple[Decimal, int, date | None] | None]:
+        """O grupo, a leitura mais recente (`None` = cliente novo) e o valor em contrato."""
         grupo = sessao.get(GrupoEconomico, grupo_id)
         if grupo is None:
             raise HTTPException(404, "grupo não encontrado")
         if grupo.fundido_em_id is not None:
             raise HTTPException(409, "grupo fundido em outro: avalie o grupo que ficou")
+        contrato = _receita_em_contrato(sessao).get(grupo_id)
         anterior = _ultima(sessao, grupo_id)
-        if anterior is None:
-            raise HTTPException(409, "o grupo ainda não tem classificação carregada")
-        return grupo, anterior
+        if anterior is None and contrato is None:
+            raise HTTPException(409, "o grupo ainda não tem classificação carregada nem contrato ativo com mensalidade")
+        return grupo, anterior, contrato
 
     @r.get("/periodo", response_model=PeriodoResposta | None)
     def periodo_aberto(sessao: Session = Depends(obter_sessao)) -> PeriodoResposta | None:
@@ -998,10 +1161,12 @@ def roteador(
     def salvar_rascunho(grupo_id: int, corpo: RascunhoEntrada, sessao: Session = Depends(obter_sessao)) -> RascunhoResposta:
         """Grava o que vier, aba por aba, sem mexer no Score. Aba ausente continua como estava."""
         periodo = _exigir_periodo_aberto(sessao)
-        _grupo_da_carteira(sessao, grupo_id)
+        _, anterior, _ = _grupo_da_carteira(sessao, grupo_id)
         novas = corpo.model_dump(exclude={"autor"}, exclude_none=True)
         if not novas:
             raise HTTPException(422, "informe ao menos uma aba")
+        if "saude" in novas and anterior is not None:
+            raise HTTPException(422, "a aba Saúde é só para cliente novo: quem já está na Carteira mantém semáforo e churn da leitura anterior")
         if "porte" in novas:
             porte = novas["porte"]
             if porte["porte"] not in PORTES_VALIDOS:
@@ -1025,19 +1190,23 @@ def roteador(
         rascunho.atualizado_por = corpo.autor.strip()
         rascunho.atualizado_em = agora()
         sessao.commit()
-        return _rascunho_resposta(rascunho)
+        return _rascunho_resposta(rascunho, novo=anterior is None)
 
     @r.post("/periodo/grupos/{grupo_id}/simulacao", response_model=SimulacaoResposta)
     def simular(grupo_id: int, sessao: Session = Depends(obter_sessao)) -> SimulacaoResposta:
         """"Calcular este cliente": o resultado de um grupo com o rascunho atual. **Não grava nada**;
         a carteira só muda no "Calcular carteira"."""
         periodo = _exigir_periodo_aberto(sessao)
-        grupo, anterior = _grupo_da_carteira(sessao, grupo_id)
+        grupo, anterior, contrato = _grupo_da_carteira(sessao, grupo_id)
         rascunho = _rascunhos(sessao, periodo).get(grupo_id)
         respostas = rascunho.respostas if rascunho else {}
         parametros, p_rent = _parametros_vigentes(sessao)
-        porte = respostas["porte"]["porte"] if "porte" in respostas else grupo.porte
-        mudou, _ = _notas_do_calculo(anterior, respostas, porte, p_rent)
+        porte = _porte_do_rascunho(respostas, grupo)
+        janela = _janela(sessao)
+        if anterior is None:
+            return _simular_novo(respostas, porte, contrato[0], parametros, p_rent, janela)
+        honorario = contrato[0] if contrato else anterior.receita_mensal
+        mudou, _ = _notas_do_calculo(anterior, respostas, porte, p_rent, honorario)
         depois = _notas_novas(anterior, mudou)
         pontos = regra.score(depois, p=parametros)
         letra = regra.classe(pontos, p=parametros)
@@ -1049,17 +1218,60 @@ def roteador(
             notas_depois={k: Decimal(getattr(depois, k)) for k in chaves},
             score_antes=anterior.score, score_depois=pontos.quantize(Decimal("0.0001")),
             classe_antes=anterior.classe_efetiva, classe_depois=regra.classe_efetiva(letra, depois, p=parametros),
-            rentabilidade=_rentabilidade(anterior.receita_mensal, porte, depois.complexidade, depois.disciplina,
-                                         depois.risco, _janela(sessao), p_rent),
+            rentabilidade=_rentabilidade(honorario, porte, depois.complexidade, depois.disciplina,
+                                         depois.risco, janela, p_rent),
+        )
+
+    def _rentabilidade_do_novo(
+        notas: dict, porte: str | None, honorario: Decimal, p_rent: regra_de_parametros.ParametrosDeRentabilidade,
+    ) -> regra_de_avaliacao.NotaDeRentabilidadeDoGrupo | None:
+        if not porte or porte not in p_rent.horas_base or not {"complexidade", "disciplina", "risco"} <= notas.keys():
+            return None
+        rent = regra_de_avaliacao.nota_de_rentabilidade_do_grupo(
+            honorario=honorario, porte=porte, complexidade=Decimal(notas["complexidade"]),
+            disciplina=Decimal(notas["disciplina"]), risco=Decimal(notas["risco"]), p=p_rent,
+        )
+        return rent if rent.nota is not None else None
+
+    def _simular_novo(
+        respostas: dict, porte: str | None, honorario: Decimal, parametros: regra.Parametros,
+        p_rent: regra_de_parametros.ParametrosDeRentabilidade, janela: JanelaResposta,
+    ) -> SimulacaoResposta:
+        """Cliente novo: sem "antes"; Score e Classe só com todas as 7 abas."""
+        notas = _notas_do_novo(respostas, porte)
+        rent = _rentabilidade_do_novo(notas, porte, honorario, p_rent)
+        if rent is not None:
+            notas["rentabilidade"] = rent.nota
+        chaves = ("receita", "rentabilidade", "complexidade", "risco", "disciplina", "cross_sell", "adimplencia",
+                  "semaforo", "churn")
+        pendentes = [a for a in regra_de_avaliacao.ABAS_DO_NOVO if a not in respostas]
+        pontos = letra = None
+        if not pendentes and all(k in notas for k in chaves):
+            completas = regra.Notas(**{k: notas[k] for k in chaves})
+            pontos = regra.score(completas, p=parametros)
+            letra = regra.classe_efetiva(regra.classe(pontos, p=parametros), completas, p=parametros)
+            pontos = pontos.quantize(Decimal("0.0001"))
+        rentabilidade = None
+        if {"complexidade", "disciplina", "risco"} <= notas.keys():
+            rentabilidade = _rentabilidade(honorario, porte, Decimal(notas["complexidade"]), Decimal(notas["disciplina"]),
+                                           Decimal(notas["risco"]), janela, p_rent)
+        return SimulacaoResposta(
+            pendentes=pendentes, notas_antes=None,
+            notas_depois={k: (Decimal(notas[k]) if k in notas else None) for k in chaves},
+            score_antes=None, score_depois=pontos, classe_antes=None, classe_depois=letra,
+            rentabilidade=rentabilidade, novo=True,
         )
 
     @r.post("/periodo/calcular", response_model=ResultadoDoCalculo)
     def calcular_carteira(corpo: CalcularCarteira, sessao: Session = Depends(obter_sessao)) -> ResultadoDoCalculo:
         """Aplica os rascunhos de **todos** os grupos de uma vez e fecha o período. Recusa enquanto
-        faltar qualquer aba de qualquer grupo (decisão de 29/09/2026)."""
+        faltar qualquer aba de qualquer grupo (decisão de 29/09/2026). A receita da leitura nova é o
+        valor em contrato; o cliente novo ganha a primeira leitura (decisões de 30/09/2026)."""
         periodo = _exigir_periodo_aberto(sessao)
         _, linhas = _leituras(sessao)
-        situacao = _periodo_resposta(sessao, periodo, linhas)
+        contratos = _receita_em_contrato(sessao)
+        novos = _grupos_novos(sessao, contratos)
+        situacao = _periodo_resposta(sessao, periodo, linhas, novos)
         if situacao.pendentes:
             nomes = ", ".join(p.grupo_nome for p in situacao.pendentes[:10])
             mais = f" e mais {len(situacao.pendentes) - 10}" if len(situacao.pendentes) > 10 else ""
@@ -1068,26 +1280,48 @@ def roteador(
         parametros, p_rent = _parametros_vigentes(sessao)
         rotulo = f"{periodo.mes_de_referencia:%m/%Y}"
         autor = corpo.autor.strip()
+        fonte = f"{FONTE_DO_CALCULO}, período {rotulo}"
+        motivo = f"Avaliação do período {rotulo}, calculada para a carteira inteira"
+        # Primeiro as primeiras leituras: se alguma não fecha, nada é gravado.
+        primeiras = []
+        for g in novos:
+            respostas = rascunhos[g.id].respostas
+            porte = respostas["porte"]["porte"]
+            notas = _notas_do_novo(respostas, porte)
+            rent = _rentabilidade_do_novo(notas, porte, contratos[g.id][0], p_rent)
+            if rent is None or "receita" not in notas:
+                raise HTTPException(409, f"{g.nome}: sem nota de Receita ou de Rentabilidade para o porte {porte}")
+            primeiras.append((g, respostas, porte, notas, rent))
         for c, _nome in linhas:
             respostas = rascunhos[c.grupo_id].respostas
             grupo = sessao.get(GrupoEconomico, c.grupo_id)
-            porte = respostas["porte"]
-            novo_porte = porte["porte"]
-            grupo.porte_justificativa = porte.get("justificativa")
-            for campo in VolumetriaEntrada.model_fields:  # ausente no rascunho = apagado na tela
-                setattr(grupo, campo, porte.get(campo))
-            if grupo.porte != novo_porte:
-                grupo.porte, grupo.porte_definido_por, grupo.porte_definido_em = novo_porte, autor, agora()
-            mudou, rent = _notas_do_calculo(c, respostas, novo_porte, p_rent)
+            novo_porte = _aplicar_porte(grupo, respostas["porte"], autor)
+            receita = contratos[c.grupo_id][0] if c.grupo_id in contratos else None
+            mudou, rent = _notas_do_calculo(c, respostas, novo_porte, p_rent, receita if receita is not None else c.receita_mensal)
             sessao.add(_nova_leitura(
-                sessao, c, mudou, parametros,
-                fonte=f"{FONTE_DO_CALCULO}, período {rotulo}", autor=autor,
-                motivo=f"Avaliação do período {rotulo}, calculada para a carteira inteira",
-                respostas={k: v for k, v in respostas.items() if k != "porte"}, rentabilidade=rent,
+                sessao, c, mudou, parametros, fonte=fonte, autor=autor, motivo=motivo,
+                respostas={k: v for k, v in respostas.items() if k != "porte"}, rentabilidade=rent, receita=receita,
+            ))
+        for g, respostas, porte, notas, rent in primeiras:
+            _aplicar_porte(g, respostas["porte"], autor)
+            sessao.add(_primeira_leitura(
+                g.id, notas, parametros, receita=contratos[g.id][0], rentabilidade=rent, fonte=fonte, autor=autor,
+                motivo=f"Primeira leitura de cliente novo, período {rotulo}",
+                respostas={k: v for k, v in respostas.items() if k != "porte"},
             ))
         periodo.calculado_em, periodo.calculado_por = agora(), autor
         sessao.commit()
-        return ResultadoDoCalculo(periodo=_periodo_resposta(sessao, periodo), grupos_calculados=len(linhas))
+        return ResultadoDoCalculo(periodo=_periodo_resposta(sessao, periodo), grupos_calculados=len(linhas) + len(primeiras))
+
+    def _aplicar_porte(grupo: GrupoEconomico, porte: dict, autor: str) -> str:
+        """O porte do rascunho vai para o grupo, com a volumetria e a justificativa."""
+        novo_porte = porte["porte"]
+        grupo.porte_justificativa = porte.get("justificativa")
+        for campo in VolumetriaEntrada.model_fields:  # ausente no rascunho = apagado na tela
+            setattr(grupo, campo, porte.get(campo))
+        if grupo.porte != novo_porte:
+            grupo.porte, grupo.porte_definido_por, grupo.porte_definido_em = novo_porte, autor, agora()
+        return novo_porte
 
     @r.post("/porte/sugestao", response_model=SugestaoDePorteResposta)
     def sugestao_de_porte(corpo: VolumetriaEntrada) -> SugestaoDePorteResposta:

@@ -82,7 +82,7 @@ export function FaixaDoPeriodo({
 
   const faltam = periodo.grupos - periodo.completos;
   const nomes = periodo.pendentes.slice(0, 6).map((p) =>
-    `${p.grupo_nome} (${p.preenchidas === 0 ? "vazio" : `${p.preenchidas} de ${periodo.abas}`})`,
+    `${p.grupo_nome}${p.novo ? ", novo" : ""} (${p.preenchidas === 0 ? "vazio" : `${p.preenchidas} de ${p.abas ?? periodo.abas}`})`,
   );
   const resto = periodo.pendentes.length - nomes.length;
 

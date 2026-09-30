@@ -711,6 +711,13 @@ class OcorrenciaResposta(Base):
     linha: int | None
     campo: str | None
     texto: str
+    oportunidade_id: int | None = None
+    """A oportunidade que está nesta linha da planilha (30/09/2026). Só na rodada mais recente:
+    `linha_planilha` guarda a posição da última carga, e em rodada antiga a linha pode ter mudado."""
+    oportunidade_nome: str | None = None
+    grupo_nome: str | None = None
+    data_aceite: date | None = None
+    """A data de aceite como está no CRM agora, não como veio da planilha."""
 
 
 class Pagina[T](BaseModel):

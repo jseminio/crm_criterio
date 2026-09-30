@@ -824,6 +824,68 @@ class TestConferencia:
 
         assert pagina["total"] == 2
 
+    def _oportunidades_nas_linhas(self, sessao: Session) -> tuple[int, int]:
+        from crm.db.modelos import GrupoEconomico, Oportunidade
+        from crm.domain.listas import Origem, Situacao, SituacaoGrupo
+
+        g = GrupoEconomico(nome="Grupo Alfa", situacao=SituacaoGrupo.CLIENTE)
+        sessao.add(g)
+        sessao.flush()
+        sem_data = Oportunidade(grupo_id=g.id, nome="Alfa BPO", situacao=Situacao.ACEITA, linha_planilha=12,
+                                origem=Origem.CARGA_2026, chave_origem="a|12")
+        com_data = Oportunidade(grupo_id=g.id, nome="Alfa Folha", situacao=Situacao.ACEITA, linha_planilha=30,
+                                data_aceite=date(2026, 3, 12), origem=Origem.CARGA_2026, chave_origem="a|30")
+        sessao.add_all([sem_data, com_data])
+        sessao.commit()
+        return sem_data.id, com_data.id
+
+    def test_cada_linha_traz_a_oportunidade_o_grupo_e_a_data_de_hoje(self, cliente: TestClient, rodada, sessao: Session):
+        """Pedido de Eduardo (30/09/2026): pela linha não dá para saber que empresa é."""
+        sem_data, com_data = self._oportunidades_nas_linhas(sessao)
+        itens = cliente.get(f"/api/cargas/{rodada}/ocorrencias", params={"campo": "data de aceite"}).json()["itens"]
+
+        assert [(i["linha"], i["oportunidade_id"], i["oportunidade_nome"], i["grupo_nome"], i["data_aceite"]) for i in itens] == [
+            (12, sem_data, "Alfa BPO", "Grupo Alfa", None),
+            (30, com_data, "Alfa Folha", "Grupo Alfa", "2026-03-12"),
+        ]
+
+    def test_linha_sem_oportunidade_fica_sem_nome(self, cliente: TestClient, rodada, sessao: Session):
+        self._oportunidades_nas_linhas(sessao)
+        duplicada = cliente.get(f"/api/cargas/{rodada}/ocorrencias", params={"campo": "linha duplicada"}).json()["itens"][0]
+
+        assert duplicada["linha"] == 317 and duplicada["oportunidade_id"] is None
+
+    def test_rodada_antiga_nao_arrisca_nome(self, cliente: TestClient, rodada, sessao: Session):
+        """A linha guardada é a da última carga; numa rodada anterior ela pode ter mudado de lugar."""
+        from datetime import timedelta
+
+        from crm.db.base import agora
+        from crm.db.modelos import ExecucaoDeCarga
+
+        self._oportunidades_nas_linhas(sessao)
+        sessao.add(ExecucaoDeCarga(
+            executada_em=agora() + timedelta(minutes=1), arquivo="depois.xlsx", lidas=1, de_outro_ano=0,
+            residuais=0, importadas=1, criadas=1, atualizadas=0, inalteradas=0,
+            ignoradas_incompletas=0, ignoradas_duplicatas=0, grupos_criados=1, grupos_reaproveitados=0))
+        sessao.commit()
+        itens = cliente.get(f"/api/cargas/{rodada}/ocorrencias", params={"campo": "data de aceite"}).json()["itens"]
+
+        assert all(i["oportunidade_id"] is None for i in itens)
+
+    def test_linha_com_duas_oportunidades_fica_sem_nome(self, cliente: TestClient, rodada, sessao: Session):
+        from crm.db.modelos import Oportunidade
+        from crm.domain.listas import Origem, Situacao
+
+        sem_data, _ = self._oportunidades_nas_linhas(sessao)
+        grupo_id = sessao.get(Oportunidade, sem_data).grupo_id
+        sessao.add(Oportunidade(grupo_id=grupo_id, nome="Outra", situacao=Situacao.ACEITA, linha_planilha=12,
+                                origem=Origem.CARGA_2026, chave_origem="b|12"))
+        sessao.commit()
+        itens = cliente.get(f"/api/cargas/{rodada}/ocorrencias", params={"campo": "data de aceite"}).json()["itens"]
+
+        assert itens[0]["linha"] == 12 and itens[0]["oportunidade_id"] is None
+        assert itens[1]["oportunidade_nome"] == "Alfa Folha"
+
     def test_carga_inexistente_da_404(self, cliente: TestClient):
         assert cliente.get("/api/cargas/999").status_code == 404
         assert cliente.get("/api/cargas/999/ocorrencias").status_code == 404

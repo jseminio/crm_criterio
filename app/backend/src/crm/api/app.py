@@ -1233,10 +1233,34 @@ def _registrar(api: FastAPI) -> None:
             .offset(salto)
             .limit(limite)
         ).all()
-        return e.Pagina(
-            total=total or 0,
-            itens=[e.OcorrenciaResposta.model_validate(i) for i in itens],
+        # O nome de cada linha, pela oportunidade que a última carga deixou nela. Só na rodada
+        # mais recente: em rodada antiga a linha pode ter mudado de lugar, e nome errado é pior
+        # que nome nenhum. Linha com mais de uma oportunidade também fica sem nome.
+        mais_recente = sessao.scalar(
+            sa.select(ExecucaoDeCarga.id).order_by(
+                ExecucaoDeCarga.executada_em.desc(), ExecucaoDeCarga.id.desc()
+            ).limit(1)
         )
+        por_linha: dict[int, list[tuple[Oportunidade, str]]] = {}
+        linhas = {i.linha for i in itens if i.linha is not None}
+        if carga_id == mais_recente and linhas:
+            for o, nome_do_grupo in sessao.execute(
+                sa.select(Oportunidade, GrupoEconomico.nome)
+                .join(GrupoEconomico, GrupoEconomico.id == Oportunidade.grupo_id)
+                .where(Oportunidade.linha_planilha.in_(linhas))
+            ):
+                por_linha.setdefault(o.linha_planilha, []).append((o, nome_do_grupo))
+
+        def resposta(i: OcorrenciaDeCarga) -> e.OcorrenciaResposta:
+            r = e.OcorrenciaResposta.model_validate(i)
+            achadas = por_linha.get(i.linha) if i.linha is not None else None
+            if achadas and len(achadas) == 1:
+                o, nome_do_grupo = achadas[0]
+                r.oportunidade_id, r.oportunidade_nome = o.id, o.nome
+                r.grupo_nome, r.data_aceite = nome_do_grupo, o.data_aceite
+            return r
+
+        return e.Pagina(total=total or 0, itens=[resposta(i) for i in itens])
 
     # ------------------------------------------------------------------- leads
     @api.get("/api/leads", response_model=e.Pagina[e.LeadResumo], tags=["leads"])

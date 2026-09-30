@@ -7,12 +7,23 @@
 
 import { useState } from "react";
 import { api } from "../api/cliente";
-import type { Execucao, ExecucaoDetalhe, Ocorrencia, Pagina } from "../api/tipos";
+import type { Execucao, ExecucaoDetalhe, Listas, Ocorrencia, Pagina } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
-import { dataHora } from "../formato";
+import { data, dataHora } from "../formato";
 import { usarDados } from "../usarDados";
+import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
+
+const DATA_DE_ACEITE = "data de aceite";
+
+/** "Situação hoje": só a data de aceite tem como ser conferida no CRM agora. */
+function situacaoHoje(o: Ocorrencia): { texto: string; classe: string } | null {
+  if (o.campo !== DATA_DE_ACEITE || !o.oportunidade_id) return null;
+  return o.data_aceite
+    ? { texto: `✓ preenchida: ${data(o.data_aceite)}`, classe: "texto-acima" }
+    : { texto: "· falta preencher", classe: "texto-revisao" };
+}
 
 const TIPOS = [
   {
@@ -53,7 +64,8 @@ function Numero({
   );
 }
 
-function Detalhe({ execucao }: { execucao: ExecucaoDetalhe }) {
+function Detalhe({ execucao, listas, maisRecente }: { execucao: ExecucaoDetalhe; listas: Listas | null; maisRecente: boolean }) {
+  const [aberta, definirAberta] = useState<number | null>(null);
   const [tipo, definirTipo] = useState<string>(
     execucao.pendencias > 0 ? "Precisa de você" : "Ajustado sozinho",
   );
@@ -177,36 +189,86 @@ function Detalhe({ execucao }: { execucao: ExecucaoDetalhe }) {
             {ocorrencias.dados!.itens.length < ocorrencias.dados!.total
               ? `Mostrando as primeiras ${ocorrencias.dados!.itens.length} de ${ocorrencias.dados!.total}, na ordem da planilha. Filtre por campo para ver o resto.`
               : `${ocorrencias.dados!.total} ocorrência${ocorrencias.dados!.total === 1 ? "" : "s"}, na ordem da planilha.`}
+            <ResumoDoAceite ocorrencias={ocorrencias.dados!} />
           </p>
+          {!maisRecente && (
+            <p className="campo-ajuda">
+              Rodada antiga: o nome de cada linha só aparece na carga mais recente, porque as linhas podem ter mudado de
+              lugar desde então.
+            </p>
+          )}
           <table className="tabela">
             <thead>
               <tr>
                 <ThOrdenavel coluna="linha" numerico ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Linha</ThOrdenavel>
+                <ThOrdenavel coluna="oportunidade" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Oportunidade e grupo</ThOrdenavel>
                 <ThOrdenavel coluna="campo" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Campo</ThOrdenavel>
                 <ThOrdenavel coluna="texto" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>O que aconteceu</ThOrdenavel>
+                <ThOrdenavel coluna="situacao" ordenacao={ordenacao} aoAlternar={alternarOrdenacao}>Situação hoje</ThOrdenavel>
               </tr>
             </thead>
             <tbody>
               {ordenar(ocorrencias.dados!.itens, ordenacao, {
                 linha: (o) => o.linha,
+                oportunidade: (o) => o.oportunidade_nome ?? null,
                 campo: (o) => o.campo,
                 texto: (o) => o.texto,
-              }).map((o) => (
-                <tr key={o.id}>
-                  <td className="tabela-numero">{o.linha ?? "—"}</td>
-                  <td>{o.campo ?? "—"}</td>
-                  <td>{o.texto}</td>
-                </tr>
-              ))}
+                situacao: (o) => situacaoHoje(o)?.texto ?? null,
+              }).map((o) => {
+                const hoje = situacaoHoje(o);
+                return (
+                  <tr key={o.id}>
+                    <td className="tabela-numero">{o.linha ?? "—"}</td>
+                    <td>
+                      {o.oportunidade_id ? (
+                        <>
+                          <button type="button" className="link-de-tabela" onClick={() => definirAberta(o.oportunidade_id!)}>
+                            {o.oportunidade_nome}
+                          </button>
+                          <span className="celula-fonte">{o.grupo_nome}</span>
+                        </>
+                      ) : (
+                        <>—{maisRecente && o.linha !== null && <span className="celula-fonte">linha sem oportunidade no CRM</span>}</>
+                      )}
+                    </td>
+                    <td>{o.campo ?? "—"}</td>
+                    <td>{o.texto}</td>
+                    <td className={hoje?.classe}>{hoje?.texto ?? "—"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </>
+      )}
+
+      {aberta !== null && (
+        <DetalheDaOportunidade
+          id={aberta}
+          listas={listas}
+          aoFechar={() => definirAberta(null)}
+          aoSalvar={ocorrencias.recarregar}
+        />
       )}
     </>
   );
 }
 
-export function Conferencia() {
+function ResumoDoAceite({ ocorrencias }: { ocorrencias: Pagina<Ocorrencia> }) {
+  // Só com a lista inteira na tela: contar uma parte daria um número errado.
+  if (ocorrencias.itens.length < ocorrencias.total) return null;
+  const conferiveis = ocorrencias.itens.map(situacaoHoje).filter((s) => s !== null);
+  if (conferiveis.length === 0) return null;
+  const preenchidas = conferiveis.filter((s) => s.classe === "texto-acima").length;
+  return (
+    <strong>
+      {" "}{preenchidas} já preenchida{preenchidas === 1 ? "" : "s"} no CRM, {conferiveis.length - preenchidas}{" "}
+      falta{conferiveis.length - preenchidas === 1 ? "" : "m"}.
+    </strong>
+  );
+}
+
+export function Conferencia({ listas = null }: { listas?: Listas | null }) {
   const [escolhida, definirEscolhida] = useState<number | null>(null);
 
   const cargas = usarDados<Execucao[]>(() => api.cargas(), []);
@@ -261,7 +323,12 @@ export function Conferencia() {
 
       {detalhe.carregando && <Carregando rotulo="Abrindo o relatório" />}
       {detalhe.erro && <Erro mensagem={detalhe.erro} aoTentarDeNovo={detalhe.recarregar} />}
-      {detalhe.dados && <Detalhe key={detalhe.dados.id} execucao={detalhe.dados} />}
+      {detalhe.dados && (
+        <Detalhe
+          key={detalhe.dados.id} execucao={detalhe.dados} listas={listas}
+          maisRecente={detalhe.dados.id === cargas.dados[0].id}
+        />
+      )}
     </>
   );
 }

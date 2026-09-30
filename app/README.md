@@ -766,6 +766,14 @@ base — e confiar na base é a condição para abandonar a planilha.
 **Aviso ≠ bloqueio.** Aceita sem data de aceite avisa e entra; situação
 desconhecida bloqueia. A distinção é do negócio, não do código.
 
+**Cada linha do relatório diz de quem é (pedido de Eduardo, 30/09/2026).** A tela de Conferência
+mostra a oportunidade e o grupo de cada linha, achados pela `linha_planilha` que a carga grava na
+oportunidade. O nome abre a oportunidade para completar, por exemplo, a data de aceite. A coluna
+"Situação hoje" olha o CRM agora: "✓ preenchida: DD/MM/AAAA" ou "· falta preencher", e o topo conta
+quantas faltam. Só na **rodada mais recente**: a `linha_planilha` guarda a posição da última carga,
+e numa rodada antiga a linha pode ter mudado de lugar. Linha com mais de uma oportunidade também
+fica sem nome, porque nome errado é pior que nome nenhum.
+
 ## O que este código deliberadamente não faz
 
 - **Não calcula preço nem margem.** As fórmulas seguem travadas pelos dois

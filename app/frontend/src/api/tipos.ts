@@ -315,6 +315,12 @@ export interface Ocorrencia {
   linha: number | null;
   campo: string | null;
   texto: string;
+  /** A oportunidade desta linha, só na rodada mais recente (a linha pode mudar entre cargas). */
+  oportunidade_id?: number | null;
+  oportunidade_nome?: string | null;
+  grupo_nome?: string | null;
+  /** Como está no CRM agora, não como veio da planilha. */
+  data_aceite?: string | null;
 }
 
 /** Agente SDR (26/09/2026): a fila de abordagens das contas âncora. */

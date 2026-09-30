@@ -148,7 +148,7 @@ export default function App() {
           {tela === "carteira" && <Carteira listas={listas} />}
           {tela === "abordagens" && <Abordagens />}
           {tela === "sdr" && <Sdr listas={listas} />}
-          {tela === "conferencia" && <Conferencia />}
+          {tela === "conferencia" && <Conferencia listas={listas} />}
           {tela === "configuracoes" && <Configuracoes />}
         </main>
       </div>

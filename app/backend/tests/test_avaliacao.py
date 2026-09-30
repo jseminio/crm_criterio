@@ -97,3 +97,16 @@ def test_sem_fator_de_risco_e_o_melhor_caso_no_score_e_no_atrito():
     assert regra.score(regra.Notas(risco=sem, **base)) > regra.score(regra.Notas(risco=com, **base))
     assert P.fator_de_atrito[sem] == 0 and P.fator_de_atrito[com] == max(P.fator_de_atrito.values())
     assert _r("3200", "Médio", 3, 3, sem).margem > _r("3200", "Médio", 3, 3, com).margem
+
+
+def test_nota_de_rentabilidade_do_grupo_pela_regua_de_margem():
+    r = a.nota_de_rentabilidade_do_grupo(honorario=D("3200"), porte="Médio", complexidade=D(3), disciplina=D(3), risco=D(3), p=P)
+    assert r.margem == D("0.6308") and r.horas == D("20.8")
+    assert r.nota == 4  # 60% ≤ margem < 70%
+    r2 = a.nota_de_rentabilidade_do_grupo(honorario=D("1900"), porte="Médio", complexidade=D(2), disciplina=D(5), risco=D(4), p=P)
+    assert r2.margem == D("0.4367") and r2.nota == 2  # 30% ≤ 43,7% < 45%
+
+
+def test_sem_honorario_nao_ha_nota_de_rentabilidade():
+    r = a.nota_de_rentabilidade_do_grupo(honorario=D("0"), porte="Médio", complexidade=D(3), disciplina=D(3), risco=D(3), p=P)
+    assert r.nota is None and r.margem is None

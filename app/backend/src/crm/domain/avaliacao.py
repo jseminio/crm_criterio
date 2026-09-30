@@ -15,12 +15,13 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from crm.domain.rentabilidade import Empresa, ParametrosDeRentabilidade, margem_da_empresa
+from crm.domain.rentabilidade import Empresa, ParametrosDeRentabilidade, margem_da_empresa, nota_de_rentabilidade
 
 __all__ = [
     "ABAS", "FATORES_COMPLEXIDADE", "FATORES_RISCO", "FATORES_CROSS_SELL",
     "nota_de_complexidade", "nota_de_risco", "nota_de_cross_sell", "nota_de_disciplina", "nota_de_adimplencia",
     "notas_das_respostas", "abas_preenchidas", "RentabilidadeDoGrupo", "rentabilidade_do_grupo",
+    "NotaDeRentabilidadeDoGrupo", "nota_de_rentabilidade_do_grupo",
 ]
 
 ABAS = ("complexidade", "risco", "disciplina", "cross_sell", "inadimplencia", "porte")
@@ -136,3 +137,27 @@ def rentabilidade_do_grupo(
         margem=margem, honorario_calculado=calculado, defasagem=defasagem,
         revisao_de_honorarios=margem is not None and margem < margem_minima,
     )
+
+
+@dataclass(frozen=True)
+class NotaDeRentabilidadeDoGrupo:
+    nota: int | None
+    """`None` sem honorário: aí não há margem, e quem chama mantém a nota anterior."""
+    margem: Decimal | None
+    horas: Decimal
+
+
+def nota_de_rentabilidade_do_grupo(
+    *, honorario: Decimal, porte: str, complexidade: Decimal, disciplina: Decimal, risco: Decimal,
+    p: ParametrosDeRentabilidade,
+) -> NotaDeRentabilidadeDoGrupo:
+    """A nota de Rentabilidade do Score pela margem calculada no CRM, no nível do grupo, com a régua de
+    margem dos parâmetros (decisão de Eduardo em 29/09/2026: vale a partir do "Calcular carteira"; o
+    que veio da planilha continua nas leituras anteriores)."""
+    m = margem_da_empresa(
+        Empresa(honorario=honorario, porte=porte, complexidade=_nota_inteira(complexidade),
+                disciplina=_nota_inteira(disciplina), risco=_nota_inteira(risco)),
+        inverter_disciplina=True, p=p,
+    )
+    margem = m.margem.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP) if m.margem is not None else None
+    return NotaDeRentabilidadeDoGrupo(nota=nota_de_rentabilidade(margem, p), margem=margem, horas=m.horas)

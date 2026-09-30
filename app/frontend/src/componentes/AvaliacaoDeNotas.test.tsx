@@ -189,7 +189,7 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
     });
     vi.mocked(api.simularCliente).mockResolvedValue({
       pendentes: ["risco", "disciplina", "cross_sell", "inadimplencia", "porte"],
-      notas_antes: {}, notas_depois: {}, score_antes: "3.4100", score_depois: "3.5200",
+      notas_antes: { rentabilidade: "3.00" }, notas_depois: { rentabilidade: "1" }, score_antes: "3.4100", score_depois: "3.5200",
       classe_antes: "B2", classe_depois: "B2",
       rentabilidade: {
         porte: "Médio", horas: "16.80", custo_de_servir: "669.90", honorario_praticado: "1900.00", margem: "0.5374",
@@ -204,6 +204,7 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
     const resultado = await screen.findByRole("region", { name: "Resultado deste cliente" });
     expect(resultado).toHaveTextContent("A carteira não muda");
     expect(resultado).toHaveTextContent("3,41 → 3,52");
+    expect(resultado).toHaveTextContent("Nota de rentabilidade (pela margem do CRM)3 → 1");
     expect(resultado).toHaveTextContent("53,7%");
     expect(resultado).toHaveTextContent("−46,1% abaixo");
     expect(resultado).toHaveTextContent("Sim, abaixo da mínima");

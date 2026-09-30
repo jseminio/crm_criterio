@@ -308,8 +308,13 @@ possível aos poucos, e a carteira só muda quando todos os grupos estiverem ava
   às da tela: a tela mostra ao vivo, o backend é quem vale no cálculo. Mudou uma, muda a outra.
 - Migração `8f8c7f3862e8` (só acrescenta duas tabelas e uma coluna). **Rode `alembic upgrade head`.**
 
-**Limite conferido:** a nota de Rentabilidade do Score (25%) continua a da planilha; a margem
-calculada aqui serve ao honorário, à defasagem e ao filtro, e não altera o Score.
+**Rentabilidade do Score pela margem do CRM (decisão de Eduardo, 29/09/2026):** a partir do
+"Calcular carteira", a nota de Rentabilidade (25% do Score) sai da margem calculada no CRM, no
+nível do grupo, pela régua de margem dos Parâmetros (30% → 2, 45% → 3, 60% → 4, 70% → 5), e a
+leitura grava a margem e as horas usadas. As leituras anteriores continuam com a nota da planilha,
+e a coluna "Rentabilidade" da Carteira mostra a da planilha até o primeiro cálculo e a do CRM
+depois dele. "Calcular este cliente" já mostra a nota nova (antes → depois). Sem honorário
+praticado não há margem, e o grupo mantém a nota anterior.
 
 ## Carteira: avaliação dos sete componentes do Score, em abas (27/09/2026, ampliado 28/09/2026)
 

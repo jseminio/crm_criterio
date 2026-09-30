@@ -302,6 +302,57 @@ class TestCriacaoDeOportunidade:
         assert cliente.post("/api/oportunidades", json={}).status_code == 422
 
 
+class TestParcelasDaOportunidadeNova:
+    """Recorrente (C1): preço anual = mensal × parcelas, travado. Pedido de
+    Karine em 30/09/2026."""
+
+    def test_recorrente_calcula_o_anual_pelas_parcelas(self, cliente: TestClient):
+        corpo = cliente.post(
+            "/api/oportunidades",
+            json={"nome": "Delta", "servico": "BPO Financeiro", "preco_mensal": "5000.00",
+                  "quantidade_parcelas": 12},
+        ).json()
+
+        assert corpo["quantidade_parcelas"] == 12
+        assert Decimal(corpo["preco_anual"]) == Decimal("60000.00")
+
+    def test_recorrente_ignora_o_anual_digitado(self, cliente: TestClient):
+        corpo = cliente.post(
+            "/api/oportunidades",
+            json={"nome": "Delta", "servico": "Dep. Pessoal", "preco_mensal": "1000",
+                  "quantidade_parcelas": 6, "preco_anual": "99999"},
+        ).json()
+
+        assert Decimal(corpo["preco_anual"]) == Decimal("6000")
+
+    def test_parcelas_sem_mensal_da_422(self, cliente: TestClient):
+        resposta = cliente.post(
+            "/api/oportunidades",
+            json={"nome": "Delta", "servico": "BPO Financeiro", "quantidade_parcelas": 12},
+        )
+
+        assert resposta.status_code == 422
+
+    def test_nao_recorrente_descarta_as_parcelas(self, cliente: TestClient):
+        corpo = cliente.post(
+            "/api/oportunidades",
+            json={"nome": "Delta", "servico": "Legalização Empresarial", "preco_mensal": "1000",
+                  "preco_anual": "4000", "quantidade_parcelas": 12},
+        ).json()
+
+        assert corpo["quantidade_parcelas"] is None
+        assert Decimal(corpo["preco_anual"]) == Decimal("4000")
+
+    def test_parcelas_fora_da_faixa_da_422(self, cliente: TestClient):
+        for parcelas in (0, 121):
+            resposta = cliente.post(
+                "/api/oportunidades",
+                json={"nome": "Delta", "servico": "BPO Financeiro", "preco_mensal": "1",
+                      "quantidade_parcelas": parcelas},
+            )
+            assert resposta.status_code == 422
+
+
 class TestVolumetriaEPorte:
     """A régua de porte (E4, 23/09/2026) — sempre sugestão, nunca decisão.
     Ver `crm.domain.porte` e `regua-de-porte-e-plano-de-teste.md`."""

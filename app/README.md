@@ -1148,6 +1148,23 @@ inventar uma barra de ações nova.
 provavelmente envolve o Bruno na definição do template — escopo maior,
 adiado para quando entrar em pauta.
 
+### Parcelas no serviço recorrente (30/09/2026)
+
+Pedido de Karine: em "Nova oportunidade", quando o serviço escolhido é
+**recorrente (C1)**, aparece o campo **Quantidade de parcelas** (1 a 120) e o
+**Preço anual** deixa de ser digitado — vira `preço mensal × parcelas`, travado
+(somente leitura). Exemplo: R$ 5.000,00 × 12 = R$ 60.000,00.
+
+- A quantidade fica guardada em `oportunidade.quantidade_parcelas` (migração
+  `3b1d5c0a9e27`) e volta no detalhe da oportunidade.
+- O servidor refaz a conta em `POST /api/oportunidades`: com serviço C1 e
+  parcelas, qualquer `preco_anual` enviado é ignorado; parcelas sem preço
+  mensal dão 422. Em serviço não recorrente (C2) ou fora do catálogo, as
+  parcelas são descartadas e o preço anual segue livre, como antes.
+- A conta na tela é feita em centavos inteiros (`src/parcelas.ts`), para o
+  valor mostrado bater com o gravado.
+- Vale só para a criação. A edição de preço no detalhe não mudou.
+
 ## A régua de porte — sugestão, nunca decisão (23/09/2026)
 
 Especificada em `../regua-de-porte-e-plano-de-teste.md`. O próprio documento

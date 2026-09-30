@@ -371,6 +371,9 @@ class Oportunidade(CarimboMixin, Base):
 
     preco_mensal: Mapped[Decimal | None] = mapped_column(DINHEIRO)
     preco_anual: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    quantidade_parcelas: Mapped[int | None] = mapped_column(sa.SmallInteger)
+    """Só em serviço recorrente (C1): o preço anual é mensal × parcelas, sem ajuste à mão.
+    Pedido de Karine em 30/09/2026."""
     valor_mensalizado: Mapped[Decimal | None] = mapped_column(DINHEIRO)
 
     proxima_acao: Mapped[str | None] = mapped_column(sa.String(200))

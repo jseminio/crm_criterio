@@ -40,6 +40,8 @@ export interface OportunidadeResumo {
   data_colocacao: string | null;
   preco_mensal: string | null;
   preco_anual: string | null;
+  /** Só em serviço recorrente: o anual é mensal × parcelas. */
+  quantidade_parcelas?: number | null;
   proxima_acao: string | null;
   proxima_acao_em: string | null;
 }

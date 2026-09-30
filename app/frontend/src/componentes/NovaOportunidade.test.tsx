@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
 import type { Listas, OportunidadeDetalhe } from "../api/tipos";
+import { precoPelasParcelas } from "../parcelas";
 import { NovaOportunidade } from "./NovaOportunidade";
 
 vi.mock("../api/cliente", async () => {
@@ -86,6 +87,57 @@ describe("NovaOportunidade", () => {
 
     await waitFor(() => expect(api.criarOportunidade).toHaveBeenCalledOnce());
     expect(vi.mocked(api.criarOportunidade).mock.calls[0][0]).toMatchObject({ servico: "Auditoria" });
+  });
+
+  it("serviço recorrente pede parcelas e trava o anual em mensal × parcelas", async () => {
+    vi.mocked(api.criarOportunidade).mockResolvedValue({} as OportunidadeDetalhe);
+    render(<NovaOportunidade listas={LISTAS} aoFechar={() => {}} aoCriar={() => {}} />);
+
+    expect(screen.queryByLabelText("Quantidade de parcelas")).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Nome da oportunidade"), "Delta");
+    await userEvent.click(screen.getByRole("button", { name: /^Serviço/ }));
+    await userEvent.click(await screen.findByRole("option", { name: "BPO Contábil e Fiscal" }));
+    await userEvent.click(screen.getByRole("button", { name: "Usar este serviço" }));
+
+    await userEvent.type(screen.getByLabelText("Preço mensal"), "5000");
+    await userEvent.type(screen.getByLabelText("Quantidade de parcelas"), "12");
+    const anual = screen.getByLabelText("Preço anual");
+    expect(anual).toHaveAttribute("readonly");
+    expect(anual).toHaveValue(60000);
+
+    await userEvent.click(screen.getByRole("button", { name: /criar oportunidade/i }));
+    await waitFor(() => expect(api.criarOportunidade).toHaveBeenCalledOnce());
+    expect(vi.mocked(api.criarOportunidade).mock.calls[0][0]).toMatchObject({
+      preco_mensal: "5000",
+      quantidade_parcelas: "12",
+      preco_anual: "60000.00",
+    });
+  });
+
+  it("serviço não recorrente não tem parcelas e o anual segue livre", async () => {
+    vi.mocked(api.criarOportunidade).mockResolvedValue({} as OportunidadeDetalhe);
+    render(<NovaOportunidade listas={LISTAS} aoFechar={() => {}} aoCriar={() => {}} />);
+
+    await userEvent.type(screen.getByLabelText("Nome da oportunidade"), "Delta");
+    await userEvent.click(screen.getByRole("button", { name: /^Serviço/ }));
+    await userEvent.click(await screen.findByRole("option", { name: "Auditoria" }));
+    await userEvent.click(screen.getByRole("button", { name: "Usar este serviço" }));
+
+    expect(screen.queryByLabelText("Quantidade de parcelas")).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Preço anual"), "4000");
+    await userEvent.click(screen.getByRole("button", { name: /criar oportunidade/i }));
+
+    await waitFor(() => expect(api.criarOportunidade).toHaveBeenCalledOnce());
+    const [corpo] = vi.mocked(api.criarOportunidade).mock.calls[0];
+    expect(corpo).toMatchObject({ preco_anual: "4000" });
+    expect(corpo).not.toHaveProperty("quantidade_parcelas");
+  });
+
+  it("a conta das parcelas é feita em centavos", () => {
+    expect(precoPelasParcelas("0.10", "3")).toBe("0.30");
+    expect(precoPelasParcelas("1234.56", "12")).toBe("14814.72");
+    expect(precoPelasParcelas("", "12")).toBe("");
+    expect(precoPelasParcelas("100", "0")).toBe("");
   });
 
   it("mostra o erro da API sem fechar o painel", async () => {

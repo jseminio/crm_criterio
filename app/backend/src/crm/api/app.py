@@ -562,6 +562,17 @@ def _registrar(api: FastAPI) -> None:
                 sessao.add(grupo)
                 sessao.flush()
 
+        # Recorrente (C1) com parcelas: o preço anual é mensal × parcelas e
+        # não aceita ajuste à mão. Pedido de Karine em 30/09/2026. Fora do C1
+        # a quantidade de parcelas não se aplica e é descartada.
+        linha = linha_do_servico(corpo.servico)
+        parcelas = corpo.quantidade_parcelas if linha is LinhaServico.C1 else None
+        preco_anual = corpo.preco_anual
+        if parcelas is not None:
+            if corpo.preco_mensal is None:
+                raise HTTPException(422, "informe o preço mensal para calcular o preço anual pelas parcelas")
+            preco_anual = corpo.preco_mensal * parcelas
+
         oportunidade = Oportunidade(
             grupo_id=grupo.id,
             nome=corpo.nome,
@@ -569,7 +580,7 @@ def _registrar(api: FastAPI) -> None:
             tipo_servico=corpo.tipo_servico,
             servico_descricao=(corpo.servico_descricao or "").strip() or None,
             servico_tema=(corpo.servico_tema or "").strip() or None,
-            linha_servico=linha_do_servico(corpo.servico),
+            linha_servico=linha,
             situacao=Situacao.ENVIAR_PROPOSTA,
             temperatura=corpo.temperatura,
             tipo_canal=corpo.tipo_canal,
@@ -577,7 +588,8 @@ def _registrar(api: FastAPI) -> None:
             captador=corpo.captador,
             data_colocacao=corpo.data_colocacao or date.today(),
             preco_mensal=corpo.preco_mensal,
-            preco_anual=corpo.preco_anual,
+            preco_anual=preco_anual,
+            quantidade_parcelas=parcelas,
             origem=Origem.CRM,
         )
         sessao.add(oportunidade)

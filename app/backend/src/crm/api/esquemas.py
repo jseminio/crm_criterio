@@ -223,6 +223,7 @@ class OportunidadeResumo(Base):
     data_colocacao: date | None = None
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
+    quantidade_parcelas: int | None = None
     proxima_acao: str | None = None
     proxima_acao_em: date | None = None
 
@@ -363,6 +364,8 @@ class OportunidadeNova(BaseModel):
     data_colocacao: date | None = None
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
+    quantidade_parcelas: int | None = Field(default=None, ge=1, le=120)
+    """Só vale em serviço recorrente (C1): lá o preço anual é mensal × parcelas."""
     captador: str | None = Field(default=None, max_length=10)
     temperatura: Temperatura | None = None
     tipo_canal: TipoCanal | None = None

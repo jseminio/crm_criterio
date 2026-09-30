@@ -3,11 +3,17 @@
  *
  * O grupo é reaproveitado pelo nome, ou nasce um novo — mesmo padrão da
  * conversão de lead: um campo de texto só, sem seletor de grupo existente.
+ *
+ * Serviço recorrente (C1) pede a quantidade de parcelas, e o preço anual
+ * passa a ser mensal × parcelas, travado. Pedido de Karine em 30/09/2026; o
+ * servidor refaz a conta e ignora qualquer anual digitado.
  */
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { Listas } from "../api/tipos";
+import type { Listas, ServicoDoCatalogo } from "../api/tipos";
+import { precoPelasParcelas } from "../parcelas";
+import { usarDados } from "../usarDados";
 import { EscolhaDeServico } from "./CatalogoDeServicos";
 import { PainelLateral } from "./PainelLateral";
 
@@ -25,6 +31,7 @@ const CAMPOS_VAZIOS = {
   data_colocacao: hoje(),
   preco_mensal: "",
   preco_anual: "",
+  quantidade_parcelas: "",
   captador: "",
   temperatura: "",
   tipo_canal: "",
@@ -43,6 +50,10 @@ export function NovaOportunidade({
   const [campos, definirCampos] = useState(CAMPOS_VAZIOS);
   const [erro, definirErro] = useState<string | null>(null);
   const [salvando, definirSalvando] = useState(false);
+  const { dados: catalogo } = usarDados<ServicoDoCatalogo[]>(() => api.servicos(), []);
+  const recorrente =
+    catalogo?.find((s) => s.nome === campos.servico)?.recorrente ?? false;
+  const anualCalculado = precoPelasParcelas(campos.preco_mensal, campos.quantidade_parcelas);
 
   const mudar = (campo: string, valor: string) =>
     definirCampos((atual) => ({ ...atual, [campo]: valor }));
@@ -51,8 +62,11 @@ export function NovaOportunidade({
     definirSalvando(true);
     definirErro(null);
     try {
+      const valores = recorrente
+        ? { ...campos, preco_anual: anualCalculado }
+        : { ...campos, quantidade_parcelas: "" };
       const corpo = Object.fromEntries(
-        Object.entries(campos).filter(([, v]) => v !== ""),
+        Object.entries(valores).filter(([, v]) => v !== ""),
       );
       await api.criarOportunidade(corpo);
       aoCriar();
@@ -149,10 +163,42 @@ export function NovaOportunidade({
           {campo("tipo_servico", "Tipo de serviço", { placeholder: "Contabilidade" })}
         </div>
 
-        <div className="formulario-duplo">
-          {campo("preco_mensal", "Preço mensal", { type: "number", step: "0.01", min: "0" })}
-          {campo("preco_anual", "Preço anual", { type: "number", step: "0.01", min: "0" })}
-        </div>
+        {recorrente ? (
+          <>
+            <div className="formulario-duplo">
+              {campo("preco_mensal", "Preço mensal", { type: "number", step: "0.01", min: "0" })}
+              {campo("quantidade_parcelas", "Quantidade de parcelas", {
+                type: "number",
+                step: "1",
+                min: "1",
+                max: "120",
+                placeholder: "12",
+              })}
+            </div>
+            <div className="campo-bloco">
+              <label className="campo-rotulo" htmlFor="n-preco_anual">
+                Preço anual
+              </label>
+              <input
+                id="n-preco_anual"
+                className="entrada"
+                type="number"
+                value={anualCalculado}
+                readOnly
+                aria-describedby="n-preco_anual-ajuda"
+              />
+              <p id="n-preco_anual-ajuda" className="campo-ajuda">
+                Serviço recorrente: calculado como preço mensal × quantidade de parcelas. Não se
+                ajusta à mão.
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="formulario-duplo">
+            {campo("preco_mensal", "Preço mensal", { type: "number", step: "0.01", min: "0" })}
+            {campo("preco_anual", "Preço anual", { type: "number", step: "0.01", min: "0" })}
+          </div>
+        )}
 
         {campo("data_colocacao", "Data de originação", { type: "date" })}
 

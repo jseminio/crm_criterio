@@ -59,6 +59,8 @@
   border-radius: var(--raio-sm); padding: var(--e2) var(--e3); min-height: 34px;
 }
 .entrada:hover, .selecao:hover { border-color: var(--borda-forte); }
+.entrada[readonly] { background: var(--surface-sunken); color: var(--texto-medio); cursor: not-allowed; }
+.entrada[readonly]:hover { border-color: var(--borda); }
 .entrada-busca { min-width: 260px; }
 
 .botao {

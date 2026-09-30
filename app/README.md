@@ -531,6 +531,18 @@ salva a empresa**.
   `GET /api/contatos/pessoas` passou a trazer `empresas` (todas as da pessoa).
 - Abordagens (ficha do SDR) e a planilha de lacunas de contato passaram a ler os vínculos.
 
+**Excluir contato e empresa (30/09/2026).** Pedido de Karine, proposta aprovada. Os botões ficam **no
+fim do painel** da pessoa e da empresa, longe dos botões do dia a dia, e pedem **confirmação em dois
+passos**, dizendo o que vai sumir ("Não dá para desfazer").
+
+- **Excluir contato** apaga a pessoa da base e de todas as empresas em que está
+  (`DELETE /api/contatos/pessoas/{id}`). Para tirar de uma empresa só, use **Desvincular**.
+- **Excluir empresa** apaga a empresa; os contatos **continuam na base** (só o vínculo some) e o grupo
+  fica (`DELETE /api/empresas/{id}`).
+- **Empresa com contrato não pode ser excluída**, em qualquer situação do contrato: apagar quebraria o
+  histórico, o MRR e a carteira. A API responde 409 e o painel mostra o motivo no lugar do botão
+  (`tem_contrato` em `GET /api/contatos/empresas`).
+
 **Pendente, por decisão:** a base tem **33 e-mails repetidos**, provavelmente a mesma pessoa cadastrada
 em mais de uma empresa. Juntar cada caso numa pessoa só fica para depois, caso a caso, com aprovação.
 

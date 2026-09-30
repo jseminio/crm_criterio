@@ -247,3 +247,34 @@ class TestBaseUnicaDeContatos:
     def test_contato_novo_ja_nasce_principal(self, cliente, base):
         r = cliente.post("/api/contatos/pessoas", json={"nome": "Chefe", "empresa_id": base["e2"], "principal": True})
         assert r.json()["principal"] is True
+
+
+class TestExclusao:
+    """Excluir contato e empresa — irreversível, com trava para empresa com contrato.
+    Pedido de Karine em 30/09/2026."""
+
+    def test_excluir_pessoa_tira_de_todas_as_empresas(self, cliente, base):
+        maria = cliente.get("/api/contatos/pessoas/busca", params={"busca": "maria"}).json()[0]["id"]
+        cliente.post(f"/api/empresas/{base['e2']}/contatos", json={"pessoa_id": maria})
+        assert cliente.delete(f"/api/contatos/pessoas/{maria}").status_code == 204
+        assert cliente.get("/api/contatos/pessoas/busca", params={"busca": "maria"}).json() == []
+        empresas = cliente.get("/api/contatos/empresas", params={"tipo": "cliente"}).json()["itens"]
+        assert all(c["nome"] != "Maria Silva" for e in empresas for c in e["contatos"])
+        assert cliente.delete(f"/api/contatos/pessoas/{maria}").status_code == 404
+
+    def test_empresa_com_contrato_nao_sai(self, cliente, base):
+        e1 = cliente.get("/api/contatos/empresas", params={"tipo": "cliente", "busca": "comercio"}).json()["itens"][0]
+        assert e1["tem_contrato"] is True
+        r = cliente.delete(f"/api/empresas/{base['e1']}")
+        assert r.status_code == 409 and "contrato" in r.json()["detail"]
+
+    def test_excluir_empresa_mantem_os_contatos_e_o_grupo(self, cliente, base):
+        livre = cliente.post("/api/contatos/pessoas", json={"nome": "Livre", "empresa_id": base["e3"]}).json()["id"]
+        e3 = cliente.get("/api/contatos/empresas", params={"tipo": "prospect", "busca": "beta"}).json()["itens"][0]
+        assert e3["tem_contrato"] is False
+        assert cliente.delete(f"/api/empresas/{base['e3']}").status_code == 204
+        pessoa = cliente.get("/api/contatos/pessoas/busca", params={"busca": "livre"}).json()[0]
+        assert pessoa["id"] == livre and pessoa["empresas"] == []
+        itens = cliente.get("/api/contatos/empresas", params={"tipo": "prospect", "busca": "beta"}).json()["itens"]
+        assert [(i["grupo_nome"], i["empresa_id"]) for i in itens] == [("Beta Prospect", None)]
+        assert cliente.delete(f"/api/empresas/{base['e3']}").status_code == 404

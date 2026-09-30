@@ -13,7 +13,7 @@ vi.mock("../api/cliente", async () => {
       contatosPorEmpresa: vi.fn(), contatosPorPessoa: vi.fn(), criarContato: vi.fn(), editarContato: vi.fn(),
       editarEmpresa: vi.fn(), criarEmpresaDoGrupo: vi.fn(),
       buscarPessoas: vi.fn(), criarEmpresa: vi.fn(), vincularContato: vi.fn(), marcarPrincipal: vi.fn(),
-      desvincularContato: vi.fn(),
+      desvincularContato: vi.fn(), excluirPessoa: vi.fn(), excluirEmpresa: vi.fn(),
     },
   };
 });
@@ -254,6 +254,52 @@ describe("Contatos — clientes e prospects separados", () => {
       await userEvent.type(screen.getByLabelText(/buscar por nome, e-mail ou telefone/i), "livre");
       await userEvent.click(await screen.findByRole("button", { name: "Vincular" }));
       await waitFor(() => expect(api.vincularContato).toHaveBeenCalledWith(10, 7));
+    });
+  });
+
+  describe("Excluir contato e empresa (30/09/2026)", () => {
+    it("exclui a empresa só depois de confirmar, avisando que os contatos ficam", async () => {
+      vi.mocked(api.contatosPorEmpresa).mockResolvedValue({
+        total: 1, itens: [entidade({ tem_contrato: false, contatos: [pessoa()] })],
+      });
+      vi.mocked(api.excluirEmpresa).mockResolvedValue(undefined);
+      render(<Contatos listas={null} />);
+      await userEvent.click((await screen.findAllByRole("button", { name: "Abrir" }))[0]);
+      await userEvent.click(screen.getByRole("button", { name: "Excluir empresa" }));
+      expect(api.excluirEmpresa).not.toHaveBeenCalled();
+      const dialogo = screen.getByRole("alertdialog", { name: "Excluir empresa" });
+      expect(dialogo).toHaveTextContent("1 contato vinculado continua na base");
+      expect(dialogo).toHaveTextContent("Não dá para desfazer");
+      await userEvent.click(within(dialogo).getByRole("button", { name: "Confirmar" }));
+      await waitFor(() => expect(api.excluirEmpresa).toHaveBeenCalledWith(10));
+    });
+
+    it("empresa com contrato não oferece a exclusão", async () => {
+      vi.mocked(api.contatosPorEmpresa).mockResolvedValue({ total: 1, itens: [entidade({ tem_contrato: true })] });
+      render(<Contatos listas={null} />);
+      await userEvent.click((await screen.findAllByRole("button", { name: "Abrir" }))[0]);
+      expect(screen.queryByRole("button", { name: "Excluir empresa" })).toBeNull();
+      expect(screen.getByText(/tem contrato e não pode ser excluída/)).toBeInTheDocument();
+    });
+
+    it("cancelar não exclui o contato; confirmar exclui", async () => {
+      vi.mocked(api.contatosPorPessoa).mockResolvedValue({
+        total: 1,
+        itens: [dePessoa({ empresas: [
+          { empresa_id: 10, razao_social: "Alfa Comércio Ltda", grupo_id: 1, grupo_nome: "Grupo Alfa", principal: false },
+        ] })],
+      });
+      vi.mocked(api.excluirPessoa).mockResolvedValue(undefined);
+      render(<Contatos listas={null} />);
+      await userEvent.click(await screen.findByRole("button", { name: "Pessoa" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Maria Silva" }));
+      await userEvent.click(screen.getByRole("button", { name: "Excluir contato" }));
+      expect(screen.getByRole("alertdialog")).toHaveTextContent("Maria Silva sai da base e da empresa Alfa Comércio Ltda.");
+      await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+      expect(api.excluirPessoa).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole("button", { name: "Excluir contato" }));
+      await userEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+      await waitFor(() => expect(api.excluirPessoa).toHaveBeenCalledWith(1));
     });
   });
 });

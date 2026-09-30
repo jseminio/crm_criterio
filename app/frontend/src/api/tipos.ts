@@ -539,6 +539,8 @@ export interface EntidadeDeContato {
   recorrente: boolean;
   /** Só prospect. */
   propostas: number;
+  /** A empresa tem contrato (em qualquer situação): não pode ser excluída. */
+  tem_contrato?: boolean;
   contatos: PessoaDeContato[];
   /** Dos sete itens (contato, e-mail, telefone, logradouro, município, UF, CEP), o que falta. */
   lacunas: string[];

@@ -90,6 +90,8 @@ class Entidade(Base):
     consultoria pontual): decisão de Eduardo, 26/09/2026. Sempre falso para prospect."""
     propostas: int = 0
     """Só prospect: quantas propostas o grupo tem."""
+    tem_contrato: bool = False
+    """A empresa tem contrato (em qualquer situação): não pode ser excluída."""
     contatos: list[Pessoa] = []
     lacunas: list[str] = []
 
@@ -250,6 +252,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
             sa.select(Oportunidade.grupo_id, sa.func.count()).where(Oportunidade.grupo_id.in_(ids)).group_by(Oportunidade.grupo_id)
         ).all())
         mensal = _mensalidades(sessao)
+        com_contrato = set(sessao.scalars(sa.select(Contrato.empresa_id).where(Contrato.empresa_id.is_not(None)).distinct()))
 
         saida: list[Entidade] = []
         for g in grupos:
@@ -273,7 +276,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
                     tipo=tipo, grupo_id=g.id, grupo_nome=g.nome, empresa_id=e.id, razao_social=e.razao_social,
                     nome_fantasia=e.nome_fantasia, cnpj=e.cnpj, endereco=Endereco.model_validate(e),
                     mensalidade=str(v) if v is not None else None, recorrente=v is not None and tipo == "cliente",
-                    propostas=propostas.get(g.id, 0),
+                    propostas=propostas.get(g.id, 0), tem_contrato=e.id in com_contrato,
                     contatos=ps, lacunas=lacunas_de(e, ps),
                 ))
         return saida
@@ -409,6 +412,16 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         sessao.flush()
         return Pessoa.model_validate(p)
 
+    @r.delete("/pessoas/{pessoa_id}", status_code=204)
+    def excluir_pessoa(pessoa_id: int, sessao: Session = Depends(obter_sessao)) -> None:
+        """Apaga a pessoa da base e de todas as empresas em que está. Irreversível: a tela pede
+        confirmação antes. Pedido de Karine em 30/09/2026."""
+        p = sessao.get(PessoaContato, pessoa_id)
+        if p is None:
+            raise HTTPException(404, "contato não encontrado")
+        sessao.delete(p)
+        sessao.flush()
+
     return r
 
 
@@ -482,6 +495,20 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
             sessao.add(VinculoDeContato(pessoa_id=pessoa_id, empresa_id=e.id, principal=principal))
         sessao.flush()
         return {"id": e.id, "razao_social": e.razao_social, "cnpj": e.cnpj, "grupo_id": grupo.id, "grupo_nome": grupo.nome}
+
+    @r.delete("/api/empresas/{empresa_id}", status_code=204)
+    def excluir_empresa(empresa_id: int, sessao: Session = Depends(obter_sessao)) -> None:
+        """Apaga a empresa. Os contatos continuam na base (só o vínculo some) e o grupo fica.
+        Empresa com contrato não sai: apagar quebraria o histórico, o MRR e a carteira.
+        Pedido de Karine em 30/09/2026, com essa trava aprovada."""
+        e = sessao.get(Empresa, empresa_id)
+        if e is None:
+            raise HTTPException(404, "empresa não encontrada")
+        if sessao.scalar(sa.select(Contrato.id).where(Contrato.empresa_id == empresa_id).limit(1)) is not None:
+            raise HTTPException(409, "esta empresa tem contrato; encerre ou mova o contrato antes de excluir")
+        sessao.execute(sa.delete(VinculoDeContato).where(VinculoDeContato.empresa_id == empresa_id))
+        sessao.delete(e)
+        sessao.flush()
 
     def _vinculo(sessao: Session, empresa_id: int, pessoa_id: int) -> VinculoDeContato:
         v = sessao.scalar(sa.select(VinculoDeContato).where(

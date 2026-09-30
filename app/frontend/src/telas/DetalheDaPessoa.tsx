@@ -4,6 +4,7 @@
 
 import type { Listas, PessoaComOrigem } from "../api/tipos";
 import { api } from "../api/cliente";
+import { ExclusaoConfirmada } from "../componentes/ExclusaoConfirmada";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { FormularioDePessoa } from "./DetalheDoContato";
 
@@ -57,6 +58,20 @@ export function DetalheDaPessoa({
         <FormularioDePessoa key={pessoa.id} inicial={pessoa} papeis={listas?.papeis_de_contato ?? []}
           rotulo="Salvar contato" aoSalvar={salvar} />
       </div>
+
+      <ExclusaoConfirmada
+        rotulo="Excluir contato"
+        aviso={empresas.length === 0
+          ? `${pessoa.nome} sai da base de contatos.`
+          : empresas.length === 1
+            ? `${pessoa.nome} sai da base e da empresa ${empresas[0].razao_social}.`
+            : `${pessoa.nome} sai da base e das ${empresas.length} empresas em que está (${empresas.map((e) => e.razao_social).join(", ")}).`}
+        aoConfirmar={async () => {
+          await api.excluirPessoa(pessoa.id);
+          aoMudar();
+          aoFechar();
+        }}
+      />
     </PainelLateral>
   );
 }

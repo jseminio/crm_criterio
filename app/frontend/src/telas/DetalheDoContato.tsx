@@ -12,6 +12,7 @@ import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { EntidadeDeContato, Listas, PessoaDeContato } from "../api/tipos";
 import { BuscaDeContato } from "../componentes/BuscaDeContato";
+import { ExclusaoConfirmada } from "../componentes/ExclusaoConfirmada";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { dinheiro } from "../formato";
 
@@ -291,7 +292,24 @@ export function DetalheDoContato({
       </div>
 
       {entidade.empresa_id !== null ? (
-        <Endereco key={entidade.empresa_id} entidade={entidade} aoMudar={aoMudar} />
+        <>
+          <Endereco key={entidade.empresa_id} entidade={entidade} aoMudar={aoMudar} />
+          <ExclusaoConfirmada
+            rotulo="Excluir empresa"
+            bloqueio={entidade.tem_contrato ? "Esta empresa tem contrato e não pode ser excluída. Encerre ou mova o contrato antes." : null}
+            aviso={(() => {
+              const vinculados = entidade.contatos.filter((p) => !p.do_grupo).length;
+              return vinculados
+                ? `${vinculados} contato${vinculados === 1 ? "" : "s"} vinculado${vinculados === 1 ? "" : "s"} continua${vinculados === 1 ? "" : "m"} na base; só o vínculo com a empresa some. O grupo ${entidade.grupo_nome} fica.`
+                : `O grupo ${entidade.grupo_nome} fica.`;
+            })()}
+            aoConfirmar={async () => {
+              await api.excluirEmpresa(entidade.empresa_id!);
+              aoMudar();
+              aoFechar();
+            }}
+          />
+        </>
       ) : (
         <div className="recado">
           Este prospect ainda não tem empresa cadastrada, e é na empresa que o endereço mora.

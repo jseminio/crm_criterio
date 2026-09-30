@@ -194,6 +194,12 @@ export const api = {
   desvincularContato: (empresaId: number, pessoaId: number) =>
     pedir<unknown>(`/api/empresas/${empresaId}/contatos/${pessoaId}`, { method: "DELETE" }),
 
+  /** Irreversível: a tela confirma antes. Tira a pessoa de todas as empresas. */
+  excluirPessoa: (id: number) => pedir<unknown>(`/api/contatos/pessoas/${id}`, { method: "DELETE" }),
+
+  /** Irreversível: a tela confirma antes. Empresa com contrato é recusada (409). */
+  excluirEmpresa: (id: number) => pedir<unknown>(`/api/empresas/${id}`, { method: "DELETE" }),
+
   criarEmpresaDoGrupo: (grupoId: number, dados: Record<string, unknown> = {}) =>
     pedir<{ id: number; razao_social: string; cnpj: string | null }>(`/api/grupos/${grupoId}/empresas`, {
       method: "POST",

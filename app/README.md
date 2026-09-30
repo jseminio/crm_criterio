@@ -316,6 +316,26 @@ e a coluna "Rentabilidade" da Carteira mostra a da planilha até o primeiro cál
 depois dele. "Calcular este cliente" já mostra a nota nova (antes → depois). Sem honorário
 praticado não há margem, e o grupo mantém a nota anterior.
 
+**Valor em contrato e cliente novo na Carteira (pedido de Eduardo, 30/09/2026):**
+- **Receita praticada = valor em contrato:** a soma das mensalidades (`preco_mensal` > 0) dos
+  contratos **ativos e suspensos** do grupo, o mesmo critério do MRR. A coluna mostra quantos
+  contratos entraram na soma. Grupo sem contrato com mensalidade no CRM continua com a receita da
+  leitura (da planilha), e a célula diz "sem contrato no CRM: valor da planilha". É esse valor que
+  entra na margem, no honorário calculado, na defasagem e no filtro "Revisão de honorários".
+- O **"Calcular carteira"** grava na leitura nova a receita em contrato (quando há). A nota de
+  Receita dos grupos que já estavam na Carteira não muda.
+- **Cliente novo:** grupo não fundido, com contrato ativo ou suspenso com mensalidade, e **sem
+  nenhuma leitura** de classificação. Aparece no topo da tabela com a etiqueta "novo" e o início do
+  contrato mais antigo; Score e Classe ficam em branco até o cálculo, e ele fica fora do ISC, do
+  retrato e da distribuição por classe. No período, entra com **7 abas**: as 6 de sempre mais a aba
+  **Saúde** (semáforo 1–3 e churn 1–5), que só existe para ele (a API recusa `saude` para quem já
+  tem leitura). Só visitar a aba Saúde não a marca como preenchida: é preciso escolher os dois.
+- A **primeira leitura** do cliente novo nasce no "Calcular carteira" (fonte "Cálculo da carteira,
+  período MM/AAAA"): Receita pelo porte (Micro 1 … Extra Grande 5), Rentabilidade pela margem do CRM
+  com o valor em contrato, semáforo e churn da aba Saúde. "Calcular este cliente" mostra o Score só
+  com as 7 abas; antes disso, mostra as notas que já dá para saber.
+- Sem migração: tudo sai das tabelas que já existem.
+
 ## Carteira: avaliação dos sete componentes do Score, em abas (27/09/2026, ampliado 28/09/2026)
 
 Régua em `escala-das-notas-humanas.md`, agora com tela. Cada grupo ganha o botão **"Avaliar"**, que

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
 import type {
-  ClassificacaoDaCarteira, ItemDaCarteira, NotasDoGrupo, Parametros, PeriodoDeAvaliacao, PorteDoGrupo, RentabilidadeDoGrupo,
+  ClassificacaoDaCarteira, ClienteNovo, ItemDaCarteira, NotasDoGrupo, Parametros, PeriodoDeAvaliacao, PorteDoGrupo, RentabilidadeDoGrupo,
 } from "../api/tipos";
 import { Carteira } from "./Carteira";
 
@@ -340,7 +340,7 @@ describe("Carteira: período de avaliação e revisão de honorários", () => {
     id: 1, mes_de_referencia: "2026-10-01", aberto_em: "2026-10-01T09:00:00", aberto_por: "Eduardo Luiz",
     margem_minima: "0.6000", margem_alvo: "0.7000", calculado_em: null, calculado_por: null,
     grupos: 3, completos: 1, abas: 6,
-    pendentes: [{ grupo_id: 2, grupo_nome: "Beta", preenchidas: 5 }, { grupo_id: 3, grupo_nome: "Gama", preenchidas: 0 }], ...o,
+    pendentes: [{ grupo_id: 2, grupo_nome: "Beta", preenchidas: 5, abas: 6, novo: false }, { grupo_id: 3, grupo_nome: "Gama", preenchidas: 0, abas: 6, novo: false }], ...o,
   });
   const rent = (o: Partial<RentabilidadeDoGrupo> = {}): RentabilidadeDoGrupo => ({
     porte: "Médio", horas: "20.8", custo_de_servir: "829.40", honorario_praticado: "5200.00", margem: "0.7428",
@@ -409,5 +409,76 @@ describe("Carteira: período de avaliação e revisão de honorários", () => {
     expect(screen.getByText(/▸ Gama/)).toBeInTheDocument();
     expect(screen.queryByText(/▸ Alfa/)).toBeNull();
     expect(screen.queryByText(/▸ Beta/)).toBeNull();
+  });
+});
+
+describe("Carteira: valor em contrato e cliente novo", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const periodo: PeriodoDeAvaliacao = {
+    id: 1, mes_de_referencia: "2026-10-01", aberto_em: "2026-10-01T09:00:00", aberto_por: "Eduardo Luiz",
+    margem_minima: "0.6000", margem_alvo: "0.7000", calculado_em: null, calculado_por: null,
+    grupos: 2, completos: 0, abas: 6,
+    pendentes: [
+      { grupo_id: 1, grupo_nome: "Alfa", preenchidas: 0, abas: 6, novo: false },
+      { grupo_id: 9, grupo_nome: "Zeta", preenchidas: 4, abas: 7, novo: true },
+    ],
+  };
+  const novo = (o: Partial<ClienteNovo> = {}): ClienteNovo => ({
+    grupo_id: 9, grupo_nome: "Zeta", desde: "2026-10-10", receita_em_contrato: "2600.00", contratos: 1,
+    empresas: [], porte: PORTE_VAZIO,
+    rascunho: { respostas: {}, preenchidas: ["complexidade", "risco", "cross_sell", "porte"], atualizado_em: "2026-10-02T10:00:00", atualizado_por: "Karine" },
+    rentabilidade_do_grupo: {
+      porte: "Pequeno", horas: "10.50", custo_de_servir: "437.72", honorario_praticado: "2600.00", margem: "0.7216",
+      honorario_calculado: "2303.78", defasagem: "0.1286", revisao_de_honorarios: false,
+    },
+    ...o,
+  });
+
+  it("receita praticada é o valor em contrato, e sem contrato no CRM diz que é da planilha", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({
+      itens: [
+        item({ receita_mensal: "1000.00", receita_em_contrato: "4800.00", contratos: 2 }),
+        item({ grupo_id: 2, grupo_nome: "Beta", receita_mensal: "7500.00", receita_em_contrato: null, contratos: 0 }),
+      ],
+    }));
+    render(<Carteira listas={null} />);
+    expect((await screen.findByText("2 contratos")).closest("td")).toHaveTextContent("R$ 4.800,00");
+    expect(screen.getByText("sem contrato no CRM: valor da planilha").closest("td")).toHaveTextContent("R$ 7.500,00");
+  });
+
+  it("cliente novo aparece com etiqueta, sem Score e com o Avaliar contando 7 abas", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({ periodo, novos: [novo()] }));
+    render(<Carteira listas={null} />);
+    const linha = (await screen.findByText(/▸ Zeta/)).closest("tr")!;
+    expect(linha).toHaveTextContent("novo");
+    expect(linha).toHaveTextContent("cliente desde 10/2026, sem leitura anterior");
+    expect(linha).toHaveTextContent("R$ 2.600,00");
+    expect(linha).toHaveTextContent("1 contrato");
+    expect(linha).toHaveTextContent("+12,9% acima");
+    expect(linha).toHaveTextContent("após o cálculo");
+    expect(screen.getByRole("button", { name: "Avaliar · 4 de 7" })).toHaveClass("avaliar-parcial");
+    expect(screen.getByText(/Zeta, novo \(4 de 7\)/)).toBeInTheDocument();
+  });
+
+  it("só com cliente novo, a Carteira não fica vazia", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({ itens: [], isc: null, retrato: null, periodo, novos: [novo()] }));
+    render(<Carteira listas={null} />);
+    expect(await screen.findByText(/▸ Zeta/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nenhuma classificação carregada/)).toBeNull();
+  });
+
+  it("filtro de eixo esconde o cliente novo, e Revisão de honorários mostra se couber", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({
+      periodo,
+      novos: [novo(), novo({ grupo_id: 8, grupo_nome: "Eta", rentabilidade_do_grupo: { ...novo().rentabilidade_do_grupo!, margem: "0.4000", revisao_de_honorarios: true } })],
+    }));
+    render(<Carteira listas={null} />);
+    await screen.findByText(/▸ Zeta/);
+    await userEvent.selectOptions(screen.getByLabelText("Eixo de ação"), "Sem urgência de churn");
+    expect(screen.queryByText(/▸ Zeta/)).toBeNull();
+    await userEvent.selectOptions(screen.getByLabelText("Eixo de ação"), "Revisão de honorários");
+    expect(screen.getByText(/▸ Eta/)).toBeInTheDocument();
+    expect(screen.queryByText(/▸ Zeta/)).toBeNull();
   });
 });

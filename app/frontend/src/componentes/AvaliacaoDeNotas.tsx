@@ -121,31 +121,67 @@ const ABAS = [
   { chave: "cross_sell", rotulo: "Cross-sell" },
   { chave: "inadimplencia", rotulo: "Adimplência" },
   { chave: "porte", rotulo: "Porte" },
+  { chave: "saude", rotulo: "Saúde" },
 ] as const;
 type Aba = (typeof ABAS)[number]["chave"];
 const DE_PREENCHER: readonly AbaDaAvaliacao[] = ["complexidade", "risco", "disciplina", "cross_sell", "inadimplencia", "porte"];
-const preenchivel = (a: Aba): a is AbaDaAvaliacao => (DE_PREENCHER as readonly string[]).includes(a);
+/** Cliente novo responde também a aba Saúde (semáforo e churn), que os demais herdam da leitura anterior. */
+const DE_PREENCHER_NOVO: readonly AbaDaAvaliacao[] = [...DE_PREENCHER, "saude"];
+const preenchivel = (a: Aba): a is AbaDaAvaliacao => (DE_PREENCHER_NOVO as readonly string[]).includes(a);
 const MES = (iso: string) => `${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+/** Decisão de 28/09/2026: a nota de Receita vem do porte. */
+const NOTA_DE_RECEITA_POR_PORTE: Record<string, number> = { Micro: 1, Pequeno: 2, "Médio": 3, Grande: 4, "Extra Grande": 5 };
+const SEMAFORO = [
+  { valor: 1, rotulo: "1 — Controlada" },
+  { valor: 2, rotulo: "2 — Atenção" },
+  { valor: 3, rotulo: "3 — Crítico" },
+];
+const CHURN = [
+  { valor: 1, rotulo: "1 — baixo" },
+  { valor: 2, rotulo: "2" },
+  { valor: 3, rotulo: "3" },
+  { valor: 4, rotulo: "4 — alto" },
+  { valor: 5, rotulo: "5 — muito alto" },
+];
+const nota = (v: string | null | undefined) => (v === null || v === undefined ? "—" : Number(v).toLocaleString("pt-BR"));
+const doisDecimais = (v: string) => Number(v).toFixed(2).replace(".", ",");
 
 function ResultadoDoCliente({ r }: { r: SimulacaoDoCliente }) {
   const rent = r.rentabilidade;
-  const rotulos: Record<string, string> = { disciplina: "Disciplina", cross_sell: "Cross-sell", inadimplencia: "Adimplência", porte: "Porte", complexidade: "Complexidade", risco: "Risco técnico" };
+  const rotulos: Record<string, string> = { disciplina: "Disciplina", cross_sell: "Cross-sell", inadimplencia: "Adimplência", porte: "Porte", complexidade: "Complexidade", risco: "Risco técnico", saude: "Saúde" };
+  const antes = r.notas_antes;
   return (
     <section className="resultado-do-cliente" aria-label="Resultado deste cliente">
       <strong>Resultado só deste grupo{r.pendentes.length ? `, com ${r.pendentes.length} aba${r.pendentes.length > 1 ? "s" : ""} pendente${r.pendentes.length > 1 ? "s" : ""}` : ""}</strong>
       <p className="campo-ajuda">
-        {r.pendentes.length > 0 && <>Pendentes ({r.pendentes.map((a) => rotulos[a]).join(", ")}): usada a nota atual da carteira. </>}
+        {r.pendentes.length > 0 && (
+          <>
+            Pendentes ({r.pendentes.map((a) => rotulos[a]).join(", ")}):{" "}
+            {r.novo ? "cliente novo não tem nota anterior, então Score e Classe saem só com todas as abas. " : "usada a nota atual da carteira. "}
+          </>
+        )}
         <strong>A carteira não muda</strong>; ela só é atualizada no "Calcular carteira".
       </p>
       <table>
         <tbody>
-          <tr><td>Score</td><td>{Number(r.score_antes).toFixed(2).replace(".", ",")} → {Number(r.score_depois).toFixed(2).replace(".", ",")}</td></tr>
-          <tr><td>Classe</td><td>{r.classe_antes} → {r.classe_depois}</td></tr>
-          {r.notas_antes.rentabilidade !== undefined && r.notas_depois.rentabilidade !== undefined && (
-            <tr>
-              <td>Nota de rentabilidade (pela margem do CRM)</td>
-              <td>{Number(r.notas_antes.rentabilidade).toLocaleString("pt-BR")} → {Number(r.notas_depois.rentabilidade).toLocaleString("pt-BR")}</td>
-            </tr>
+          {r.novo ? (
+            <>
+              <tr><td>Score</td><td>{r.score_depois ? doisDecimais(r.score_depois) : "— (após preencher as 7 abas)"}</td></tr>
+              <tr><td>Classe</td><td>{r.classe_depois ?? "—"}</td></tr>
+              <tr><td>Nota de Receita (pelo porte)</td><td>{nota(r.notas_depois.receita)}</td></tr>
+              <tr><td>Nota de rentabilidade (pela margem do CRM)</td><td>{nota(r.notas_depois.rentabilidade)}</td></tr>
+            </>
+          ) : (
+            <>
+              <tr><td>Score</td><td>{doisDecimais(r.score_antes ?? "0")} → {doisDecimais(r.score_depois ?? "0")}</td></tr>
+              <tr><td>Classe</td><td>{r.classe_antes} → {r.classe_depois}</td></tr>
+              {antes?.rentabilidade !== undefined && r.notas_depois.rentabilidade !== undefined && (
+                <tr>
+                  <td>Nota de rentabilidade (pela margem do CRM)</td>
+                  <td>{nota(antes.rentabilidade)} → {nota(r.notas_depois.rentabilidade)}</td>
+                </tr>
+              )}
+            </>
           )}
           {rent ? (
             <>
@@ -157,7 +193,13 @@ function ResultadoDoCliente({ r }: { r: SimulacaoDoCliente }) {
               <tr><td>Revisão de honorários?</td><td className={rent.revisao_de_honorarios ? "texto-revisao" : undefined}>{rent.revisao_de_honorarios ? "Sim, abaixo da mínima" : "Não"}</td></tr>
             </>
           ) : (
-            <tr><td colSpan={2}>Sem porte confirmado: não dá para calcular a margem nem o honorário.</td></tr>
+            <tr>
+              <td colSpan={2}>
+                {r.novo
+                  ? "Falta o porte ou alguma das abas Complexidade, Disciplina e Risco técnico para calcular a margem e o honorário."
+                  : "Sem porte confirmado: não dá para calcular a margem nem o honorário."}
+              </td>
+            </tr>
           )}
         </tbody>
       </table>
@@ -167,11 +209,12 @@ function ResultadoDoCliente({ r }: { r: SimulacaoDoCliente }) {
 
 export function AvaliacaoDeNotas({
   grupoId, grupoNome, notasAtuais, porteAtual, avaliacaoGravada = null, rascunho = null, periodo = null,
-  portes, aoFechar, aoMudar,
+  portes, aoFechar, aoMudar, novo = false,
 }: {
   grupoId: number;
   grupoNome: string;
-  notasAtuais: NotasDoGrupo;
+  /** `null` para cliente novo, que ainda não tem leitura. */
+  notasAtuais: NotasDoGrupo | null;
   porteAtual: PorteDoGrupo;
   avaliacaoGravada?: AvaliacaoGravada | null;
   rascunho?: RascunhoDaAvaliacao | null;
@@ -180,7 +223,11 @@ export function AvaliacaoDeNotas({
   aoFechar: () => void;
   /** Depois de salvar: recarrega a lista (status do botão Avaliar) sem fechar o painel. */
   aoMudar: () => void;
+  /** Cliente novo: 7 abas, com a Saúde (semáforo e churn), e Receita pelo porte. */
+  novo?: boolean;
 }) {
+  const dePreencher = novo ? DE_PREENCHER_NOVO : DE_PREENCHER;
+  const abasVisiveis = ABAS.filter((a) => a.chave !== "saude" || novo);
   const [aba, definirAba] = useState<Aba>("complexidade");
   // Abre com o rascunho do período; na falta dele, com a última avaliação gravada (para só revisar).
   const r = rascunho?.respostas;
@@ -197,6 +244,8 @@ export function AvaliacaoDeNotas({
   const [mesesEmDia, definirMesesEmDia] = useState(adim?.meses_em_dia ?? 3);
   const [emNegociacao, definirEmNegociacao] = useState(adim?.em_negociacao ?? false);
   const [jaSuspenso, definirJaSuspenso] = useState(adim?.ja_suspenso ?? false);
+  const [semaforo, definirSemaforo] = useState<number | null>(r?.saude?.semaforo ?? null);
+  const [churn, definirChurn] = useState<number | null>(r?.saude?.churn ?? null);
   const origemDoPorte: Partial<PorteDoGrupo> = porteInicial ?? porteAtual;
   const [volumetria, definirVolumetria] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -223,8 +272,11 @@ export function AvaliacaoDeNotas({
 
   // Uma aba vista (saiu dela, mexeu nela ou está aberta ao salvar) conta como revisada, mesmo sem
   // nada marcado: "nada se aplica" também é resposta.
+  const marcar = (a: AbaDaAvaliacao) => definirTocadas((antes) => (antes.has(a) ? antes : new Set(antes).add(a)));
   const tocar = (a: Aba) => {
-    if (preenchivel(a)) definirTocadas((antes) => (antes.has(a) ? antes : new Set(antes).add(a)));
+    // Na Saúde não há "nada se aplica": só conta depois de escolher semáforo ou churn.
+    if (a === "saude" && semaforo === null && churn === null) return;
+    if (preenchivel(a)) marcar(a);
   };
   const irPara = (nova: Aba) => {
     tocar(aba);
@@ -272,7 +324,7 @@ export function AvaliacaoDeNotas({
 
   const abasParaSalvar = (): Set<AbaDaAvaliacao> => {
     const todas = new Set(tocadas);
-    if (preenchivel(aba)) todas.add(aba);
+    if (preenchivel(aba) && (aba !== "saude" || semaforo !== null || churn !== null)) todas.add(aba);
     return todas;
   };
 
@@ -289,6 +341,7 @@ export function AvaliacaoDeNotas({
     ...(abas.has("porte") && {
       porte: { ...volumetriaEntrada(), porte: porteConfirmado, justificativa: justificativa.trim() || null },
     }),
+    ...(abas.has("saude") && semaforo !== null && churn !== null && { saude: { semaforo, churn } }),
   });
 
   /** Grava o que foi revisto; devolve false se não deu. */
@@ -296,6 +349,10 @@ export function AvaliacaoDeNotas({
     const abas = abasParaSalvar();
     if (abas.has("porte") && !porteConfirmado) {
       definirErro("Escolha o porte confirmado antes de salvar a aba Porte.");
+      return false;
+    }
+    if (abas.has("saude") && (semaforo === null || churn === null)) {
+      definirErro("Escolha o semáforo e o churn antes de salvar a aba Saúde.");
       return false;
     }
     const salvo = await api.salvarRascunho(grupoId, { autor: autor.trim(), ...montarRascunho(abas) });
@@ -347,7 +404,7 @@ export function AvaliacaoDeNotas({
       titulo={grupoNome}
       subtitulo={
         periodo
-          ? `${MES(periodo.mes_de_referencia)} · ${salvas.size} de ${DE_PREENCHER.length} abas preenchidas`
+          ? `${MES(periodo.mes_de_referencia)}${novo ? " · cliente novo" : ""} · ${salvas.size} de ${dePreencher.length} abas preenchidas`
           : "Avalie os sete componentes do Score, um de cada vez, e o porte"
       }
       aoFechar={aoFechar}
@@ -377,6 +434,13 @@ export function AvaliacaoDeNotas({
         </div>
       )}
 
+      {novo && (
+        <p className="recado">
+          Cliente novo: entrou na Carteira pelo contrato ativo, sem leitura anterior. A primeira leitura nasce no
+          "Calcular carteira".
+        </p>
+      )}
+
       {semPeriodo ? (
         <p className="recado">
           Nenhum período de avaliação aberto. Abra um na Carteira para salvar o rascunho e calcular.
@@ -398,7 +462,7 @@ export function AvaliacaoDeNotas({
       )}
 
       <div className="abas abas-avaliacao" role="tablist" aria-label="Componentes do Score e porte">
-        {ABAS.map((a) => (
+        {abasVisiveis.map((a) => (
           <button
             key={a.chave}
             type="button"
@@ -408,7 +472,9 @@ export function AvaliacaoDeNotas({
             onClick={() => irPara(a.chave)}
           >
             {a.rotulo}
-            {preenchivel(a.chave) ? status(a.chave) : <span className="aba-status">calculada</span>}
+            {preenchivel(a.chave)
+              ? status(a.chave)
+              : <span className="aba-status">{novo && a.chave === "receita" ? "pelo porte" : "calculada"}</span>}
           </button>
         ))}
       </div>
@@ -421,7 +487,15 @@ export function AvaliacaoDeNotas({
             Médio=3, Grande=4, Extra Grande=5 (decisão de 27/09/2026, substitui o corte por percentil
             sobre o honorário praticado). Nada aqui é editável.
           </p>
-          <NotaCalculada valor={notasAtuais.receita} />
+          {notasAtuais ? (
+            <NotaCalculada valor={notasAtuais.receita} />
+          ) : (
+            <p className="recado">
+              {NOTA_DE_RECEITA_POR_PORTE[porteConfirmado]
+                ? <>Pelo porte confirmado ({porteConfirmado}): <strong>{NOTA_DE_RECEITA_POR_PORTE[porteConfirmado]}</strong></>
+                : "Sem porte confirmado ainda: a nota sai do porte escolhido na aba Porte."}
+            </p>
+          )}
         </section>
       )}
 
@@ -430,11 +504,18 @@ export function AvaliacaoDeNotas({
           <h3>Rentabilidade (25% do Score)</h3>
           <p className="campo-ajuda" style={{ marginTop: 0 }}>
             Calculada a partir da margem (honorário menos imposto e custo de servir, pelo porte do grupo e pelo
-            atrito de complexidade/disciplina/risco). Até o próximo "Calcular carteira" vale a nota abaixo
-            {notasAtuais.rentabilidade_da_planilha ? ", que veio da planilha de saúde da carteira" : ""}; a partir
-            dele, a nota sai da margem calculada pelo CRM, pela régua de margem dos Parâmetros.
+            atrito de complexidade/disciplina/risco).{" "}
+            {notasAtuais ? (
+              <>
+                Até o próximo "Calcular carteira" vale a nota abaixo
+                {notasAtuais.rentabilidade_da_planilha ? ", que veio da planilha de saúde da carteira" : ""}; a partir
+                dele, a nota sai da margem calculada pelo CRM, pela régua de margem dos Parâmetros.
+              </>
+            ) : (
+              <>Cliente novo: a nota sai da margem calculada pelo CRM, com o valor em contrato. Veja em "Calcular este cliente".</>
+            )}
           </p>
-          <NotaCalculada valor={notasAtuais.rentabilidade} />
+          {notasAtuais && <NotaCalculada valor={notasAtuais.rentabilidade} />}
         </section>
       )}
 
@@ -614,6 +695,35 @@ export function AvaliacaoDeNotas({
               onChange={(e) => { tocar("porte"); definirJustificativa(e.target.value); }}
             />
           </label>
+        </section>
+      )}
+
+      {aba === "saude" && novo && (
+        <section className="avaliacao-secao">
+          <h3>Saúde do cliente (semáforo e churn)</h3>
+          <label className="campo-bloco">
+            <span className="campo-rotulo">Semáforo — saúde operacional</span>
+            <select
+              className="selecao" value={semaforo ?? ""}
+              onChange={(e) => { marcar("saude"); definirSemaforo(e.target.value ? Number(e.target.value) : null); }}
+            >
+              <option value="">— escolha —</option>
+              {SEMAFORO.map((o) => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
+            </select>
+          </label>
+          <label className="campo-bloco" style={{ marginTop: "var(--e2)" }}>
+            <span className="campo-rotulo">Churn — risco de o cliente sair (1 baixo … 5 muito alto)</span>
+            <select
+              className="selecao" value={churn ?? ""}
+              onChange={(e) => { marcar("saude"); definirChurn(e.target.value ? Number(e.target.value) : null); }}
+            >
+              <option value="">— escolha —</option>
+              {CHURN.map((o) => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
+            </select>
+          </label>
+          <p className="campo-ajuda">
+            Cliente que já está na Carteira mantém semáforo e churn da leitura anterior; esta aba é só para o primeiro registro.
+          </p>
         </section>
       )}
 

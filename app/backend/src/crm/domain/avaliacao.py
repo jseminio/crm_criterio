@@ -20,12 +20,18 @@ from crm.domain.rentabilidade import Empresa, ParametrosDeRentabilidade, margem_
 __all__ = [
     "ABAS", "FATORES_COMPLEXIDADE", "FATORES_RISCO", "FATORES_CROSS_SELL",
     "nota_de_complexidade", "nota_de_risco", "nota_de_cross_sell", "nota_de_disciplina", "nota_de_adimplencia",
-    "notas_das_respostas", "abas_preenchidas", "RentabilidadeDoGrupo", "rentabilidade_do_grupo",
+    "ABAS_DO_NOVO", "NOTA_DE_RECEITA_POR_PORTE", "notas_das_respostas", "abas_preenchidas", "RentabilidadeDoGrupo", "rentabilidade_do_grupo",
     "NotaDeRentabilidadeDoGrupo", "nota_de_rentabilidade_do_grupo",
 ]
 
 ABAS = ("complexidade", "risco", "disciplina", "cross_sell", "inadimplencia", "porte")
 """As seis abas que alguém preenche. Receita e Rentabilidade são calculadas."""
+
+ABAS_DO_NOVO = (*ABAS, "saude")
+"""Cliente novo (sem leitura anterior) responde também semáforo e churn (decisão de 30/09/2026)."""
+
+NOTA_DE_RECEITA_POR_PORTE = {"Micro": 1, "Pequeno": 2, "Médio": 3, "Grande": 4, "Extra Grande": 5}
+"""Decisão de 28/09/2026: a nota de Receita vem do porte. Por ora só na primeira leitura de cliente novo."""
 
 FATORES_COMPLEXIDADE = frozenset(
     {"holding", "centros_de_custo", "plano_de_contas", "auditoria", "regimes", "parcelamento_complexidade"}
@@ -73,9 +79,9 @@ def nota_de_adimplencia(meses_em_dia: int, em_negociacao: bool, ja_suspenso: boo
     return _por_furos(meses_em_dia, em_negociacao, ja_suspenso)
 
 
-def abas_preenchidas(respostas: dict[str, Any] | None) -> list[str]:
+def abas_preenchidas(respostas: dict[str, Any] | None, *, novo: bool = False) -> list[str]:
     """Aba presente no rascunho = revista por alguém neste período, mesmo sem nada marcado."""
-    return [a for a in ABAS if respostas and a in respostas]
+    return [a for a in (ABAS_DO_NOVO if novo else ABAS) if respostas and a in respostas]
 
 
 def notas_das_respostas(respostas: dict[str, Any]) -> dict[str, int]:
@@ -93,6 +99,9 @@ def notas_das_respostas(respostas: dict[str, Any]) -> dict[str, int]:
     if "inadimplencia" in respostas:
         i = respostas["inadimplencia"]
         notas["adimplencia"] = nota_de_adimplencia(i["meses_em_dia"], i["em_negociacao"], i["ja_suspenso"])
+    if "saude" in respostas:
+        notas["semaforo"] = respostas["saude"]["semaforo"]
+        notas["churn"] = respostas["saude"]["churn"]
     return notas
 
 

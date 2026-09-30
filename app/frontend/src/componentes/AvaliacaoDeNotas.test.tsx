@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
-import type { ClassificacaoDaCarteira, ItemDaCarteira, Listas, NotasDoGrupo, PeriodoDeAvaliacao, PorteDoGrupo } from "../api/tipos";
+import type { ClassificacaoDaCarteira, ClienteNovo, ItemDaCarteira, Listas, NotasDoGrupo, PeriodoDeAvaliacao, PorteDoGrupo } from "../api/tipos";
 import { Carteira } from "../telas/Carteira";
 
 vi.mock("../api/cliente", async () => {
@@ -73,7 +73,7 @@ function nota(texto: string) {
 const PERIODO: PeriodoDeAvaliacao = {
   id: 1, mes_de_referencia: "2026-10-01", aberto_em: "2026-10-01T09:00:00", aberto_por: "Eduardo Luiz",
   margem_minima: "0.6000", margem_alvo: "0.7000", calculado_em: null, calculado_por: null,
-  grupos: 1, completos: 0, abas: 6, pendentes: [{ grupo_id: 1, grupo_nome: "Alfa", preenchidas: 0 }],
+  grupos: 1, completos: 0, abas: 6, pendentes: [{ grupo_id: 1, grupo_nome: "Alfa", preenchidas: 0, abas: 6, novo: false }],
 };
 
 async function abrirComPeriodo() {
@@ -347,5 +347,78 @@ describe("Avaliação de complexidade, risco e disciplina por checklist", () => 
     await userEvent.click(screen.getByRole("button", { name: "Fechar painel" }));
     expect(screen.queryByRole("tablist", { name: "Componentes do Score e porte" })).toBeNull();
     expect(api.salvarRascunho).not.toHaveBeenCalled();
+  });
+});
+
+describe("Avaliação de cliente novo: aba Saúde e Receita pelo porte", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const NOVO: ClienteNovo = {
+    grupo_id: 9, grupo_nome: "Zeta", desde: "2026-10-10", receita_em_contrato: "2600.00", contratos: 1,
+    empresas: [], porte: PORTE_VAZIO, rascunho: null, rentabilidade_do_grupo: null,
+  };
+
+  async function abrirNovo() {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta({
+      itens: [], periodo: { ...PERIODO, pendentes: [{ grupo_id: 9, grupo_nome: "Zeta", preenchidas: 0, abas: 7, novo: true }] },
+      novos: [NOVO],
+    }));
+    render(<Carteira listas={LISTAS} />);
+    await screen.findByText(/▸ Zeta/);
+    await userEvent.click(screen.getByRole("button", { name: "Avaliar · vazio" }));
+  }
+
+  it("tem 7 abas a preencher, com a Saúde, e a Receita diz que vem do porte", async () => {
+    await abrirNovo();
+    expect(screen.getByText("10/2026 · cliente novo · 0 de 7 abas preenchidas")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Saúde· pendente/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: /^Receitapelo porte/ }));
+    expect(screen.getByText(/Sem porte confirmado ainda/)).toBeInTheDocument();
+  });
+
+  it("grupo que já está na Carteira não tem a aba Saúde", async () => {
+    await abrirComPeriodo();
+    expect(screen.queryByRole("tab", { name: /^Saúde/ })).toBeNull();
+    expect(screen.getByText("10/2026 · 0 de 6 abas preenchidas")).toBeInTheDocument();
+  });
+
+  it("só visitar a Saúde não conta; escolher semáforo e churn grava a aba", async () => {
+    vi.mocked(api.salvarRascunho).mockResolvedValue({
+      respostas: {}, preenchidas: ["complexidade", "saude"], atualizado_em: "2026-10-02T10:00:00", atualizado_por: "Karine",
+    });
+    await abrirNovo();
+    await userEvent.click(screen.getByRole("tab", { name: /^Saúde/ }));
+    await userEvent.click(screen.getByRole("tab", { name: /^Complexidade/ }));
+    await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Karine");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    expect(api.salvarRascunho).toHaveBeenLastCalledWith(9, { autor: "Karine", complexidade: [] });
+
+    await userEvent.click(screen.getByRole("tab", { name: /^Saúde/ }));
+    await userEvent.selectOptions(screen.getByLabelText("Semáforo — saúde operacional"), "2");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Escolha o semáforo e o churn");
+
+    await userEvent.selectOptions(screen.getByLabelText(/^Churn/), "4");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    expect(api.salvarRascunho).toHaveBeenLastCalledWith(9, { autor: "Karine", complexidade: [], saude: { semaforo: 2, churn: 4 } });
+  });
+
+  it("calcular este cliente novo mostra Score só com todas as abas, sem o antes", async () => {
+    vi.mocked(api.salvarRascunho).mockResolvedValue({
+      respostas: {}, preenchidas: ["complexidade"], atualizado_em: "2026-10-02T10:00:00", atualizado_por: "Karine",
+    });
+    vi.mocked(api.simularCliente).mockResolvedValue({
+      pendentes: ["risco", "disciplina", "cross_sell", "inadimplencia", "porte", "saude"], novo: true,
+      notas_antes: null, notas_depois: { receita: null, rentabilidade: null, complexidade: "1" },
+      score_antes: null, score_depois: null, classe_antes: null, classe_depois: null, rentabilidade: null,
+    });
+    await abrirNovo();
+    await userEvent.type(screen.getByLabelText("Quem está avaliando"), "Karine");
+    await userEvent.click(screen.getByRole("button", { name: "Calcular este cliente" }));
+    const resultado = await screen.findByRole("region", { name: "Resultado deste cliente" });
+    expect(resultado).toHaveTextContent("— (após preencher as 7 abas)");
+    expect(resultado).toHaveTextContent("cliente novo não tem nota anterior");
+    expect(resultado).toHaveTextContent("Saúde");
+    expect(resultado).not.toHaveTextContent("→");
   });
 });

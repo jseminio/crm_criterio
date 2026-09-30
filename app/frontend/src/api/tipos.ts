@@ -597,9 +597,30 @@ export interface ItemDaCarteira {
   rascunho?: RascunhoDaAvaliacao | null;
   /** Margem e honorário calculado no nível do grupo; `null` sem porte confirmado. */
   rentabilidade_do_grupo?: RentabilidadeDoGrupo | null;
+  /** Soma das mensalidades dos contratos ativos e suspensos; `null` = sem contrato no CRM (vale a planilha). */
+  receita_em_contrato?: string | null;
+  contratos?: number;
 }
 
-export type AbaDaAvaliacao = "complexidade" | "risco" | "disciplina" | "cross_sell" | "inadimplencia" | "porte";
+/** Com contrato valendo e sem nenhuma leitura: entra no período com 7 abas (30/09/2026). */
+export interface ClienteNovo {
+  grupo_id: number;
+  grupo_nome: string;
+  desde: string | null;
+  receita_em_contrato: string;
+  contratos: number;
+  empresas: EmpresaDoGrupo[];
+  porte: PorteDoGrupo;
+  rascunho?: RascunhoDaAvaliacao | null;
+  rentabilidade_do_grupo?: RentabilidadeDoGrupo | null;
+}
+
+export type AbaDaAvaliacao = "complexidade" | "risco" | "disciplina" | "cross_sell" | "inadimplencia" | "porte" | "saude";
+
+export interface RespostasDeSaude {
+  semaforo: number;
+  churn: number;
+}
 
 export interface RespostasDePorte extends VolumetriaEntrada {
   porte: string;
@@ -614,6 +635,8 @@ export interface RespostasDoRascunho {
   disciplina?: RespostasDaAvaliacao["disciplina"];
   inadimplencia?: RespostasDaAvaliacao["inadimplencia"];
   porte?: RespostasDePorte;
+  /** Só cliente novo. */
+  saude?: RespostasDeSaude;
 }
 
 export interface RascunhoDaAvaliacao {
@@ -646,7 +669,7 @@ export interface PeriodoDeAvaliacao {
   grupos: number;
   completos: number;
   abas: number;
-  pendentes: { grupo_id: number; grupo_nome: string; preenchidas: number }[];
+  pendentes: { grupo_id: number; grupo_nome: string; preenchidas: number; abas: number; novo: boolean }[];
 }
 
 export interface JanelaDeRentabilidade {
@@ -657,13 +680,16 @@ export interface JanelaDeRentabilidade {
 
 export interface SimulacaoDoCliente {
   pendentes: AbaDaAvaliacao[];
-  notas_antes: Record<string, string>;
-  notas_depois: Record<string, string>;
-  score_antes: string;
-  score_depois: string;
-  classe_antes: string;
-  classe_depois: string;
+  /** `null` para cliente novo, que não tem leitura anterior. */
+  notas_antes: Record<string, string> | null;
+  /** Cliente novo: `null` na nota cuja aba ainda falta. */
+  notas_depois: Record<string, string | null>;
+  score_antes: string | null;
+  score_depois: string | null;
+  classe_antes: string | null;
+  classe_depois: string | null;
   rentabilidade: RentabilidadeDoGrupo | null;
+  novo?: boolean;
 }
 
 export interface RespostasDaAvaliacao {
@@ -874,6 +900,8 @@ export interface ClassificacaoDaCarteira {
   avisos: string[];
   periodo?: PeriodoDeAvaliacao | null;
   janela?: JanelaDeRentabilidade | null;
+  /** Clientes novos, sem leitura: fora do ISC, do retrato e da distribuição por classe. */
+  novos?: ClienteNovo[];
 }
 
 export interface AnaliseDaCarteira {

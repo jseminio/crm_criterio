@@ -120,7 +120,7 @@ class TestRascunho:
         assert item["score"] == score and item["rascunho"]["atualizado_por"] == AUTOR
         assert _leituras(sessao, g.id) == 1
         periodo = cliente.get("/api/carteira/periodo").json()
-        assert periodo["pendentes"] == [{"grupo_id": g.id, "grupo_nome": "Alfa", "preenchidas": 2}]
+        assert periodo["pendentes"] == [{"grupo_id": g.id, "grupo_nome": "Alfa", "preenchidas": 2, "abas": 6, "novo": False}]
 
     def test_aba_revista_sem_nada_marcado_conta(self, cliente, sessao):
         g = _grupo(sessao, "Alfa")

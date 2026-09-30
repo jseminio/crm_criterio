@@ -215,7 +215,13 @@ class Empresa(CarimboMixin, Base):
 
 
 class PessoaContato(CarimboMixin, Base):
-    """Quem se fala. Ligada ao grupo ou a uma empresa dele."""
+    """Quem se fala. Ligada a uma ou mais empresas (`VinculoDeContato`), ao
+    grupo inteiro, ou ainda a ninguém.
+
+    Desde 30/09/2026 (pedido de Karine): a pessoa é cadastrada antes da
+    empresa e pode estar em várias empresas — base única de contatos, sem
+    recadastrar a mesma pessoa a cada empresa nova.
+    """
 
     __tablename__ = "pessoa_contato"
 
@@ -223,7 +229,7 @@ class PessoaContato(CarimboMixin, Base):
     grupo_id: Mapped[int | None] = mapped_column(
         sa.ForeignKey("grupo_economico.id"), index=True
     )
-    empresa_id: Mapped[int | None] = mapped_column(sa.ForeignKey("empresa.id"), index=True)
+    """Ligada ao grupo todo: aparece em todas as empresas dele."""
     nome: Mapped[str] = mapped_column(sa.String(200), nullable=False)
     cargo: Mapped[str | None] = mapped_column(sa.String(100))
     email: Mapped[str | None] = mapped_column(sa.String(200), index=True)
@@ -244,15 +250,43 @@ class PessoaContato(CarimboMixin, Base):
     nao_contatar_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     nao_contatar_motivo: Mapped[str | None] = mapped_column(sa.String(200))
 
-    __table_args__ = (
-        sa.CheckConstraint(
-            "grupo_id IS NOT NULL OR empresa_id IS NOT NULL",
-            name="contato_pertence_a_alguem",
-        ),
+    vinculos: Mapped[list[VinculoDeContato]] = relationship(
+        back_populates="pessoa", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:
         return f"<PessoaContato {self.id} {self.nome!r}>"
+
+
+class VinculoDeContato(CarimboMixin, Base):
+    """A pessoa numa empresa. Uma pessoa em várias empresas, uma empresa com
+    vários contatos, e mais de um principal por empresa (pedido de Karine em
+    30/09/2026). "Principal" é do vínculo: principal na Delta, não na Alfa.
+
+    Cargo, e-mail e telefone continuam na pessoa, iguais em todas as empresas
+    (suposição aprovada junto com a proposta).
+    """
+
+    __tablename__ = "vinculo_de_contato"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pessoa_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("pessoa_contato.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    empresa_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("empresa.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    principal: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default=sa.false()
+    )
+
+    pessoa: Mapped[PessoaContato] = relationship(back_populates="vinculos")
+    empresa: Mapped[Empresa] = relationship()
+
+    __table_args__ = (sa.UniqueConstraint("pessoa_id", "empresa_id", name="uq_vinculo_pessoa_empresa"),)
+
+    def __repr__(self) -> str:
+        return f"<VinculoDeContato pessoa={self.pessoa_id} empresa={self.empresa_id}>"
 
 
 class Lead(CarimboMixin, Base):

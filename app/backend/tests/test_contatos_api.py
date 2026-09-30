@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
 from crm.api.app import criar_app
-from crm.db.modelos import Contrato, Empresa, GrupoEconomico, Oportunidade, PessoaContato
+from crm.db.modelos import Contrato, Empresa, GrupoEconomico, Oportunidade, PessoaContato, VinculoDeContato
 from crm.domain.listas import Situacao, SituacaoContrato, SituacaoGrupo
 
 CNPJ_A, CNPJ_B = "11222333000181", "11444777000161"
@@ -39,7 +39,8 @@ def base(sessao: Session) -> dict:
     sessao.add(Contrato(grupo_id=alfa.id, empresa_id=e1.id, situacao=SituacaoContrato.ATIVO, preco_mensal=Decimal("1500.00"), anterior_ao_crm=True))
     sessao.add(Oportunidade(grupo_id=pros.id, nome="Proposta", situacao=Situacao.ENVIAR_PROPOSTA))
     sessao.add_all([
-        PessoaContato(nome="Maria Silva", email="maria@alfa.com", telefone="(21) 99999-0000", empresa_id=e1.id, cargo="Sócia"),
+        PessoaContato(nome="Maria Silva", email="maria@alfa.com", telefone="(21) 99999-0000",
+                      vinculos=[VinculoDeContato(empresa_id=e1.id)], cargo="Sócia"),
         PessoaContato(nome="João do Grupo", email="joao@alfa.com", grupo_id=alfa.id),
         PessoaContato(nome="Bia Prospect", email="bia@acao.com", grupo_id=pros.id),
     ])
@@ -123,8 +124,7 @@ class TestPessoas:
         assert r.status_code == 201 and (r.json()["nome"], r.json()["email"], r.json()["papel"]) == ("Ana Costa", "ana@x.com", "Decisor")
         assert cliente.post("/api/contatos/pessoas", json={"nome": "X", "email": "sem-arroba", "empresa_id": base["e2"]}).status_code == 422
 
-    def test_exige_empresa_ou_grupo_mas_nao_os_dois(self, cliente, base):
-        assert cliente.post("/api/contatos/pessoas", json={"nome": "X"}).status_code == 422
+    def test_empresa_ou_grupo_mas_nao_os_dois(self, cliente, base):
         assert cliente.post("/api/contatos/pessoas", json={"nome": "X", "empresa_id": base["e1"], "grupo_id": base["alfa"]}).status_code == 422
         assert cliente.post("/api/contatos/pessoas", json={"nome": "X", "empresa_id": 9999}).status_code == 404
 
@@ -185,3 +185,65 @@ class TestClienteNaoRecorrente:
     def test_empresa_de_cliente_sem_contrato_ativo_tambem_nao_e_recorrente(self, cliente, base):
         e2 = next(i for i in cliente.get("/api/contatos/empresas", params={"tipo": "cliente", "busca": "servicos"}).json()["itens"])
         assert e2["recorrente"] is False and e2["mensalidade"] is None
+
+
+class TestBaseUnicaDeContatos:
+    """Pessoa antes da empresa, pessoa em várias empresas e vários principais por empresa.
+    Pedido de Karine em 30/09/2026."""
+
+    def test_pessoa_nasce_sem_empresa_e_aparece_em_prospects(self, cliente, base):
+        r = cliente.post("/api/contatos/pessoas", json={"nome": "Livre Silva", "email": "livre@x.com"})
+        assert r.status_code == 201
+        itens = cliente.get("/api/contatos/pessoas", params={"tipo": "prospect", "busca": "livre"}).json()["itens"]
+        assert [(i["nome"], i["grupo_nome"], i["empresas"]) for i in itens] == [("Livre Silva", None, [])]
+        assert cliente.get("/api/contatos/pessoas", params={"tipo": "cliente", "busca": "livre"}).json()["total"] == 0
+
+    def test_busca_toda_a_base_por_nome_email_e_telefone(self, cliente, base):
+        for termo in ("maria", "maria@alfa", "99999-0000"):
+            nomes = [p["nome"] for p in cliente.get("/api/contatos/pessoas/busca", params={"busca": termo}).json()]
+            assert "Maria Silva" in nomes, termo
+        assert cliente.get("/api/contatos/pessoas/busca", params={"busca": "m"}).json() == []
+
+    def test_nova_empresa_cria_o_grupo_e_vincula_os_contatos(self, cliente, base):
+        livre = cliente.post("/api/contatos/pessoas", json={"nome": "Livre"}).json()["id"]
+        maria = cliente.get("/api/contatos/pessoas/busca", params={"busca": "maria"}).json()[0]["id"]
+        r = cliente.post("/api/empresas", json={
+            "razao_social": "Delta Engenharia Ltda", "uf": "rj", "cep": "20040-020",
+            "contatos": [{"pessoa_id": livre, "principal": True}, {"pessoa_id": maria, "principal": True}],
+        })
+        assert r.status_code == 201, r.text
+        corpo = r.json()
+        assert corpo["grupo_nome"] == "Delta Engenharia Ltda"
+        delta = cliente.get("/api/contatos/empresas", params={"tipo": "prospect", "busca": "delta"}).json()["itens"][0]
+        assert delta["endereco"]["uf"] == "RJ" and delta["endereco"]["cep"] == "20040020"
+        assert sorted((c["nome"], c["principal"]) for c in delta["contatos"]) == [("Livre", True), ("Maria Silva", True)]
+        # Maria continua na Alfa: agora está nas duas empresas.
+        m = cliente.get("/api/contatos/pessoas/busca", params={"busca": "maria"}).json()[0]
+        assert sorted(e["razao_social"] for e in m["empresas"]) == ["Alfa Comércio Ltda", "Delta Engenharia Ltda"]
+
+    def test_nova_empresa_reaproveita_o_grupo_pelo_nome(self, cliente, base):
+        r = cliente.post("/api/empresas", json={"razao_social": "Beta Filial", "nome_do_grupo": "beta prospect"})
+        assert r.json()["grupo_id"] == base["pro2"]
+
+    def test_nova_empresa_valida_como_a_edicao(self, cliente, base):
+        assert cliente.post("/api/empresas", json={"razao_social": "X", "cnpj": CNPJ_A}).status_code == 409
+        assert cliente.post("/api/empresas", json={"razao_social": "X", "uf": "ZZ"}).status_code == 422
+        assert cliente.post("/api/empresas", json={"razao_social": "X", "contatos": [{"pessoa_id": 9999}]}).status_code == 404
+        assert cliente.post("/api/empresas", json={"razao_social": ""}).status_code == 422
+
+    def test_vincula_marca_principal_e_desvincula(self, cliente, base):
+        livre = cliente.post("/api/contatos/pessoas", json={"nome": "Livre"}).json()["id"]
+        url = f"/api/empresas/{base['e2']}/contatos"
+        assert cliente.post(url, json={"pessoa_id": livre}).status_code == 201
+        assert cliente.post(url, json={"pessoa_id": livre}).status_code == 409
+        assert cliente.patch(f"{url}/{livre}", json={"principal": True}).json()["principal"] is True
+        e2 = cliente.get("/api/contatos/empresas", params={"tipo": "cliente", "busca": "servicos"}).json()["itens"][0]
+        assert [(c["nome"], c["principal"], c["do_grupo"]) for c in e2["contatos"] if c["nome"] == "Livre"] == [("Livre", True, False)]
+        assert cliente.delete(f"{url}/{livre}").status_code == 204
+        assert cliente.delete(f"{url}/{livre}").status_code == 404
+        # A pessoa continua na base, agora sem empresa.
+        assert cliente.get("/api/contatos/pessoas/busca", params={"busca": "livre"}).json()[0]["empresas"] == []
+
+    def test_contato_novo_ja_nasce_principal(self, cliente, base):
+        r = cliente.post("/api/contatos/pessoas", json={"nome": "Chefe", "empresa_id": base["e2"], "principal": True})
+        assert r.json()["principal"] is True

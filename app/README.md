@@ -480,7 +480,7 @@ pontual). Antes, só a carteira recorrente era "Cliente". Agora:
 
 ## Contatos: clientes e prospects segregados (26/09/2026)
 
-**Nova pessoa (26/09/2026).** O botão "Nova pessoa", no topo do menu Contatos, abre um painel para cadastrar uma pessoa sem precisar abrir antes uma empresa: busca a empresa, o CNPJ ou o grupo (entre clientes e prospects), escolhe se a pessoa fica ligada só à empresa ou ao grupo todo (prospect sem empresa liga ao grupo) e preenche nome, cargo, e-mail, telefone, papel, observação e "não contatar". Usa a mesma rota `POST /api/contatos/pessoas`, que exige empresa OU grupo.
+**Nova pessoa (26/09/2026).** O botão "Nova pessoa", no topo do menu Contatos, abre um painel para cadastrar uma pessoa sem precisar abrir antes uma empresa: busca a empresa, o CNPJ ou o grupo (entre clientes e prospects), escolhe se a pessoa fica ligada só à empresa ou ao grupo todo (prospect sem empresa liga ao grupo) e preenche nome, cargo, e-mail, telefone, papel, observação e "não contatar". Usa a mesma rota `POST /api/contatos/pessoas`. Desde 30/09/2026 a empresa é opcional (ver "Base única de contatos", abaixo).
 
 Menu **Contatos** (`crm/api/contatos.py`, `crm/domain/contatos.py`). Duas abas, **Clientes** e
 **Prospects**, e dois modos de busca:
@@ -500,8 +500,39 @@ Menu **Contatos** (`crm/api/contatos.py`, `crm/domain/contatos.py`). Duas abas, 
 - `GET /api/contatos/empresas`, `GET /api/contatos/pessoas`, `POST/PATCH /api/contatos/pessoas`,
   `PATCH /api/empresas/{id}`, `POST /api/grupos/{id}/empresas`.
 
-**Ainda fora:** duplicar contato entre empresas, importação de contatos em lote pela tela (segue pela
-planilha), e as listas de campanha que **respeitam** o *não contatar* (o campo já é gravado).
+**Ainda fora:** importação de contatos em lote pela tela (segue pela planilha), e as listas de
+campanha que **respeitam** o *não contatar* (o campo já é gravado).
+
+### Base única de contatos: pessoa antes da empresa (30/09/2026)
+
+Pedido de Karine, amostra e proposta aprovadas em chat. O objetivo é não recadastrar a mesma pessoa a
+cada empresa nova. Fluxo: **Nova pessoa → salva na base → Nova empresa → busca o contato → vincula →
+salva a empresa**.
+
+- **Nova pessoa sem empresa.** A empresa passou a ser opcional. A pessoa sem empresa nem grupo aparece
+  em **Prospects > Pessoa** como "Sem empresa". Clicar no nome abre o painel da pessoa, com os dados e
+  **todas as empresas** em que ela está (★ onde é principal).
+- **Nova empresa** (botão ao lado de "Nova pessoa"): razão social, CNPJ, endereço e **Contato(s)
+  vinculado(s)**. A busca cobre a base inteira (clientes e prospects) por **nome, e-mail ou telefone**.
+  O grupo (o cliente) é reaproveitado pelo nome ou nasce um prospect novo, como na Nova oportunidade.
+  CNPJ, UF e CEP são validados como na edição.
+- **Muitos para muitos.** Uma pessoa pode estar em **várias empresas**; uma empresa tem **vários
+  contatos** e pode ter **vários principais**. "Principal" é do vínculo: Maria pode ser principal na
+  Delta e não na Alfa. Cargo, e-mail e telefone são da pessoa, iguais em todas as empresas.
+- No painel da empresa: marcar/desmarcar principal, **Desvincular** (a pessoa continua na base e nas
+  outras empresas) e **Vincular contato já cadastrado**.
+- **Banco:** tabela nova `vinculo_de_contato` (pessoa, empresa, principal, único por par); saiu
+  `pessoa_contato.empresa_id` e a regra "todo contato pertence a alguém". A migração `5e8b3f1a2c47`
+  transforma cada ligação antiga em um vínculo. Ensaio numa cópia do banco (pg_dump) em 30/09/2026:
+  226 pessoas antes e depois, 175 ligações → 175 vínculos idênticos, e o downgrade devolveu as mesmas
+  ligações. O downgrade guarda só o vínculo mais antigo de cada pessoa e perde a marca de principal.
+- Rotas novas: `GET /api/contatos/pessoas/busca`, `POST /api/empresas`,
+  `POST /api/empresas/{id}/contatos`, `PATCH` e `DELETE /api/empresas/{id}/contatos/{pessoa_id}`.
+  `GET /api/contatos/pessoas` passou a trazer `empresas` (todas as da pessoa).
+- Abordagens (ficha do SDR) e a planilha de lacunas de contato passaram a ler os vínculos.
+
+**Pendente, por decisão:** a base tem **33 e-mails repetidos**, provavelmente a mesma pessoa cadastrada
+em mais de uma empresa. Juntar cada caso numa pessoa só fica para depois, caso a caso, com aprovação.
 
 ## Carga da carteira anterior ao CRM (26/09/2026)
 

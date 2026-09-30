@@ -485,6 +485,15 @@ export interface Mrr {
 
 export type TipoDeContato = "cliente" | "prospect";
 
+/** Uma empresa em que a pessoa está — a pessoa pode estar em várias (30/09/2026). */
+export interface EmpresaDaPessoa {
+  empresa_id: number;
+  razao_social: string;
+  grupo_id: number;
+  grupo_nome: string;
+  principal: boolean;
+}
+
 export interface PessoaDeContato {
   id: number;
   nome: string;
@@ -498,6 +507,10 @@ export interface PessoaDeContato {
   grupo_id: number | null;
   /** Ligada só ao grupo, não a esta empresa. */
   do_grupo: boolean;
+  /** Contato principal desta empresa. Uma empresa pode ter vários. */
+  principal?: boolean;
+  /** Todas as empresas em que a pessoa está. */
+  empresas?: EmpresaDaPessoa[];
 }
 
 export interface EnderecoDeContato {
@@ -533,7 +546,8 @@ export interface EntidadeDeContato {
 
 export interface PessoaComOrigem extends PessoaDeContato {
   tipo: TipoDeContato;
-  grupo_nome: string;
+  /** Nulo quando a pessoa ainda não está em empresa nem grupo. */
+  grupo_nome: string | null;
   razao_social: string | null;
 }
 

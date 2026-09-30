@@ -21,7 +21,7 @@ import sqlalchemy as sa
 from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
-from crm.db.modelos import Empresa, GrupoEconomico, PessoaContato
+from crm.db.modelos import Empresa, GrupoEconomico, PessoaContato, VinculoDeContato
 
 __all__ = ["Relatorio", "ler", "aplicar", "cnpj_valido"]
 
@@ -248,16 +248,20 @@ def aplicar(sessao: Session, linhas: list[Linha], rel: Relatorio, *, sobrescreve
         vals_c = {"cargo": d.get("contato_cargo"), "email": d.get("email"), "telefone": d.get("telefone")}
         vals_c = {k: v for k, v in vals_c.items() if v}
         if nome or vals_c:
-            dono = {"empresa_id": empresa.id} if empresa else {"grupo_id": grupo.id}
             base = sa.select(PessoaContato).where(PessoaContato.grupo_id == grupo.id) if not empresa else \
-                sa.select(PessoaContato).where(PessoaContato.empresa_id == empresa.id)
+                sa.select(PessoaContato).join(VinculoDeContato).where(VinculoDeContato.empresa_id == empresa.id)
             achado = None
             if d.get("email"):
                 achado = sessao.scalars(base.where(PessoaContato.email == d["email"])).first()
             if achado is None and nome:
                 achado = sessao.scalars(base.where(sa.func.lower(PessoaContato.nome) == nome.lower())).first()
             if achado is None:
-                sessao.add(PessoaContato(nome=nome or d.get("email") or grupo.nome, **dono, **vals_c))
+                nova = PessoaContato(nome=nome or d.get("email") or grupo.nome, **vals_c)
+                if empresa:
+                    nova.vinculos.append(VinculoDeContato(empresa_id=empresa.id))
+                else:
+                    nova.grupo_id = grupo.id
+                sessao.add(nova)
                 rel.contatos_criados += 1
             elif _preencher(achado, vals_c, f"{lin.n} (contato)", rel, sobrescrever):
                 rel.contatos_atualizados += 1

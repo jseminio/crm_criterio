@@ -1,7 +1,8 @@
 /** Cadastro de pessoa de contato direto no menu Contatos.
  *
- * A pessoa se liga a uma empresa **ou** ao grupo (a API exige uma das duas). Aqui a pessoa escolhe onde ela
- * trabalha buscando a empresa ou o grupo, entre clientes e prospects, e depois preenche os dados.
+ * Desde 30/09/2026 (pedido de Karine) a empresa é **opcional**: a pessoa entra na base única de
+ * contatos e pode ser vinculada depois, em "Nova empresa" ou no painel de qualquer empresa. Se a
+ * empresa já existir, dá para escolhê-la aqui mesmo, ou ligar a pessoa ao grupo todo.
  */
 
 import { useState } from "react";
@@ -27,17 +28,20 @@ export function NovaPessoa({ listas, aoFechar, aoCriar }: { listas: Listas | nul
   }, [termo]);
 
   const criar = async (corpo: Record<string, unknown>) => {
-    if (!escolhida) return;
-    const alvo = escolhida.empresa_id !== null && vinculo === "empresa" ? { empresa_id: escolhida.empresa_id } : { grupo_id: escolhida.grupo_id };
+    const alvo = !escolhida
+      ? {}
+      : escolhida.empresa_id !== null && vinculo === "empresa"
+        ? { empresa_id: escolhida.empresa_id }
+        : { grupo_id: escolhida.grupo_id };
     await api.criarContato({ ...corpo, ...alvo });
     aoCriar();
     aoFechar();
   };
 
   return (
-    <PainelLateral titulo="Nova pessoa" subtitulo="Cadastre quem falar em uma empresa ou grupo." aoFechar={aoFechar}>
+    <PainelLateral titulo="Nova pessoa" subtitulo="A pessoa entra na base de contatos; a empresa pode vir depois." aoFechar={aoFechar}>
       <div style={{ display: "grid", gap: "var(--e3)" }}>
-        <h3 style={{ fontSize: 14 }}>1. Onde esta pessoa trabalha?</h3>
+        <h3 style={{ fontSize: 14 }}>1. Empresa (opcional)</h3>
         {escolhida ? (
           <div className="recado" role="status">
             <strong>{escolhida.razao_social ?? escolhida.grupo_nome}</strong>
@@ -51,10 +55,10 @@ export function NovaPessoa({ listas, aoFechar, aoCriar }: { listas: Listas | nul
           <>
             <div className="campo-bloco">
               <label className="campo-rotulo" htmlFor="np-busca">Empresa, CNPJ ou grupo</label>
-              <input id="np-busca" className="entrada" value={busca} onChange={(e) => definirBusca(e.target.value)} placeholder="digite ao menos 2 letras" autoFocus />
+              <input id="np-busca" className="entrada" value={busca} onChange={(e) => definirBusca(e.target.value)} placeholder="deixe em branco para cadastrar sem empresa" />
             </div>
             {termo.length >= 2 && resultados.dados && resultados.dados.length === 0 && !resultados.carregando && (
-              <p className="campo-ajuda" style={{ margin: 0 }}>Nada encontrado. Cadastre a empresa ou o prospect antes.</p>
+              <p className="campo-ajuda" style={{ margin: 0 }}>Nada encontrado. Cadastre a pessoa sem empresa e vincule depois, em “Nova empresa”.</p>
             )}
             <ul className="contatos-lista" aria-label="Resultados da busca">
               {(resultados.dados ?? []).map((e) => (
@@ -72,23 +76,19 @@ export function NovaPessoa({ listas, aoFechar, aoCriar }: { listas: Listas | nul
           </>
         )}
 
-        {escolhida && (
-          <>
-            {escolhida.empresa_id !== null && (
-              <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: "var(--e1)" }}>
-                <legend className="campo-rotulo">A pessoa fica ligada a</legend>
-                <label style={{ fontSize: 13 }}>
-                  <input type="radio" name="np-vinculo" checked={vinculo === "empresa"} onChange={() => definirVinculo("empresa")} /> Só a esta empresa
-                </label>
-                <label style={{ fontSize: 13 }}>
-                  <input type="radio" name="np-vinculo" checked={vinculo === "grupo"} onChange={() => definirVinculo("grupo")} /> Ao grupo todo (aparece em todas as empresas dele)
-                </label>
-              </fieldset>
-            )}
-            <h3 style={{ fontSize: 14 }}>2. Dados da pessoa</h3>
-            <FormularioDePessoa papeis={listas?.papeis_de_contato ?? []} rotulo="Cadastrar pessoa" aoSalvar={criar} aoCancelar={aoFechar} />
-          </>
+        {escolhida && escolhida.empresa_id !== null && (
+          <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: "var(--e1)" }}>
+            <legend className="campo-rotulo">A pessoa fica ligada a</legend>
+            <label style={{ fontSize: 13 }}>
+              <input type="radio" name="np-vinculo" checked={vinculo === "empresa"} onChange={() => definirVinculo("empresa")} /> Só a esta empresa
+            </label>
+            <label style={{ fontSize: 13 }}>
+              <input type="radio" name="np-vinculo" checked={vinculo === "grupo"} onChange={() => definirVinculo("grupo")} /> Ao grupo todo (aparece em todas as empresas dele)
+            </label>
+          </fieldset>
         )}
+        <h3 style={{ fontSize: 14 }}>2. Dados da pessoa</h3>
+        <FormularioDePessoa papeis={listas?.papeis_de_contato ?? []} rotulo="Cadastrar pessoa" aoSalvar={criar} aoCancelar={aoFechar} />
       </div>
     </PainelLateral>
   );

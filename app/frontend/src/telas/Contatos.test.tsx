@@ -12,6 +12,8 @@ vi.mock("../api/cliente", async () => {
     api: {
       contatosPorEmpresa: vi.fn(), contatosPorPessoa: vi.fn(), criarContato: vi.fn(), editarContato: vi.fn(),
       editarEmpresa: vi.fn(), criarEmpresaDoGrupo: vi.fn(),
+      buscarPessoas: vi.fn(), criarEmpresa: vi.fn(), vincularContato: vi.fn(), marcarPrincipal: vi.fn(),
+      desvincularContato: vi.fn(),
     },
   };
 });
@@ -169,10 +171,17 @@ describe("Contatos — clientes e prospects separados", () => {
       expect(vi.mocked(api.criarContato).mock.calls[0][0]).toMatchObject({ nome: "Carla", grupo_id: 2 });
     });
 
-    it("não deixa cadastrar sem escolher onde a pessoa trabalha", async () => {
+    it("cadastra a pessoa sem empresa, na base única de contatos", async () => {
+      vi.mocked(api.criarContato).mockResolvedValue(pessoa());
       await abrir();
-      expect(screen.queryByRole("button", { name: "Cadastrar pessoa" })).toBeNull();
-      expect(screen.getByText("1. Onde esta pessoa trabalha?")).toBeInTheDocument();
+      expect(screen.getByText("1. Empresa (opcional)")).toBeInTheDocument();
+      await userEvent.type(screen.getByLabelText("Nome"), "Livre Silva");
+      await userEvent.click(screen.getByRole("button", { name: "Cadastrar pessoa" }));
+      await waitFor(() => expect(api.criarContato).toHaveBeenCalledTimes(1));
+      const [corpo] = vi.mocked(api.criarContato).mock.calls[0];
+      expect(corpo).toMatchObject({ nome: "Livre Silva" });
+      expect(corpo).not.toHaveProperty("empresa_id");
+      expect(corpo).not.toHaveProperty("grupo_id");
     });
 
     it("avisa quando a busca não acha nada", async () => {
@@ -180,6 +189,71 @@ describe("Contatos — clientes e prospects separados", () => {
       vi.mocked(api.contatosPorEmpresa).mockResolvedValue({ total: 0, itens: [] });
       await userEvent.type(screen.getByLabelText(/empresa, cnpj ou grupo/i), "zzz");
       expect(await screen.findByText(/nada encontrado/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("Base única de contatos (30/09/2026)", () => {
+    const livre = pessoa({ id: 7, nome: "Livre Silva", email: "livre@x.com", empresa_id: null, empresas: [] });
+
+    it("a pessoa sem empresa aparece como \"Sem empresa\" e abre com as empresas dela", async () => {
+      vi.mocked(api.contatosPorPessoa).mockResolvedValue({
+        total: 2,
+        itens: [
+          dePessoa({ id: 7, nome: "Livre Silva", grupo_nome: null, razao_social: null, empresas: [] }),
+          dePessoa({ empresas: [
+            { empresa_id: 10, razao_social: "Alfa Comércio Ltda", grupo_id: 1, grupo_nome: "Grupo Alfa", principal: true },
+            { empresa_id: 11, razao_social: "Delta Ltda", grupo_id: 3, grupo_nome: "Delta Ltda", principal: false },
+          ] }),
+        ],
+      });
+      render(<Contatos listas={null} />);
+      await userEvent.click(await screen.findByRole("button", { name: "Pessoa" }));
+      expect(await screen.findByText(/Sem empresa/)).toBeInTheDocument();
+      expect(screen.getByText("★ Alfa Comércio Ltda, Delta Ltda")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Maria Silva" }));
+      const empresas = await screen.findByRole("list", { name: "Empresas da pessoa" });
+      expect(within(empresas).getAllByRole("listitem")).toHaveLength(2);
+      expect(within(empresas).getByText("Principal")).toBeInTheDocument();
+    });
+
+    it("Nova empresa vincula um contato já cadastrado, como principal", async () => {
+      vi.mocked(api.buscarPessoas).mockResolvedValue([livre]);
+      vi.mocked(api.criarEmpresa).mockResolvedValue({ id: 50, razao_social: "Delta", cnpj: null, grupo_id: 9, grupo_nome: "Delta" });
+      render(<Contatos listas={null} />);
+      await screen.findByText("Alfa Comércio Ltda");
+      await userEvent.click(screen.getByRole("button", { name: "Nova empresa" }));
+      await userEvent.type(screen.getByLabelText("Razão social"), "Delta Engenharia");
+      await userEvent.type(screen.getByLabelText("Município"), "Niterói");
+      await userEvent.type(screen.getByLabelText(/buscar por nome, e-mail ou telefone/i), "livre");
+      const achados = await screen.findByRole("list", { name: "Contatos encontrados" });
+      await userEvent.click(within(achados).getByRole("button", { name: "Vincular" }));
+      const vinculados = screen.getByRole("list", { name: "Contatos vinculados" });
+      await userEvent.click(within(vinculados).getByRole("checkbox", { name: "Contato principal" }));
+      await userEvent.click(screen.getByRole("button", { name: "Salvar empresa" }));
+      await waitFor(() => expect(api.criarEmpresa).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(api.criarEmpresa).mock.calls[0][0]).toMatchObject({
+        razao_social: "Delta Engenharia",
+        municipio: "Niterói",
+        cnpj: null,
+        contatos: [{ pessoa_id: 7, principal: true }],
+      });
+    });
+
+    it("no painel da empresa marca principal, desvincula e vincula quem já existe", async () => {
+      vi.mocked(api.contatosPorEmpresa).mockResolvedValue({
+        total: 1,
+        itens: [entidade({ contatos: [pessoa({ principal: false })] })],
+      });
+      vi.mocked(api.buscarPessoas).mockResolvedValue([livre]);
+      render(<Contatos listas={null} />);
+      await userEvent.click((await screen.findAllByRole("button", { name: "Abrir" }))[0]);
+      await userEvent.click(screen.getByRole("checkbox", { name: "Contato principal" }));
+      await waitFor(() => expect(api.marcarPrincipal).toHaveBeenCalledWith(10, 1, true));
+      await userEvent.click(screen.getByRole("button", { name: "Desvincular" }));
+      await waitFor(() => expect(api.desvincularContato).toHaveBeenCalledWith(10, 1));
+      await userEvent.type(screen.getByLabelText(/buscar por nome, e-mail ou telefone/i), "livre");
+      await userEvent.click(await screen.findByRole("button", { name: "Vincular" }));
+      await waitFor(() => expect(api.vincularContato).toHaveBeenCalledWith(10, 7));
     });
   });
 });

@@ -9,7 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from crm.db.modelos import Empresa, GrupoEconomico, Lead, Oportunidade, PessoaContato
+from crm.db.modelos import Empresa, GrupoEconomico, Lead, Oportunidade, PessoaContato, VinculoDeContato
 from crm.domain.listas import (
     Origem,
     PapelContato,
@@ -84,10 +84,27 @@ class TestEmpresa:
 
 
 class TestPessoaContato:
-    def test_contato_precisa_pertencer_a_alguem(self, sessao: Session):
-        """Contato solto não tem como ser encontrado nem respeitado."""
-        sessao.add(PessoaContato(nome="Fulano"))
+    def test_contato_pode_nascer_sem_empresa(self, sessao: Session):
+        """Desde 30/09/2026 a pessoa é cadastrada antes da empresa (pedido de Karine)."""
+        contato = PessoaContato(nome="Fulano")
+        sessao.add(contato)
+        sessao.flush()
 
+        assert contato.id is not None and contato.vinculos == []
+
+    def test_mesma_pessoa_em_varias_empresas_e_vinculo_unico(self, sessao: Session):
+        grupo = _grupo(sessao)
+        a, b = Empresa(grupo_id=grupo.id, razao_social="A"), Empresa(grupo_id=grupo.id, razao_social="B")
+        sessao.add_all([a, b])
+        sessao.flush()
+        contato = PessoaContato(nome="Maria", vinculos=[
+            VinculoDeContato(empresa_id=a.id, principal=True), VinculoDeContato(empresa_id=b.id),
+        ])
+        sessao.add(contato)
+        sessao.flush()
+
+        assert sorted((v.empresa_id, v.principal) for v in contato.vinculos) == [(a.id, True), (b.id, False)]
+        sessao.add(VinculoDeContato(pessoa_id=contato.id, empresa_id=a.id))
         with pytest.raises(sa.exc.IntegrityError):
             sessao.flush()
 

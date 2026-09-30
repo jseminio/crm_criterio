@@ -168,6 +168,32 @@ export const api = {
   editarEmpresa: (id: number, mudancas: Record<string, unknown>) =>
     pedir<EnderecoDeContato>(`/api/empresas/${id}`, { method: "PATCH", body: JSON.stringify(mudancas) }),
 
+  /** Toda a base de contatos (clientes e prospects), por nome, e-mail ou telefone. */
+  buscarPessoas: (busca: string) =>
+    pedir<PessoaDeContato[]>(comParametros("/api/contatos/pessoas/busca", { busca })),
+
+  /** Contatos > Nova empresa: dados, endereço e os contatos vinculados. */
+  criarEmpresa: (dados: Record<string, unknown>) =>
+    pedir<{ id: number; razao_social: string; cnpj: string | null; grupo_id: number; grupo_nome: string }>(
+      "/api/empresas",
+      { method: "POST", body: JSON.stringify(dados) },
+    ),
+
+  vincularContato: (empresaId: number, pessoaId: number, principal = false) =>
+    pedir<unknown>(`/api/empresas/${empresaId}/contatos`, {
+      method: "POST",
+      body: JSON.stringify({ pessoa_id: pessoaId, principal }),
+    }),
+
+  marcarPrincipal: (empresaId: number, pessoaId: number, principal: boolean) =>
+    pedir<unknown>(`/api/empresas/${empresaId}/contatos/${pessoaId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ principal }),
+    }),
+
+  desvincularContato: (empresaId: number, pessoaId: number) =>
+    pedir<unknown>(`/api/empresas/${empresaId}/contatos/${pessoaId}`, { method: "DELETE" }),
+
   criarEmpresaDoGrupo: (grupoId: number, dados: Record<string, unknown> = {}) =>
     pedir<{ id: number; razao_social: string; cnpj: string | null }>(`/api/grupos/${grupoId}/empresas`, {
       method: "POST",

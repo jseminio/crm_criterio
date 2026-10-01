@@ -17,7 +17,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from crm.db.modelos import Empresa, GrupoEconomico, Oportunidade, PessoaContato, QuestionarioRecebido
+from crm.db.modelos import Empresa, GrupoEconomico, Oportunidade, PessoaContato, QuestionarioRecebido, VinculoDeContato
 from crm.domain.listas import Origem, OrigemDoDado, Situacao, SituacaoDoQuestionario, SituacaoGrupo
 from crm.questionario.leitura import Leitura, ler
 
@@ -74,9 +74,12 @@ def _contato(sessao: Session, q: QuestionarioRecebido, grupo: GrupoEconomico, em
         PessoaContato.grupo_id == grupo.id, sa.func.lower(PessoaContato.email) == email,
     )):
         return False
+    # Do grupo e vinculado à empresa — a ligação pessoa-empresa é o `VinculoDeContato` desde a
+    # base única de contatos (30/09/2026).
     sessao.add(PessoaContato(
-        grupo_id=grupo.id, empresa_id=empresa.id, nome=q.contato_nome, cargo=q.contato_cargo,
+        grupo_id=grupo.id, nome=q.contato_nome, cargo=q.contato_cargo,
         email=q.contato_email, telefone=q.contato_celular,
+        vinculos=[VinculoDeContato(empresa_id=empresa.id)],
     ))
     return True
 

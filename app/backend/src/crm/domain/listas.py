@@ -397,6 +397,15 @@ class Tom(Enum):
     NEGATIVO = "Negativo"
 
 
+class IndiceDeReajuste(Enum):
+    """Índice de reajuste do contrato. Pedido de Karine em 30/09/2026: só
+    registra o índice escolhido, sem calcular o reajuste."""
+
+    IPCA = "IPCA (IBGE)"
+    IGPM = "IGP-M (FGV)"
+    SEM_REAJUSTE = "Sem reajuste"
+
+
 class Temperatura(Enum):
     FRIO = "Frio"
     MORNO = "Morno"

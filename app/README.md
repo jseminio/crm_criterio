@@ -553,7 +553,7 @@ pontual). Antes, só a carteira recorrente era "Cliente". Agora:
 
 ## Contatos: clientes e prospects segregados (26/09/2026)
 
-**Nova pessoa (26/09/2026).** O botão "Nova pessoa", no topo do menu Contatos, abre um painel para cadastrar uma pessoa sem precisar abrir antes uma empresa: busca a empresa, o CNPJ ou o grupo (entre clientes e prospects), escolhe se a pessoa fica ligada só à empresa ou ao grupo todo (prospect sem empresa liga ao grupo) e preenche nome, cargo, e-mail, telefone, papel, observação e "não contatar". Usa a mesma rota `POST /api/contatos/pessoas`, que exige empresa OU grupo.
+**Nova pessoa (26/09/2026).** O botão "Nova pessoa", no topo do menu Contatos, abre um painel para cadastrar uma pessoa sem precisar abrir antes uma empresa: busca a empresa, o CNPJ ou o grupo (entre clientes e prospects), escolhe se a pessoa fica ligada só à empresa ou ao grupo todo (prospect sem empresa liga ao grupo) e preenche nome, cargo, e-mail, telefone, papel, observação e "não contatar". Usa a mesma rota `POST /api/contatos/pessoas`. Desde 30/09/2026 a empresa é opcional (ver "Base única de contatos", abaixo).
 
 Menu **Contatos** (`crm/api/contatos.py`, `crm/domain/contatos.py`). Duas abas, **Clientes** e
 **Prospects**, e dois modos de busca:
@@ -573,8 +573,51 @@ Menu **Contatos** (`crm/api/contatos.py`, `crm/domain/contatos.py`). Duas abas, 
 - `GET /api/contatos/empresas`, `GET /api/contatos/pessoas`, `POST/PATCH /api/contatos/pessoas`,
   `PATCH /api/empresas/{id}`, `POST /api/grupos/{id}/empresas`.
 
-**Ainda fora:** duplicar contato entre empresas, importação de contatos em lote pela tela (segue pela
-planilha), e as listas de campanha que **respeitam** o *não contatar* (o campo já é gravado).
+**Ainda fora:** importação de contatos em lote pela tela (segue pela planilha), e as listas de
+campanha que **respeitam** o *não contatar* (o campo já é gravado).
+
+### Base única de contatos: pessoa antes da empresa (30/09/2026)
+
+Pedido de Karine, amostra e proposta aprovadas em chat. O objetivo é não recadastrar a mesma pessoa a
+cada empresa nova. Fluxo: **Nova pessoa → salva na base → Nova empresa → busca o contato → vincula →
+salva a empresa**.
+
+- **Nova pessoa sem empresa.** A empresa passou a ser opcional. A pessoa sem empresa nem grupo aparece
+  em **Prospects > Pessoa** como "Sem empresa". Clicar no nome abre o painel da pessoa, com os dados e
+  **todas as empresas** em que ela está (★ onde é principal).
+- **Nova empresa** (botão ao lado de "Nova pessoa"): razão social, CNPJ, endereço e **Contato(s)
+  vinculado(s)**. A busca cobre a base inteira (clientes e prospects) por **nome, e-mail ou telefone**.
+  O grupo (o cliente) é reaproveitado pelo nome ou nasce um prospect novo, como na Nova oportunidade.
+  CNPJ, UF e CEP são validados como na edição.
+- **Muitos para muitos.** Uma pessoa pode estar em **várias empresas**; uma empresa tem **vários
+  contatos** e pode ter **vários principais**. "Principal" é do vínculo: Maria pode ser principal na
+  Delta e não na Alfa. Cargo, e-mail e telefone são da pessoa, iguais em todas as empresas.
+- No painel da empresa: marcar/desmarcar principal, **Desvincular** (a pessoa continua na base e nas
+  outras empresas) e **Vincular contato já cadastrado**.
+- **Banco:** tabela nova `vinculo_de_contato` (pessoa, empresa, principal, único por par); saiu
+  `pessoa_contato.empresa_id` e a regra "todo contato pertence a alguém". A migração `5e8b3f1a2c47`
+  transforma cada ligação antiga em um vínculo. Ensaio numa cópia do banco (pg_dump) em 30/09/2026:
+  226 pessoas antes e depois, 175 ligações → 175 vínculos idênticos, e o downgrade devolveu as mesmas
+  ligações. O downgrade guarda só o vínculo mais antigo de cada pessoa e perde a marca de principal.
+- Rotas novas: `GET /api/contatos/pessoas/busca`, `POST /api/empresas`,
+  `POST /api/empresas/{id}/contatos`, `PATCH` e `DELETE /api/empresas/{id}/contatos/{pessoa_id}`.
+  `GET /api/contatos/pessoas` passou a trazer `empresas` (todas as da pessoa).
+- Abordagens (ficha do SDR) e a planilha de lacunas de contato passaram a ler os vínculos.
+
+**Excluir contato e empresa (30/09/2026).** Pedido de Karine, proposta aprovada. Os botões ficam **no
+fim do painel** da pessoa e da empresa, longe dos botões do dia a dia, e pedem **confirmação em dois
+passos**, dizendo o que vai sumir ("Não dá para desfazer").
+
+- **Excluir contato** apaga a pessoa da base e de todas as empresas em que está
+  (`DELETE /api/contatos/pessoas/{id}`). Para tirar de uma empresa só, use **Desvincular**.
+- **Excluir empresa** apaga a empresa; os contatos **continuam na base** (só o vínculo some) e o grupo
+  fica (`DELETE /api/empresas/{id}`).
+- **Empresa com contrato não pode ser excluída**, em qualquer situação do contrato: apagar quebraria o
+  histórico, o MRR e a carteira. A API responde 409 e o painel mostra o motivo no lugar do botão
+  (`tem_contrato` em `GET /api/contatos/empresas`).
+
+**Pendente, por decisão:** a base tem **33 e-mails repetidos**, provavelmente a mesma pessoa cadastrada
+em mais de uma empresa. Juntar cada caso numa pessoa só fica para depois, caso a caso, com aprovação.
 
 ## Carga da carteira anterior ao CRM (26/09/2026)
 
@@ -731,6 +774,19 @@ descartada pelo servidor, e a API recusa origem de campo que não seja direciona
 
 **Ainda fora:** a *lista do que falta para a proposta, com responsável e prazo* e a *geração do
 documento* — a primeira depende de definir os itens, a segunda do modelo oficial e do formato.
+
+## Grade do funil em Excel (28/09/2026)
+
+Na visão **Grade** do funil, o botão **Exportar para Excel** (ao lado da troca Kanban/Grade) baixa
+`funil-AAAA-MM-DD.xlsx` com as mesmas oito colunas da tabela — Cliente, Oportunidade, Situação,
+Temperatura, Captador, Originação, Mensal e Anual — e as mesmas oportunidades que os filtros da tela
+selecionam, inclusive Situação. Sem limite de página. Valor sai como número (R$) e Originação como
+data; cabeçalho congelado e filtro do Excel ligado.
+
+- Rota: `GET /api/oportunidades/exportar`, com os mesmos parâmetros de `GET /api/oportunidades`.
+- A ordem é a padrão da lista (originação mais recente primeiro). A ordenação clicada nas colunas da
+  tela não vai para a planilha: ordene lá, pelo filtro do Excel.
+- Só lê. Leva dado de cliente: guarde fora do repositório.
 
 ## Endereço da empresa
 
@@ -1220,6 +1276,36 @@ inventar uma barra de ações nova.
 (PDF/Word) para enviar ao cliente. Precisaria de modelo aprovado e
 provavelmente envolve o Bruno na definição do template — escopo maior,
 adiado para quando entrar em pauta.
+
+### Parcelas no serviço recorrente (30/09/2026)
+
+Pedido de Karine: em "Nova oportunidade", quando o serviço escolhido é
+**recorrente (C1)**, aparece o campo **Quantidade de parcelas** (1 a 120) e o
+**Preço anual** deixa de ser digitado — vira `preço mensal × parcelas`, travado
+(somente leitura). Exemplo: R$ 5.000,00 × 12 = R$ 60.000,00.
+
+- A quantidade fica guardada em `oportunidade.quantidade_parcelas` (migração
+  `3b1d5c0a9e27`) e volta no detalhe da oportunidade.
+- O servidor refaz a conta em `POST /api/oportunidades`: com serviço C1 e
+  parcelas, qualquer `preco_anual` enviado é ignorado; parcelas sem preço
+  mensal dão 422. Em serviço não recorrente (C2) ou fora do catálogo, as
+  parcelas são descartadas e o preço anual segue livre, como antes.
+- A conta na tela é feita em centavos inteiros (`src/parcelas.ts`), para o
+  valor mostrado bater com o gravado.
+- Vale só para a criação. A edição de preço no detalhe não mudou.
+
+### Reajuste na nova oportunidade (30/09/2026)
+
+Pedido de Karine: "Nova oportunidade" ganhou o seletor **Reajuste**, para
+qualquer serviço, com as opções **IPCA (IBGE)**, **IGP-M (FGV)** e **Sem
+reajuste**. Em branco fica "Não informado".
+
+- Só registra o índice escolhido; o CRM não calcula reajuste.
+- A lista vive em `IndiceDeReajuste` (`crm/domain/listas.py`) e chega à tela
+  por `GET /api/listas` (`indices_de_reajuste`). Incluir um índice novo é
+  acrescentar um item ali, sem migração, porque a coluna guarda texto.
+- Fica em `oportunidade.reajuste` (migração `7c4e2a91d6b0`); valor fora da
+  lista dá 422.
 
 ## A régua de porte — sugestão, nunca decisão (23/09/2026)
 

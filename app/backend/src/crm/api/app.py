@@ -22,7 +22,7 @@ from datetime import date
 from typing import Callable, Iterator, Literal
 
 import sqlalchemy as sa
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -60,11 +60,13 @@ from crm.domain import agenda as regras_da_agenda
 from crm.domain import eventos_de_contrato as regras_de_eventos
 from crm.domain import mrr as regras_de_mrr
 from crm.domain import recortes as regras_de_recortes
+from crm.relatorios.exportacao_do_funil import LinhaDoFunil, gerar_planilha_do_funil
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
 from crm.domain.servicos import CATALOGO as CATALOGO_DE_SERVICOS, OUTRO, linha_do_servico, problema_na_descricao, problema_no_tema
 from crm.domain.listas import (
     ORIGEM_DA_MUDANCA_NO_CRM,
+    IndiceDeReajuste,
     IniciativaDoEncerramento,
     LinhaServico,
     MotivoDeDescarte,
@@ -231,6 +233,7 @@ def _registrar(api: FastAPI) -> None:
             portes=[p.value for p in regras_de_porte.Porte],
             servicos=list(servicos),
             motivos_de_descarte=_valores(MotivoDeDescarte),
+            indices_de_reajuste=_valores(IndiceDeReajuste),
         )
 
     @api.get("/api/servicos", response_model=list[e.ServicoDoCatalogo], tags=["listas"])
@@ -525,6 +528,51 @@ def _registrar(api: FastAPI) -> None:
             itens=[_resumo_de(o, nome) for o, nome in linhas],
         )
 
+    # Antes de `/api/oportunidades/{oportunidade_id}`: senão "exportar" seria lido como id.
+    @api.get("/api/oportunidades/exportar", tags=["funil"])
+    def exportar_oportunidades(
+        sessao: Session = Depends(obter_sessao),
+        situacao: list[Situacao] | None = Query(default=None),
+        captador: list[str] | None = Query(default=None),
+        tipo_canal: list[TipoCanal] | None = Query(default=None),
+        temperatura: list[Temperatura] | None = Query(default=None),
+        grupo_id: int | None = None,
+        busca: str | None = None,
+        data_tipo: Literal["colocacao", "aceite"] | None = None,
+        data_de: date | None = None,
+        data_ate: date | None = None,
+        servico: list[str] | None = Query(default=None),
+    ) -> Response:
+        """A Grade em Excel: os mesmos filtros e a mesma ordem da lista, sem limite de página
+        (`crm.relatorios.exportacao_do_funil`)."""
+        consulta = _consulta_de_oportunidades(
+            situacao, captador, tipo_canal, temperatura, grupo_id, busca,
+            data_tipo, data_de, data_ate, servico,
+        )
+        linhas = sessao.execute(
+            consulta.order_by(
+                Oportunidade.data_colocacao.desc().nulls_last(), Oportunidade.id.desc()
+            )
+        ).all()
+        conteudo = gerar_planilha_do_funil([
+            LinhaDoFunil(
+                cliente=nome,
+                oportunidade=o.nome,
+                situacao=o.situacao.value,
+                temperatura=o.temperatura.value if o.temperatura else None,
+                captador=o.captador,
+                originacao=o.data_colocacao,
+                mensal=o.preco_mensal,
+                anual=o.preco_anual,
+            )
+            for o, nome in linhas
+        ])
+        return Response(
+            conteudo,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="funil-{date.today():%Y-%m-%d}.xlsx"'},
+        )
+
     @api.post(
         "/api/oportunidades",
         response_model=e.OportunidadeDetalhe,
@@ -564,6 +612,17 @@ def _registrar(api: FastAPI) -> None:
                 sessao.add(grupo)
                 sessao.flush()
 
+        # Recorrente (C1) com parcelas: o preço anual é mensal × parcelas e
+        # não aceita ajuste à mão. Pedido de Karine em 30/09/2026. Fora do C1
+        # a quantidade de parcelas não se aplica e é descartada.
+        linha = linha_do_servico(corpo.servico)
+        parcelas = corpo.quantidade_parcelas if linha is LinhaServico.C1 else None
+        preco_anual = corpo.preco_anual
+        if parcelas is not None:
+            if corpo.preco_mensal is None:
+                raise HTTPException(422, "informe o preço mensal para calcular o preço anual pelas parcelas")
+            preco_anual = corpo.preco_mensal * parcelas
+
         oportunidade = Oportunidade(
             grupo_id=grupo.id,
             nome=corpo.nome,
@@ -571,7 +630,7 @@ def _registrar(api: FastAPI) -> None:
             tipo_servico=corpo.tipo_servico,
             servico_descricao=(corpo.servico_descricao or "").strip() or None,
             servico_tema=(corpo.servico_tema or "").strip() or None,
-            linha_servico=linha_do_servico(corpo.servico),
+            linha_servico=linha,
             situacao=Situacao.ENVIAR_PROPOSTA,
             temperatura=corpo.temperatura,
             tipo_canal=corpo.tipo_canal,
@@ -579,7 +638,9 @@ def _registrar(api: FastAPI) -> None:
             captador=corpo.captador,
             data_colocacao=corpo.data_colocacao or date.today(),
             preco_mensal=corpo.preco_mensal,
-            preco_anual=corpo.preco_anual,
+            preco_anual=preco_anual,
+            quantidade_parcelas=parcelas,
+            reajuste=corpo.reajuste,
             origem=Origem.CRM,
         )
         sessao.add(oportunidade)

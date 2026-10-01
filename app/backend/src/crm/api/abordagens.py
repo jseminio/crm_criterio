@@ -29,6 +29,7 @@ from crm.db.modelos import (
     GrupoEconomico,
     Oportunidade,
     PessoaContato,
+    VinculoDeContato,
 )
 from crm.db.sessao import sessao as sessao_de
 from crm.domain import abordagem as regras
@@ -165,10 +166,14 @@ def _historico_do_crm(sessao: Session, grupo_id: int) -> list[str]:
 
 def _contatos(sessao: Session, grupo_id: int) -> list[str]:
     # Ligado ao grupo ou a uma empresa dele — mesma regra da área de Contatos.
+    nas_empresas = (
+        sa.select(VinculoDeContato.pessoa_id)
+        .join(Empresa, Empresa.id == VinculoDeContato.empresa_id)
+        .where(Empresa.grupo_id == grupo_id)
+    )
     contatos = sessao.scalars(
         sa.select(PessoaContato)
-        .outerjoin(Empresa, PessoaContato.empresa_id == Empresa.id)
-        .where(sa.func.coalesce(PessoaContato.grupo_id, Empresa.grupo_id) == grupo_id)
+        .where(sa.or_(PessoaContato.grupo_id == grupo_id, PessoaContato.id.in_(nas_empresas)))
         .order_by(PessoaContato.id)
     ).all()
     return [

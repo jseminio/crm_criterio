@@ -20,7 +20,8 @@ vi.mock("../api/cliente", async () => {
     api: {
       funil: vi.fn(), indicadores: vi.fn(), oportunidade: vi.fn(), editarOportunidade: vi.fn(),
       recortes: vi.fn().mockResolvedValue([]), cenariosDeTicket: vi.fn().mockResolvedValue(null),
-      oportunidades: vi.fn(),
+      oportunidades: vi.fn(), questionarios: vi.fn().mockResolvedValue([]),
+      questionarioDaOportunidade: vi.fn().mockResolvedValue(null),
       servicos: vi.fn().mockResolvedValue([
         { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
           para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],

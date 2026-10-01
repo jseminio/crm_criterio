@@ -51,6 +51,9 @@ import type {
   OportunidadeResumo,
   Pagina,
   ResumoDasAbordagens,
+  QuestionarioDaOportunidade,
+  QuestionarioResumo,
+  ResultadoDaBusca,
 } from "./tipos";
 
 export class ErroDaApi extends Error {
@@ -235,6 +238,12 @@ export const api = {
     ),
 
   oportunidade: (id: number) => pedir<OportunidadeDetalhe>(`/api/oportunidades/${id}`),
+  questionarioDaOportunidade: (id: number) =>
+    pedir<QuestionarioDaOportunidade | null>(`/api/oportunidades/${id}/questionario`),
+  buscarQuestionarios: () => pedir<ResultadoDaBusca>("/api/questionarios/buscar", { method: "POST" }),
+  questionarios: () => pedir<QuestionarioResumo[]>("/api/questionarios"),
+  resolverQuestionario: (id: number, acao: "anexar" | "criar") =>
+    pedir<QuestionarioResumo>(`/api/questionarios/${id}/resolver`, { method: "POST", body: JSON.stringify({ acao }) }),
 
   criarOportunidade: (oportunidade: Record<string, unknown>) =>
     pedir<OportunidadeDetalhe>("/api/oportunidades", {

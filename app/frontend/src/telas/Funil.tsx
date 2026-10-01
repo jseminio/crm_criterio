@@ -17,6 +17,7 @@ import {
   type EstadoDosFiltros,
 } from "../componentes/Filtros";
 import { NovaOportunidade } from "../componentes/NovaOportunidade";
+import { BotaoBuscarQuestionarios, QuestionariosDoSite, usarQuestionarios } from "../componentes/QuestionariosDoSite";
 import { CenariosDeTicket } from "../componentes/CenariosDeTicket";
 import { Numeros } from "../componentes/Numeros";
 import { Recolhivel } from "../componentes/Recolhivel";
@@ -131,6 +132,7 @@ export function Funil({ listas }: { listas: Listas | null }) {
   );
 
   const { dados, carregando, erro, recarregar } = visao === "kanban" ? kanban : grade;
+  const questionarios = usarQuestionarios(recarregar);
   const total = visao === "kanban"
     ? (kanban.dados?.reduce((soma, coluna) => soma + coluna.quantas, 0) ?? 0)
     : (grade.dados?.total ?? 0);
@@ -245,12 +247,15 @@ export function Funil({ listas }: { listas: Listas | null }) {
                 ☰ Grade
               </button>
             </div>
+            <BotaoBuscarQuestionarios estado={questionarios} />
             <button type="button" className="botao botao-primario" onClick={() => definirCriando(true)}>
               Nova oportunidade
             </button>
           </>
         }
       />
+
+      <QuestionariosDoSite estado={questionarios} aoAbrir={(id) => definirAberta(id)} />
 
       {visao === "kanban" && erroDeMovimento && (
         <div className="aviso-de-movimento" role="alert">

@@ -1098,3 +1098,56 @@ export interface PedidoDeServicoNovo {
   descricao: string;
   registrado_em: string;
 }
+
+/** Questionário para proposta enviado pelo cliente no site e trazido pelo "Buscar questionários" (01/10/2026). */
+export interface QuestionarioResumo {
+  id: number;
+  recebido_em: string;
+  razao_social: string;
+  nome_fantasia: string | null;
+  cnpj: string;
+  contato_nome: string;
+  contato_cargo: string | null;
+  /** "Importado" ou "Precisa de você". */
+  situacao: string;
+  cliente_novo: boolean;
+  o_que_fez: string;
+  grupo_id: number | null;
+  grupo_nome: string | null;
+  oportunidade_id: number | null;
+  /** Só em "Precisa de você": a oportunidade em aberto que já existia para o CNPJ. */
+  oportunidade_em_aberto_id: number | null;
+  porte_crm: string | null;
+  porte_site: string | null;
+  tem_pdf: boolean;
+}
+
+export interface ResultadoDaBusca {
+  buscado_em: string;
+  novos: QuestionarioResumo[];
+  avisos: string[];
+}
+
+export interface QuestionarioDaOportunidade {
+  id: number;
+  recebido_em: string;
+  versao: string;
+  contato_nome: string;
+  contato_cargo: string | null;
+  contato_email: string | null;
+  contato_celular: string | null;
+  servicos: string[];
+  porte_crm: string | null;
+  porte_site: string | null;
+  pontuacao: string | null;
+  horas_base: number | null;
+  nota_complexidade: number;
+  fatores_complexidade: { id: string; rotulo: string }[];
+  nota_risco: number;
+  fatores_risco: { id: string; rotulo: string }[];
+  /** [texto, área] */
+  pontos_de_atencao: [string, string][];
+  notas_emitidas: number | null;
+  notas_recebidas: number | null;
+  tem_pdf: boolean;
+}

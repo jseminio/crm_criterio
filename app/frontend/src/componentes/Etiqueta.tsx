@@ -22,6 +22,10 @@ const TOM_POR_SITUACAO: Record<string, string> = {
   Fundido: "espera",
   "Aguardando assinatura": "espera",
   Ativo: "ganho",
+  // Questionário do site (01/10/2026)
+  "cliente novo": "ganho",
+  "empresa já no CRM": "andamento",
+  "precisa de você": "espera",
   Suspenso: "espera",
   "A preparar": "neutra",
   Pesquisando: "andamento",

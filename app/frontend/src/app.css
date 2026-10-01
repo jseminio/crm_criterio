@@ -784,6 +784,23 @@
 .marcador-ok { color: var(--ganho); }
 
 
+/* ------------------------------------------------- campo de data (dd/mm/aaaa) */
+.campo-data { position: relative; }
+.campo-data-linha { display: flex; gap: var(--e1); }
+.campo-data-linha .entrada { flex: 1; min-width: 0; }
+.campo-data-botao { padding: 0 var(--e2); }
+.campo-data-erro { color: var(--perda); }
+.campo-data-calendario { position: absolute; z-index: 30; top: 100%; left: 0; margin-top: var(--e1); width: 260px;
+  background: var(--surface-card); border: 1px solid var(--borda); border-radius: var(--raio-sm);
+  box-shadow: var(--sombra-painel); padding: var(--e2); }
+.campo-data-cabecalho { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--e2); font-size: 13px; }
+.campo-data-grade { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; font-size: 12px; }
+.campo-data-semana { color: var(--texto-medio); font-weight: 600; padding: 2px 0; }
+.campo-data-dia { border: 0; background: none; border-radius: var(--raio-sm); padding: 4px 0; cursor: pointer; color: var(--texto-forte); }
+.campo-data-dia:hover { background: var(--surface-sunken); }
+.campo-data-hoje { font-weight: 700; text-decoration: underline; }
+.campo-data-escolhido { background: var(--surface-brand); color: var(--texto-sobre-marca); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

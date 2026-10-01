@@ -4,10 +4,10 @@
 - **Prospects** = grupos ainda não clientes; a unidade é o grupo (ou a empresa, se já tiver).
 - Busca por **empresa** (razão social, fantasia, CNPJ, nome do grupo) ou por **pessoa** (nome, cargo,
   e-mail, telefone), sem depender de acento nem de caixa.
-- Contato pode estar ligado a **uma ou mais empresas** (`VinculoDeContato`), ao **grupo** inteiro,
-  ou ainda a ninguém; o de grupo aparece em todas as empresas dele e é marcado como "do grupo".
-  Pessoa sem empresa nem grupo aparece em Prospects, como "Sem empresa". Cada empresa pode ter
-  vários contatos principais. Pedido de Karine em 30/09/2026.
+- Contato é ligado **só a empresas** (`VinculoDeContato`), uma ou várias, ou ainda a nenhuma — nunca
+  ao grupo, porque as empresas de uma pessoa nem sempre são do mesmo grupo (Karine, 01/10/2026). O
+  grupo é informado na **empresa**. Pessoa sem empresa aparece em Prospects, como "Sem empresa".
+  Cada empresa pode ter vários contatos principais. Pedido de Karine em 30/09/2026.
 - `nao_contatar` é respeitado pela área de campanhas: aqui só é exibido e editável.
 """
 
@@ -56,8 +56,7 @@ class Pessoa(Base):
     nao_contatar: bool = False
     empresa_id: int | None = None
     grupo_id: int | None = None
-    do_grupo: bool = False
-    """Ligada só ao grupo, não a esta empresa."""
+    """Grupo da empresa desta linha — informação, não ligação da pessoa."""
     principal: bool = False
     """Contato principal desta empresa (vale para o vínculo, não para a pessoa)."""
     empresas: list[EmpresaDaPessoa] = []
@@ -117,7 +116,7 @@ class PessoaNova(BaseModel):
     observacao: str | None = None
     nao_contatar: bool = False
     empresa_id: int | None = None
-    grupo_id: int | None = None
+    """Opcional: a pessoa pode nascer sem empresa e ser vinculada depois."""
     principal: bool = False
     """Só com `empresa_id`: já nasce como contato principal da empresa."""
 
@@ -143,6 +142,9 @@ class EmpresaEdicao(BaseModel):
     municipio: str | None = Field(default=None, max_length=100)
     uf: str | None = Field(default=None, max_length=2)
     cep: str | None = None
+    nome_do_grupo: str | None = Field(default=None, max_length=200)
+    """Grupo (o cliente) da empresa, informado por nome: reaproveita o que existir ou nasce um
+    prospect novo. Empresa com contrato não troca de grupo."""
 
 
 class EmpresaNova(BaseModel):
@@ -163,7 +165,6 @@ class EmpresaCompleta(EmpresaEdicao):
     """
 
     razao_social: str = Field(min_length=1, max_length=200)
-    nome_do_grupo: str | None = Field(default=None, max_length=200)
     contatos: list[ContatoParaVincular] = []
 
 
@@ -216,11 +217,9 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         ).all()
         return {e: v for e, v in linhas}
 
-    def _pessoa(p: PessoaContato, empresa_id: int | None = None, *, do_grupo: bool = False,
-                principal: bool = False) -> Pessoa:
+    def _pessoa(p: PessoaContato, empresa_id: int | None = None, *, principal: bool = False) -> Pessoa:
         out = Pessoa.model_validate(p)
         out.empresa_id = empresa_id
-        out.do_grupo = do_grupo
         out.principal = principal
         return out
 
@@ -243,11 +242,6 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
             .order_by(PessoaContato.nome)
         ).all():
             por_empresa.setdefault(v.empresa_id, []).append((p, v.principal))
-        por_grupo: dict[int, list[PessoaContato]] = {}
-        for p in sessao.scalars(
-            sa.select(PessoaContato).where(PessoaContato.grupo_id.in_(ids)).order_by(PessoaContato.nome)
-        ):
-            por_grupo.setdefault(p.grupo_id, []).append(p)
         propostas = dict(sessao.execute(
             sa.select(Oportunidade.grupo_id, sa.func.count()).where(Oportunidade.grupo_id.in_(ids)).group_by(Oportunidade.grupo_id)
         ).all())
@@ -256,21 +250,15 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
 
         saida: list[Entidade] = []
         for g in grupos:
-            do_grupo = por_grupo.get(g.id, [])
             emps = empresas.get(g.id, [])
             if not emps:
                 # Cliente sem empresa cadastrada = cliente **não recorrente** (a carteira sempre cria a
                 # empresa; a consultoria pontual não). Aparece pelo grupo, como o prospect.
-                ps = [_pessoa(p, None) for p in do_grupo]
                 saida.append(Entidade(tipo=tipo, grupo_id=g.id, grupo_nome=g.nome, propostas=propostas.get(g.id, 0),
-                                      contatos=ps, lacunas=lacunas_de(None, ps)))
+                                      contatos=[], lacunas=lacunas_de(None, [])))
                 continue
             for e in emps:
-                ligadas = por_empresa.get(e.id, [])
-                ja = {p.id for p, _ in ligadas}
-                ps = [_pessoa(p, e.id, principal=pr) for p, pr in ligadas] + [
-                    _pessoa(p, e.id, do_grupo=True) for p in do_grupo if p.id not in ja
-                ]
+                ps = [_pessoa(p, e.id, principal=pr) for p, pr in por_empresa.get(e.id, [])]
                 v = mensal.get(e.id)
                 saida.append(Entidade(
                     tipo=tipo, grupo_id=g.id, grupo_nome=g.nome, empresa_id=e.id, razao_social=e.razao_social,
@@ -321,8 +309,8 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
     ) -> dict:
         """Pessoas de contato, de clientes ou de prospects, com as empresas delas.
 
-        A pessoa aparece na aba de cada empresa ou grupo em que está; a que ainda não está em
-        nenhum aparece em Prospects, como "Sem empresa".
+        A pessoa aparece na aba das empresas em que está; a que ainda não está em nenhuma aparece em
+        Prospects, como "Sem empresa".
         """
         situacao = SituacaoGrupo.CLIENTE if tipo == "cliente" else SituacaoGrupo.PROSPECT
         grupos = {g.id: g for g in sessao.scalars(sa.select(GrupoEconomico).where(GrupoEconomico.fundido_em_id.is_(None)))}
@@ -333,18 +321,15 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
                 continue
             todas = empresas.get(p.id, [])
             nesta_aba = [v for v in todas if v.grupo_id in grupos and grupos[v.grupo_id].situacao is situacao]
-            grupo = grupos.get(p.grupo_id) if p.grupo_id is not None else None
-            do_grupo = grupo is not None and grupo.situacao is situacao
-            solta = not todas and p.grupo_id is None
-            if not (nesta_aba or do_grupo or (solta and tipo == "prospect")):
+            if not (nesta_aba or (not todas and tipo == "prospect")):
                 continue
             base = Pessoa.model_validate(p).model_dump(exclude={"empresas", "empresa_id", "grupo_id"})
             primeira = nesta_aba[0] if nesta_aba else None
             itens.append(PessoaComOrigem(
                 **base, tipo=tipo, empresas=todas,
                 empresa_id=primeira.empresa_id if primeira else None,
-                grupo_id=primeira.grupo_id if primeira else (grupo.id if do_grupo else None),
-                grupo_nome=primeira.grupo_nome if primeira else (grupo.nome if do_grupo else None),
+                grupo_id=primeira.grupo_id if primeira else None,
+                grupo_nome=primeira.grupo_nome if primeira else None,
                 razao_social=primeira.razao_social if primeira else None,
             ))
         return {"total": len(itens), "itens": itens[salto:salto + limite]}
@@ -379,16 +364,12 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
 
     @r.post("/pessoas", response_model=Pessoa, status_code=201)
     def criar_pessoa(corpo: PessoaNova, sessao: Session = Depends(obter_sessao)) -> Pessoa:
-        if corpo.empresa_id is not None and corpo.grupo_id is not None:
-            raise HTTPException(422, "informe a empresa OU o grupo do contato, não os dois")
         if corpo.empresa_id is not None and sessao.get(Empresa, corpo.empresa_id) is None:
             raise HTTPException(404, "empresa não encontrada")
-        if corpo.grupo_id is not None and sessao.get(GrupoEconomico, corpo.grupo_id) is None:
-            raise HTTPException(404, "grupo não encontrado")
-        p = PessoaContato(nome="x", grupo_id=corpo.grupo_id)
+        p = PessoaContato(nome="x")
         if corpo.empresa_id is not None:
             p.vinculos.append(VinculoDeContato(empresa_id=corpo.empresa_id, principal=corpo.principal))
-        dados = corpo.model_dump(exclude={"empresa_id", "grupo_id", "principal"})
+        dados = corpo.model_dump(exclude={"empresa_id", "principal"})
         _aplicar_pessoa(p, dados)
         if p.nao_contatar:
             p.nao_contatar_em = agora()
@@ -429,8 +410,24 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
     """Endereço e dados cadastrais da empresa (fora do prefixo /contatos)."""
     r = APIRouter(tags=["contatos"])
 
+    def _grupo_pelo_nome(sessao: Session, nome: str) -> GrupoEconomico:
+        """O grupo com este nome (sem caixa), ou um prospect novo — mesmo padrão da Nova oportunidade."""
+        grupo = sessao.scalar(
+            sa.select(GrupoEconomico).where(
+                sa.func.lower(GrupoEconomico.nome) == nome.casefold(),
+                GrupoEconomico.fundido_em_id.is_(None),
+            )
+        )
+        if grupo is None:
+            grupo = GrupoEconomico(nome=nome, situacao=SituacaoGrupo.PROSPECT, origem=Origem.CRM)
+            sessao.add(grupo)
+            sessao.flush()
+        return grupo
+
     def _aplicar_empresa(sessao: Session, e: Empresa, dados: dict) -> None:
         for campo, valor in dados.items():
+            if campo == "nome_do_grupo":
+                continue
             if campo == "cnpj":
                 valor = _digitos(valor)
                 if valor is not None:
@@ -460,7 +457,13 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
         e = sessao.get(Empresa, empresa_id)
         if e is None:
             raise HTTPException(404, "empresa não encontrada")
-        _aplicar_empresa(sessao, e, corpo.model_dump(exclude_unset=True))
+        dados = corpo.model_dump(exclude_unset=True)
+        _aplicar_empresa(sessao, e, dados)
+        nome = _limpar(dados.get("nome_do_grupo"))
+        if nome is not None and nome.casefold() != e.grupo.nome.casefold():
+            if sessao.scalar(sa.select(Contrato.id).where(Contrato.empresa_id == e.id).limit(1)) is not None:
+                raise HTTPException(409, "esta empresa tem contrato e não troca de grupo; use a fusão de grupos")
+            e.grupo_id = _grupo_pelo_nome(sessao, nome).id
         sessao.flush()
         return Endereco.model_validate(e)
 
@@ -477,17 +480,8 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
         if nome_do_grupo is None:
             raise HTTPException(422, "a razão social não pode ficar vazia")
         e = Empresa(razao_social="x")
-        _aplicar_empresa(sessao, e, corpo.model_dump(exclude={"nome_do_grupo", "contatos"}))
-        grupo = sessao.scalar(
-            sa.select(GrupoEconomico).where(
-                sa.func.lower(GrupoEconomico.nome) == nome_do_grupo.casefold(),
-                GrupoEconomico.fundido_em_id.is_(None),
-            )
-        )
-        if grupo is None:
-            grupo = GrupoEconomico(nome=nome_do_grupo, situacao=SituacaoGrupo.PROSPECT, origem=Origem.CRM)
-            sessao.add(grupo)
-            sessao.flush()
+        _aplicar_empresa(sessao, e, corpo.model_dump(exclude={"contatos"}))
+        grupo = _grupo_pelo_nome(sessao, nome_do_grupo)
         e.grupo_id = grupo.id
         sessao.add(e)
         sessao.flush()

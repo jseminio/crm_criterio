@@ -6,6 +6,7 @@
 
 import type { Listas } from "../api/tipos";
 import { PRESETS, resolverPeriodo, type Preset } from "../periodo";
+import { CampoDeData } from "./CampoDeData";
 
 export interface EstadoDosFiltros {
   busca: string;
@@ -216,24 +217,20 @@ export function Filtros({
             <label className="campo-rotulo" htmlFor="filtro-data-de">
               De
             </label>
-            <input
+            <CampoDeData
               id="filtro-data-de"
-              type="date"
-              className="entrada"
               value={filtros.dataDe}
-              onChange={mudar("dataDe")}
+              aoMudar={(v) => mudar("dataDe")({ target: { value: v } })}
             />
           </div>
           <div className="campo">
             <label className="campo-rotulo" htmlFor="filtro-data-ate">
               Até
             </label>
-            <input
+            <CampoDeData
               id="filtro-data-ate"
-              type="date"
-              className="entrada"
               value={filtros.dataAte}
-              onChange={mudar("dataAte")}
+              aoMudar={(v) => mudar("dataAte")({ target: { value: v } })}
             />
           </div>
         </>

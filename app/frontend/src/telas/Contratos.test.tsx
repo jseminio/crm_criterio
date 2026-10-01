@@ -48,7 +48,7 @@ describe("Contratos — vigência na assinatura (25/09/2026)", () => {
   it("libera quando a data da assinatura é preenchida", async () => {
     await abrir();
     await userEvent.selectOptions(screen.getByLabelText("Situação", { selector: "#c-situacao" }), "Ativo");
-    await userEvent.type(screen.getByLabelText(/data da assinatura/i), "2026-03-01");
+    await userEvent.type(screen.getByLabelText(/data da assinatura/i), "01032026");
     expect(screen.getByRole("button", { name: /salvar alterações/i })).toBeEnabled();
   });
 

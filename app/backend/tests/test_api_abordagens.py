@@ -233,7 +233,8 @@ def test_contato_nao_contatar_trava_a_aprovacao(cliente, ambiente, sessao: Sessi
     abordagem = _pronta(cliente)
     sessao.add(
         PessoaContato(
-            grupo_id=abordagem["grupo_id"], nome="Ana", email="ANA@omega.com.br", nao_contatar=True
+            vinculos=[VinculoDeContato(empresa=Empresa(grupo_id=abordagem["grupo_id"], razao_social="Omega"))],
+            nome="Ana", email="ANA@omega.com.br", nao_contatar=True,
         )
     )
     sessao.commit()
@@ -257,8 +258,8 @@ def test_contato_da_empresa_entra_na_ficha_sem_email_nem_telefone(cliente, ambie
                 vinculos=[VinculoDeContato(empresa_id=empresa.id)], nome="Bia", cargo="Controller",
                 email="bia@omega.com.br", telefone="21999990000",
             ),
-            PessoaContato(grupo_id=abordagem["grupo_id"], nome="Caio"),
-            PessoaContato(grupo_id=outro.id, nome="Dora"),
+            PessoaContato(vinculos=[VinculoDeContato(empresa_id=empresa.id)], nome="Caio"),
+            PessoaContato(vinculos=[VinculoDeContato(empresa=Empresa(grupo_id=outro.id, razao_social="Outra"))], nome="Dora"),
         ]
     )
     sessao.commit()

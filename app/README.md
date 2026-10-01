@@ -551,6 +551,15 @@ pontual). Antes, só a carteira recorrente era "Cliente". Agora:
 - A sugestão "prospect que já é cliente" passou a comparar os grupos **sem empresa** (prospects e clientes
   não recorrentes) com os clientes da carteira, para não perder as duplicatas depois da promoção.
 
+## Datas no padrão brasileiro (01/10/2026)
+
+Pedido de Karine: os campos de data apareciam como mm/dd/aaaa. Motivo: o `<input type="date">` do
+navegador segue o idioma do sistema (aqui, en-US), não o `lang="pt-BR"` da página. Os 14 campos de data
+(filtro De/Até, Nova oportunidade, detalhe da oportunidade, Agenda, Contratos, eventos de contrato,
+Leads e Abordagens) passaram a usar `CampoDeData`: sempre **dd/mm/aaaa**, as barras entram sozinhas ao
+digitar, o 📅 abre um calendário em português, e data que não existe (31/02) avisa "Data inválida" e não
+é repassada. Por dentro o valor continua ISO (aaaa-mm-dd), o mesmo da API — conversões em `src/dataBr.ts`.
+
 ## Contatos: clientes e prospects segregados (26/09/2026)
 
 **Nova pessoa (26/09/2026).** O botão "Nova pessoa", no topo do menu Contatos, abre um painel para cadastrar uma pessoa sem precisar abrir antes uma empresa: busca a empresa, o CNPJ ou o grupo (entre clientes e prospects), escolhe se a pessoa fica ligada só à empresa ou ao grupo todo (prospect sem empresa liga ao grupo) e preenche nome, cargo, e-mail, telefone, papel, observação e "não contatar". Usa a mesma rota `POST /api/contatos/pessoas`. Desde 30/09/2026 a empresa é opcional (ver "Base única de contatos", abaixo).
@@ -615,6 +624,22 @@ passos**, dizendo o que vai sumir ("Não dá para desfazer").
 - **Empresa com contrato não pode ser excluída**, em qualquer situação do contrato: apagar quebraria o
   histórico, o MRR e a carteira. A API responde 409 e o painel mostra o motivo no lugar do botão
   (`tem_contrato` em `GET /api/contatos/empresas`).
+
+**Contato só por empresa; o grupo mora na empresa (01/10/2026).** Pedido de Karine, aprovado: as
+empresas de uma pessoa nem sempre são do mesmo grupo, então o contato deixou de ser ligado ao grupo.
+
+- Saiu a opção "Ao grupo todo" da Nova pessoa e a coluna `pessoa_contato.grupo_id`. Escolher um
+  prospect ainda sem empresa (na Nova pessoa ou no painel) cria a empresa com o nome do grupo e vincula
+  a pessoa a ela.
+- O **Grupo** é informado na empresa: campo em "Nova empresa" e no painel da empresa, com os grupos
+  existentes como sugestão; nome novo vira prospect novo. **Empresa com contrato não troca de grupo**
+  (409; use a fusão de grupos).
+- Migração `9a1c7e4b2d63`: cada contato ligado a grupo virou vínculo — grupo com uma empresa: com ela;
+  sem empresa: nasce a empresa com o nome do grupo; com duas ou mais: se a pessoa já está numa empresa
+  do grupo, fica só nela, senão vai para todas.
+- Fusão de grupos: o contato vai junto com a empresa a que está vinculado; `movidos["pessoa_contato"]`
+  passou a ser só registro de quem foi junto (desfazer não o usa). Questionário do site, planilha de
+  lacunas e ficha das Abordagens leem só os vínculos.
 
 **Pendente, por decisão:** a base tem **33 e-mails repetidos**, provavelmente a mesma pessoa cadastrada
 em mais de uma empresa. Juntar cada caso numa pessoa só fica para depois, caso a caso, com aprovação.

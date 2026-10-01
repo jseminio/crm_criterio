@@ -21,12 +21,12 @@ import { DetalheDoContato } from "./DetalheDoContato";
 import { NovaEmpresa } from "./NovaEmpresa";
 import { NovaPessoa } from "./NovaPessoa";
 
-/** As empresas da pessoa nesta lista, com ★ na principal; sem nenhuma, o grupo ou "Sem empresa". */
+/** As empresas da pessoa, com ★ onde é principal; sem nenhuma, "Sem empresa". */
 function empresasDaPessoa(p: PessoaComOrigem): string {
   if (p.empresas && p.empresas.length > 0) {
     return p.empresas.map((e) => `${e.principal ? "★ " : ""}${e.razao_social}`).join(", ");
   }
-  return p.grupo_nome ?? "Sem empresa";
+  return "Sem empresa";
 }
 
 type Modo = "empresa" | "pessoa";
@@ -208,7 +208,7 @@ export function Contatos({ listas }: { listas: Listas | null }) {
                 <td>{p.cargo ?? "—"}</td>
                 <td>{p.email ?? "—"}</td>
                 <td>{p.telefone ?? "—"}</td>
-                <td>{p.empresas && p.empresas.length > 0 || p.grupo_nome ? empresasDaPessoa(p) : <span className="numero-nota">— Sem empresa</span>}</td>
+                <td>{p.empresas && p.empresas.length > 0 ? empresasDaPessoa(p) : <span className="numero-nota">— Sem empresa</span>}</td>
               </tr>
             ))}
           </tbody>

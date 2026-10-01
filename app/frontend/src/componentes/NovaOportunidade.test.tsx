@@ -53,8 +53,8 @@ describe("NovaOportunidade", () => {
 
     // Data local, não UTC — `toISOString` desloca o dia perto da meia-noite
     // (mesmo cuidado do componente e de `periodo.ts`).
-    const hoje = new Date().toLocaleDateString("sv");
-    expect(screen.getByLabelText("Data de originação")).toHaveValue(hoje);
+    const [a, m, d] = new Date().toLocaleDateString("sv").split("-");
+    expect(screen.getByLabelText("Data de originação")).toHaveValue(`${d}/${m}/${a}`); // padrão brasileiro
   });
 
   it("preenchendo o nome, libera criar — e manda só os campos preenchidos", async () => {

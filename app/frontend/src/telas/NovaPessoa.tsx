@@ -2,7 +2,8 @@
  *
  * Desde 30/09/2026 (pedido de Karine) a empresa é **opcional**: a pessoa entra na base única de
  * contatos e pode ser vinculada depois, em "Nova empresa" ou no painel de qualquer empresa. Se a
- * empresa já existir, dá para escolhê-la aqui mesmo, ou ligar a pessoa ao grupo todo.
+ * empresa já existir, dá para escolhê-la aqui mesmo. O contato é ligado só a empresas, nunca ao
+ * grupo (01/10/2026): escolhido um prospect ainda sem empresa, ela nasce com o nome do grupo.
  */
 
 import { useState } from "react";
@@ -13,12 +14,9 @@ import { cnpj as formatarCnpj } from "../formato";
 import { usarDados } from "../usarDados";
 import { FormularioDePessoa } from "./DetalheDoContato";
 
-type Vinculo = "empresa" | "grupo";
-
 export function NovaPessoa({ listas, aoFechar, aoCriar }: { listas: Listas | null; aoFechar: () => void; aoCriar: () => void }) {
   const [busca, definirBusca] = useState("");
   const [escolhida, definirEscolhida] = useState<EntidadeDeContato | null>(null);
-  const [vinculo, definirVinculo] = useState<Vinculo>("empresa");
   const termo = busca.trim();
 
   const resultados = usarDados<EntidadeDeContato[]>(async () => {
@@ -28,12 +26,9 @@ export function NovaPessoa({ listas, aoFechar, aoCriar }: { listas: Listas | nul
   }, [termo]);
 
   const criar = async (corpo: Record<string, unknown>) => {
-    const alvo = !escolhida
-      ? {}
-      : escolhida.empresa_id !== null && vinculo === "empresa"
-        ? { empresa_id: escolhida.empresa_id }
-        : { grupo_id: escolhida.grupo_id };
-    await api.criarContato({ ...corpo, ...alvo });
+    let empresaId = escolhida?.empresa_id ?? null;
+    if (escolhida && empresaId === null) empresaId = (await api.criarEmpresaDoGrupo(escolhida.grupo_id)).id;
+    await api.criarContato(empresaId !== null ? { ...corpo, empresa_id: empresaId } : corpo);
     aoCriar();
     aoFechar();
   };
@@ -69,23 +64,17 @@ export function NovaPessoa({ listas, aoFechar, aoCriar }: { listas: Listas | nul
                     <span className="etiqueta etiqueta-neutra" style={{ marginLeft: 6 }}>{e.tipo === "cliente" ? "Cliente" : "Prospect"}</span>
                     {e.cnpj && <span className="numero-nota"> · {formatarCnpj(e.cnpj)}</span>}
                   </div>
-                  <button type="button" className="botao botao-secundario" onClick={() => { definirEscolhida(e); definirVinculo("empresa"); }}>Escolher</button>
+                  <button type="button" className="botao botao-secundario" onClick={() => definirEscolhida(e)}>Escolher</button>
                 </li>
               ))}
             </ul>
           </>
         )}
 
-        {escolhida && escolhida.empresa_id !== null && (
-          <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: "var(--e1)" }}>
-            <legend className="campo-rotulo">A pessoa fica ligada a</legend>
-            <label style={{ fontSize: 13 }}>
-              <input type="radio" name="np-vinculo" checked={vinculo === "empresa"} onChange={() => definirVinculo("empresa")} /> Só a esta empresa
-            </label>
-            <label style={{ fontSize: 13 }}>
-              <input type="radio" name="np-vinculo" checked={vinculo === "grupo"} onChange={() => definirVinculo("grupo")} /> Ao grupo todo (aparece em todas as empresas dele)
-            </label>
-          </fieldset>
+        {escolhida && escolhida.empresa_id === null && (
+          <p className="campo-ajuda" style={{ margin: 0 }}>
+            Este prospect ainda não tem empresa: ela será criada com o nome do grupo, e a pessoa vinculada a ela.
+          </p>
         )}
         <h3 style={{ fontSize: 14 }}>2. Dados da pessoa</h3>
         <FormularioDePessoa papeis={listas?.papeis_de_contato ?? []} rotulo="Cadastrar pessoa" aoSalvar={criar} aoCancelar={aoFechar} />

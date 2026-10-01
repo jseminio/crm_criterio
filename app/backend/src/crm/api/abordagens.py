@@ -165,7 +165,7 @@ def _historico_do_crm(sessao: Session, grupo_id: int) -> list[str]:
 
 
 def _contatos(sessao: Session, grupo_id: int) -> list[str]:
-    # Ligado ao grupo ou a uma empresa dele — mesma regra da área de Contatos.
+    # Vinculado a uma empresa do grupo — mesma regra da área de Contatos.
     nas_empresas = (
         sa.select(VinculoDeContato.pessoa_id)
         .join(Empresa, Empresa.id == VinculoDeContato.empresa_id)
@@ -173,7 +173,7 @@ def _contatos(sessao: Session, grupo_id: int) -> list[str]:
     )
     contatos = sessao.scalars(
         sa.select(PessoaContato)
-        .where(sa.or_(PessoaContato.grupo_id == grupo_id, PessoaContato.id.in_(nas_empresas)))
+        .where(PessoaContato.id.in_(nas_empresas))
         .order_by(PessoaContato.id)
     ).all()
     return [

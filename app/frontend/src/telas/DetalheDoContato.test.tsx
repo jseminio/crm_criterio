@@ -7,14 +7,20 @@ import { DetalheDoContato } from "./DetalheDoContato";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { criarContato: vi.fn(), editarContato: vi.fn(), editarEmpresa: vi.fn(), criarEmpresaDoGrupo: vi.fn() } };
+  return {
+    ...real,
+    api: {
+      criarContato: vi.fn(), editarContato: vi.fn(), editarEmpresa: vi.fn(), criarEmpresaDoGrupo: vi.fn(),
+      grupos: vi.fn().mockResolvedValue({ total: 1, itens: [{ id: 1, nome: "Grupo Alfa" }] }),
+    },
+  };
 });
 
 const LISTAS = { papeis_de_contato: ["Decisor", "Ponto focal"] } as unknown as Listas;
 const E = { logradouro: null, numero: null, complemento: null, bairro: null, municipio: null, uf: null, cep: null };
 const p = (o: Partial<PessoaDeContato> = {}): PessoaDeContato => ({
   id: 5, nome: "Maria", cargo: null, email: "m@a.com", telefone: null, papel: null, observacao: null,
-  nao_contatar: false, empresa_id: 10, grupo_id: null, do_grupo: false, ...o,
+  nao_contatar: false, empresa_id: 10, grupo_id: null, ...o,
 });
 const ent = (o: Partial<EntidadeDeContato> = {}): EntidadeDeContato => ({
   tipo: "cliente", grupo_id: 1, grupo_nome: "Grupo Alfa", empresa_id: 10, razao_social: "Alfa Ltda", nome_fantasia: null,
@@ -43,13 +49,15 @@ describe("DetalheDoContato", () => {
     expect(screen.getByRole("button", { name: "Adicionar contato" })).toBeDisabled();
   });
 
-  it("prospect sem empresa liga o contato ao grupo", async () => {
-    vi.mocked(api.criarContato).mockResolvedValue(p({ empresa_id: null, grupo_id: 1 }));
+  it("prospect sem empresa: cria a empresa com o nome do grupo e vincula o contato a ela", async () => {
+    vi.mocked(api.criarEmpresaDoGrupo).mockResolvedValue({ id: 77, razao_social: "Grupo Alfa", cnpj: null });
+    vi.mocked(api.criarContato).mockResolvedValue(p({ empresa_id: 77 }));
     abrir(ent({ tipo: "prospect", empresa_id: null, razao_social: null }));
     await userEvent.type(screen.getByLabelText("Nome", { selector: "#nova-nome" }), "Bia");
     await userEvent.click(screen.getByRole("button", { name: "Adicionar contato" }));
-    await waitFor(() => expect(api.criarContato).toHaveBeenCalledWith(expect.objectContaining({ nome: "Bia", grupo_id: 1 })));
-    expect((vi.mocked(api.criarContato).mock.calls[0][0] as Record<string, unknown>).empresa_id).toBeUndefined();
+    await waitFor(() => expect(api.criarContato).toHaveBeenCalledWith(expect.objectContaining({ nome: "Bia", empresa_id: 77 })));
+    expect(api.criarEmpresaDoGrupo).toHaveBeenCalledWith(1);
+    expect(vi.mocked(api.criarContato).mock.calls[0][0]).not.toHaveProperty("grupo_id");
   });
 
   it("prospect sem empresa oferece cadastrar a empresa antes do endereço", async () => {
@@ -66,11 +74,32 @@ describe("DetalheDoContato", () => {
     expect(screen.getByText(/Cliente não recorrente/)).toBeInTheDocument();
   });
 
-  it("mostra os contatos, o do grupo marcado e o 'não contatar'", () => {
-    abrir(ent({ contatos: [p(), p({ id: 6, nome: "João", do_grupo: true, nao_contatar: true })], lacunas: [] }));
+  it("mostra os contatos e o 'não contatar'", () => {
+    abrir(ent({ contatos: [p(), p({ id: 6, nome: "João", nao_contatar: true })], lacunas: [] }));
     expect(screen.getByText("Contato e endereço completos.")).toBeInTheDocument();
-    expect(screen.getByText(/do grupo/)).toBeInTheDocument();
+    expect(screen.getByText("João")).toBeInTheDocument();
     expect(screen.getByText("Não contatar")).toBeInTheDocument();
+  });
+
+  it("o grupo é informado na empresa e só vai quando muda", async () => {
+    vi.mocked(api.editarEmpresa).mockResolvedValue(E);
+    abrir(ent({ tem_contrato: false }));
+    const grupo = screen.getByLabelText("Grupo");
+    expect(grupo).toHaveValue("Grupo Alfa");
+    await userEvent.click(screen.getByRole("button", { name: /salvar empresa e endereço/i }));
+    await waitFor(() => expect(api.editarEmpresa).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(api.editarEmpresa).mock.calls[0][1]).not.toHaveProperty("nome_do_grupo");
+    await userEvent.clear(grupo);
+    await userEvent.type(grupo, "Holding Delta");
+    await userEvent.click(screen.getByRole("button", { name: /salvar empresa e endereço/i }));
+    await waitFor(() => expect(api.editarEmpresa).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(api.editarEmpresa).mock.calls[1][1]).toMatchObject({ nome_do_grupo: "Holding Delta" });
+  });
+
+  it("empresa com contrato não troca de grupo", () => {
+    abrir(ent({ tem_contrato: true }));
+    expect(screen.getByLabelText("Grupo")).toBeDisabled();
+    expect(screen.getByText(/não troca de grupo/)).toBeInTheDocument();
   });
 
   it("edita um contato existente", async () => {

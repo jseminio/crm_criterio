@@ -12,7 +12,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from crm.db.modelos import Empresa, GrupoEconomico, Oportunidade, PessoaContato, QuestionarioRecebido
+from crm.db.modelos import Empresa, GrupoEconomico, Oportunidade, PessoaContato, QuestionarioRecebido, VinculoDeContato
 from crm.domain import porte as regras_de_porte
 from crm.domain.listas import TipoDeMatriz
 from crm.proposta.conta import faturamento_por_extenso
@@ -120,8 +120,14 @@ def base_da_proposta(sessao: Session, o: Oportunidade) -> Base:
     if q is not None:
         contato = q.contato_nome
     else:
+        # Contato é ligado às empresas do grupo, não ao grupo (01/10/2026); o principal vem primeiro.
         pessoa = sessao.scalars(
-            sa.select(PessoaContato).where(PessoaContato.grupo_id == grupo.id).order_by(PessoaContato.id).limit(1)
+            sa.select(PessoaContato)
+            .join(VinculoDeContato, VinculoDeContato.pessoa_id == PessoaContato.id)
+            .join(Empresa, Empresa.id == VinculoDeContato.empresa_id)
+            .where(Empresa.grupo_id == grupo.id)
+            .order_by(VinculoDeContato.principal.desc(), PessoaContato.id)
+            .limit(1)
         ).first()
         contato = pessoa.nome if pessoa else "[NOME]"
 

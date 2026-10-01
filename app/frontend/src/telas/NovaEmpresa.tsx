@@ -9,12 +9,13 @@ import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { PessoaDeContato } from "../api/tipos";
 import { BuscaDeContato } from "../componentes/BuscaDeContato";
+import { CampoDeGrupo } from "../componentes/CampoDeGrupo";
 import { PainelLateral } from "../componentes/PainelLateral";
 
 const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
 
 const VAZIO = {
-  razao_social: "", cnpj: "", logradouro: "", numero: "", complemento: "", bairro: "", municipio: "", uf: "", cep: "",
+  razao_social: "", cnpj: "", nome_do_grupo: "", logradouro: "", numero: "", complemento: "", bairro: "", municipio: "", uf: "", cep: "",
 };
 
 type Vinculado = { pessoa: PessoaDeContato; principal: boolean };
@@ -75,6 +76,7 @@ export function NovaEmpresa({ aoFechar, aoCriar }: { aoFechar: () => void; aoCri
       <div className="formulario">
         <h3 style={{ fontSize: 14 }}>Empresa e endereço</h3>
         <div className="formulario-duplo">{campo("razao_social", "Razão social")}{campo("cnpj", "CNPJ")}</div>
+        <CampoDeGrupo id="ne-grupo" valor={c.nome_do_grupo} aoMudar={(v) => mudar("nome_do_grupo", v)} />
         <div className="formulario-duplo">{campo("logradouro", "Logradouro")}{campo("numero", "Número")}</div>
         <div className="formulario-duplo">{campo("complemento", "Complemento")}{campo("bairro", "Bairro")}</div>
         <div className="formulario-duplo">
@@ -123,8 +125,8 @@ export function NovaEmpresa({ aoFechar, aoCriar }: { aoFechar: () => void; aoCri
       </div>
 
       <div className="recado">
-        A empresa entra como <strong>prospect</strong>, num grupo com o mesmo nome — ou no grupo que já
-        existir com esse nome. Pode haver mais de um contato principal.
+        A empresa entra no <strong>grupo</strong> informado (um que já existe, ou um prospect novo); em
+        branco, num grupo com o nome da empresa. Pode haver mais de um contato principal.
       </div>
     </PainelLateral>
   );

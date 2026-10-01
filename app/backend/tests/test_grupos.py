@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from crm.db.grupos import FusaoInvalida, fundir_grupos
-from crm.db.modelos import Empresa, GrupoEconomico, Oportunidade, PessoaContato
+from crm.db.modelos import Empresa, GrupoEconomico, Oportunidade, PessoaContato, VinculoDeContato
 from crm.domain.listas import Origem, Situacao, SituacaoGrupo
 
 
@@ -41,8 +41,10 @@ class TestFusao:
     def test_move_empresas_oportunidades_e_contatos(self, sessao: Session):
         principal = _grupo(sessao, "Grupo Alfa")
         absorvido = _grupo(sessao, "Alfa Participações")
-        sessao.add(Empresa(grupo_id=absorvido.id, razao_social="Alfa Part. Ltda"))
-        sessao.add(PessoaContato(grupo_id=absorvido.id, nome="Decisor"))
+        empresa = Empresa(grupo_id=absorvido.id, razao_social="Alfa Part. Ltda")
+        sessao.add(empresa)
+        # O contato vai junto com a empresa a que está vinculado (01/10/2026).
+        sessao.add(PessoaContato(nome="Decisor", vinculos=[VinculoDeContato(empresa=empresa)]))
         _oportunidade(sessao, absorvido, "Alfa")
         sessao.flush()
 

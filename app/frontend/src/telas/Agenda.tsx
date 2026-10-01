@@ -16,6 +16,7 @@ import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
 import { data, dinheiroCurto } from "../formato";
 import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
+import { CampoDeData } from "../componentes/CampoDeData";
 
 const BALDES: { chave: BaldeDaAgenda; rotulo: string; explicacao: string }[] = [
   { chave: "atrasada", rotulo: "Atrasadas", explicacao: "A data da próxima ação já passou." },
@@ -91,12 +92,10 @@ function Linha({
             value={acao}
             onChange={(e) => definirAcao(e.target.value)}
           />
-          <input
-            className="entrada"
-            type="date"
+          <CampoDeData
             aria-label={`Quando, para ${item.titulo}`}
             value={quando}
-            onChange={(e) => definirQuando(e.target.value)}
+            aoMudar={(v) => definirQuando(v)}
           />
           <button type="button" className="botao botao-primario" disabled={!podeSalvar} onClick={salvar}>
             {salvando ? "Salvando…" : "Salvar"}

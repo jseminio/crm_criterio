@@ -110,7 +110,7 @@ class TestPessoaContato:
 
     def test_nao_contatar_comeca_desligado_e_registra_quando_e_por_que(self, sessao: Session):
         grupo = _grupo(sessao)
-        contato = PessoaContato(grupo_id=grupo.id, nome="Beltrano", papel=PapelContato.DECISOR)
+        contato = PessoaContato(nome="Beltrano", papel=PapelContato.DECISOR)
         sessao.add(contato)
         sessao.flush()
 

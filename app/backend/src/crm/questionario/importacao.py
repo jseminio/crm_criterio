@@ -70,14 +70,18 @@ def _nova_oportunidade(sessao: Session, q: QuestionarioRecebido, grupo: GrupoEco
 def _contato(sessao: Session, q: QuestionarioRecebido, grupo: GrupoEconomico, empresa: Empresa) -> bool:
     """Cria o contato do questionário, a não ser que o grupo já tenha alguém com o mesmo e-mail."""
     email = (q.contato_email or "").strip().lower()
+    nas_empresas_do_grupo = (
+        sa.select(VinculoDeContato.pessoa_id)
+        .join(Empresa, Empresa.id == VinculoDeContato.empresa_id)
+        .where(Empresa.grupo_id == grupo.id)
+    )
     if email and sessao.scalar(sa.select(PessoaContato.id).where(
-        PessoaContato.grupo_id == grupo.id, sa.func.lower(PessoaContato.email) == email,
+        PessoaContato.id.in_(nas_empresas_do_grupo), sa.func.lower(PessoaContato.email) == email,
     )):
         return False
-    # Do grupo e vinculado à empresa — a ligação pessoa-empresa é o `VinculoDeContato` desde a
-    # base única de contatos (30/09/2026).
+    # Contato é ligado só a empresas (`VinculoDeContato`), nunca ao grupo — 01/10/2026.
     sessao.add(PessoaContato(
-        grupo_id=grupo.id, nome=q.contato_nome, cargo=q.contato_cargo,
+        nome=q.contato_nome, cargo=q.contato_cargo,
         email=q.contato_email, telefone=q.contato_celular,
         vinculos=[VinculoDeContato(empresa_id=empresa.id)],
     ))

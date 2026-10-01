@@ -1,7 +1,8 @@
 /** O painel de uma empresa (cliente) ou de um grupo (prospect): contatos e endereço.
  *
- * Contato pode ser da empresa ou só do grupo. Prospect ainda não tem empresa, então o
- * endereço só aparece depois de "Cadastrar empresa" — é na empresa que ele mora.
+ * Contato é ligado só a empresas, nunca ao grupo (01/10/2026). Prospect ainda sem empresa ganha
+ * uma com "Cadastrar empresa" (ou ao adicionar o primeiro contato) — é nela que o endereço mora.
+ * O grupo é informado na empresa.
  * **Não contatar** é gravado e respeitado pelas listas de campanha.
  *
  * Na empresa, o contato pode ser marcado como principal (pode haver vários), desvinculado, e uma
@@ -12,6 +13,7 @@ import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { EntidadeDeContato, Listas, PessoaDeContato } from "../api/tipos";
 import { BuscaDeContato } from "../componentes/BuscaDeContato";
+import { CampoDeGrupo } from "../componentes/CampoDeGrupo";
 import { ExclusaoConfirmada } from "../componentes/ExclusaoConfirmada";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { dinheiro } from "../formato";
@@ -117,7 +119,7 @@ function Endereco({ entidade, aoMudar }: { entidade: EntidadeDeContato; aoMudar:
   const [c, definirC] = useState<Campos>({
     razao_social: vazio(entidade.razao_social), cnpj: vazio(entidade.cnpj), logradouro: vazio(e.logradouro),
     numero: vazio(e.numero), complemento: vazio(e.complemento), bairro: vazio(e.bairro),
-    municipio: vazio(e.municipio), uf: vazio(e.uf), cep: vazio(e.cep),
+    municipio: vazio(e.municipio), uf: vazio(e.uf), cep: vazio(e.cep), nome_do_grupo: entidade.grupo_nome,
   });
   const [erro, definirErro] = useState<string | null>(null);
   const [ok, definirOk] = useState(false);
@@ -135,7 +137,11 @@ function Endereco({ entidade, aoMudar }: { entidade: EntidadeDeContato; aoMudar:
     definirSalvando(true);
     definirErro(null);
     try {
-      const corpo = Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v.trim() === "" ? null : v.trim()]));
+      const corpo: Record<string, unknown> = Object.fromEntries(
+        Object.entries(c).map(([k, v]) => [k, v.trim() === "" ? null : v.trim()]),
+      );
+      // Grupo só vai quando mudou: empresa com contrato não troca de grupo.
+      if ((corpo.nome_do_grupo ?? "") === entidade.grupo_nome || corpo.nome_do_grupo === null) delete corpo.nome_do_grupo;
       await api.editarEmpresa(entidade.empresa_id!, corpo);
       definirOk(true);
       aoMudar();
@@ -150,6 +156,9 @@ function Endereco({ entidade, aoMudar }: { entidade: EntidadeDeContato; aoMudar:
     <div className="formulario">
       <h3 style={{ fontSize: 14 }}>Empresa e endereço</h3>
       <div className="formulario-duplo">{campo("razao_social", "Razão social")}{campo("cnpj", "CNPJ")}</div>
+      <CampoDeGrupo id="end-grupo" valor={c.nome_do_grupo} aoMudar={(v) => mudar("nome_do_grupo", v)}
+        desabilitado={entidade.tem_contrato}
+        ajuda={entidade.tem_contrato ? "Empresa com contrato não troca de grupo; use a fusão de grupos." : undefined} />
       <div className="formulario-duplo">{campo("logradouro", "Logradouro")}{campo("numero", "Número")}</div>
       <div className="formulario-duplo">{campo("complemento", "Complemento")}{campo("bairro", "Bairro")}</div>
       <div className="formulario-duplo">
@@ -189,7 +198,9 @@ export function DetalheDoContato({
   const titulo = entidade.razao_social ?? entidade.grupo_nome;
 
   const criar = async (corpo: Record<string, unknown>) => {
-    await api.criarContato(entidade.empresa_id ? { ...corpo, empresa_id: entidade.empresa_id } : { ...corpo, grupo_id: entidade.grupo_id });
+    // Contato é ligado só a empresas: prospect ainda sem empresa ganha uma com o nome do grupo.
+    const empresaId = entidade.empresa_id ?? (await api.criarEmpresaDoGrupo(entidade.grupo_id)).id;
+    await api.criarContato({ ...corpo, empresa_id: empresaId });
     aoMudar();
   };
   const editar = (id: number) => async (corpo: Record<string, unknown>) => {
@@ -252,13 +263,12 @@ export function DetalheDoContato({
                   {p.principal && <span className="etiqueta etiqueta-neutra" style={{ marginLeft: 6 }}>Principal</span>}
                   {p.cargo && <span className="numero-nota"> · {p.cargo}</span>}
                   {p.papel && <span className="etiqueta etiqueta-neutra" style={{ marginLeft: 6 }}>{p.papel}</span>}
-                  {p.do_grupo && <span className="numero-nota"> · do grupo</span>}
                   {p.nao_contatar && <span className="etiqueta etiqueta-perda" style={{ marginLeft: 6 }}>Não contatar</span>}
                 </div>
                 <div className="numero-nota">{[p.email, p.telefone].filter(Boolean).join(" · ") || "sem e-mail nem telefone"}</div>
                 <div className="sugestao-acoes" style={{ justifyContent: "flex-start" }}>
                   <button type="button" className="botao botao-secundario" onClick={() => definirEditando(p.id)}>Editar</button>
-                  {empresaId !== null && !p.do_grupo && (
+                  {empresaId !== null && (
                     <>
                       <label style={{ display: "flex", gap: "var(--e1)", alignItems: "center", fontSize: 13 }}>
                         <input type="checkbox" checked={p.principal ?? false}
@@ -298,7 +308,7 @@ export function DetalheDoContato({
             rotulo="Excluir empresa"
             bloqueio={entidade.tem_contrato ? "Esta empresa tem contrato e não pode ser excluída. Encerre ou mova o contrato antes." : null}
             aviso={(() => {
-              const vinculados = entidade.contatos.filter((p) => !p.do_grupo).length;
+              const vinculados = entidade.contatos.length;
               return vinculados
                 ? `${vinculados} contato${vinculados === 1 ? "" : "s"} vinculado${vinculados === 1 ? "" : "s"} continua${vinculados === 1 ? "" : "m"} na base; só o vínculo com a empresa some. O grupo ${entidade.grupo_nome} fica.`
                 : `O grupo ${entidade.grupo_nome} fica.`;

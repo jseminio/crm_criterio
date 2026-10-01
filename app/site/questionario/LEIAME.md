@@ -29,6 +29,13 @@ o CRM busca de lá com a chave secreta ("Buscar questionários" no Funil).
 Enquanto a URL e a chave publicável não forem preenchidas, a página abre mas **não envia**: avisa
 o cliente para baixar o PDF e mandar por e-mail.
 
+## Prévia do link (WhatsApp, e-mail)
+O cartão com imagem e título que aparece ao colar o link vem das etiquetas Open Graph no topo do
+`index.html` e da imagem `og-image.png` (1200×630). Por isso publique a **pasta inteira**, não só o
+`index.html`. As etiquetas apontam para `https://criterio-questionario-proposta.netlify.app/`: se o
+endereço mudar (por exemplo, um domínio da Critério), troque-o nelas. O WhatsApp guarda a prévia de
+um link por algum tempo; para conferir logo após publicar, teste com o link seguido de `?v=3`.
+
 ## Regras do banco (banco.sql)
 - O site só **insere**, e só com o consentimento LGPD marcado. Ninguém de fora lê, altera ou apaga.
 - O CRM lê os pendentes e marca `importado_crm_em` com a chave secreta.

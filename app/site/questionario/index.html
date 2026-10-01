@@ -148,8 +148,8 @@ input:focus,textarea:focus{outline:none;border-color:var(--noturno);box-shadow:0
 /* Banco do questionário: o projeto Supabase da Critério (fora do Lovable desde 01/10/2026).
    A chave publicável é pública por natureza: só permite INSERIR, com o consentimento LGPD marcado
    (ver banco.sql). Quem lê é só o CRM, com a chave secreta, que nunca entra nesta página. */
-const SUPABASE_URL = 'PREENCHER_URL_DO_PROJETO';
-const SUPABASE_ANON_KEY = 'PREENCHER_CHAVE_PUBLICAVEL';
+const SUPABASE_URL = 'https://fowkrqvcawdkackanjfh.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_p4cdQND2eTHKeOjFfGV3Gw_oZ9-6tmx';
 const BANCO_CONFIGURADO = !SUPABASE_URL.startsWith('PREENCHER') && !SUPABASE_ANON_KEY.startsWith('PREENCHER');
 const TABELA = 'questionarios_proposta';
 const VERSAO_QUESTIONARIO = 'BPO Full 2026 v6';

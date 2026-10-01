@@ -1,5 +1,9 @@
 # Questionário para proposta — fora do Lovable (01/10/2026)
 
+**Configurado em 01/10/2026:** projeto Supabase `fowkrqvcawdkackanjfh` (conta da Critério), tabela criada
+com o `banco.sql`, chave publicável já na página e o CRM conectado (`definir_questionario.py`).
+Falta só publicar (passo 4).
+
 Página única (`index.html`), sem build. Grava as respostas no projeto Supabase **da Critério**;
 o CRM busca de lá com a chave secreta ("Buscar questionários" no Funil).
 

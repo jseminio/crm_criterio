@@ -180,7 +180,8 @@ class TestBuscar:
         assert empresa.grupo_id == o.grupo_id and empresa.regime_tributario == "Lucro Presumido"
         assert sessao.get(GrupoEconomico, o.grupo_id).situacao is SituacaoGrupo.PROSPECT
         contato = sessao.scalar(sa.select(PessoaContato).where(PessoaContato.grupo_id == o.grupo_id))
-        assert (contato.nome, contato.email, contato.empresa_id) == ("Ana Souza", "ana@exemplo.com.br", empresa.id)
+        assert (contato.nome, contato.email) == ("Ana Souza", "ana@exemplo.com.br")
+        assert [v.empresa_id for v in contato.vinculos] == [empresa.id]
 
     def test_buscar_de_novo_nao_duplica(self, cliente, sessao):
         _buscar(cliente)

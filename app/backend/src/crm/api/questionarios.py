@@ -19,7 +19,7 @@ from crm.db.modelos import GrupoEconomico, Oportunidade, QuestionarioRecebido
 from crm.domain.listas import SituacaoDoQuestionario
 from crm.questionario import importacao
 from crm.questionario.fonte import (
-    VARIAVEIS, BuscaFalhou, FonteDeQuestionarios, FonteSupabase, ler_configuracao,
+    VARIAVEIS, BuscaFalhou, FonteDaFuncao, FonteDeQuestionarios, FonteSupabase, e_funcao, ler_configuracao,
 )
 from crm.questionario.leitura import ROTULOS_COMPLEXIDADE, ROTULOS_RISCO, inteiro_ou_nada
 
@@ -28,7 +28,9 @@ __all__ = ["roteador_de_questionarios", "fonte_real"]
 
 def fonte_real() -> FonteDeQuestionarios | None:
     config = ler_configuracao()
-    return FonteSupabase(config) if config else None
+    if config is None:
+        return None
+    return FonteDaFuncao(config) if e_funcao(config) else FonteSupabase(config)
 
 
 class QuestionarioResumo(BaseModel):

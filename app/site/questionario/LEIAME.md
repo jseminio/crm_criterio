@@ -10,10 +10,10 @@ o CRM busca de lá com a chave secreta ("Buscar questionários" no Funil).
 2. **Chaves.** Em *Project Settings → API Keys*, anote:
    - a **URL do projeto** (`https://xxxx.supabase.co`) e a chave **publicável** (`sb_publishable_…`):
      vão no topo do `index.html` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`). São públicas por natureza;
-   - a chave **secreta** (`sb_secret_…`): vai **só** no `backend/.env` do CRM, nunca na página nem no chat:
+   - a chave **secreta** (`sb_secret_…`): vai **só** no `backend/.env` do CRM, nunca na página nem no chat.
+     No Terminal, este comando pergunta a URL e a chave, grava no `.env` e testa a busca:
      ```
-     CRM_QUESTIONARIO_URL=https://xxxx.supabase.co
-     CRM_QUESTIONARIO_CHAVE=sb_secret_…
+     cd app/backend && ~/.venvs/criterio-crm/bin/python scripts/definir_questionario.py
      ```
 3. **Logomarca.** `logo_branca.png` já está aqui: letras brancas, fundo transparente (feita a partir da logomarca oficial). Sem ela a página
    funciona, só sem a logo no topo e no PDF.

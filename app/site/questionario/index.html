@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Questionário para Proposta · Critério</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+/* Paleta oficial Critério (acervo institucional, MET-001). Delight não tem versão web
+   disponível; Inter é o substituto provisório. */
+:root{
+  --noturno:#1A2338; --cosmico:#0B0E17; --neve:#A5C0D6; --gelo:#CAE3F7; --cinza:#B6B6B6;
+  --bg:#F4F8FC; --card:#FFFFFF; --border:#DCE6EF; --text:#0B0E17; --muted:#5B6478; --faint:#8A93A6;
+  --erro:#B42318; --erro-bg:#FEF3F2; --alerta:#92400E; --alerta-bg:#FEF3C7; --ok:#067647; --ok-bg:#ECFDF3;
+  --radius:12px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5}
+.topbar{background:var(--noturno);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.topbar img{height:64px;width:auto;display:block}
+.status{font-size:12px;color:var(--gelo);border:1px solid #3A4868;border-radius:99px;padding:4px 12px;white-space:nowrap}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+.intro{margin:0 0 20px}
+.intro .eyebrow{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--noturno);background:var(--gelo);border-radius:99px;padding:4px 12px;margin-bottom:10px}
+.intro h1{font-size:24px;font-weight:600;margin:0 0 4px;color:var(--noturno)}
+.intro p{margin:0;color:var(--muted);font-size:14px}
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:24px;align-items:start}
+.steps{position:sticky;top:16px;display:flex;flex-direction:column;gap:4px}
+.step{all:unset;cursor:pointer;display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:8px;color:var(--muted);font-size:14px}
+.step .n{width:24px;height:24px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;flex:none;background:#fff}
+.step:hover{background:#fff}
+.step.on{background:#fff;color:var(--noturno);font-weight:600;box-shadow:inset 0 0 0 1px var(--neve)}
+.step.on .n{background:var(--noturno);border-color:var(--noturno);color:#fff}
+.step.done .n{background:var(--gelo);border-color:var(--neve);color:var(--noturno)}
+.step:focus-visible{outline:2px solid var(--noturno);outline-offset:2px}
+.bar{height:6px;background:var(--border);border-radius:99px;margin:10px 12px 4px;overflow:hidden}
+.bar>div{height:100%;background:var(--neve);width:0;transition:width .2s}
+.bar-t{font-size:12px;color:var(--faint);padding:0 12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.sec-h{font-size:19px;font-weight:600;margin:0 0 4px;color:var(--noturno)}
+.sec-sub{font-size:13px;color:var(--muted);margin:0 0 20px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px}
+.f{display:flex;flex-direction:column;gap:6px;min-width:0}
+.f.full{grid-column:1/-1}
+.f[hidden]{display:none}
+.f.sub{border-left:2px solid var(--neve);padding-left:14px}
+label.l,.l{font-size:13px;font-weight:500;color:var(--text)}
+.req{color:var(--erro)}
+.hint{font-size:12px;color:var(--faint)}
+input[type=text],input[type=email],input[type=tel],input[type=date],input[type=number],textarea{font:inherit;font-size:14px;color:var(--text);background:#FBFDFF;border:1px solid var(--border);border-radius:8px;padding:9px 11px;width:100%}
+textarea{min-height:76px;resize:vertical}
+input:focus,textarea:focus{outline:none;border-color:var(--noturno);box-shadow:0 0 0 3px rgba(165,192,214,.45)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{all:unset;cursor:pointer;font-size:13px;border:1px solid var(--border);border-radius:99px;padding:6px 14px;color:var(--muted);background:#fff}
+.chip:hover{border-color:var(--neve)}
+.chip[aria-pressed=true]{background:var(--gelo);border-color:var(--neve);color:var(--noturno);font-weight:500}
+.chip:focus-visible{outline:2px solid var(--noturno);outline-offset:2px}
+.err-msg{font-size:12px;color:var(--erro);display:none}
+.f.err .err-msg{display:block}
+.f.err input,.f.err textarea{border-color:var(--erro)}
+.f.err .chips .chip{border-color:#F4B4AE}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:left;padding:0 8px 8px}
+.tbl td{padding:8px;border-top:1px solid var(--border);vertical-align:middle}
+.tbl td:first-child{font-size:14px;font-weight:500;width:26%}
+.vol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 16px}
+.nav{display:flex;justify-content:space-between;gap:12px;margin-top:24px;padding-top:18px;border-top:1px solid var(--border)}
+.btn{font:inherit;font-size:14px;font-weight:500;border-radius:8px;padding:10px 18px;cursor:pointer;border:1px solid transparent}
+.btn-p{background:var(--noturno);color:#fff}
+.btn-p:hover{background:#243050}
+.btn-g{background:#fff;color:var(--noturno);border-color:var(--border)}
+.btn-g:hover{border-color:var(--neve)}
+.btn:disabled{opacity:.6;cursor:wait}
+.req-note{font-size:12px;color:var(--faint);margin-top:14px}
+/* Resumo */
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 20px}
+.m{background:var(--bg);border-radius:10px;padding:14px}
+.m b{display:block;font-size:22px;font-weight:600;color:var(--noturno);line-height:1.2}
+.m span{font-size:12px;color:var(--muted)}
+.att{list-style:none;margin:0 0 20px;padding:0}
+.att li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--border);font-size:14px}
+.tag{font-size:11px;font-weight:500;border-radius:4px;padding:2px 8px;background:var(--alerta-bg);color:var(--alerta);white-space:nowrap;align-self:center}
+.h3{font-size:14px;font-weight:600;margin:0 0 8px;color:var(--noturno)}
+.consent{display:flex;gap:10px;align-items:flex-start;background:var(--bg);border-radius:10px;padding:14px;font-size:13px;color:var(--muted);margin:8px 0 0}
+.consent input{margin-top:3px;width:16px;height:16px;flex:none;accent-color:var(--noturno)}
+.consent.err{box-shadow:inset 0 0 0 1px var(--erro)}
+.actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:20px}
+.banner{border-radius:10px;padding:14px 16px;font-size:14px;margin-top:16px}
+.banner.ok{background:var(--ok-bg);color:var(--ok)}
+.banner.erro{background:var(--erro-bg);color:var(--erro)}
+.notas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:12px 0}
+.nota{border:1px solid var(--border);border-radius:10px;padding:12px}
+.nota b{display:block;font-size:22px;font-weight:600;color:var(--noturno)}
+.nota span{font-size:12px;color:var(--muted)}
+.nota small{display:block;font-size:11px;color:var(--faint);margin-top:4px}
+.fatores{font-size:13px;color:var(--muted);margin:4px 0 0;padding-left:18px}
+.aviso{font-size:12px;color:var(--muted);background:var(--bg);border-radius:8px;padding:10px 12px;margin-top:12px}
+@media (max-width:820px){
+  .topbar{padding:12px 16px}.topbar img{height:48px}.status{display:none}
+  .layout{grid-template-columns:1fr}
+  .steps{position:static;flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:4px}
+  .step{white-space:nowrap;padding:7px 10px}
+  .step .t{display:none}.step.on .t{display:inline}
+  .bar,.bar-t{display:none}
+  .grid,.vol{grid-template-columns:1fr}
+  .metrics,.notas{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .card{padding:18px}
+  .tbl td:first-child{width:auto}
+  .tbl,.tbl tbody,.tbl tr,.tbl td{display:block}.tbl thead{display:none}
+  .tbl td{border-top:none;padding:6px 0}.tbl tr{border-top:1px solid var(--border);padding:8px 0}
+}
+@media print{.topbar,.steps,.nav,.actions,.consent{display:none}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <img src="logo_branca.png" alt="Critério — Advisory | Tax | Accounting">
+  <span class="status" id="status">Salvo automaticamente neste navegador</span>
+</header>
+
+<main class="wrap">
+  <div class="intro" id="intro">
+    <span class="eyebrow">Questionário para elaboração de proposta</span>
+    <h1>BPO contábil, fiscal, trabalhista e financeiro</h1>
+    <p>Preencha os dados disponíveis. O que faltar será levantado na reunião de início (kick-off), caso sejamos contratados.</p>
+  </div>
+
+  <div class="layout" id="form-view">
+    <nav class="steps" id="steps" aria-label="Seções do questionário"></nav>
+    <section class="card" id="card" aria-live="polite"></section>
+  </div>
+
+  <section class="card" id="resumo-view" hidden></section>
+</main>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= Configuração ================= */
+// Banco do diagnóstico OCAP (mesmo projeto Supabase). A tabela é criada pelo prompt do Lovable.
+/* Banco do questionário: o projeto Supabase da Critério (fora do Lovable desde 01/10/2026).
+   A chave publicável é pública por natureza: só permite INSERIR, com o consentimento LGPD marcado
+   (ver banco.sql). Quem lê é só o CRM, com a chave secreta, que nunca entra nesta página. */
+const SUPABASE_URL = 'PREENCHER_URL_DO_PROJETO';
+const SUPABASE_ANON_KEY = 'PREENCHER_CHAVE_PUBLICAVEL';
+const BANCO_CONFIGURADO = !SUPABASE_URL.startsWith('PREENCHER') && !SUPABASE_ANON_KEY.startsWith('PREENCHER');
+const TABELA = 'questionarios_proposta';
+const VERSAO_QUESTIONARIO = 'BPO Full 2026 v6';
+const STORAGE_KEY = 'criterio_questionario_bpo_v4';
+const LOGO_BRANCA = 'logo_branca.png';
+let LOGO_PDF = LOGO_BRANCA; // data URI usado no PDF
+if(!LOGO_BRANCA.startsWith('data:')){ fetch(LOGO_BRANCA).then(r=>r.blob()).then(b=>{ const fr=new FileReader(); fr.onload=()=>{ LOGO_PDF=fr.result; }; fr.readAsDataURL(b); }).catch(()=>{}); }
+
+/* ================= Questionário (v4 aprovada em 30/09/2026) ================= */
+const SIM_NAO = ['Não','Sim'];
+const has = (a,id,v) => Array.isArray(a[id]) ? a[id].includes(v) : a[id] === v;
+
+const SECOES = [
+ { id:'s1', titulo:'Empresa, escopo e responsáveis', campos:[
+   {id:'razao_social', t:'text', l:'Razão social', req:true},
+   {id:'cnpj', t:'cnpj', l:'CNPJ principal', req:true, ph:'00.000.000/0000-00'},
+   {id:'nome_fantasia', t:'text', l:'Nome fantasia'},
+   {id:'atividade', t:'text', l:'Atividade / segmento'},
+   {id:'faturamento_anual', t:'money', l:'Faturamento anual', ph:'R$ 0,00'},
+   {id:'regime_tributario', t:'multi', l:'Regime tributário (todos, se houver mais de um)', o:['Simples Nacional','Lucro Presumido','Lucro Real','MEI','Outro']},
+   {id:'cnpjs_escopo', t:'textarea', l:'CNPJs no escopo', full:true, hint:'Liste os CNPJs que entram no escopo, um por linha.'},
+   {id:'filiais_localidades', t:'text', l:'Filiais / localidades', full:true},
+   {id:'contato_nome', t:'text', l:'Contato', req:true},
+   {id:'contato_cargo', t:'text', l:'Cargo', req:true},
+   {id:'contato_celular', t:'tel', l:'Celular', req:true, ph:'(21) 90000-0000'},
+   {id:'contato_email', t:'email', l:'E-mail', req:true, ph:'nome@empresa.com.br'},
+   {id:'servicos', t:'multi', l:'Serviços no escopo', req:true, full:true, o:['Contábil','Fiscal','Folha / DP','Financeiro']},
+   {id:'operacao', t:'single', l:'Operação atual', full:true, o:['Interna','Terceirizada','Mista']},
+   {id:'fornecedor_atual', t:'text', l:'Fornecedor atual / prazo de aviso prévio', full:true, show:a=>has(a,'operacao','Terceirizada')||has(a,'operacao','Mista')},
+   {id:'equipe_interna', t:'int', l:'Equipe interna dedicada hoje (nº de pessoas)'},
+   {id:'valor_fornecedor', t:'money', l:'Valor mensal pago ao fornecedor atual', ph:'R$ 0,00', show:a=>has(a,'operacao','Terceirizada')||has(a,'operacao','Mista')}
+ ]},
+ { id:'s2', titulo:'Sistemas, dados e integrações', campos:[
+   {id:'sistemas', t:'systems', full:true, rows:[['erp','ERP / financeiro'],['contabil','Contábil / fiscal'],['folha','Folha / eSocial'],['ponto','Ponto / RH']], o:['Integração/API','Arquivo','Manual']},
+   {id:'implantacao_historico', t:'textarea', l:'Implantação / histórico', full:true, hint:'Módulos em implantação, migrações em curso ou dados históricos não disponíveis.'}
+ ]},
+ { id:'s3', titulo:'Volumes mensais para dimensionamento', sub:'Informe a média mensal ou a quantidade atual. Deixe em branco o que não se aplica.', campos:[
+   {id:'vol', t:'volumes', full:true, itens:[
+     ['notas_emitidas','Notas fiscais emitidas (serviço / produto)'],['notas_recebidas','Notas fiscais recebidas'],['lancamentos','Lançamentos contábeis'],
+     ['pagamentos','Pagamentos efetuados'],['contas_bancarias','Contas bancárias'],['conciliacoes_cartao','Conciliações de cartão'],
+     ['empregados_clt','Empregados CLT'],['pjs_estagiarios','PJs / estagiários'],['admissoes','Admissões'],
+     ['desligamentos','Desligamentos'],['cnpjs','CNPJs (empresas do grupo que a Critério atenderá)'],['tomadores','Tomadores de serviço (clientes atendidos)'],['filiais_estabelecimentos','Filiais / estabelecimentos']]}
+ ]},
+ { id:'s4', titulo:'Contábil e gerencial', campos:[
+   {id:'fechamento', t:'textarea', n:1, l:'Data de fechamento atual e prazo desejado para balancete / demonstrações (número de dias úteis)', full:true},
+   {id:'plano_contas', t:'single', n:2, l:'O plano de contas contempla natureza de serviço, centro de custo e projeto?', o:SIM_NAO.slice().reverse(), full:true},
+   {id:'plano_contas_qtd', t:'text', l:'Quantidades', full:true, sub:true, show:a=>has(a,'plano_contas','Sim')},
+   {id:'folha_rateio', t:'single', n:3, l:'A folha deve ser rateada por centro de custo, projeto ou natureza?', o:['Sim','Não'], full:true},
+   {id:'folha_rateio_formal', t:'single', l:'Regra formalizada?', o:['Sim','Não'], full:true, sub:true, show:a=>has(a,'folha_rateio','Sim')},
+   {id:'relatorios', t:'multi', n:4, l:'Relatórios necessários', o:['DRE por centro/projeto','Balanço','Fluxo de caixa','Consolidação','Outros'], full:true},
+   {id:'relatorios_outros', t:'text', l:'Outros relatórios', full:true, sub:true, show:a=>has(a,'relatorios','Outros')},
+   {id:'auditada', t:'single', n:5, l:'A empresa é auditada?', o:SIM_NAO, full:true},
+   {id:'auditoria_det', t:'textarea', l:'Empresa, frequência e exigências de fechamento', full:true, sub:true, show:a=>has(a,'auditada','Sim')}
+ ]},
+ { id:'s5', titulo:'Fiscal e obrigações', campos:[
+   {id:'tributos', t:'multi', n:1, l:'Tributos e operações', o:['ISS','ICMS','IPI','Retenções'], full:true},
+   {id:'municipios_ufs', t:'text', l:'Municípios/UFs com atividade', full:true},
+   {id:'exterior', t:'single', n:2, l:'Há remessas/retornos, importação/exportação ou pagamentos de software/serviços ao exterior?', o:SIM_NAO, full:true},
+   {id:'exterior_det', t:'text', l:'Descreva', full:true, sub:true, show:a=>has(a,'exterior','Sim')},
+   {id:'obrigacoes_especificas', t:'textarea', n:3, l:'Há obrigações específicas, benefícios fiscais ou certidões exigidas por clientes?', hint:'Indique tipo e frequência.', full:true},
+   {id:'passivos', t:'single', n:4, l:'Existem parcelamentos, passivos, autos de infração ou processos tributários?', o:SIM_NAO, full:true},
+   {id:'passivos_tipos', t:'multi', l:'Quais?', o:['Parcelamento','Auto de infração','Processo tributário','Outro passivo'], full:true, sub:true, show:a=>has(a,'passivos','Sim')},
+   {id:'passivos_det', t:'textarea', l:'Descreva', full:true, sub:true, show:a=>has(a,'passivos','Sim')},
+   {id:'parcelamento_situacao', t:'single', l:'Se houver parcelamento', o:['Em dia','Em atraso, ou já quebrado antes'], full:true, sub:true, show:a=>has(a,'passivos','Sim')},
+   {id:'obrig_esforco', t:'textarea', n:5, l:'Quais declarações/obrigações demandam tratamento especial ou maior esforço da equipe?', full:true},
+   {id:'obrig_atraso', t:'single', n:6, l:'Alguma obrigação acessória foi entregue com atraso nos últimos 3 meses?', o:SIM_NAO, full:true},
+   {id:'obrig_atraso_det', t:'text', l:'Quais', full:true, sub:true, show:a=>has(a,'obrig_atraso','Sim')}
+ ]},
+ { id:'s6', titulo:'Folha de pagamento e departamento pessoal', show:a=>has(a,'servicos','Folha / DP'), campos:[
+   {id:'colab_distribuicao', t:'textarea', n:1, l:'Distribuição dos colaboradores por UF/localidade e modalidade (presencial, híbrido, remoto ou alocado em cliente)', full:true},
+   {id:'sindicatos', t:'textarea', n:2, l:'Sindicatos e CCTs aplicáveis; há colaboradores sujeitos a CCT de outra localidade?', full:true},
+   {id:'calendario_folha', t:'textarea', n:3, l:'Corte do ponto, fechamento e pagamento da folha; há adiantamento ou folha complementar?', full:true},
+   {id:'eventos', t:'multi', n:4, l:'Eventos variáveis', o:['HE/banco de horas','Noturno','Sobreaviso','Periculosidade','Comissão','Outros'], full:true},
+   {id:'eventos_outros', t:'text', l:'Outros eventos', full:true, sub:true, show:a=>has(a,'eventos','Outros')},
+   {id:'ponto_beneficios', t:'textarea', n:5, l:'Sistema de ponto e nível de conferência manual; benefícios administrados no escopo', full:true},
+   {id:'tomadores_upload', t:'single', n:6, l:'Tomadores exigem upload de folha/encargos ou condicionam faturamento?', o:SIM_NAO, full:true},
+   {id:'tomadores_upload_det', t:'text', l:'Quantos, quais dados e prazo', full:true, sub:true, show:a=>has(a,'tomadores_upload','Sim')},
+   {id:'pendencias_esocial', t:'textarea', n:7, l:'Há pendências de eSocial/SST, histórico de folha a migrar ou ocorrências trabalhistas relevantes?', full:true}
+ ]},
+ { id:'s7', titulo:'Financeiro', show:a=>has(a,'servicos','Financeiro'), campos:[
+   {id:'fin_escopo', t:'multi', n:1, l:'Escopo desejado', o:['Contas a pagar','Contas a receber','Faturamento','Cobrança','Conciliação','Fluxo de caixa'], full:true},
+   {id:'fin_aprovacoes', t:'textarea', n:2, l:'Aprovações, alçadas, bancos e prazos críticos; há pagamentos/recebimentos no exterior?', full:true},
+   {id:'fin_relatorios', t:'textarea', n:3, l:'Relatórios e periodicidade esperados; principais processos ainda manuais', full:true},
+   {id:'fin_inadimplencia', t:'textarea', n:4, l:'Inadimplência/atraso médio de clientes; uso de capital de giro ou linhas de crédito; volumes mensais (boletos emitidos, cobranças realizadas)', full:true}
+ ]},
+ { id:'s8', titulo:'Dores, expectativas, transição e decisão', campos:[
+   {id:'dores', t:'textarea', n:1, l:'Quais erros, atrasos ou retrabalhos dos últimos 12 meses mais impactaram a empresa?', full:true},
+   {id:'proatividade', t:'textarea', n:2, l:'O que o novo parceiro deve antecipar ou fazer de forma mais proativa?', full:true},
+   {id:'criterio_1', t:'text', n:3, l:'Critério de sucesso 1'},
+   {id:'criterio_2', t:'text', l:'Critério de sucesso 2'},
+   {id:'criterio_3', t:'text', l:'Critério de sucesso 3'},
+   {id:'slas', t:'textarea', n:4, l:'SLAs esperados (folha, balancete, obrigações e relatórios)', full:true},
+   {id:'data_inicio', t:'date', l:'Data desejada de início'},
+   {id:'decisores', t:'textarea', n:5, l:'Decisor final, influenciadores e usuários do serviço', full:true},
+   {id:'ponto_focal', t:'textarea', n:6, l:'Ponto focal da implantação e quem concede acessos a sistemas, bancos e portais (nome/cargo/celular/e-mail)', full:true},
+   {id:'documentos', t:'multi', l:'Documentos disponíveis', o:['Balancete','Folha','Obrigações','Relatórios gerenciais','Contrato atual','Balanço de Abertura','Balancete de encerramento','Plano de contas','Histórico contábil','Outros'], full:true},
+   {id:'historico_exercicios', t:'int', l:'Histórico contábil: nº de exercícios', sub:true, show:a=>has(a,'documentos','Histórico contábil')},
+   {id:'documentos_outros', t:'text', l:'Outros documentos', sub:true, show:a=>has(a,'documentos','Outros')}
+ ]},
+ { id:'s9', titulo:'Acessos, documentos e estrutura — para a implantação', sub:'Preencha o que já estiver definido. O que faltar será levantado na reunião de início (kick-off).', campos:[
+   {id:'reestruturacao', t:'single', n:1, l:'Há reestruturação societária, fusão, cisão ou entrada de sócio em curso?', o:SIM_NAO, full:true},
+   {id:'reestruturacao_det', t:'textarea', l:'Descreva e informe o prazo estimado', full:true, sub:true, show:a=>has(a,'reestruturacao','Sim')},
+   {id:'certificado', t:'single', n:2, l:'Certificado digital', o:['e-CNPJ A1','e-CNPJ A3','Não possui'], full:true},
+   {id:'certificado_titular', t:'text', l:'Titular', sub:true, show:a=>a.certificado && a.certificado!=='Não possui'},
+   {id:'certificado_validade', t:'date', l:'Validade', show:a=>a.certificado && a.certificado!=='Não possui'},
+   {id:'procuracao', t:'single', n:3, l:'Procuração eletrônica para a contabilidade', o:SIM_NAO, full:true},
+   {id:'procuracao_det', t:'text', l:'Escopo e validade', full:true, sub:true, show:a=>has(a,'procuracao','Sim')},
+   {id:'domicilios', t:'textarea', n:4, l:'Domicílios eletrônicos em uso (e-CAC, DTE estadual, municipal, outros). Informe quais existem e quem os acompanha hoje', full:true},
+   {id:'saldos', t:'multi', n:5, l:'Saldos a migrar', o:['Férias','13º','Banco de horas','Provisões','Outros'], full:true},
+   {id:'saldos_outros', t:'text', l:'Outros saldos', sub:true, show:a=>has(a,'saldos','Outros')},
+   {id:'saldos_onde', t:'text', l:'Disponíveis em (sistema ou arquivo)', show:a=>Array.isArray(a.saldos)&&a.saldos.length>0}
+ ]}
+];
+
+/* ================= Estado ================= */
+let A = {};          // respostas
+let atual = 0;       // índice na lista de seções visíveis
+let visitadas = new Set();
+let envio = null;    // {ok, quando, erro}
+
+function carregar(){
+  try{ const raw = localStorage.getItem(STORAGE_KEY); if(raw){ const s = JSON.parse(raw); A = s.A||{}; atual = s.atual||0; visitadas = new Set(s.visitadas||[]); envio = s.envio||null; } }catch(e){}
+}
+function salvar(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({A, atual, visitadas:[...visitadas], envio})); }catch(e){}
+}
+const visiveis = () => SECOES.filter(s => !s.show || s.show(A));
+
+/* ================= Utilidades ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const digitos = s => String(s||'').replace(/\D/g,'');
+function maskCNPJ(v){ const d = digitos(v).slice(0,14); return d.replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2'); }
+function cnpjValido(v){
+  const c = digitos(v); if(c.length!==14 || /^(\d)\1+$/.test(c)) return false;
+  const calc = n => { let s=0, p=n-7; for(let i=0;i<n;i++){ s += +c[i]*p--; if(p<2) p=9; } const r = s%11; return r<2?0:11-r; };
+  return calc(12)===+c[12] && calc(13)===+c[13];
+}
+function maskTel(v){ const d = digitos(v).slice(0,11); if(d.length<=10) return d.replace(/^(\d{2})(\d)/,'($1) $2').replace(/(\d{4})(\d)/,'$1-$2'); return d.replace(/^(\d{2})(\d)/,'($1) $2').replace(/(\d{5})(\d)/,'$1-$2'); }
+const brl = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+function maskMoney(v){ const d = digitos(v); if(!d) return ''; return brl.format(+d/100); }
+const intOrNull = v => (v===''||v==null||isNaN(+v)) ? null : Math.max(0, Math.round(+v));
+const fmtData = iso => { if(!iso) return ''; const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; };
+
+/* ================= Renderização ================= */
+function renderSteps(){
+  const secs = visiveis();
+  $('#steps').innerHTML = secs.map((s,i)=>`<button type="button" class="step ${i===atual?'on':''} ${visitadas.has(s.id)&&i!==atual?'done':''}" data-i="${i}" ${i===atual?'aria-current="step"':''}><span class="n">${i+1}</span><span class="t">${esc(s.titulo.split(' — ')[0])}</span></button>`).join('')
+    + `<div class="bar"><div style="width:${Math.round((atual+1)/secs.length*100)}%"></div></div><div class="bar-t">Seção ${atual+1} de ${secs.length}</div>`;
+  $('#steps').querySelectorAll('.step').forEach(b=>b.onclick=()=>{ const i=+b.dataset.i; if(i>atual && !validar()) return; irPara(i); });
+}
+
+function campoHTML(c){
+  const v = A[c.id];
+  const lab = `${c.n?`<span style="color:var(--faint)">${c.n}&nbsp;&nbsp;</span>`:''}${esc(c.l||'')}${c.req?' <span class="req">*</span>':''}`;
+  const cls = `f ${c.full?'full':''} ${c.sub?'sub':''}`;
+  const hint = c.hint ? `<span class="hint">${esc(c.hint)}</span>` : '';
+  const err = `<span class="err-msg" id="err-${c.id}"></span>`;
+  switch(c.t){
+    case 'text': case 'email': case 'tel': case 'cnpj': case 'money': case 'date': {
+      const type = c.t==='email'?'email':c.t==='date'?'date':c.t==='tel'?'tel':'text';
+      const im = (c.t==='cnpj'||c.t==='tel'||c.t==='money')?' inputmode="numeric"':'';
+      return `<div class="${cls}" data-f="${c.id}"><label class="l" for="in-${c.id}">${lab}</label>${hint}<input id="in-${c.id}" type="${type}"${im} data-id="${c.id}" data-t="${c.t}" value="${esc(v)}" placeholder="${esc(c.ph||'')}" autocomplete="off">${err}</div>`;
+    }
+    case 'int':
+      return `<div class="${cls}" data-f="${c.id}"><label class="l" for="in-${c.id}">${lab}</label>${hint}<input id="in-${c.id}" type="number" min="0" step="1" inputmode="numeric" data-id="${c.id}" data-t="int" value="${esc(v)}">${err}</div>`;
+    case 'textarea':
+      return `<div class="${cls}" data-f="${c.id}"><label class="l" for="in-${c.id}">${lab}</label>${hint}<textarea id="in-${c.id}" data-id="${c.id}" data-t="textarea">${esc(v)}</textarea>${err}</div>`;
+    case 'single': case 'multi': {
+      const sel = c.t==='multi' ? (Array.isArray(v)?v:[]) : [v];
+      return `<div class="${cls}" data-f="${c.id}" role="group" aria-labelledby="lb-${c.id}"><span class="l" id="lb-${c.id}">${lab}</span>${c.t==='multi'?'<span class="hint">Marque todas que se aplicam.</span>':''}${hint}<div class="chips">${c.o.map(o=>`<button type="button" class="chip" data-id="${c.id}" data-t="${c.t}" data-v="${esc(o)}" aria-pressed="${sel.includes(o)}">${esc(o)}</button>`).join('')}</div>${err}</div>`;
+    }
+    case 'systems': {
+      const s = A.sistemas || {};
+      return `<div class="${cls}"><table class="tbl"><thead><tr><th>Processo</th><th>Sistema atual</th><th>Forma de troca de dados</th></tr></thead><tbody>${c.rows.map(([k,nome])=>{
+        const r = s[k]||{}; const tr = Array.isArray(r.troca)?r.troca:[];
+        return `<tr><td>${esc(nome)}</td><td><input type="text" aria-label="Sistema atual — ${esc(nome)}" data-sys="${k}" value="${esc(r.sistema)}"></td><td><div class="chips">${c.o.map(o=>`<button type="button" class="chip" data-sysk="${k}" data-v="${esc(o)}" aria-pressed="${tr.includes(o)}">${esc(o)}</button>`).join('')}</div></td></tr>`;
+      }).join('')}</tbody></table></div>`;
+    }
+    case 'volumes': {
+      const vol = A.vol || {};
+      return `<div class="${cls}"><div class="vol">${c.itens.map(([k,nome])=>`<div class="f"><label class="l" for="vol-${k}">${esc(nome)}</label><input id="vol-${k}" type="number" min="0" step="1" inputmode="numeric" data-vol="${k}" value="${esc(vol[k])}"></div>`).join('')}</div></div>`;
+    }
+  }
+  return '';
+}
+
+function renderSecao(){
+  const secs = visiveis();
+  if(atual >= secs.length) atual = secs.length-1;
+  const s = secs[atual];
+  visitadas.add(s.id);
+  const ultimo = atual === secs.length-1;
+  $('#card').innerHTML = `<h2 class="sec-h">${atual+1}&nbsp;&nbsp;${esc(s.titulo)}</h2><p class="sec-sub">${esc(s.sub||'Preencha os dados disponíveis.')}</p>
+    <div class="grid">${s.campos.map(campoHTML).join('')}</div>
+    ${s.campos.some(c=>c.req)?'<p class="req-note"><span class="req">*</span> Campos obrigatórios.</p>':''}
+    <div class="nav"><button type="button" class="btn btn-g" id="btn-voltar" ${atual===0?'style="visibility:hidden"':''}>Voltar</button>
+    <button type="button" class="btn btn-p" id="btn-avancar">${ultimo?'Revisar e concluir':'Próxima seção'}</button></div>`;
+  bindSecao(s);
+  aplicarCondicoes(s);
+  renderSteps();
+  salvar();
+}
+
+function aplicarCondicoes(s){
+  s.campos.forEach(c=>{ if(!c.show) return; const el = document.querySelector(`[data-f="${c.id}"]`); if(el) el.hidden = !c.show(A); });
+}
+
+function bindSecao(s){
+  const card = $('#card');
+  card.querySelectorAll('input[data-id],textarea[data-id]').forEach(el=>{
+    const id = el.dataset.id, t = el.dataset.t;
+    el.addEventListener('input', ()=>{
+      if(t==='cnpj'){ el.value = maskCNPJ(el.value); }
+      if(t==='tel'){ el.value = maskTel(el.value); }
+      if(t==='money'){ el.value = maskMoney(el.value); }
+      A[id] = el.value; limparErro(id); salvar(); aplicarCondicoes(s);
+    });
+  });
+  card.querySelectorAll('.chip[data-id]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const id=b.dataset.id, v=b.dataset.v;
+      if(b.dataset.t==='multi'){ const arr = Array.isArray(A[id])?A[id].slice():[]; const i=arr.indexOf(v); if(i>=0) arr.splice(i,1); else arr.push(v); A[id]=arr; }
+      else { A[id] = A[id]===v ? '' : v; }
+      card.querySelectorAll(`.chip[data-id="${id}"]`).forEach(x=>{ const sel = Array.isArray(A[id])?A[id].includes(x.dataset.v):A[id]===x.dataset.v; x.setAttribute('aria-pressed', sel); });
+      limparErro(id); salvar(); aplicarCondicoes(s);
+      if(id==='servicos') renderSteps();
+    });
+  });
+  card.querySelectorAll('input[data-sys]').forEach(el=>el.addEventListener('input',()=>{ const k=el.dataset.sys; A.sistemas=A.sistemas||{}; A.sistemas[k]=A.sistemas[k]||{}; A.sistemas[k].sistema=el.value; salvar(); }));
+  card.querySelectorAll('.chip[data-sysk]').forEach(b=>b.addEventListener('click',()=>{ const k=b.dataset.sysk, v=b.dataset.v; A.sistemas=A.sistemas||{}; A.sistemas[k]=A.sistemas[k]||{}; const arr=Array.isArray(A.sistemas[k].troca)?A.sistemas[k].troca:[]; const i=arr.indexOf(v); if(i>=0) arr.splice(i,1); else arr.push(v); A.sistemas[k].troca=arr; b.setAttribute('aria-pressed', arr.includes(v)); salvar(); }));
+  card.querySelectorAll('input[data-vol]').forEach(el=>el.addEventListener('input',()=>{ A.vol=A.vol||{}; A.vol[el.dataset.vol]=el.value; salvar(); }));
+  $('#btn-voltar').onclick = ()=> irPara(atual-1);
+  $('#btn-avancar').onclick = ()=>{ if(!validar()) return; if(atual===visiveis().length-1) mostrarResumo(); else irPara(atual+1); };
+}
+
+function irPara(i){ atual = Math.max(0, Math.min(i, visiveis().length-1)); renderSecao(); window.scrollTo({top:0,behavior:'smooth'}); }
+
+function erro(id,msg){ const f=document.querySelector(`[data-f="${id}"]`); if(!f) return; f.classList.add('err'); const e=document.getElementById('err-'+id); if(e) e.textContent=msg; }
+function limparErro(id){ const f=document.querySelector(`[data-f="${id}"]`); if(f) f.classList.remove('err'); }
+
+function validar(){
+  const s = visiveis()[atual]; let primeiro = null;
+  s.campos.forEach(c=>{
+    if(c.show && !c.show(A)) return;
+    const v = A[c.id]; const vazio = v==null || v==='' || (Array.isArray(v)&&v.length===0);
+    let msg = null;
+    if(c.req && vazio) msg = c.t==='multi' ? 'Selecione ao menos uma opção.' : 'Preencha este campo.';
+    else if(!vazio && c.t==='cnpj' && !cnpjValido(v)) msg = 'CNPJ inválido. Confira os números.';
+    else if(!vazio && c.t==='email' && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) msg = 'Informe um e-mail válido.';
+    else if(!vazio && c.t==='tel' && digitos(v).length<10) msg = 'Informe um telefone com DDD.';
+    if(msg){ erro(c.id,msg); if(!primeiro) primeiro=c.id; }
+  });
+  if(primeiro){ const el=document.querySelector(`[data-f="${primeiro}"]`); el.scrollIntoView({behavior:'smooth',block:'center'}); const inp=el.querySelector('input,textarea,.chip'); if(inp) inp.focus({preventScroll:true}); return false; }
+  return true;
+}
+
+/* ================= Avaliação para precificação (réguas do CRM Critério) =================
+   Réplica fiel de crm_criterio: domain/porte.py (régua de porte) e domain/avaliacao.py
+   (notas de complexidade e risco), especificadas em regua-de-porte-e-plano-de-teste.md e
+   escala-das-notas-humanas.md. As réguas são HIPÓTESE EM VALIDAÇÃO: o resultado é sugestão
+   e a área técnica confirma ou sobrepõe no CRM. Nunca decide preço sozinho. */
+const DIRECIONADORES = [
+  ['documentos_fiscais_mes','Documentos fiscais/mês (emitidas + recebidas)',[[50,0],[150,1],[300,2],[600,3],[null,4]]],
+  ['lancamentos_contabeis_mes','Lançamentos contábeis/mês',[[100,0],[300,1],[800,2],[2000,3],[null,4]]],
+  ['pagamentos_mes','Pagamentos/mês',[[50,0],[150,1],[400,2],[1000,3],[null,4]]],
+  ['contas_bancarias','Contas bancárias',[[1,0],[2,1],[4,2],[10,3],[null,4]]],
+  ['conciliacoes_cartao_mes','Conciliações de cartão/mês',[[0,0],[150,1],[300,2],[800,3],[null,4]]],
+  ['empregados_clt','Empregados CLT',[[5,0],[20,1],[50,2],[150,3],[null,4]]],
+  ['admissoes_desligamentos_mes','Admissões + desligamentos/mês',[[1,0],[4,1],[10,2],[25,3],[null,4]]],
+  ['cnpjs_no_escopo','CNPJs no escopo',[[1,0],[2,1],[4,2],[10,3],[null,4]]],
+  ['tomadores_de_servico','Tomadores de serviço',[[5,0],[30,1],[100,2],[300,3],[null,4]]]
+];
+const HORAS_BASE = {'Micro':5,'Pequeno':10,'Médio':16,'Grande':40,'Extra Grande':80};
+const ATRITO = {1:0,2:0.05,3:0.10,4:0.30,5:0.50};
+const TETO_ATRITO = 1.5;
+const DISCIPLINA_PREMISSA = 3;
+const ROTULOS_COMPLEXIDADE = {holding:'Holding com consolidação',centros_de_custo:'Centros de custo ou rateio entre unidades',plano_de_contas:'Plano de contas customizado',auditoria:'Auditoria externa',regimes:'Mais de um regime tributário',parcelamento_complexidade:'Parcelamento tributário ativo'};
+const ROTULOS_RISCO = {auto_de_infracao:'Auto de infração ou processo fiscal',parcelamento_atraso:'Parcelamento em atraso ou já quebrado',obrigacao_atrasada:'Obrigação acessória atrasada (3 meses)',certificado_vencendo:'Certificado digital vence em até 60 dias',passivo_sem_provisao:'Passivo sem provisionamento'};
+
+function pontuar(cortes, v){ if(v==null) return null; for(const [lim,p] of cortes){ if(lim===null || v<=lim) return p; } return null; }
+const r2 = x => Math.round((x + Number.EPSILON) * 100) / 100;
+
+function volumetria(){
+  const v = A.vol || {}; const n = k => intOrNull(v[k]);
+  const soma = (a,b) => (a==null && b==null) ? null : (a||0)+(b||0);
+  return {
+    documentos_fiscais_mes: soma(n('notas_emitidas'), n('notas_recebidas')),
+    lancamentos_contabeis_mes: n('lancamentos'),
+    pagamentos_mes: n('pagamentos'),
+    contas_bancarias: n('contas_bancarias'),
+    conciliacoes_cartao_mes: n('conciliacoes_cartao'),
+    empregados_clt: n('empregados_clt'),
+    admissoes_desligamentos_mes: soma(n('admissoes'), n('desligamentos')),
+    cnpjs_no_escopo: n('cnpjs'),
+    tomadores_de_servico: n('tomadores')
+  };
+}
+
+function avaliar(){
+  const vol = volumetria();
+  const servicos = Array.isArray(A.servicos) ? A.servicos : [];
+  const consolidacao = has(A,'relatorios','Consolidação');
+  const auditada = has(A,'auditada','Sim');
+  const pontos = DIRECIONADORES.map(([k,,c]) => pontuar(c, vol[k])).filter(p => p!==null);
+  let porte = null, pontuacao = null, horas_base = null;
+  if(pontos.length){
+    const base = pontos.reduce((a,b)=>a+b,0)/pontos.length;
+    const escopo = Math.min(0.25*Math.max(0,servicos.length-1), 0.75);
+    pontuacao = r2(base + escopo + (consolidacao?0.5:0) + (auditada?0.25:0));
+    porte = pontuacao<0.75?'Micro':pontuacao<1.5?'Pequeno':pontuacao<2.25?'Médio':pontuacao<3.25?'Grande':'Extra Grande';
+    horas_base = HORAS_BASE[porte];
+  }
+  // Complexidade — fatores de escala-das-notas-humanas.md §2, lidos do questionário
+  const regimes = (Array.isArray(A.regime_tributario)?A.regime_tributario:[]).filter(r=>r!=='Outro');
+  const cx = [];
+  if(consolidacao) cx.push('holding');
+  if(has(A,'folha_rateio','Sim') || has(A,'relatorios','DRE por centro/projeto')) cx.push('centros_de_custo');
+  if(has(A,'plano_contas','Sim')) cx.push('plano_de_contas');
+  if(auditada) cx.push('auditoria');
+  if(regimes.length>1) cx.push('regimes');
+  if(has(A,'passivos','Sim') && (has(A,'passivos_tipos','Parcelamento') || !!A.parcelamento_situacao)) cx.push('parcelamento_complexidade');
+  const nx = cx.length; const nota_complexidade = nx===0?1:nx===1?2:nx<=3?3:nx===4?4:5;
+  // Risco técnico — escala-das-notas-humanas.md §3
+  const rk = [];
+  if(has(A,'passivos','Sim') && (has(A,'passivos_tipos','Auto de infração') || has(A,'passivos_tipos','Processo tributário'))) rk.push('auto_de_infracao');
+  if(has(A,'passivos','Sim') && A.parcelamento_situacao==='Em atraso, ou já quebrado antes') rk.push('parcelamento_atraso');
+  if(has(A,'obrig_atraso','Sim')) rk.push('obrigacao_atrasada');
+  if(A.certificado && A.certificado!=='Não possui' && A.certificado_validade){
+    const dias = (new Date(A.certificado_validade+'T00:00:00') - new Date(new Date().toDateString()))/86400000;
+    if(dias <= 60) rk.push('certificado_vencendo');
+  }
+  const nota_risco = Math.min(5, 1 + rk.length);
+  const atrito = Math.min(ATRITO[nota_complexidade] + ATRITO[nota_risco] + ATRITO[6-DISCIPLINA_PREMISSA], TETO_ATRITO);
+  const horas_propostas = horas_base==null ? null : r2(horas_base*(1+atrito));
+  return {
+    regua_versao:'crm_criterio 30/09/2026 (hipótese em validação)',
+    volumetria: vol, direcionadores_aplicados: pontos.length,
+    servicos_contratados_alem_do_primeiro: Math.max(0,servicos.length-1),
+    tem_consolidacao_de_grupo: consolidacao, e_auditada: auditada,
+    porte_sugerido: porte, pontuacao_porte: pontuacao, horas_base,
+    complexidade: {fatores: cx, nota: nota_complexidade},
+    risco: {fatores: rk, nota: nota_risco, nao_avaliado:['passivo_sem_provisao']},
+    disciplina: {nota: DISCIPLINA_PREMISSA, premissa: true},
+    atrito_total: r2(atrito), horas_propostas_mes: horas_propostas,
+    respostas_crm: {complexidade: cx, risco: rk}
+  };
+}
+
+/* ================= Resumo ================= */
+function pontosDeAtencao(){
+  const p = [];
+  if(has(A,'passivos','Sim')) p.push(['Parcelamentos, passivos, autos ou processos tributários declarados','Fiscal']);
+  if(A.parcelamento_situacao==='Em atraso, ou já quebrado antes') p.push(['Parcelamento em atraso ou já quebrado antes','Fiscal']);
+  if(has(A,'obrig_atraso','Sim')) p.push(['Obrigação acessória entregue com atraso nos últimos 3 meses','Fiscal']);
+  if(has(A,'folha_rateio','Sim') && has(A,'folha_rateio_formal','Não')) p.push(['Rateio da folha sem regra formalizada','Contábil']);
+  if(has(A,'auditada','Sim')) p.push(['Empresa auditada: exigências de fechamento','Contábil']);
+  if(has(A,'exterior','Sim')) p.push(['Operações ou pagamentos com o exterior','Fiscal']);
+  if(has(A,'tomadores_upload','Sim')) p.push(['Tomadores exigem upload de folha/encargos','Folha / DP']);
+  if(has(A,'reestruturacao','Sim')) p.push(['Reestruturação societária em curso','Implantação']);
+  if(A.certificado==='Não possui') p.push(['Empresa sem certificado digital','Implantação']);
+  const av = avaliar(); if(av.risco.fatores.includes('certificado_vencendo')) p.push(['Certificado digital vence em até 60 dias','Implantação']);
+  if(A.operacao==='Terceirizada'||A.operacao==='Mista'){ if(A.fornecedor_atual) p.push(['Transição de fornecedor atual: '+A.fornecedor_atual,'Implantação']); }
+  return p;
+}
+
+function mostrarResumo(){
+  $('#form-view').hidden = true; $('#intro').hidden = true;
+  const v = $('#resumo-view'); v.hidden = false;
+  const vol = volumetria(); const servicos = A.servicos||[];
+  const num = x => x==null ? '—' : x.toLocaleString('pt-BR');
+  const att = pontosDeAtencao();
+  v.innerHTML = `<h2 class="sec-h">Resumo para elaboração da proposta</h2>
+    <p class="sec-sub">${esc(A.razao_social)} · CNPJ ${esc(A.cnpj)} · ${new Date().toLocaleDateString('pt-BR')}</p>
+    <div class="metrics">
+      <div class="m"><b>${servicos.length}</b><span>serviços no escopo</span></div>
+      <div class="m"><b>${num(vol.documentos_fiscais_mes)}</b><span>notas fiscais/mês</span></div>
+      <div class="m"><b>${num(vol.empregados_clt)}</b><span>empregados CLT</span></div>
+      <div class="m"><b>${num(vol.cnpjs_no_escopo)}</b><span>CNPJs</span></div>
+    </div>
+    <p class="h3">Escopo</p><p style="margin:0 0 18px;font-size:14px">${servicos.map(esc).join(' · ')||'—'}</p>
+    <p class="h3">Pontos de atenção declarados</p>
+    ${att.length?`<ul class="att">${att.map(([t,g])=>`<li><span>${esc(t)}</span><span class="tag">${esc(g)}</span></li>`).join('')}</ul>`:'<p style="font-size:14px;color:var(--muted);margin:0 0 18px">Nenhum ponto de atenção declarado.</p>'}
+    <label class="consent" id="consent-box"><input type="checkbox" id="consent" ${envio&&envio.ok?'checked disabled':''}>
+      <span>Autorizo a Critério a tratar os dados informados neste questionário exclusivamente para elaborar a proposta comercial e, se contratada, planejar a implantação dos serviços, nos termos da Lei Geral de Proteção de Dados (Lei nº 13.709/2018).</span></label>
+    <div class="actions">
+      ${envio&&envio.ok?'<button type="button" class="btn btn-g" id="btn-novo">Iniciar novo questionário</button>':''}
+      <button type="button" class="btn btn-g" id="btn-revisar">Revisar respostas</button>
+      <button type="button" class="btn btn-g" id="btn-pdf">Baixar PDF</button>
+      <button type="button" class="btn btn-p" id="btn-enviar" ${envio&&envio.ok?'disabled':''}>${envio&&envio.ok?'Enviado':'Enviar para a Critério'}</button>
+    </div>
+    <div id="envio-msg">${envio&&envio.ok?`<div class="banner ok">Questionário enviado em ${esc(envio.quando)}. A equipe da Critério entrará em contato.</div>`:''}</div>
+    `;
+  $('#btn-revisar').onclick = ()=>{ v.hidden=true; $('#form-view').hidden=false; $('#intro').hidden=false; irPara(0); };
+  if($('#btn-novo')) $('#btn-novo').onclick = ()=>{ if(!confirm('Apagar as respostas deste navegador e começar um questionário novo?')) return; A={}; atual=0; visitadas=new Set(); envio=null; salvar(); v.hidden=true; $('#form-view').hidden=false; $('#intro').hidden=false; $('#status').textContent='Salvo automaticamente neste navegador'; renderSecao(); };
+  $('#btn-pdf').onclick =()=>{ try{ gerarPDF(false).save(`Questionario_Critério_${digitos(A.cnpj)||'empresa'}.pdf`); }catch(e){ mostrarMsg('erro','Não foi possível gerar o PDF. Verifique a conexão e tente de novo.'); } };
+  $('#btn-enviar').onclick = enviar;
+  $('#consent').onchange = ()=> $('#consent-box').classList.remove('err');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function mostrarMsg(tipo, txt){ $('#envio-msg').innerHTML = `<div class="banner ${tipo}">${esc(txt)}</div>`; }
+
+function mostrarConfirmacao(){
+  $('#form-view').hidden = true; $('#intro').hidden = true;
+  const v = $('#resumo-view'); v.hidden = false;
+  const blocos = visiveis().map(s=>({titulo:s.titulo, linhas:linhasSecao(s)})).filter(b=>b.linhas.length);
+  v.innerHTML = `<h2 class="sec-h">Questionário enviado</h2>
+    <p class="sec-sub">${esc(A.razao_social)} · CNPJ ${esc(A.cnpj)} · enviado em ${esc(envio.quando)}</p>
+    <div class="banner ok">Recebemos suas respostas. A equipe da Critério entrará em contato.</div>
+    <p class="h3">Dados enviados</p>
+    ${blocos.map(b=>`<p class="h3" style="font-size:13px">${esc(b.titulo)}</p>
+      <dl style="margin:0 0 18px;font-size:14px">${b.linhas.map(([l,val])=>`<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--line,#e5eaf2)"><dt style="flex:0 0 220px;color:var(--muted)">${esc(l)}</dt><dd style="margin:0;flex:1">${esc(val)}</dd></div>`).join('')}</dl>`).join('')}
+    <div class="actions">
+      <button type="button" class="btn btn-g" id="btn-novo">Iniciar novo questionário</button>
+      <button type="button" class="btn btn-g" id="btn-pdf">Baixar PDF</button>
+    </div>`;
+  $('#btn-pdf').onclick =()=>{ try{ gerarPDF(false).save(`Questionario_Critério_${digitos(A.cnpj)||'empresa'}.pdf`); }catch(e){} };
+  $('#btn-novo').onclick = ()=>{ if(!confirm('Apagar as respostas deste navegador e começar um questionário novo?')) return; A={}; atual=0; visitadas=new Set(); envio=null; salvar(); v.hidden=true; $('#form-view').hidden=false; $('#intro').hidden=false; $('#status').textContent='Salvo automaticamente neste navegador'; renderSecao(); };
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ================= PDF ================= */
+function linhasSecao(s){
+  const out = [];
+  s.campos.forEach(c=>{
+    if(c.show && !c.show(A)) return;
+    if(c.t==='systems'){ c.rows.forEach(([k,nome])=>{ const r=(A.sistemas||{})[k]||{}; if(r.sistema||(r.troca||[]).length) out.push([nome, [r.sistema, (r.troca||[]).join(', ')].filter(Boolean).join(' — ')]); }); return; }
+    if(c.t==='volumes'){ c.itens.forEach(([k,nome])=>{ const v=(A.vol||{})[k]; if(v!==''&&v!=null) out.push([nome, String(v)]); }); return; }
+    let v = A[c.id]; if(Array.isArray(v)) v = v.join(', '); if(c.t==='date') v = fmtData(v);
+    if(v!=='' && v!=null) out.push([c.l, String(v)]);
+  });
+  return out;
+}
+
+function gerarPDF(interno){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:"pt", format:"a4", compress:true});
+  const W = doc.internal.pageSize.getWidth();
+  const NOTURNO = [26,35,56], GELO = [202,227,247];
+  doc.setFillColor(...NOTURNO); doc.rect(0,0,W,78,'F');
+  try{ doc.addImage(LOGO_PDF,'PNG',36,14,176,50); }catch(e){}
+  doc.setTextColor(255,255,255); doc.setFontSize(9);
+  doc.text('Questionário para elaboração de proposta', W-36, 36, {align:'right'});
+  doc.text(new Date().toLocaleDateString('pt-BR'), W-36, 50, {align:'right'});
+  doc.setTextColor(...NOTURNO); doc.setFontSize(15); doc.setFont(undefined,'bold');
+  doc.text(A.razao_social||'Empresa', 36, 110);
+  doc.setFont(undefined,'normal'); doc.setFontSize(10); doc.setTextColor(91,100,120);
+  doc.text(`CNPJ ${A.cnpj||'—'} · Escopo: ${(A.servicos||[]).join(', ')||'—'} · ${VERSAO_QUESTIONARIO}`, 36, 126);
+  let y = 140;
+  if(interno){
+    const av = avaliar();
+    doc.autoTable({ startY:y, margin:{left:36,right:36}, theme:'grid',
+      head:[[{content:'FICHA DE PRECIFICAÇÃO — USO INTERNO (réguas do CRM, hipótese em validação)', colSpan:2}]],
+      body:[
+        ['Porte sugerido', `${av.porte_sugerido||'—'} (pontuação ${av.pontuacao_porte??'—'}; ${av.direcionadores_aplicados} direcionadores)`],
+        ['Horas-base / propostas', `${av.horas_base??'—'} h → ${av.horas_propostas_mes??'—'} h/mês (atrito +${Math.round(av.atrito_total*100)}%)`],
+        ['Complexidade', `Nota ${av.complexidade.nota} — ${av.complexidade.fatores.map(f=>ROTULOS_COMPLEXIDADE[f]).join('; ')||'nenhum fator'}`],
+        ['Risco técnico', `Nota ${av.risco.nota} — ${av.risco.fatores.map(f=>ROTULOS_RISCO[f]).join('; ')||'nenhum fator'}`],
+        ['Disciplina', 'Nota 3 — premissa declarada (não estimável antes de operar)'],
+        ['Observação', 'Sugestão; a área técnica confirma ou sobrepõe no CRM. Passivo sem provisionamento não avaliado.']
+      ],
+      headStyles:{fillColor:[180,35,24], textColor:255, fontSize:9}, styles:{fontSize:9, cellPadding:5},
+      columnStyles:{0:{cellWidth:140, fontStyle:'bold', textColor:NOTURNO}} });
+    y = doc.lastAutoTable.finalY + 16;
+  }
+  const att = pontosDeAtencao();
+  if(att.length){
+    doc.autoTable({ startY:y, margin:{left:36,right:36}, theme:'plain', head:[['Pontos de atenção declarados','Área']], body:att,
+      headStyles:{fillColor:GELO, textColor:NOTURNO, fontSize:10}, styles:{fontSize:9, cellPadding:5}, columnStyles:{1:{cellWidth:90}} });
+    y = doc.lastAutoTable.finalY + 16;
+  }
+  visiveis().forEach((s,i)=>{
+    const linhas = linhasSecao(s); if(!linhas.length) return;
+    doc.autoTable({ startY:y, margin:{left:36,right:36}, theme:'striped',
+      head:[[{content:`${i+1}  ${s.titulo}`, colSpan:2}]], body:linhas,
+      headStyles:{fillColor:NOTURNO, textColor:255, fontSize:10}, styles:{fontSize:9, cellPadding:5, overflow:'linebreak'},
+      alternateRowStyles:{fillColor:[244,248,252]}, columnStyles:{0:{cellWidth:190, textColor:[91,100,120]}} });
+    y = doc.lastAutoTable.finalY + 14;
+  });
+  const n = doc.internal.getNumberOfPages();
+  for(let p=1;p<=n;p++){ doc.setPage(p); doc.setFontSize(8); doc.setTextColor(138,147,166); doc.text(`Critério · Advisory | Tax | Accounting · página ${p} de ${n}`, W/2, doc.internal.pageSize.getHeight()-20, {align:'center'}); }
+  return doc;
+}
+
+/* ================= Envio ================= */
+async function enviar(){
+  if(!$('#consent').checked){ $('#consent-box').classList.add('err'); mostrarMsg('erro','Para enviar, marque a autorização de uso dos dados.'); return; }
+  if(!BANCO_CONFIGURADO){ mostrarMsg('erro','O envio ainda não está configurado. Baixe o PDF e envie para eduardo.luiz@grupocriterio.com.br.'); return; }
+  const btn = $('#btn-enviar'); btn.disabled = true; btn.textContent = 'Enviando…';
+  let pdfBase64 = null;
+  try{ pdfBase64 = gerarPDF(true).output('datauristring').split(',')[1]; }catch(e){ console.warn('[Questionário] PDF não gerado para o e-mail:', e); }
+  const av = avaliar();
+  const payload = {
+    versao_questionario: VERSAO_QUESTIONARIO,
+    razao_social: A.razao_social, cnpj: digitos(A.cnpj), nome_fantasia: A.nome_fantasia||null,
+    contato_nome: A.contato_nome, contato_cargo: A.contato_cargo, contato_celular: A.contato_celular, contato_email: A.contato_email,
+    servicos: A.servicos||[],
+    respostas: A,
+    avaliacao: av,
+    porte_sugerido: av.porte_sugerido, nota_complexidade: av.complexidade.nota, nota_risco: av.risco.nota, horas_propostas_mes: av.horas_propostas_mes,
+    consentimento_lgpd: true, consentimento_em: new Date().toISOString(),
+    pdf_base64: pdfBase64
+  };
+  try{
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABELA}`, { method:'POST',
+      headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+SUPABASE_ANON_KEY, 'Content-Type':'application/json', 'Prefer':'return=minimal' },
+      body: JSON.stringify(payload) });
+    if(!r.ok){ const t = await r.text().catch(()=> ''); throw new Error(`HTTP ${r.status} ${t.slice(0,200)}`); }
+    envio = {ok:true, quando:new Date().toLocaleString('pt-BR')}; salvar();
+    $('#status').textContent = 'Enviado à Critério';
+    mostrarConfirmacao();
+  }catch(e){
+    console.error('[Questionário] Falha no envio:', e);
+    btn.disabled = false; btn.textContent = 'Tentar enviar de novo';
+    mostrarMsg('erro','Não foi possível enviar agora. Suas respostas continuam salvas neste navegador. Tente de novo ou baixe o PDF e envie para eduardo.luiz@grupocriterio.com.br.');
+  }
+}
+
+/* ================= Início ================= */
+carregar();
+if(envio && envio.ok){ mostrarConfirmacao(); } else { renderSecao(); }
+window.__questionario = { avaliar, gerarPDF, get respostas(){ return A; } }; // inspeção em teste
+})();
+</script>
+</body>
+</html>

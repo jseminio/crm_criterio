@@ -359,6 +359,15 @@ class TestMatrizesEConfiguracao:
     def test_subida_recusada(self, cliente, kw, status):
         assert _subir(cliente, **kw).status_code == status
 
+    def test_limite_de_tamanho(self, cliente, monkeypatch):
+        from crm.api import propostas
+        assert propostas._LIMITE_DA_MATRIZ == 200 * 1024 * 1024
+        monkeypatch.setattr(propostas, "_LIMITE_DA_MATRIZ", len(MATRIZ_CONTABIL) - 1)
+        r = _subir(cliente)
+        assert r.status_code == 413 and "grande demais" in r.json()["detail"]
+        monkeypatch.setattr(propostas, "_LIMITE_DA_MATRIZ", len(MATRIZ_CONTABIL))
+        assert _subir(cliente).status_code == 200
+
     def test_configuracao(self, cliente):
         c = cliente.get("/api/propostas/configuracao").json()
         assert c["proximo_numero"] == 154 and c["revisores"] == ["Eduardo", "Karine"] and D(c["imposto"]) == D("0.11")

@@ -36,7 +36,8 @@ PADRAO_DA_CONFIGURACAO = {
     "proximo_numero": 154, "revisores": ["Eduardo", "Karine"],
     "plano_bpo": Decimal("5000"), "plano_plus": Decimal("7000"), "plano_cfo": Decimal("9000"),
 }
-_LIMITE_DA_MATRIZ = 40 * 1024 * 1024
+# 200 MB desde 01/10/2026, a pedido de Eduardo: a matriz Contábil oficial, cheia de imagens, não coube em 40 MB.
+_LIMITE_DA_MATRIZ = 200 * 1024 * 1024
 _TRACO = "—"
 
 Matriz = Literal["Contábil", "Financeiro"]
@@ -417,7 +418,7 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         if not dados:
             raise HTTPException(400, "nenhum arquivo enviado")
         if len(dados) > _LIMITE_DA_MATRIZ:
-            raise HTTPException(413, "arquivo grande demais (o limite é 40 MB)")
+            raise HTTPException(413, f"arquivo grande demais (o limite é {_LIMITE_DA_MATRIZ // (1024 * 1024)} MB)")
         t = TipoDeMatriz(tipo)
         try:
             exame = marcadores.examinar(dados, t)

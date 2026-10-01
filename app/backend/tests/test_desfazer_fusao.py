@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from crm.api.app import criar_app
 from crm.db.grupos import FusaoInvalida, desfazer_fusao, fundir_grupos
-from crm.db.modelos import Contrato, Empresa, FusaoDeGrupos, GrupoEconomico, Oportunidade, PessoaContato
+from crm.db.modelos import Contrato, Empresa, FusaoDeGrupos, GrupoEconomico, Oportunidade, PessoaContato, VinculoDeContato
 from crm.domain.listas import Situacao, SituacaoContrato, SituacaoGrupo
 
 
@@ -25,14 +25,16 @@ def grupo(sessao, nome, situacao=SituacaoGrupo.PROSPECT, entrada=None):
 def com_itens(sessao, g, sufixo):
     e = Empresa(grupo_id=g.id, razao_social=f"Emp {sufixo}", cnpj=None)
     o = Oportunidade(grupo_id=g.id, nome=f"Prop {sufixo}", situacao=Situacao.ENVIAR_PROPOSTA)
-    p = PessoaContato(nome=f"Pessoa {sufixo}", grupo_id=g.id)
+    p = PessoaContato(nome=f"Pessoa {sufixo}", vinculos=[VinculoDeContato(empresa=e)])
     c = Contrato(grupo_id=g.id, situacao=SituacaoContrato.ATIVO, preco_mensal=Decimal("100"), anterior_ao_crm=True)
     sessao.add_all([e, o, p, c]); sessao.flush()
     return {"e": e.id, "o": o.id, "p": p.id, "c": c.id}
 
 
 def dono(sessao, itens):
-    return {k: sessao.get(m, itens[k]).grupo_id for k, m in (("e", Empresa), ("o", Oportunidade), ("p", PessoaContato), ("c", Contrato))}
+    donos = {k: sessao.get(m, itens[k]).grupo_id for k, m in (("e", Empresa), ("o", Oportunidade), ("c", Contrato))}
+    donos["p"] = sessao.get(PessoaContato, itens["p"]).vinculos[0].empresa.grupo_id  # pela empresa
+    return donos
 
 
 def test_a_fusao_registra_o_que_moveu_incluindo_contratos(sessao: Session):
@@ -40,6 +42,7 @@ def test_a_fusao_registra_o_que_moveu_incluindo_contratos(sessao: Session):
     it = com_itens(sessao, b, "b")
     r = fundir_grupos(sessao, a, b)
     f = sessao.get(FusaoDeGrupos, r.fusao_id)
+    # O contato vai junto com a empresa a que está vinculado (01/10/2026); fica registrado.
     assert f.movidos == {"empresa": [it["e"]], "oportunidade": [it["o"]], "pessoa_contato": [it["p"]], "contrato": [it["c"]]}
     assert set(dono(sessao, it).values()) == {a.id}  # o contrato também foi (antes ficava para trás)
 

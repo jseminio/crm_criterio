@@ -237,7 +237,7 @@ class TestBuscar:
         empresa = sessao.scalar(sa.select(Empresa).where(Empresa.cnpj == CNPJ_ALFA))
         assert empresa.grupo_id == o.grupo_id and empresa.regime_tributario == "Lucro Presumido"
         assert sessao.get(GrupoEconomico, o.grupo_id).situacao is SituacaoGrupo.PROSPECT
-        contato = sessao.scalar(sa.select(PessoaContato).where(PessoaContato.grupo_id == o.grupo_id))
+        contato = sessao.scalar(sa.select(PessoaContato).where(PessoaContato.nome == "Ana Souza"))
         assert (contato.nome, contato.email) == ("Ana Souza", "ana@exemplo.com.br")
         assert [v.empresa_id for v in contato.vinculos] == [empresa.id]
 

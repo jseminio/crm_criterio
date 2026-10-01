@@ -14,6 +14,7 @@ vi.mock("../api/cliente", async () => {
       editarEmpresa: vi.fn(), criarEmpresaDoGrupo: vi.fn(),
       buscarPessoas: vi.fn(), criarEmpresa: vi.fn(), vincularContato: vi.fn(), marcarPrincipal: vi.fn(),
       desvincularContato: vi.fn(), excluirPessoa: vi.fn(), excluirEmpresa: vi.fn(),
+      grupos: vi.fn().mockResolvedValue({ total: 0, itens: [] }),
     },
   };
 });
@@ -21,7 +22,7 @@ vi.mock("../api/cliente", async () => {
 const SEM_ENDERECO = { logradouro: null, numero: null, complemento: null, bairro: null, municipio: null, uf: null, cep: null };
 const pessoa = (o: Partial<PessoaDeContato> = {}): PessoaDeContato => ({
   id: 1, nome: "Maria Silva", cargo: "Sócia", email: "maria@alfa.com", telefone: "2199", papel: null, observacao: null,
-  nao_contatar: false, empresa_id: 10, grupo_id: null, do_grupo: false, ...o,
+  nao_contatar: false, empresa_id: 10, grupo_id: null, ...o,
 });
 const entidade = (o: Partial<EntidadeDeContato> = {}): EntidadeDeContato => ({
   tipo: "cliente", grupo_id: 1, grupo_nome: "Grupo Alfa", empresa_id: 10, razao_social: "Alfa Comércio Ltda",
@@ -144,20 +145,9 @@ describe("Contatos — clientes e prospects separados", () => {
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     });
 
-    it("pode ligar ao grupo todo", async () => {
-      vi.mocked(api.criarContato).mockResolvedValue(pessoa());
-      await abrir();
-      await escolherEmpresa();
-      await userEvent.click(screen.getByRole("radio", { name: /ao grupo todo/i }));
-      await userEvent.type(screen.getByLabelText("Nome"), "Ana");
-      await userEvent.click(screen.getByRole("button", { name: "Cadastrar pessoa" }));
-      await waitFor(() => expect(api.criarContato).toHaveBeenCalled());
-      expect(vi.mocked(api.criarContato).mock.calls[0][0]).toMatchObject({ nome: "Ana", grupo_id: 1 });
-      expect(vi.mocked(api.criarContato).mock.calls[0][0]).not.toHaveProperty("empresa_id");
-    });
-
-    it("prospect sem empresa liga ao grupo, sem perguntar", async () => {
+    it("prospect sem empresa: cria a empresa com o nome do grupo e vincula a pessoa", async () => {
       vi.mocked(api.contatosPorEmpresa).mockResolvedValue({ total: 1, itens: [entidade({ tipo: "prospect", empresa_id: null, razao_social: null, cnpj: null, grupo_nome: "Beta Prospect", grupo_id: 2 })] });
+      vi.mocked(api.criarEmpresaDoGrupo).mockResolvedValue({ id: 88, razao_social: "Beta Prospect", cnpj: null });
       vi.mocked(api.criarContato).mockResolvedValue(pessoa());
       render(<Contatos listas={null} />);
       await screen.findByText("Beta Prospect");
@@ -165,10 +155,13 @@ describe("Contatos — clientes e prospects separados", () => {
       await userEvent.type(screen.getByLabelText(/empresa, cnpj ou grupo/i), "beta");
       await userEvent.click((await within(await screen.findByRole("list", { name: "Resultados da busca" })).findAllByRole("button", { name: "Escolher" }))[0]);
       expect(screen.queryByRole("radio")).toBeNull();
+      expect(screen.getByText(/será criada com o nome do grupo/)).toBeInTheDocument();
       await userEvent.type(screen.getByLabelText("Nome"), "Carla");
       await userEvent.click(screen.getByRole("button", { name: "Cadastrar pessoa" }));
       await waitFor(() => expect(api.criarContato).toHaveBeenCalled());
-      expect(vi.mocked(api.criarContato).mock.calls[0][0]).toMatchObject({ nome: "Carla", grupo_id: 2 });
+      expect(api.criarEmpresaDoGrupo).toHaveBeenCalledWith(2);
+      expect(vi.mocked(api.criarContato).mock.calls[0][0]).toMatchObject({ nome: "Carla", empresa_id: 88 });
+      expect(vi.mocked(api.criarContato).mock.calls[0][0]).not.toHaveProperty("grupo_id");
     });
 
     it("cadastra a pessoa sem empresa, na base única de contatos", async () => {

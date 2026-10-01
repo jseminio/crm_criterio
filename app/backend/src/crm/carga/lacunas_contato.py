@@ -4,8 +4,9 @@ Regras (decisão de Eduardo, 25/09/2026): **o mesmo cliente pode ter várias
 empresas, em linhas separadas** com o mesmo ID_GRUPO. Cada linha vira:
 
 - uma **Empresa**, quando traz razão social, CNPJ ou endereço;
-- uma **PessoaContato**, quando traz nome, e-mail ou telefone — ligada à empresa
-  da linha, ou ao grupo se a linha não tem empresa.
+- uma **PessoaContato**, quando traz nome, e-mail ou telefone — vinculada à empresa
+  da linha; sem empresa na linha, à única do grupo ou a uma com o nome do grupo
+  (contato não é ligado ao grupo desde 01/10/2026).
 
 Nada é sobrescrito em silêncio: campo já preenchido no CRM com valor diferente
 vira **conflito** no relatório e só muda com `sobrescrever=True`.
@@ -248,8 +249,18 @@ def aplicar(sessao: Session, linhas: list[Linha], rel: Relatorio, *, sobrescreve
         vals_c = {"cargo": d.get("contato_cargo"), "email": d.get("email"), "telefone": d.get("telefone")}
         vals_c = {k: v for k, v in vals_c.items() if v}
         if nome or vals_c:
-            base = sa.select(PessoaContato).where(PessoaContato.grupo_id == grupo.id) if not empresa else \
-                sa.select(PessoaContato).join(VinculoDeContato).where(VinculoDeContato.empresa_id == empresa.id)
+            # Contato é ligado só a empresas (01/10/2026). Sem empresa na linha: a única do grupo,
+            # ou a que tem o nome do grupo, ou uma nova com esse nome.
+            if empresa is None:
+                do_grupo = list(sessao.scalars(sa.select(Empresa).where(Empresa.grupo_id == grupo.id)))
+                empresa = do_grupo[0] if len(do_grupo) == 1 else next(
+                    (e for e in do_grupo if e.razao_social.lower() == grupo.nome.lower()), None)
+                if empresa is None:
+                    empresa = Empresa(grupo_id=grupo.id, razao_social=grupo.nome)
+                    sessao.add(empresa)
+                    sessao.flush()
+                    rel.empresas_criadas += 1
+            base = sa.select(PessoaContato).join(VinculoDeContato).where(VinculoDeContato.empresa_id == empresa.id)
             achado = None
             if d.get("email"):
                 achado = sessao.scalars(base.where(PessoaContato.email == d["email"])).first()
@@ -257,10 +268,7 @@ def aplicar(sessao: Session, linhas: list[Linha], rel: Relatorio, *, sobrescreve
                 achado = sessao.scalars(base.where(sa.func.lower(PessoaContato.nome) == nome.lower())).first()
             if achado is None:
                 nova = PessoaContato(nome=nome or d.get("email") or grupo.nome, **vals_c)
-                if empresa:
-                    nova.vinculos.append(VinculoDeContato(empresa_id=empresa.id))
-                else:
-                    nova.grupo_id = grupo.id
+                nova.vinculos.append(VinculoDeContato(empresa_id=empresa.id))
                 sessao.add(nova)
                 rel.contatos_criados += 1
             elif _preencher(achado, vals_c, f"{lin.n} (contato)", rel, sobrescrever):

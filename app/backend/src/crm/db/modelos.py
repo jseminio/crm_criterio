@@ -216,8 +216,9 @@ class Empresa(CarimboMixin, Base):
 
 
 class PessoaContato(CarimboMixin, Base):
-    """Quem se fala. Ligada a uma ou mais empresas (`VinculoDeContato`), ao
-    grupo inteiro, ou ainda a ninguém.
+    """Quem se fala. Ligada a uma ou mais empresas (`VinculoDeContato`), ou
+    ainda a nenhuma — nunca ao grupo: as empresas de uma pessoa nem sempre são
+    do mesmo grupo (Karine, 01/10/2026). O grupo mora na empresa.
 
     Desde 30/09/2026 (pedido de Karine): a pessoa é cadastrada antes da
     empresa e pode estar em várias empresas — base única de contatos, sem
@@ -227,10 +228,6 @@ class PessoaContato(CarimboMixin, Base):
     __tablename__ = "pessoa_contato"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    grupo_id: Mapped[int | None] = mapped_column(
-        sa.ForeignKey("grupo_economico.id"), index=True
-    )
-    """Ligada ao grupo todo: aparece em todas as empresas dele."""
     nome: Mapped[str] = mapped_column(sa.String(200), nullable=False)
     cargo: Mapped[str | None] = mapped_column(sa.String(100))
     email: Mapped[str | None] = mapped_column(sa.String(200), index=True)

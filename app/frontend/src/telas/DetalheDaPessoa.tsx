@@ -36,9 +36,7 @@ export function DetalheDaPessoa({
         <h3 style={{ fontSize: 14 }}>Empresas</h3>
         {empresas.length === 0 ? (
           <p className="campo-ajuda" style={{ margin: 0 }}>
-            {pessoa.grupo_nome
-              ? `Ligada ao grupo ${pessoa.grupo_nome} (aparece em todas as empresas dele).`
-              : "Ainda não está em nenhuma empresa. Vincule em “Nova empresa” ou no painel da empresa."}
+            Ainda não está em nenhuma empresa. Vincule em “Nova empresa” ou no painel da empresa.
           </p>
         ) : (
           <ul className="contatos-lista" aria-label="Empresas da pessoa">

@@ -15,14 +15,16 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from crm.db.base import agora
-from crm.db.modelos import Contrato, Empresa, FusaoDeGrupos, GrupoEconomico, Oportunidade, PessoaContato
+from crm.db.modelos import Contrato, Empresa, FusaoDeGrupos, GrupoEconomico, Oportunidade, VinculoDeContato
 from crm.domain.listas import SituacaoGrupo
 
 __all__ = ["fundir_grupos", "desfazer_fusao", "FusaoInvalida", "ResultadoDaFusao"]
 
 #: As tabelas que a fusão move do absorvido para o principal, e a coluna que aponta o grupo.
 #: (Ficha de conta e abordagem do agente SDR ainda não são movidas: têm regra própria.)
-_MOVIDOS = ((Empresa, "empresa"), (Oportunidade, "oportunidade"), (PessoaContato, "pessoa_contato"), (Contrato, "contrato"))
+#: Contato não está aqui desde 01/10/2026: ele é ligado às empresas e vai junto com elas. A chave
+#: "pessoa_contato" de `movidos` é só registro (quem foi junto) e é ignorada ao desfazer.
+_MOVIDOS = ((Empresa, "empresa"), (Oportunidade, "oportunidade"), (Contrato, "contrato"))
 
 
 class FusaoInvalida(ValueError):
@@ -90,7 +92,13 @@ def fundir_grupos(
         movidos[chave] = ids
         if ids:
             sessao.execute(sa.update(modelo).where(modelo.id.in_(ids)).values(grupo_id=principal.id))
-    empresas, oportunidades, contatos = (len(movidos[k]) for k in ("empresa", "oportunidade", "pessoa_contato"))
+    empresas, oportunidades = len(movidos["empresa"]), len(movidos["oportunidade"])
+    # Contatos vão junto com as empresas a que estão vinculados. Ficam registrados em `movidos`
+    # só para o relatório: desfazer não os toca (não estão em _MOVIDOS), eles voltam com a empresa.
+    movidos["pessoa_contato"] = sorted(set(sessao.scalars(
+        sa.select(VinculoDeContato.pessoa_id).where(VinculoDeContato.empresa_id.in_(movidos["empresa"]))
+    ))) if movidos["empresa"] else []
+    contatos = len(movidos["pessoa_contato"])
     principal_situacao_antes, principal_entrada_antes = principal.situacao, principal.data_entrada
 
     absorvido.fundido_em_id = principal.id

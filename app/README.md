@@ -616,6 +616,22 @@ passos**, dizendo o que vai sumir ("Não dá para desfazer").
   histórico, o MRR e a carteira. A API responde 409 e o painel mostra o motivo no lugar do botão
   (`tem_contrato` em `GET /api/contatos/empresas`).
 
+**Contato só por empresa; o grupo mora na empresa (01/10/2026).** Pedido de Karine, aprovado: as
+empresas de uma pessoa nem sempre são do mesmo grupo, então o contato deixou de ser ligado ao grupo.
+
+- Saiu a opção "Ao grupo todo" da Nova pessoa e a coluna `pessoa_contato.grupo_id`. Escolher um
+  prospect ainda sem empresa (na Nova pessoa ou no painel) cria a empresa com o nome do grupo e vincula
+  a pessoa a ela.
+- O **Grupo** é informado na empresa: campo em "Nova empresa" e no painel da empresa, com os grupos
+  existentes como sugestão; nome novo vira prospect novo. **Empresa com contrato não troca de grupo**
+  (409; use a fusão de grupos).
+- Migração `9a1c7e4b2d63`: cada contato ligado a grupo virou vínculo — grupo com uma empresa: com ela;
+  sem empresa: nasce a empresa com o nome do grupo; com duas ou mais: se a pessoa já está numa empresa
+  do grupo, fica só nela, senão vai para todas.
+- Fusão de grupos: o contato vai junto com a empresa a que está vinculado; `movidos["pessoa_contato"]`
+  passou a ser só registro de quem foi junto (desfazer não o usa). Questionário do site, planilha de
+  lacunas e ficha das Abordagens leem só os vínculos.
+
 **Pendente, por decisão:** a base tem **33 e-mails repetidos**, provavelmente a mesma pessoa cadastrada
 em mais de uma empresa. Juntar cada caso numa pessoa só fica para depois, caso a caso, com aprovação.
 

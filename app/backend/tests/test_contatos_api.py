@@ -41,8 +41,8 @@ def base(sessao: Session) -> dict:
     sessao.add_all([
         PessoaContato(nome="Maria Silva", email="maria@alfa.com", telefone="(21) 99999-0000",
                       vinculos=[VinculoDeContato(empresa_id=e1.id)], cargo="Sócia"),
-        PessoaContato(nome="João do Grupo", email="joao@alfa.com", grupo_id=alfa.id),
-        PessoaContato(nome="Bia Prospect", email="bia@acao.com", grupo_id=pros.id),
+        PessoaContato(nome="João do Grupo", email="joao@alfa.com", vinculos=[VinculoDeContato(empresa_id=e2.id)]),
+        PessoaContato(nome="Bia Prospect", email="bia@acao.com"),  # ainda sem empresa
     ])
     sessao.commit()
     return {"alfa": alfa.id, "pros": pros.id, "pro2": pro2.id, "e1": e1.id, "e2": e2.id, "e3": e3.id}
@@ -62,7 +62,8 @@ class TestSegregacao:
 
     def test_prospect_sem_empresa_e_uma_entidade_do_grupo(self, cliente, base):
         p = cliente.get("/api/contatos/empresas", params={"tipo": "prospect", "busca": "acao"}).json()["itens"][0]
-        assert p["empresa_id"] is None and p["propostas"] == 1 and p["contatos"][0]["nome"] == "Bia Prospect"
+        # Contato não é ligado ao grupo (01/10/2026): sem empresa, o prospect não tem contatos.
+        assert p["empresa_id"] is None and p["propostas"] == 1 and p["contatos"] == []
 
     def test_tipo_invalido_e_422(self, cliente):
         assert cliente.get("/api/contatos/empresas", params={"tipo": "todos"}).status_code == 422
@@ -84,9 +85,10 @@ class TestBuscaPorEmpresa:
         e = next(i for i in cliente.get("/api/contatos/empresas", params={"tipo": "cliente", "busca": "comercio"}).json()["itens"])
         assert e["mensalidade"] == "1500.00"
 
-    def test_contato_do_grupo_aparece_nas_empresas_e_e_marcado(self, cliente, base):
-        e = next(i for i in cliente.get("/api/contatos/empresas", params={"tipo": "cliente", "busca": "servicos"}).json()["itens"])
-        assert [(c["nome"], c["do_grupo"]) for c in e["contatos"]] == [("João do Grupo", True)]
+    def test_contato_aparece_so_nas_empresas_em_que_esta(self, cliente, base):
+        itens = {i["razao_social"]: i for i in cliente.get("/api/contatos/empresas", params={"tipo": "cliente"}).json()["itens"]}
+        assert [c["nome"] for c in itens["Alfa Serviços SA"]["contatos"]] == ["João do Grupo"]
+        assert [c["nome"] for c in itens["Alfa Comércio Ltda"]["contatos"]] == ["Maria Silva"]
 
     def test_lacunas_e_filtro_so_com_lacunas(self, cliente, base):
         itens = {i["razao_social"]: i for i in cliente.get("/api/contatos/empresas", params={"tipo": "cliente"}).json()["itens"]}
@@ -115,7 +117,7 @@ class TestBuscaPorPessoa:
         maria = cliente.get("/api/contatos/pessoas", params={"tipo": "cliente", "busca": "maria"}).json()["itens"][0]
         assert (maria["grupo_nome"], maria["razao_social"]) == ("Grupo Alfa", "Alfa Comércio Ltda")
         joao = cliente.get("/api/contatos/pessoas", params={"tipo": "cliente", "busca": "joao"}).json()["itens"][0]
-        assert (joao["grupo_nome"], joao["razao_social"]) == ("Grupo Alfa", None)
+        assert (joao["grupo_nome"], joao["razao_social"]) == ("Grupo Alfa", "Alfa Serviços SA")
 
 
 class TestPessoas:
@@ -124,8 +126,7 @@ class TestPessoas:
         assert r.status_code == 201 and (r.json()["nome"], r.json()["email"], r.json()["papel"]) == ("Ana Costa", "ana@x.com", "Decisor")
         assert cliente.post("/api/contatos/pessoas", json={"nome": "X", "email": "sem-arroba", "empresa_id": base["e2"]}).status_code == 422
 
-    def test_empresa_ou_grupo_mas_nao_os_dois(self, cliente, base):
-        assert cliente.post("/api/contatos/pessoas", json={"nome": "X", "empresa_id": base["e1"], "grupo_id": base["alfa"]}).status_code == 422
+    def test_empresa_inexistente_e_404(self, cliente, base):
         assert cliente.post("/api/contatos/pessoas", json={"nome": "X", "empresa_id": 9999}).status_code == 404
 
     def test_edita_e_marca_nao_contatar_com_a_data(self, cliente, base):
@@ -238,7 +239,7 @@ class TestBaseUnicaDeContatos:
         assert cliente.post(url, json={"pessoa_id": livre}).status_code == 409
         assert cliente.patch(f"{url}/{livre}", json={"principal": True}).json()["principal"] is True
         e2 = cliente.get("/api/contatos/empresas", params={"tipo": "cliente", "busca": "servicos"}).json()["itens"][0]
-        assert [(c["nome"], c["principal"], c["do_grupo"]) for c in e2["contatos"] if c["nome"] == "Livre"] == [("Livre", True, False)]
+        assert [(c["nome"], c["principal"]) for c in e2["contatos"] if c["nome"] == "Livre"] == [("Livre", True)]
         assert cliente.delete(f"{url}/{livre}").status_code == 204
         assert cliente.delete(f"{url}/{livre}").status_code == 404
         # A pessoa continua na base, agora sem empresa.
@@ -278,3 +279,30 @@ class TestExclusao:
         itens = cliente.get("/api/contatos/empresas", params={"tipo": "prospect", "busca": "beta"}).json()["itens"]
         assert [(i["grupo_nome"], i["empresa_id"]) for i in itens] == [("Beta Prospect", None)]
         assert cliente.delete(f"/api/empresas/{base['e3']}").status_code == 404
+
+
+class TestGrupoNaEmpresa:
+    """O grupo é informado na empresa; o contato não tem grupo. Pedido de Karine em 01/10/2026."""
+
+    def test_nova_empresa_entra_no_grupo_informado(self, cliente, base):
+        r = cliente.post("/api/empresas", json={"razao_social": "Alfa Filial Norte", "nome_do_grupo": "GRUPO ALFA"})
+        assert (r.json()["grupo_id"], r.json()["grupo_nome"]) == (base["alfa"], "Grupo Alfa")
+        novo = cliente.post("/api/empresas", json={"razao_social": "Ômega Ltda", "nome_do_grupo": "Holding Ômega"}).json()
+        assert novo["grupo_nome"] == "Holding Ômega" and novo["grupo_id"] not in (base["alfa"], base["pros"], base["pro2"])
+
+    def test_empresa_sem_contrato_troca_de_grupo(self, cliente, base):
+        assert cliente.patch(f"/api/empresas/{base['e3']}", json={"nome_do_grupo": "Grupo Alfa"}).status_code == 200
+        itens = cliente.get("/api/contatos/empresas", params={"tipo": "cliente", "busca": "beta ltda"}).json()["itens"]
+        assert [(i["razao_social"], i["grupo_nome"]) for i in itens] == [("Beta Ltda", "Grupo Alfa")]
+
+    def test_empresa_com_contrato_nao_troca_de_grupo(self, cliente, base):
+        r = cliente.patch(f"/api/empresas/{base['e1']}", json={"nome_do_grupo": "Outro Grupo"})
+        assert r.status_code == 409 and "contrato" in r.json()["detail"]
+        # o mesmo grupo, escrito de outro jeito, não é troca
+        assert cliente.patch(f"/api/empresas/{base['e1']}", json={"nome_do_grupo": "grupo alfa"}).status_code == 200
+
+    def test_pessoa_nao_aceita_grupo(self, cliente, base):
+        r = cliente.post("/api/contatos/pessoas", json={"nome": "Zé", "grupo_id": base["alfa"]})
+        assert r.status_code == 201
+        ze = cliente.get("/api/contatos/pessoas/busca", params={"busca": "zé"}).json()[0]
+        assert ze["empresas"] == []

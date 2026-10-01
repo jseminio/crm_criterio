@@ -504,9 +504,8 @@ export interface PessoaDeContato {
   observacao: string | null;
   nao_contatar: boolean;
   empresa_id: number | null;
+  /** Grupo da empresa desta linha — informação; o contato é ligado só a empresas (01/10/2026). */
   grupo_id: number | null;
-  /** Ligada só ao grupo, não a esta empresa. */
-  do_grupo: boolean;
   /** Contato principal desta empresa. Uma empresa pode ter vários. */
   principal?: boolean;
   /** Todas as empresas em que a pessoa está. */

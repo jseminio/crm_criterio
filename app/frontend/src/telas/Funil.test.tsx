@@ -22,6 +22,7 @@ vi.mock("../api/cliente", async () => {
       recortes: vi.fn().mockResolvedValue([]), cenariosDeTicket: vi.fn().mockResolvedValue(null),
       oportunidades: vi.fn(), questionarios: vi.fn().mockResolvedValue([]),
       questionarioDaOportunidade: vi.fn().mockResolvedValue(null),
+      enderecoDaExportacaoDoFunil: real.api.enderecoDaExportacaoDoFunil,
       servicos: vi.fn().mockResolvedValue([
         { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
           para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],
@@ -279,6 +280,35 @@ describe("fusão Kanban/Grade (27/09/2026)", () => {
 
     await waitFor(() =>
       expect(api.oportunidades).toHaveBeenLastCalledWith(expect.objectContaining({ situacao: ["On hold"] })),
+    );
+  });
+
+  it("'Exportar para Excel' só aparece na Grade", async () => {
+    await abrir([coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")])]);
+    expect(screen.queryByRole("link", { name: "Exportar para Excel" })).toBeNull();
+
+    vi.mocked(api.oportunidades).mockResolvedValue({ total: 0, itens: [] });
+    await fireEvent.click(screen.getByRole("button", { name: "☰ Grade" }));
+
+    expect(await screen.findByRole("link", { name: "Exportar para Excel" })).toHaveAttribute(
+      "href",
+      "/api/oportunidades/exportar",
+    );
+  });
+
+  it("o link de exportação leva os filtros da Grade, inclusive a situação", async () => {
+    await abrir([coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")])]);
+    vi.mocked(api.oportunidades).mockResolvedValue({ total: 0, itens: [] });
+    await fireEvent.click(screen.getByRole("button", { name: "☰ Grade" }));
+    await screen.findByLabelText("Situação");
+
+    fireEvent.change(screen.getByLabelText("Situação"), { target: { value: "On hold" } });
+
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Exportar para Excel" })).toHaveAttribute(
+        "href",
+        "/api/oportunidades/exportar?situacao=On+hold",
+      ),
     );
   });
 

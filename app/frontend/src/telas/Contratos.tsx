@@ -15,6 +15,7 @@ import { data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
 import { EventosDeContrato } from "./EventosDeContrato";
 import { Receita } from "./Receita";
+import { CampoDeData } from "../componentes/CampoDeData";
 
 const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "Encerrado"];
 
@@ -196,25 +197,21 @@ function EdicaoDeContrato({
             <label className="campo-rotulo" htmlFor="c-inicio">
               Data da assinatura (início da vigência)
             </label>
-            <input
+            <CampoDeData
               id="c-inicio"
-              type="date"
-              className="entrada"
               value={rascunho.data_inicio}
-              onChange={(e) => mudar("data_inicio", e.target.value)}
+              aoMudar={(v) => mudar("data_inicio", v)}
             />
           </div>
           <div className="campo-bloco">
             <label className="campo-rotulo" htmlFor="c-fim">
               Fim da vigência
             </label>
-            <input
+            <CampoDeData
               id="c-fim"
-              type="date"
-              className="entrada"
               value={rascunho.data_fim}
               disabled={(assinado && !!contrato.data_fim) || encerrado}
-              onChange={(e) => mudar("data_fim", e.target.value)}
+              aoMudar={(v) => mudar("data_fim", v)}
             />
           </div>
         </div>

@@ -10,6 +10,7 @@ import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { ContratoDetalhe, EventoDeContrato } from "../api/tipos";
 import { data, dataHora, dinheiro } from "../formato";
+import { CampoDeData } from "../componentes/CampoDeData";
 
 type Tipo = EventoDeContrato["tipo"];
 const TIPOS: { valor: Tipo; ajuda: string }[] = [
@@ -133,7 +134,7 @@ export function EventosDeContrato({
 
           <div className="campo-bloco">
             <label className="campo-rotulo" htmlFor="ev-data">Data do evento (vazio = hoje)</label>
-            <input id="ev-data" type="date" className="entrada" value={campos.data_do_evento ?? ""} onChange={(e) => mudar("data_do_evento", e.target.value)} />
+            <CampoDeData id="ev-data" value={campos.data_do_evento ?? ""} aoMudar={(v) => mudar("data_do_evento", v)} />
           </div>
 
           {PRECOS.includes(tipo) && (
@@ -159,7 +160,7 @@ export function EventosDeContrato({
           {tipo === "Renovação" && (
             <div className="campo-bloco">
               <label className="campo-rotulo" htmlFor="ev-fim">Nova data de fim</label>
-              <input id="ev-fim" type="date" className="entrada" value={campos.data_fim_nova ?? ""} onChange={(e) => mudar("data_fim_nova", e.target.value)} />
+              <CampoDeData id="ev-fim" value={campos.data_fim_nova ?? ""} aoMudar={(v) => mudar("data_fim_nova", v)} />
               <p className="campo-ajuda">Hoje o contrato termina em {contrato.data_fim ? data(contrato.data_fim) : "— (sem data de fim)"}.</p>
             </div>
           )}

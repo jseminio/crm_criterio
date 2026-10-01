@@ -13,6 +13,7 @@ import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { data } from "../formato";
 import { usarDados } from "../usarDados";
+import { CampoDeData } from "../componentes/CampoDeData";
 
 const MESES = [
   "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -379,8 +380,8 @@ function PainelDaAbordagem({ id, aoMudar }: { id: number; aoMudar: () => void })
             <p className="campo-ajuda">Enviada em {data(a.enviada_em)}.</p>
             <div className="campo-bloco">
               <label className="campo-rotulo" htmlFor="ab-diagnostico">Diagnóstico agendado para</label>
-              <input id="ab-diagnostico" className="entrada" type="date" value={diagnostico}
-                onChange={(e) => definirDiagnostico(e.target.value)} />
+              <CampoDeData id="ab-diagnostico" value={diagnostico}
+                aoMudar={(v) => definirDiagnostico(v)} />
             </div>
           </section>
         )}

@@ -11,6 +11,7 @@ import { QuestionarioDaOportunidade } from "../componentes/QuestionarioDaOportun
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro } from "../componentes/estados";
 import { dataHora, dinheiro } from "../formato";
+import { CampoDeData } from "../componentes/CampoDeData";
 
 function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
@@ -590,12 +591,10 @@ export function DetalheDaOportunidade({
               <label className="campo-rotulo" htmlFor="d-originacao">
                 Data de originação
               </label>
-              <input
+              <CampoDeData
                 id="d-originacao"
-                type="date"
-                className="entrada"
                 value={rascunho.data_colocacao}
-                onChange={(e) => mudar("data_colocacao", e.target.value)}
+                aoMudar={(v) => mudar("data_colocacao", v)}
               />
             </div>
 
@@ -629,12 +628,10 @@ export function DetalheDaOportunidade({
                 <label className="campo-rotulo" htmlFor="d-aceite">
                   Data do aceite
                 </label>
-                <input
+                <CampoDeData
                   id="d-aceite"
-                  type="date"
-                  className="entrada"
                   value={rascunho.data_aceite}
-                  onChange={(e) => mudar("data_aceite", e.target.value)}
+                  aoMudar={(v) => mudar("data_aceite", v)}
                   aria-describedby={exigeDataDeAceite ? "d-aceite-aviso" : undefined}
                 />
                 {exigeDataDeAceite && (
@@ -688,12 +685,10 @@ export function DetalheDaOportunidade({
                 <label className="campo-rotulo" htmlFor="d-acao-em">
                   Quando
                 </label>
-                <input
+                <CampoDeData
                   id="d-acao-em"
-                  type="date"
-                  className="entrada"
                   value={rascunho.proxima_acao_em}
-                  onChange={(e) => mudar("proxima_acao_em", e.target.value)}
+                  aoMudar={(v) => mudar("proxima_acao_em", v)}
                 />
               </div>
             </div>

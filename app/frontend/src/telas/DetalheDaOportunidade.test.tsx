@@ -141,7 +141,7 @@ describe("DetalheDaOportunidade", () => {
     await abrir(oportunidade());
 
     await userEvent.selectOptions(screen.getByLabelText("Situação"), "Aceita");
-    await userEvent.type(screen.getByLabelText("Data do aceite"), "2026-04-15");
+    await userEvent.type(screen.getByLabelText("Data do aceite"), "15042026");
 
     expect(screen.getByRole("button", { name: /salvar alterações/i })).toBeEnabled();
   });
@@ -191,7 +191,7 @@ describe("DetalheDaOportunidade", () => {
     expect(screen.getByLabelText("Tipo de serviço")).toHaveValue("Recorrente");
     expect(screen.getByLabelText("Preço mensal")).toHaveValue(5000);
     expect(screen.getByLabelText("Preço anual")).toHaveValue(65000);
-    expect(screen.getByLabelText("Data de originação")).toHaveValue("2026-03-01");
+    expect(screen.getByLabelText("Data de originação")).toHaveValue("01/03/2026");
   });
 
   it("envia preço e serviço editados junto do resto", async () => {

@@ -20,6 +20,7 @@ import { precoPelasParcelas } from "../parcelas";
 import { usarDados } from "../usarDados";
 import { EscolhaDeServico } from "./CatalogoDeServicos";
 import { PainelLateral } from "./PainelLateral";
+import { CampoDeData } from "./CampoDeData";
 
 function hoje(): string {
   return new Date().toLocaleDateString("sv"); // "sv" formata como AAAA-MM-DD
@@ -207,7 +208,10 @@ export function NovaOportunidade({
 
         {seletor("reajuste", "Reajuste", listas?.indices_de_reajuste, "Não informado")}
 
-        {campo("data_colocacao", "Data de originação", { type: "date" })}
+        <div className="campo-bloco">
+          <label className="campo-rotulo" htmlFor="n-data_colocacao">Data de originação</label>
+          <CampoDeData id="n-data_colocacao" value={campos.data_colocacao} aoMudar={(v) => mudar("data_colocacao", v)} />
+        </div>
 
         <div className="formulario-duplo">
           {seletor("captador", "Captador", listas?.captadores, "Não informado")}

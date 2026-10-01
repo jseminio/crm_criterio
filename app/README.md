@@ -551,6 +551,15 @@ pontual). Antes, só a carteira recorrente era "Cliente". Agora:
 - A sugestão "prospect que já é cliente" passou a comparar os grupos **sem empresa** (prospects e clientes
   não recorrentes) com os clientes da carteira, para não perder as duplicatas depois da promoção.
 
+## Datas no padrão brasileiro (01/10/2026)
+
+Pedido de Karine: os campos de data apareciam como mm/dd/aaaa. Motivo: o `<input type="date">` do
+navegador segue o idioma do sistema (aqui, en-US), não o `lang="pt-BR"` da página. Os 14 campos de data
+(filtro De/Até, Nova oportunidade, detalhe da oportunidade, Agenda, Contratos, eventos de contrato,
+Leads e Abordagens) passaram a usar `CampoDeData`: sempre **dd/mm/aaaa**, as barras entram sozinhas ao
+digitar, o 📅 abre um calendário em português, e data que não existe (31/02) avisa "Data inválida" e não
+é repassada. Por dentro o valor continua ISO (aaaa-mm-dd), o mesmo da API — conversões em `src/dataBr.ts`.
+
 ## Contatos: clientes e prospects segregados (26/09/2026)
 
 **Nova pessoa (26/09/2026).** O botão "Nova pessoa", no topo do menu Contatos, abre um painel para cadastrar uma pessoa sem precisar abrir antes uma empresa: busca a empresa, o CNPJ ou o grupo (entre clientes e prospects), escolhe se a pessoa fica ligada só à empresa ou ao grupo todo (prospect sem empresa liga ao grupo) e preenche nome, cargo, e-mail, telefone, papel, observação e "não contatar". Usa a mesma rota `POST /api/contatos/pessoas`. Desde 30/09/2026 a empresa é opcional (ver "Base única de contatos", abaixo).

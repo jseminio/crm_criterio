@@ -63,7 +63,7 @@ describe("Agenda", () => {
     render(<Agenda listas={null} aoAbrirLeads={vi.fn()} />);
     await screen.findByText("Grupo Alfa");
     await userEvent.type(screen.getByLabelText(/Próxima ação de Grupo Alfa/), "  Ligar  ");
-    fireEvent.change(screen.getByLabelText(/Quando, para Grupo Alfa/), { target: { value: "2026-09-30" } });
+    fireEvent.change(screen.getByLabelText(/Quando, para Grupo Alfa/), { target: { value: "30/09/2026" } });
     await userEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledWith(1, { proxima_acao: "Ligar", proxima_acao_em: "2026-09-30" }));
     await waitFor(() => expect(api.agenda).toHaveBeenCalledTimes(2));

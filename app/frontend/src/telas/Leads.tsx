@@ -13,6 +13,7 @@ import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
 import { data, dataHora, prazo } from "../formato";
 import { usarDados } from "../usarDados";
+import { CampoDeData } from "../componentes/CampoDeData";
 
 const CAMPOS_VAZIOS = {
   nome: "",
@@ -148,7 +149,10 @@ function FormularioDeLead({
 
         <div className="formulario-duplo">
           {campo("proxima_acao", "Próxima ação")}
-          {campo("proxima_acao_em", "Quando", { type: "date" })}
+          <div className="campo-bloco">
+            <label className="campo-rotulo" htmlFor="l-proxima_acao_em">Quando</label>
+            <CampoDeData id="l-proxima_acao_em" value={campos.proxima_acao_em} aoMudar={(v) => mudar("proxima_acao_em", v)} />
+          </div>
         </div>
       </div>
 
@@ -510,12 +514,10 @@ function EdicaoDeLead({
             <label className="campo-rotulo" htmlFor="e-acao-em">
               Quando
             </label>
-            <input
+            <CampoDeData
               id="e-acao-em"
-              type="date"
-              className="entrada"
               value={rascunho.proxima_acao_em}
-              onChange={(e) => mudar("proxima_acao_em", e.target.value)}
+              aoMudar={(v) => mudar("proxima_acao_em", v)}
             />
           </div>
         </div>

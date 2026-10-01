@@ -198,9 +198,11 @@ export function MatrizesDeProposta() {
           <input className="entrada" type="number" min="0" step="0.01" value={rascunho.plano_cfo} onChange={mudar("plano_cfo")} />
         </label>
       </div>
-      <button type="button" className="botao botao-secundario" onClick={() => void salvar()} disabled={ocupado}>
-        Salvar configuração das propostas
-      </button>
+      <div>
+        <button type="button" className="botao botao-secundario" onClick={() => void salvar()} disabled={ocupado}>
+          Salvar configuração das propostas
+        </button>
+      </div>
 
       <Recolhivel titulo="Lista de marcadores" resumo="o que cada {{marcador}} da matriz recebe">
         <table className="tabela" aria-label="Marcadores das matrizes">

@@ -9,16 +9,16 @@ from __future__ import annotations
 
 import base64
 import re
+import unicodedata
 from collections.abc import Callable, Iterator
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
-from urllib.parse import quote
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from crm.api.classificacao import janela_vigente, parametros_vigentes
 from crm.db.base import agora
@@ -165,8 +165,10 @@ def _nome_do_arquivo(p: Proposta, tipo: TipoDeMatriz) -> str:
 
 
 def _disposicao(nome: str) -> str:
-    ascii_ = nome.encode("ascii", "replace").decode().replace("?", "_")
-    return f"attachment; filename=\"{ascii_}\"; filename*=UTF-8''{quote(nome)}"
+    """Nome sem acento ("Serviços" → "Servicos"), como as propostas da Critério já são nomeadas, e só
+    em `filename`: com `filename*` em UTF-8 o Chromium testado descartou o nome e salvou "download"."""
+    sem_acento = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode()
+    return f'attachment; filename="{sem_acento.replace(chr(34), "")}"'
 
 
 def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
@@ -187,8 +189,10 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         return parametros_vigentes(sessao)[1].imposto
 
     def _matriz_em_uso(sessao: Session, tipo: TipoDeMatriz) -> MatrizDeProposta | None:
+        # O .pptx em base64 pode ter dezenas de MB: só vem do banco quando alguém baixa ou gera o arquivo.
         return sessao.scalars(
-            sa.select(MatrizDeProposta).where(MatrizDeProposta.tipo == tipo)
+            sa.select(MatrizDeProposta).options(defer(MatrizDeProposta.conteudo_base64))
+            .where(MatrizDeProposta.tipo == tipo)
             .order_by(MatrizDeProposta.enviada_em.desc(), MatrizDeProposta.id.desc()).limit(1)
         ).first()
 

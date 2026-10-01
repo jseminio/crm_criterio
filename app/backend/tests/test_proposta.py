@@ -233,7 +233,7 @@ class TestGerarEEnviar:
 
         baixado = cliente.get(f"/api/propostas/{p['id']}/pptx")
         assert baixado.status_code == 200
-        assert "filename*=UTF-8''Exemplo%20Alfa_Proposta%20BPO%20Contabil" in baixado.headers["content-disposition"]
+        assert baixado.headers["content-disposition"] == f'attachment; filename="Exemplo Alfa_Proposta BPO Contabil_154.{ANO}.pptx"'
         assert texto_do_pptx(baixado.content) == [
             f"PROP CCE RJ 154.{ANO}", "Exemplo Alfa", "Prezada Sra. Ana Souza,", "A Exemplo Alfa atua no comércio.",
             "Contábil R$ 4.500 mês · 6 horas", "DP R$ 2.400 mês · 3 horas",
@@ -333,6 +333,11 @@ class TestGerarEEnviar:
             s.commit()
         cliente.post(f"/api/propostas/{1}/enviada", json={"por": "Karine", "em": str(date.today())})
         assert cliente.post(f"/api/oportunidades/{oid}/proposta", json=_entrada()).json()["numero"] == f"155.{ANO}"
+
+
+def test_nome_do_arquivo_sem_acento():
+    from crm.api.propostas import _disposicao
+    assert _disposicao('Serviços "Ação"_Proposta.pptx') == 'attachment; filename="Servicos Acao_Proposta.pptx"'
 
 
 class TestMatrizesEConfiguracao:

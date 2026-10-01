@@ -35,12 +35,13 @@ function hoje(): string {
 }
 
 function baixar(proposta: PropostaResumo) {
+  // O nome do arquivo vem do cabeçalho da API; o link só sai da página depois que o navegador o usou.
   const a = document.createElement("a");
   a.href = `/api/propostas/${proposta.id}/pptx`;
   a.download = proposta.arquivo;
   document.body.appendChild(a);
   a.click();
-  a.remove();
+  setTimeout(() => a.remove(), 1000);
 }
 
 export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunidadeId: number; aoEnviar: () => void }) {
@@ -157,7 +158,7 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
           )}
 
           <h3 className="proposta-titulo">Honorários que vão na proposta (líquidos, como no contrato)</h3>
-          <div className="proposta-grade">
+          <div className="proposta-grade proposta-grade-fixa">
             <label className="campo">
               <span className="campo-rotulo">Contábil / Fiscal (R$/mês)</span>
               <input className="entrada" type="number" min="0" step="0.01" value={entrada.valor_contabil ?? ""} onChange={texto("valor_contabil")} />
@@ -165,6 +166,14 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
             <label className="campo">
               <span className="campo-rotulo">Departamento Pessoal (R$/mês)</span>
               <input className="entrada" type="number" min="0" step="0.01" value={entrada.valor_dp ?? ""} onChange={texto("valor_dp")} />
+            </label>
+            <label className="campo">
+              <span className="campo-rotulo">Horas de consulta/ano: Contábil</span>
+              <input className="entrada" type="number" min="0" step="1" value={entrada.horas_contabil ?? ""} onChange={inteiro("horas_contabil")} />
+            </label>
+            <label className="campo">
+              <span className="campo-rotulo">Horas de consulta/ano: DP</span>
+              <input className="entrada" type="number" min="0" step="1" value={entrada.horas_dp ?? ""} onChange={inteiro("horas_dp")} />
             </label>
             <div className="proposta-caixa">
               Total líquido
@@ -176,14 +185,6 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
                 </span>
               )}
             </div>
-            <label className="campo">
-              <span className="campo-rotulo">Horas de consulta/ano: Contábil</span>
-              <input className="entrada" type="number" min="0" step="1" value={entrada.horas_contabil ?? ""} onChange={inteiro("horas_contabil")} />
-            </label>
-            <label className="campo">
-              <span className="campo-rotulo">Horas de consulta/ano: DP</span>
-              <input className="entrada" type="number" min="0" step="1" value={entrada.horas_dp ?? ""} onChange={inteiro("horas_dp")} />
-            </label>
             <div className="proposta-caixa">
               Valor bruto (alíquota estimada {fracaoEmPercentual(aba.imposto, 0)})
               <strong className="proposta-valor">{liquido > 0 ? dinheiro(brutoPrevio(liquido, imposto)) : "—"}</strong>
@@ -220,19 +221,18 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
           <input className="entrada" value={`PROP CCE RJ ${aba.proximo_numero}`} readOnly aria-readonly="true" />
           <span className="campo-ajuda">{aberta ? "a mesma da proposta ainda não enviada" : "reservado ao gerar; não se repete"}</span>
         </label>
-        <label className="campo">
-          <span className="campo-rotulo">Tratamento</span>
-          <input className="entrada" value={entrada.tratamento} onChange={(e) => mudar("tratamento", e.target.value)} />
-        </label>
       </div>
+      <label className="campo">
+        <span className="campo-rotulo">Tratamento</span>
+        <input className="entrada" value={entrada.tratamento} onChange={(e) => mudar("tratamento", e.target.value)} />
+      </label>
       <label className="campo">
         <span className="campo-rotulo">Contextualização (rascunho a partir do questionário; ajuste aqui ou no PowerPoint)</span>
         <textarea className="entrada" rows={5} value={entrada.contextualizacao} onChange={(e) => mudar("contextualizacao", e.target.value)} />
       </label>
 
-      <h3 className="proposta-titulo">
-        Perfil do cliente <span className="campo-ajuda">· do questionário e da oportunidade; o que não veio sai como "N/D"</span>
-      </h3>
+      <h3 className="proposta-titulo">Perfil do cliente</h3>
+      <p className="campo-ajuda">Do questionário e da oportunidade; o que não veio sai como "N/D". Ajuste no PowerPoint, se preciso.</p>
       <dl className="proposta-perfil">
         {PERFIL[matriz].map(([chave, rotulo, unidade]) => (
           <div key={chave}>
@@ -264,8 +264,7 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
         <table className="tabela" aria-label="Propostas geradas">
           <thead>
             <tr>
-              <th scope="col">Número</th>
-              <th scope="col">Gerada</th>
+              <th scope="col">Proposta</th>
               <th scope="col">Situação</th>
               <th scope="col" aria-label="Ações" />
             </tr>
@@ -275,23 +274,22 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
               <tr key={p.id}>
                 <td>
                   {p.numero}
-                  <span className="celula-fonte">{p.matriz}</span>
-                </td>
-                <td>
-                  {dataHora(p.gerada_em)}
-                  <span className="celula-fonte">{p.valor_liquido ? `${dinheiro(p.valor_liquido)} líquido` : "três planos"}</span>
+                  <span className="celula-fonte">
+                    {p.matriz} · {p.valor_liquido ? `${dinheiro(p.valor_liquido)} líquido` : "três planos"}
+                  </span>
+                  <span className="celula-fonte">gerada em {dataHora(p.gerada_em)}</span>
                 </td>
                 <td>
                   <Etiqueta texto={p.enviada_em ? "enviada" : "gerada, não enviada"} />
                   {p.enviada_em && <span className="celula-fonte">por {p.enviada_por} em {data(p.enviada_em)}</span>}
                 </td>
                 <td>
+                  <div className="proposta-acoes-da-linha">
                   <a className="link-de-tabela" href={`/api/propostas/${p.id}/pptx`} download={p.arquivo}>
                     Baixar de novo
                   </a>
                   {!p.enviada_em && (
                     <>
-                      {" · "}
                       <button type="button" className="link-de-tabela" onClick={() => definirEnviando({ id: p.id, por: aba.revisores[0] ?? "", em: hoje() })}>
                         Marcar como enviada
                       </button>
@@ -313,6 +311,7 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
                       <button type="button" className="link-de-tabela" onClick={() => definirEnviando(null)}>cancelar</button>
                     </div>
                   )}
+                  </div>
                 </td>
               </tr>
             ))}

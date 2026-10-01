@@ -52,6 +52,10 @@ def principal() -> int:
         return 1
     print("\nChave SECRETA (começa com sb_secret_). Ela não aparece enquanto você cola — isso é normal.")
     chave = getpass.getpass("Chave secreta: ").strip()
+    if chave.count("sb_secret_") > 1:
+        print("\n✗ A chave veio colada mais de uma vez (nada aparece na tela, então é fácil repetir o Cmd+V).")
+        print("  Rode de novo e cole uma vez só. Nada foi gravado.")
+        return 1
     if not chave.startswith(("sb_secret_", "eyJ")):
         print("\n✗ Essa não é a chave secreta (sb_secret_…). A publicável não serve. Nada foi gravado.")
         return 1

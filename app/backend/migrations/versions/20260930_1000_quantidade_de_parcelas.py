@@ -1,7 +1,7 @@
 """quantidade de parcelas da oportunidade
 
 Revisão: 3b1d5c0a9e27
-Revisão anterior: 8f8c7f3862e8
+Revisão anterior: 3b26e19f7eeb
 Criada em: 2026-09-30 10:00:00
 """
 
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = '3b1d5c0a9e27'
-down_revision: str | None = '8f8c7f3862e8'
+down_revision: str | None = '3b26e19f7eeb'
 branch_labels: str | None = None
 depends_on: str | None = None
 

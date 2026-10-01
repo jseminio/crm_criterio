@@ -132,6 +132,10 @@ continua só em `127.0.0.1`.
   guardada no Lovable como segredo `CRM_QUESTIONARIO_SENHA`. A função só entrega os pendentes e marca
   os importados; sem a senha, recusa. Com a chave secreta de um Supabase próprio, a URL do projeto
   também funciona (o CRM escolhe pelo endereço). O código da função está em `site/questionarios-crm/index.ts`.
+- **Fora do Lovable (01/10/2026):** a página do questionário está em `site/questionario/` (HTML
+  único, sem build) com o `banco.sql` do projeto Supabase da própria Critério. Com ela publicada,
+  a busca usa a URL do projeto e a chave secreta, sem função nem créditos. Passo a passo em
+  `site/questionario/LEIAME.md`.
 - **O CNPJ é a identidade.** Empresa nova cria grupo (Prospect, origem "Questionário do cliente"),
   empresa, contato e a oportunidade em "Enviar proposta". Empresa já cadastrada leva a oportunidade
   ao grupo dela (ao que ficou, se foi fundido). Grupo homônimo sem o CNPJ é só avisado: juntar é

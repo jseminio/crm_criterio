@@ -773,6 +773,7 @@
   font-size: 13px; }
 .proposta-perfil dt { color: var(--texto-fraco); }
 .proposta-perfil dd { margin: 0; font-weight: 600; }
+.proposta-bloqueio { color: var(--perda); font-size: 13px; font-weight: 500; }
 .proposta-acoes { display: flex; gap: var(--e3); align-items: center; flex-wrap: wrap; }
 .proposta-envio { display: flex; gap: var(--e2); align-items: end; flex-wrap: wrap; margin-top: var(--e2); }
 .matrizes-de-proposta .tabela { margin-bottom: var(--e3); }

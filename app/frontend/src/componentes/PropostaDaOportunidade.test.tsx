@@ -53,6 +53,7 @@ const GERADA: PropostaResumo = {
 
 describe("aba Proposta", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.resetAllMocks();
     vi.mocked(api.abaDaProposta).mockResolvedValue(ABA);
   });
@@ -126,6 +127,41 @@ describe("aba Proposta", () => {
     expect(await screen.findByText("Sem porte: preencha a volumetria.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Gerar PowerPoint" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("preencha o honorário de Contábil/Fiscal");
+  });
+
+  it("o que foi digitado sobrevive a trocar de aba e fechar o painel, e some ao gerar", async () => {
+    const primeiro = render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText("Contábil / Fiscal (R$/mês)"), { target: { value: "4500" } });
+    fireEvent.change(screen.getByLabelText("Horas de consulta/ano: Contábil"), { target: { value: "6" } });
+    primeiro.unmount(); // trocar de aba ou salvar a oportunidade desmonta a aba
+
+    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
+    expect(await screen.findByLabelText("Contábil / Fiscal (R$/mês)")).toHaveValue(4500);
+    expect(screen.getByLabelText("Horas de consulta/ano: Contábil")).toHaveValue(6);
+    expect(screen.getByText(/Rascunho ainda não gerado/)).toBeInTheDocument();
+
+    vi.mocked(api.gerarProposta).mockResolvedValue(GERADA);
+    const clique = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    await userEvent.click(screen.getByRole("button", { name: "Gerar PowerPoint" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Proposta 154.2026 gerada");
+    expect(localStorage.getItem("crm.proposta.rascunho.10")).toBeNull();
+    clique.mockRestore();
+  });
+
+  it("descartar o rascunho volta ao sugerido", async () => {
+    localStorage.setItem("crm.proposta.rascunho.10", JSON.stringify({ entrada: { ...ABA.rascunho, valor_contabil: "999" }, salvo_em: "2026-10-01T10:00:00" }));
+    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
+    expect(await screen.findByLabelText("Contábil / Fiscal (R$/mês)")).toHaveValue(999);
+    await userEvent.click(screen.getByRole("button", { name: "descartar e voltar ao sugerido" }));
+    expect(screen.getByLabelText("Contábil / Fiscal (R$/mês)")).toHaveValue(null);
+    expect(localStorage.getItem("crm.proposta.rascunho.10")).toBeNull();
+  });
+
+  it("sem matriz, diz por que não dá para gerar", async () => {
+    vi.mocked(api.abaDaProposta).mockResolvedValue({ ...ABA, matrizes: { "Contábil": null, Financeiro: null } });
+    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
+    expect(await screen.findByRole("note")).toHaveTextContent("Falta a matriz Contábil: suba o PowerPoint com os marcadores em Configurações › Propostas.");
+    expect(screen.getByRole("button", { name: "Gerar PowerPoint" })).toBeDisabled();
   });
 
   it("prévia do bruto segue a regra da API", () => {

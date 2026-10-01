@@ -60,7 +60,7 @@ def test_varias_empresas_do_mesmo_cliente_em_linhas_separadas(sessao, grupo, tmp
     e = sessao.scalars(sa.select(Empresa).where(Empresa.cnpj == CNPJ_A)).one()
     assert (e.numero, e.complemento, e.uf, e.cep) == ("10", "sala 2", "RJ", "20040020")
     c = sessao.scalars(sa.select(PessoaContato)).one()
-    assert c.empresa_id == e.id and c.email == "maria@alfa.com"
+    assert [v.empresa_id for v in c.vinculos] == [e.id] and c.email == "maria@alfa.com"
 
 
 def test_rodar_duas_vezes_nao_duplica(sessao, grupo, tmp_path):
@@ -147,7 +147,7 @@ def test_linha_por_empresa_usa_o_id_e_preenche_so_o_que_falta(sessao, grupo, tmp
     rel = _rodar(sessao, p)
     assert rel.pode_aplicar and rel.empresas_atualizadas == 1 and rel.contatos_criados == 2
     assert sessao.get(Empresa, e1.id).logradouro == "Rua Ação" and sessao.get(Empresa, e2.id).logradouro is None
-    contatos = {c.nome: c.empresa_id for c in sessao.scalars(sa.select(PessoaContato))}
+    contatos = {c.nome: c.vinculos[0].empresa_id for c in sessao.scalars(sa.select(PessoaContato))}
     assert contatos == {"Maria": e1.id, "João": e2.id}
 
 

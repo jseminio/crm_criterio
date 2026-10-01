@@ -3,11 +3,16 @@
  * Contato pode ser da empresa ou só do grupo. Prospect ainda não tem empresa, então o
  * endereço só aparece depois de "Cadastrar empresa" — é na empresa que ele mora.
  * **Não contatar** é gravado e respeitado pelas listas de campanha.
+ *
+ * Na empresa, o contato pode ser marcado como principal (pode haver vários), desvinculado, e uma
+ * pessoa já cadastrada pode ser vinculada pela busca — pedido de Karine em 30/09/2026.
  */
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { EntidadeDeContato, Listas, PessoaDeContato } from "../api/tipos";
+import { BuscaDeContato } from "../componentes/BuscaDeContato";
+import { ExclusaoConfirmada } from "../componentes/ExclusaoConfirmada";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { dinheiro } from "../formato";
 
@@ -192,6 +197,16 @@ export function DetalheDoContato({
     definirEditando(null);
     aoMudar();
   };
+  const empresaId = entidade.empresa_id;
+  const acao = (fazer: () => Promise<unknown>) => async () => {
+    definirErro(null);
+    try {
+      await fazer();
+      aoMudar();
+    } catch (f) {
+      definirErro(f instanceof ErroDaApi ? f.message : "Falha ao salvar.");
+    }
+  };
   const cadastrarEmpresa = async () => {
     definirErro(null);
     try {
@@ -233,24 +248,68 @@ export function DetalheDoContato({
             ) : (
               <li key={p.id} className="contato-item">
                 <div>
-                  <strong>{p.nome}</strong>
+                  <strong>{p.principal ? "★ " : ""}{p.nome}</strong>
+                  {p.principal && <span className="etiqueta etiqueta-neutra" style={{ marginLeft: 6 }}>Principal</span>}
                   {p.cargo && <span className="numero-nota"> · {p.cargo}</span>}
                   {p.papel && <span className="etiqueta etiqueta-neutra" style={{ marginLeft: 6 }}>{p.papel}</span>}
                   {p.do_grupo && <span className="numero-nota"> · do grupo</span>}
                   {p.nao_contatar && <span className="etiqueta etiqueta-perda" style={{ marginLeft: 6 }}>Não contatar</span>}
                 </div>
                 <div className="numero-nota">{[p.email, p.telefone].filter(Boolean).join(" · ") || "sem e-mail nem telefone"}</div>
-                <button type="button" className="botao botao-secundario" onClick={() => definirEditando(p.id)}>Editar</button>
+                <div className="sugestao-acoes" style={{ justifyContent: "flex-start" }}>
+                  <button type="button" className="botao botao-secundario" onClick={() => definirEditando(p.id)}>Editar</button>
+                  {empresaId !== null && !p.do_grupo && (
+                    <>
+                      <label style={{ display: "flex", gap: "var(--e1)", alignItems: "center", fontSize: 13 }}>
+                        <input type="checkbox" checked={p.principal ?? false}
+                          onChange={(e) => void acao(() => api.marcarPrincipal(empresaId, p.id, e.target.checked))()} />
+                        Contato principal
+                      </label>
+                      <button type="button" className="botao botao-secundario"
+                        onClick={acao(() => api.desvincularContato(empresaId, p.id))}>
+                        Desvincular
+                      </button>
+                    </>
+                  )}
+                </div>
               </li>
             ),
           )}
         </ul>
+        {erro && empresaId !== null && <p role="alert" className="estado-texto">{erro}</p>}
+        {empresaId !== null && (
+          <>
+            <h3 style={{ fontSize: 14 }}>Vincular contato já cadastrado</h3>
+            <BuscaDeContato
+              id="dc-busca-contato"
+              jaVinculados={entidade.contatos.map((p) => p.id)}
+              aoEscolher={(pessoa) => void acao(() => api.vincularContato(empresaId, pessoa.id))()}
+            />
+          </>
+        )}
         <h3 style={{ fontSize: 14 }}>Adicionar contato</h3>
         <FormularioDePessoa papeis={papeis} rotulo="Adicionar contato" aoSalvar={criar} />
       </div>
 
       {entidade.empresa_id !== null ? (
-        <Endereco key={entidade.empresa_id} entidade={entidade} aoMudar={aoMudar} />
+        <>
+          <Endereco key={entidade.empresa_id} entidade={entidade} aoMudar={aoMudar} />
+          <ExclusaoConfirmada
+            rotulo="Excluir empresa"
+            bloqueio={entidade.tem_contrato ? "Esta empresa tem contrato e não pode ser excluída. Encerre ou mova o contrato antes." : null}
+            aviso={(() => {
+              const vinculados = entidade.contatos.filter((p) => !p.do_grupo).length;
+              return vinculados
+                ? `${vinculados} contato${vinculados === 1 ? "" : "s"} vinculado${vinculados === 1 ? "" : "s"} continua${vinculados === 1 ? "" : "m"} na base; só o vínculo com a empresa some. O grupo ${entidade.grupo_nome} fica.`
+                : `O grupo ${entidade.grupo_nome} fica.`;
+            })()}
+            aoConfirmar={async () => {
+              await api.excluirEmpresa(entidade.empresa_id!);
+              aoMudar();
+              aoFechar();
+            }}
+          />
+        </>
       ) : (
         <div className="recado">
           Este prospect ainda não tem empresa cadastrada, e é na empresa que o endereço mora.

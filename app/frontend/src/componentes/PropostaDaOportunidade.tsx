@@ -44,6 +44,37 @@ function baixar(proposta: PropostaResumo) {
   setTimeout(() => a.remove(), 1000);
 }
 
+/** O que foi digitado e ainda não virou PowerPoint fica guardado neste navegador, por oportunidade:
+ * trocar de aba, salvar a oportunidade (que fecha o painel) ou recarregar a página não perde nada.
+ * Some ao gerar. Navegador sem armazenamento (janela anônima) só não guarda: a tela funciona igual. */
+type Guardado = { entrada: EntradaDaProposta; salvo_em: string };
+const chaveDoRascunho = (id: number) => `crm.proposta.rascunho.${id}`;
+
+function lerRascunho(id: number): Guardado | null {
+  try {
+    const bruto = localStorage.getItem(chaveDoRascunho(id));
+    return bruto ? (JSON.parse(bruto) as Guardado) : null;
+  } catch {
+    return null;
+  }
+}
+
+function guardarRascunho(id: number, entrada: EntradaDaProposta) {
+  try {
+    localStorage.setItem(chaveDoRascunho(id), JSON.stringify({ entrada, salvo_em: new Date().toISOString() }));
+  } catch {
+    /* sem armazenamento: segue sem guardar */
+  }
+}
+
+function apagarRascunho(id: number) {
+  try {
+    localStorage.removeItem(chaveDoRascunho(id));
+  } catch {
+    /* idem */
+  }
+}
+
 export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunidadeId: number; aoEnviar: () => void }) {
   const [aba, definirAba] = useState<AbaDaProposta | null>(null);
   const [entrada, definirEntrada] = useState<EntradaDaProposta | null>(null);
@@ -52,6 +83,8 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
   const [aviso, definirAviso] = useState<string | null>(null);
   const [gerando, definirGerando] = useState(false);
   const [enviando, definirEnviando] = useState<{ id: number; por: string; em: string } | null>(null);
+  const [editado, definirEditado] = useState(false);
+  const [restaurado, definirRestaurado] = useState<string | null>(null);
 
   const carregar = () => {
     definirErroAoAbrir(null);
@@ -59,17 +92,35 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
       .abaDaProposta(oportunidadeId)
       .then((a) => {
         definirAba(a);
-        definirEntrada(a.rascunho);
+        const guardado = lerRascunho(oportunidadeId);
+        definirEntrada(guardado ? { ...a.rascunho, ...guardado.entrada } : a.rascunho);
+        definirRestaurado(guardado ? guardado.salvo_em : null);
       })
       .catch((f) => definirErroAoAbrir(f instanceof ErroDaApi ? f.message : "Falha ao abrir a proposta."));
   };
   useEffect(carregar, [oportunidadeId]);
+  useEffect(() => {
+    if (editado && entrada) guardarRascunho(oportunidadeId, entrada);
+  }, [editado, entrada, oportunidadeId]);
 
   if (erroAoAbrir) return <Erro mensagem={erroAoAbrir} aoTentarDeNovo={carregar} />;
   if (!aba || !entrada) return <Carregando rotulo="Montando a proposta" />;
 
-  const mudar = <K extends keyof EntradaDaProposta>(campo: K, valor: EntradaDaProposta[K]) =>
+  const mudar = <K extends keyof EntradaDaProposta>(campo: K, valor: EntradaDaProposta[K]) => {
+    definirEditado(true);
     definirEntrada((atual) => (atual ? { ...atual, [campo]: valor } : atual));
+  };
+  const descartarRascunho = () => {
+    apagarRascunho(oportunidadeId);
+    definirEditado(false);
+    definirRestaurado(null);
+    definirEntrada(aba.rascunho);
+  };
+  const semMatriz = !aba.matrizes[entrada.matriz]
+    ? `Falta a matriz ${entrada.matriz}: suba o PowerPoint com os marcadores em Configurações › Propostas.`
+    : !aba.matrizes[entrada.matriz]!.utilizavel
+      ? `A matriz ${entrada.matriz} em uso tem marcador faltando ou errado: corrija em Configurações › Propostas.`
+      : null;
   const texto = (campo: keyof EntradaDaProposta) => (e: { target: { value: string } }) =>
     mudar(campo, (e.target.value === "" ? null : e.target.value) as never);
   const inteiro = (campo: "horas_contabil" | "horas_dp") => (e: { target: { value: string } }) =>
@@ -89,6 +140,9 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
     definirAviso(null);
     try {
       const p = await api.gerarProposta(oportunidadeId, entrada);
+      apagarRascunho(oportunidadeId);
+      definirEditado(false);
+      definirRestaurado(null);
       baixar(p);
       definirAviso(`Proposta ${p.numero} gerada: o PowerPoint está sendo baixado. Revise, salve como PDF e envie.`);
       carregar();
@@ -117,6 +171,12 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
     <section className="proposta-da-oportunidade" aria-label="Proposta">
       {erro && <p className="estado estado-erro estado-texto" role="alert">{erro}</p>}
       {aviso && <p className="recado" role="status">{aviso}</p>}
+      {restaurado && (
+        <p className="recado">
+          Rascunho ainda não gerado, guardado em {dataHora(restaurado)}.{" "}
+          <button type="button" className="link-de-tabela" onClick={descartarRascunho}>descartar e voltar ao sugerido</button>
+        </p>
+      )}
 
       <p className="recado">
         Matriz: <strong>{matriz}</strong>{" "}
@@ -125,7 +185,6 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
         ) : (
           <span>· ainda não há matriz {matriz}: suba o PowerPoint em Configurações › Propostas.</span>
         )}
-        {emUso && !emUso.utilizavel && <span> · ⚠ a matriz em uso tem marcador faltando; corrija em Configurações › Propostas.</span>}
         {" · "}
         <button type="button" className="link-de-tabela" onClick={() => mudar("matriz", outra)}>
           usar a {outra}
@@ -247,15 +306,23 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
       </dl>
 
       <div className="proposta-acoes">
-        <button type="button" className="botao botao-primario" onClick={gerar} disabled={gerando || !emUso?.utilizavel}>
+        <button type="button" className="botao botao-primario" onClick={gerar} disabled={gerando || !!semMatriz}>
           {gerando ? "Gerando…" : "Gerar PowerPoint"}
         </button>
-        <span className="campo-ajuda">
-          {aberta
-            ? `Baixa o .pptx. A ${aberta.numero} ainda não foi enviada: gerar de novo regrava ela, com o mesmo número.`
-            : "Baixa o .pptx. Revise, salve como PDF no PowerPoint e envie."}
-        </span>
+        {semMatriz ? (
+          <span className="proposta-bloqueio" role="note">⚠ {semMatriz}</span>
+        ) : (
+          <span className="campo-ajuda">
+            {aberta
+              ? `Baixa o .pptx. A ${aberta.numero} ainda não foi enviada: gerar de novo regrava ela, com o mesmo número.`
+              : "Baixa o .pptx. Revise, salve como PDF no PowerPoint e envie."}
+          </span>
+        )}
       </div>
+      <p className="campo-ajuda">
+        O que você digita aqui fica guardado neste navegador até gerar o PowerPoint, mesmo trocando de aba.
+        "Salvar alterações", no rodapé, grava só os dados da oportunidade.
+      </p>
 
       <h3 className="proposta-titulo">Propostas desta oportunidade</h3>
       {aba.propostas.length === 0 ? (

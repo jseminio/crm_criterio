@@ -1,0 +1,3 @@
+# Endereço que os clientes recebem: /questionario abre a mesma página (sem mudar a URL).
+/questionario    /index.html    200
+/questionario/   /index.html    200

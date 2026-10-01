@@ -42,6 +42,12 @@ npx netlify-cli deploy --prod --no-build --dir . --site 6515cf4d-79c7-4b07-b448-
 Use o **ID**, não o nome: com o nome o CLI respondeu "Not Found". Na primeira vez numa máquina,
 rode antes `npx netlify-cli login` e autorize no navegador.
 
+## Link para os clientes
+
+**https://criterio-questionario-proposta.netlify.app/questionario** — o arquivo `_redirects` faz esse
+caminho abrir a mesma página. O WhatsApp de quem envia guarda a prévia de cada endereço: o endereço sem
+`/questionario` ficou guardado com a prévia antiga (sem imagem) e por isso não é o que se manda.
+
 ## Prévia do link (WhatsApp, e-mail)
 O cartão com imagem e título que aparece ao colar o link vem das etiquetas Open Graph no topo do
 `index.html` e da imagem `og-image.png` (1200×630). Por isso publique a **pasta inteira**, não só o

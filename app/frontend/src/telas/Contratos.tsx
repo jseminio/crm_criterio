@@ -54,6 +54,15 @@ function EdicaoDeContrato({
   // depois registrados. O servidor recusa; aqui a tela nem deixa digitar.
   const assinado = situacaoAtual === "Ativo" || situacaoAtual === "Suspenso";
   const encerrado = situacaoAtual === "Encerrado";
+  // O que está gravado, não o que veio da lista: uma Renovação muda o fim.
+  const dataFimGravada = detalhe ? detalhe.data_fim : contrato.data_fim;
+  // Encerrado não sai por edição; assinado só alterna entre Ativo e Suspenso; antes
+  // da assinatura, tudo menos Encerrado (que só vem pelo evento de Encerramento).
+  const situacoesPermitidas = encerrado
+    ? ["Encerrado"]
+    : assinado
+      ? ["Ativo", "Suspenso"]
+      : SITUACOES_DE_CONTRATO.filter((s) => s !== "Encerrado");
   // Contrato da carteira anterior ao CRM não tem a data e não precisa dela.
   const semAssinatura =
     rascunho.situacao === "Ativo" && !rascunho.data_inicio && !contrato.anterior_ao_crm;
@@ -105,7 +114,7 @@ function EdicaoDeContrato({
             type="button"
             className="botao botao-primario"
             onClick={salvar}
-            disabled={salvando || semAssinatura}
+            disabled={salvando || semAssinatura || encerrado}
           >
             {salvando ? "Salvando…" : "Salvar alterações"}
           </button>
@@ -127,9 +136,10 @@ function EdicaoDeContrato({
             id="c-situacao"
             className="selecao"
             value={rascunho.situacao}
+            disabled={encerrado}
             onChange={(e) => mudar("situacao", e.target.value)}
           >
-            {SITUACOES_DE_CONTRATO.filter((s) => s !== "Encerrado" || encerrado).map((s) => (
+            {situacoesPermitidas.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
@@ -150,6 +160,7 @@ function EdicaoDeContrato({
             id="c-escopo"
             className="entrada"
             value={rascunho.escopo}
+            disabled={encerrado}
             onChange={(e) => mudar("escopo", e.target.value)}
           />
         </div>
@@ -184,7 +195,10 @@ function EdicaoDeContrato({
             />
           </div>
         </div>
-        {(assinado || encerrado) && (
+        {encerrado && (
+          <p className="campo-ajuda">Contrato encerrado: nada mais muda, nem por evento nem aqui.</p>
+        )}
+        {assinado && (
           <p className="campo-ajuda">
             Contrato assinado: o preço e a data de fim só mudam por um evento (reajuste, expansão,
             contração ou renovação), que guarda o valor anterior.
@@ -201,6 +215,7 @@ function EdicaoDeContrato({
               type="date"
               className="entrada"
               value={rascunho.data_inicio}
+              disabled={encerrado}
               onChange={(e) => mudar("data_inicio", e.target.value)}
             />
           </div>
@@ -213,7 +228,7 @@ function EdicaoDeContrato({
               type="date"
               className="entrada"
               value={rascunho.data_fim}
-              disabled={(assinado && !!contrato.data_fim) || encerrado}
+              disabled={(assinado && !!dataFimGravada) || encerrado}
               onChange={(e) => mudar("data_fim", e.target.value)}
             />
           </div>
@@ -227,6 +242,7 @@ function EdicaoDeContrato({
             id="c-signatario"
             className="entrada"
             value={rascunho.signatario}
+            disabled={encerrado}
             onChange={(e) => mudar("signatario", e.target.value)}
           />
         </div>

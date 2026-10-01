@@ -16,7 +16,7 @@ vínculo com empresa:
 Depois, a coluna `grupo_id` sai do contato.
 
 Revisão: 9a1c7e4b2d63
-Revisão anterior: 5e8b3f1a2c47
+Revisão anterior: a1f0c2d93b5e (a junção da proposta com os contatos)
 Criada em: 2026-10-01 09:00:00
 """
 
@@ -26,7 +26,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = '9a1c7e4b2d63'
-down_revision: str | None = '5e8b3f1a2c47'
+down_revision: str | None = 'a1f0c2d93b5e'
 branch_labels: str | None = None
 depends_on: str | None = None
 

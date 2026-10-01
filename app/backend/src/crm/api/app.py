@@ -33,6 +33,8 @@ from crm.api.classificacao import ServicosDeAnalise, roteador as roteador_de_car
 from crm.api.contatos import roteador as roteador_de_contatos
 from crm.api.contatos import roteador_de_empresas
 from crm.api.sdr import roteador as roteador_do_sdr
+from crm.api.questionarios import fonte_real, roteador_de_questionarios
+from crm.questionario.fonte import FonteDeQuestionarios
 from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
 from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, desfazer_fusao, fundir_grupos
@@ -106,6 +108,7 @@ def criar_app(
     fabrica: sessionmaker[Session] | None = None,
     servicos: Callable[[], Servicos] | None = None,
     servicos_de_analise: Callable[[], ServicosDeAnalise] | None = None,
+    fonte_de_questionarios: Callable[[], FonteDeQuestionarios | None] | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede."""
@@ -138,6 +141,7 @@ def criar_app(
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
     api.include_router(roteador_do_sdr(obter_sessao))
+    api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real))
     return api
 
 

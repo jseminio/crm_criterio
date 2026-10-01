@@ -30,9 +30,10 @@ def ambiente_isolado(tmp_path, monkeypatch):
     """
     from crm.agente.config import VARIAVEIS as DO_AGENTE
     from crm.db import sessao as modulo
+    from crm.questionario.fonte import VARIAVEIS as DO_QUESTIONARIO
 
     monkeypatch.setattr(modulo, "ARQUIVO_ENV", tmp_path / "sem-env")
-    for nome in (modulo.VARIAVEL, *modulo.PARTES.values(), *DO_AGENTE.values()):
+    for nome in (modulo.VARIAVEL, *modulo.PARTES.values(), *DO_AGENTE.values(), *DO_QUESTIONARIO.values()):
         monkeypatch.delenv(nome, raising=False)
 
 

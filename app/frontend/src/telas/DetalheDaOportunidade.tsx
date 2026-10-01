@@ -6,6 +6,7 @@ import type { Listas, MudancaDePreco, OportunidadeDetalhe } from "../api/tipos";
 import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { DIRECIONADORES_DE_PORTE } from "../componentes/direcionadoresDePorte";
 import { Etiqueta } from "../componentes/Etiqueta";
+import { QuestionarioDaOportunidade } from "../componentes/QuestionarioDaOportunidade";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro } from "../componentes/estados";
 import { dataHora, dinheiro } from "../formato";
@@ -724,6 +725,7 @@ export function DetalheDaOportunidade({
           </>
           )}
 
+          {aba === "volumetria" && <QuestionarioDaOportunidade oportunidadeId={id} />}
           {aba === "volumetria" && (
             <VolumetriaEPorte
               detalhe={detalhe}

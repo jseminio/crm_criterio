@@ -16,7 +16,7 @@ import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(), servicos: vi.fn().mockResolvedValue([
+  return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(), questionarioDaOportunidade: vi.fn().mockResolvedValue(null), servicos: vi.fn().mockResolvedValue([
         { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
           para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],
           fora_do_perfil: ["MEI"], transbordo: "Comercial · BPO (C1)", nomes_antigos: ["BPO Contábil"], rascunho: true, temas: [] },

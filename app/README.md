@@ -53,6 +53,37 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Questionário do site vira oportunidade (01/10/2026)
+
+O cliente preenche o questionário para proposta no site (Lovable), que grava na tabela
+`questionarios_proposta` do Supabase. No Funil, **"Buscar questionários"** traz para o CRM o que
+ainda não entrou e marca `importado_crm_em` lá. O CRM **busca**; o Supabase nunca chama o CRM, que
+continua só em `127.0.0.1`.
+
+- **Configuração:** `CRM_QUESTIONARIO_URL` e `CRM_QUESTIONARIO_CHAVE` no `backend/.env` (ver
+  `.env.example`). A chave é a **secreta** do projeto Supabase: a tabela só aceita inserir pela
+  chave pública (conferido em 01/10/2026: RLS ligado, uma única política, de INSERT com o
+  consentimento LGPD marcado), então ninguém de fora lê as respostas.
+- **O CNPJ é a identidade.** Empresa nova cria grupo (Prospect, origem "Questionário do cliente"),
+  empresa, contato e a oportunidade em "Enviar proposta". Empresa já cadastrada leva a oportunidade
+  ao grupo dela (ao que ficou, se foi fundido). Grupo homônimo sem o CNPJ é só avisado: juntar é
+  com Fundir grupos.
+- **Não duplica:** com oportunidade em aberto no grupo, o questionário fica **"Precisa de você"**.
+  "Anexar à existente" só preenche o que está vazio (nada digitado some); "Criar nova" abre outra.
+- **A oportunidade nasce preenchida:** os nove direcionadores com origem "Questionário" (campo em
+  branco fica fora da média), serviços além do primeiro, consolidação, auditoria e as notas de
+  complexidade e risco. O **porte não é confirmado**: a régua do CRM sugere, e o cálculo que o
+  formulário faz em JavaScript fica só para comparação.
+- As regras de **leitura** das respostas (qual resposta acende qual fator) estão em
+  `crm.questionario.leitura`, copiadas do formulário "BPO Full 2026 v6": mudou o formulário, muda
+  o módulo. As de porte e nota são as do CRM.
+- O questionário inteiro fica em `questionario_recebido`, com o PDF (base64, para o backup levar
+  junto). A aba "Volumetria e porte" da oportunidade mostra de onde veio, o PDF, as notas com o
+  motivo e os pontos de atenção.
+- Cada questionário é gravado aqui **antes** de ser marcado lá: se a marca falhar, ele volta na
+  próxima busca e o CRM só refaz a marca. Linha sem razão social, CNPJ ou contato fica no site, com aviso.
+- Migração `3b26e19f7eeb` (só cria a tabela). **Rode `alembic upgrade head`.**
+
 ## Detalhe da oportunidade: abas no topo (27/09/2026)
 
 O painel de uma oportunidade tinha "Volumetria e porte" e "Histórico de preço" empilhados abaixo do

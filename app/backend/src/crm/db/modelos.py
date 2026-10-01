@@ -41,6 +41,7 @@ from crm.domain.listas import (
     Situacao,
     SituacaoAbordagem,
     SituacaoContrato,
+    SituacaoDoQuestionario,
     SituacaoEmpresa,
     SituacaoGrupo,
     SituacaoLead,
@@ -1206,3 +1207,44 @@ class InvestimentoEmMidia(CarimboMixin, Base):
         sa.UniqueConstraint("mes", "canal", name="uq_investimento_mes_canal"),
         sa.CheckConstraint("valor >= 0", name="valor_nao_negativo"),
     )
+
+
+class QuestionarioRecebido(CarimboMixin, Base):
+    """Um questionário para proposta enviado pelo cliente no site e trazido pelo "Buscar
+    questionários" (01/10/2026). Guarda a resposta inteira, como chegou: o que o CRM fez com ela
+    está em `oportunidade_id` e `o_que_fez`."""
+
+    __tablename__ = "questionario_recebido"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    externo_id: Mapped[str] = mapped_column(sa.String(64), nullable=False, unique=True)
+    """O `id` da linha no Supabase: buscar de novo nunca duplica."""
+    recebido_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, index=True)
+    versao: Mapped[str] = mapped_column(sa.String(60), nullable=False)
+    razao_social: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    nome_fantasia: Mapped[str | None] = mapped_column(sa.String(200))
+    cnpj: Mapped[str] = mapped_column(sa.String(14), nullable=False, index=True)
+    contato_nome: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    contato_cargo: Mapped[str | None] = mapped_column(sa.String(100))
+    contato_celular: Mapped[str | None] = mapped_column(sa.String(30))
+    contato_email: Mapped[str | None] = mapped_column(sa.String(200))
+    respostas: Mapped[dict] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+    avaliacao_do_site: Mapped[dict | None] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"))
+    """O cálculo que o próprio formulário fez, em JavaScript. Só para comparação: vale o do CRM."""
+    pdf_base64: Mapped[str | None] = mapped_column(sa.Text)
+    """O PDF que o cliente viu, em base64 (texto, para o backup lógico levar junto)."""
+
+    situacao: Mapped[SituacaoDoQuestionario] = mapped_column(
+        coluna_lista(SituacaoDoQuestionario), nullable=False, index=True
+    )
+    o_que_fez: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    grupo_id: Mapped[int | None] = mapped_column(sa.ForeignKey("grupo_economico.id"), index=True)
+    oportunidade_id: Mapped[int | None] = mapped_column(sa.ForeignKey("oportunidade.id"), index=True)
+    oportunidade_em_aberto_id: Mapped[int | None] = mapped_column(sa.ForeignKey("oportunidade.id"))
+    """Só em "Precisa de você": a oportunidade em aberto que já existia para o CNPJ."""
+    cliente_novo: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
+    porte_crm: Mapped[str | None] = mapped_column(sa.String(20))
+    porte_site: Mapped[str | None] = mapped_column(sa.String(20))
+    marcado_na_origem_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    """Quando o Supabase aceitou a marca de importado. Vazio = a marca falhou; na próxima busca ele
+    volta e o CRM só tenta marcar de novo."""

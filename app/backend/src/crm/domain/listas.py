@@ -192,10 +192,20 @@ class Origem(Enum):
     CRM = "CRM"
     KIT_BRUNO_2026 = "Recuperação e-mail/WhatsApp (Bruno)"
     CARTEIRA_ANTERIOR = "Carteira anterior ao CRM"
+    QUESTIONARIO = "Questionário do cliente"
+    """Nasceu do questionário para proposta que o próprio cliente preencheu no site (01/10/2026)."""
     """Propostas de 2026 do kit de transferência que o Bruno passou ao Eduardo
     em 22/09/2026 — reconstruídas por ele a partir do próprio e-mail e WhatsApp,
     enquanto foi o comercial exclusivo da Critério. Origem própria, não é
     'Carga 2026' (não veio da planilha) nem 'CRM' (não nasceu digitada aqui)."""
+
+
+class SituacaoDoQuestionario(Enum):
+    """O que o CRM fez com um questionário buscado no site (01/10/2026)."""
+
+    IMPORTADO = "Importado"
+    PRECISA_DE_VOCE = "Precisa de você"
+    """Já havia oportunidade em aberto para o CNPJ: o CRM não duplica, a pessoa escolhe."""
 
 
 class TipoDeEventoDeContrato(Enum):

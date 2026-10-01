@@ -29,6 +29,19 @@ o CRM busca de lá com a chave secreta ("Buscar questionários" no Funil).
 Enquanto a URL e a chave publicável não forem preenchidas, a página abre mas **não envia**: avisa
 o cliente para baixar o PDF e mandar por e-mail.
 
+## Publicar uma versão nova (no ar desde 01/10/2026)
+
+Site: https://criterio-questionario-proposta.netlify.app (Netlify, ID `6515cf4d-79c7-4b07-b448-155eb73f9171`).
+No Terminal, depois do `git pull`:
+
+```
+cd app/site/questionario
+npx netlify-cli deploy --prod --no-build --dir . --site 6515cf4d-79c7-4b07-b448-155eb73f9171
+```
+
+Use o **ID**, não o nome: com o nome o CLI respondeu "Not Found". Na primeira vez numa máquina,
+rode antes `npx netlify-cli login` e autorize no navegador.
+
 ## Prévia do link (WhatsApp, e-mail)
 O cartão com imagem e título que aparece ao colar o link vem das etiquetas Open Graph no topo do
 `index.html` e da imagem `og-image.png` (1200×630). Por isso publique a **pasta inteira**, não só o

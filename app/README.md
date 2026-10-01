@@ -80,7 +80,8 @@ enviam. A proposta fica em PowerPoint justamente para isso: dá para mudar um de
 **Configurações › Propostas:** subir e trocar as matrizes, próximo número, quem revisa e envia, e
 o preço de tabela dos planos financeiros. Matriz com marcador obrigatório faltando, ou com
 marcador desconhecido (erro de digitação), fica gravada mas **não é usada** até subir a corrigida.
-A lista completa de marcadores está na própria tela ("Lista de marcadores").
+A lista completa de marcadores está na própria tela ("Lista de marcadores"). A matriz aceita até
+**200 MB** (era 40 MB até 01/10/2026; a Contábil oficial, cheia de imagens, não cabia).
 
 ### Pôr os marcadores nas matrizes oficiais
 

@@ -1151,3 +1151,101 @@ export interface QuestionarioDaOportunidade {
   notas_recebidas: number | null;
   tem_pdf: boolean;
 }
+
+/** Proposta em PowerPoint (01/10/2026). Dinheiro chega como texto decimal ("6900.00"). */
+export type TipoDeMatriz = "Contábil" | "Financeiro";
+
+export interface SugestaoDePreco {
+  porte: string;
+  porte_confirmado: boolean;
+  horas_base: string;
+  complexidade: number;
+  complexidade_informada: boolean;
+  risco: number;
+  risco_informado: boolean;
+  disciplina: number;
+  atrito: string;
+  horas: string;
+  custo_hora: string;
+  custo: string;
+  imposto: string;
+  margem_alvo: string;
+  origem_da_margem: string;
+  bruto: string;
+  liquido: string;
+}
+
+export interface EntradaDaProposta {
+  matriz: TipoDeMatriz;
+  cliente: string;
+  tratamento: string;
+  contextualizacao: string;
+  valor_contabil: string | null;
+  valor_dp: string | null;
+  horas_contabil: number | null;
+  horas_dp: number | null;
+  plano_bpo: string | null;
+  plano_plus: string | null;
+  plano_cfo: string | null;
+}
+
+export interface PropostaResumo {
+  id: number;
+  numero: string;
+  matriz: TipoDeMatriz;
+  gerada_em: string;
+  valor_liquido: string | null;
+  valor_bruto: string | null;
+  enviada_em: string | null;
+  enviada_por: string | null;
+  arquivo: string;
+}
+
+export interface MatrizResumo {
+  id: number;
+  tipo: TipoDeMatriz;
+  nome_arquivo: string;
+  enviada_em: string;
+  enviada_por: string;
+  encontrados: number;
+  obrigatorios: number;
+  faltando: string[];
+  desconhecidos: string[];
+  utilizavel: boolean;
+}
+
+export interface AbaDaProposta {
+  matriz_sugerida: TipoDeMatriz;
+  servicos: string[];
+  tem_dp: boolean;
+  sugestao: SugestaoDePreco | null;
+  sem_sugestao: string | null;
+  rascunho: EntradaDaProposta;
+  perfil: Record<string, string>;
+  imposto: string;
+  matrizes: Record<TipoDeMatriz, MatrizResumo | null>;
+  revisores: string[];
+  proximo_numero: string;
+  propostas: PropostaResumo[];
+}
+
+export interface ConfiguracaoDeProposta {
+  proximo_numero: number;
+  revisores: string[];
+  plano_bpo: string;
+  plano_plus: string;
+  plano_cfo: string;
+  imposto: string;
+  ultimo_usado: string | null;
+}
+
+export interface MarcadorDeProposta {
+  nome: string;
+  descricao: string;
+  obrigatorio_em: TipoDeMatriz[];
+}
+
+export interface MatrizesDeProposta {
+  em_uso: Record<TipoDeMatriz, MatrizResumo | null>;
+  marcadores: MarcadorDeProposta[];
+}

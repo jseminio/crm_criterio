@@ -208,6 +208,14 @@ class SituacaoDoQuestionario(Enum):
     """Já havia oportunidade em aberto para o CNPJ: o CRM não duplica, a pessoa escolhe."""
 
 
+class TipoDeMatriz(Enum):
+    """As duas matrizes oficiais de proposta em PowerPoint (01/10/2026): BPO Contábil (contábil,
+    fiscal e DP) e BPO Financeiro (três planos de preço de tabela)."""
+
+    CONTABIL = "Contábil"
+    FINANCEIRO = "Financeiro"
+
+
 class TipoDeEventoDeContrato(Enum):
     """O que aconteceu com um contrato depois de assinado — Etapa 2.
 

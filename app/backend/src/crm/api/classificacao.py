@@ -533,6 +533,53 @@ class CelulaDeMixResposta(BaseModel):
 _CAMPOS_DE_LINHA = tuple(regra_de_parametros.LinhaDeParametros.__dataclass_fields__)
 
 
+def _q4_janela(v: Decimal) -> Decimal:
+    # O mesmo texto ("0.7000") no SQLite dos testes e no PostgreSQL.
+    return Decimal(v).quantize(Decimal("0.0001"))
+
+
+def janela_vigente(sessao: Session) -> JanelaResposta:
+    """A margem mínima e a alvo em uso: as do período aberto, senão as do último, senão o padrão.
+    Fora do roteador porque a proposta usa a mesma margem alvo para o preço sugerido."""
+    aberto = sessao.scalars(sa.select(PeriodoDeAvaliacao).where(PeriodoDeAvaliacao.calculado_em.is_(None))).first()
+    if aberto is not None:
+        return JanelaResposta(margem_minima=_q4_janela(aberto.margem_minima), margem_alvo=_q4_janela(aberto.margem_alvo), origem="período aberto")
+    ultimo = sessao.scalars(
+        sa.select(PeriodoDeAvaliacao).order_by(PeriodoDeAvaliacao.mes_de_referencia.desc()).limit(1)
+    ).first()
+    if ultimo is not None:
+        return JanelaResposta(margem_minima=_q4_janela(ultimo.margem_minima), margem_alvo=_q4_janela(ultimo.margem_alvo), origem="último período")
+    return JanelaResposta(margem_minima=JANELA_PADRAO[0], margem_alvo=JANELA_PADRAO[1], origem="padrão")
+
+
+def _versao_de_parametros_vigente(sessao: Session) -> VersaoDeParametros | None:
+    return sessao.scalars(
+        sa.select(VersaoDeParametros).order_by(VersaoDeParametros.criado_em.desc()).limit(1)
+    ).first()
+
+
+def _linha_de_parametros(v: VersaoDeParametros) -> regra_de_parametros.LinhaDeParametros:
+    return regra_de_parametros.LinhaDeParametros(**{c: getattr(v, c) for c in _CAMPOS_DE_LINHA})
+
+
+def _mix_de(v: VersaoDeParametros) -> list[regra_de_parametros.CelulaDeMix]:
+    return [regra_de_parametros.CelulaDeMix(porte=m.porte, cargo=m.cargo, mix_percentual=m.mix_percentual) for m in v.mix]
+
+
+def parametros_vigentes(sessao: Session) -> tuple[regra.Parametros, regra_de_parametros.ParametrosDeRentabilidade]:
+    """A versão mais recente do banco; sem nenhuma gravada ainda, cai nas constantes do código
+    (a mesma semente que a migração grava — nunca fica sem parâmetro)."""
+    v = _versao_de_parametros_vigente(sessao)
+    if v is None:
+        return regra.PARAMETROS, PARAMETROS_DE_RENTABILIDADE
+    linha = _linha_de_parametros(v)
+    versao_str = f"banco-v{v.id}"
+    return (
+        regra_de_parametros.construir_parametros(linha, versao=versao_str),
+        regra_de_parametros.construir_parametros_de_rentabilidade(linha, _mix_de(v), versao=versao_str),
+    )
+
+
 class EdicaoDeParametros(BaseModel):
     """Uma edição vira **versão nova**, nunca sobrescreve a vigente (mesmo princípio de `EdicaoDeNotas`)."""
 
@@ -674,16 +721,7 @@ def roteador(
         # O mesmo texto ("0.7000") no SQLite dos testes e no PostgreSQL.
         return Decimal(v).quantize(Decimal("0.0001"))
 
-    def _janela(sessao: Session) -> JanelaResposta:
-        aberto = _periodo_aberto(sessao)
-        if aberto is not None:
-            return JanelaResposta(margem_minima=_q4(aberto.margem_minima), margem_alvo=_q4(aberto.margem_alvo), origem="período aberto")
-        ultimo = sessao.scalars(
-            sa.select(PeriodoDeAvaliacao).order_by(PeriodoDeAvaliacao.mes_de_referencia.desc()).limit(1)
-        ).first()
-        if ultimo is not None:
-            return JanelaResposta(margem_minima=_q4(ultimo.margem_minima), margem_alvo=_q4(ultimo.margem_alvo), origem="último período")
-        return JanelaResposta(margem_minima=JANELA_PADRAO[0], margem_alvo=JANELA_PADRAO[1], origem="padrão")
+    _janela = janela_vigente
 
     def _rascunhos(sessao: Session, periodo: PeriodoDeAvaliacao | None) -> dict[int, AvaliacaoEmAndamento]:
         if periodo is None:
@@ -915,29 +953,8 @@ def roteador(
             .order_by(ClassificacaoDoGrupo.referencia.desc(), ClassificacaoDoGrupo.revisao.desc()).limit(1)
         ).first()
 
-    def _versao_vigente(sessao: Session) -> VersaoDeParametros | None:
-        return sessao.scalars(
-            sa.select(VersaoDeParametros).order_by(VersaoDeParametros.criado_em.desc()).limit(1)
-        ).first()
-
-    def _linha_de_parametros(v: VersaoDeParametros) -> regra_de_parametros.LinhaDeParametros:
-        return regra_de_parametros.LinhaDeParametros(**{c: getattr(v, c) for c in _CAMPOS_DE_LINHA})
-
-    def _mix_de(v: VersaoDeParametros) -> list[regra_de_parametros.CelulaDeMix]:
-        return [regra_de_parametros.CelulaDeMix(porte=m.porte, cargo=m.cargo, mix_percentual=m.mix_percentual) for m in v.mix]
-
-    def _parametros_vigentes(sessao: Session) -> tuple[regra.Parametros, regra_de_parametros.ParametrosDeRentabilidade]:
-        """A versão mais recente do banco; sem nenhuma gravada ainda, cai nas constantes do código
-        (a mesma semente que a migração grava — nunca fica sem parâmetro)."""
-        v = _versao_vigente(sessao)
-        if v is None:
-            return regra.PARAMETROS, PARAMETROS_DE_RENTABILIDADE
-        linha = _linha_de_parametros(v)
-        versao_str = f"banco-v{v.id}"
-        return (
-            regra_de_parametros.construir_parametros(linha, versao=versao_str),
-            regra_de_parametros.construir_parametros_de_rentabilidade(linha, _mix_de(v), versao=versao_str),
-        )
+    _versao_vigente = _versao_de_parametros_vigente
+    _parametros_vigentes = parametros_vigentes
 
     def _parametros_resposta(v: VersaoDeParametros) -> ParametrosResposta:
         linha = _linha_de_parametros(v)

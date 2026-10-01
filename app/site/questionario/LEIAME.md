@@ -19,8 +19,8 @@ o CRM busca de lá com a chave secreta ("Buscar questionários" no Funil).
      ```
      cd app/backend && ~/.venvs/criterio-crm/bin/python scripts/definir_questionario.py
      ```
-3. **Logomarca.** `logo_branca.png` já está aqui: letras brancas, fundo transparente (feita a partir da logomarca oficial). Sem ela a página
-   funciona, só sem a logo no topo e no PDF.
+3. **Logomarca.** Embutida no próprio `index.html` (letras brancas, fundo transparente); o `logo_branca.png` fica aqui só como original. Publicar só o
+   `index.html` já basta para a logo aparecer no topo e no PDF.
 4. **Publicar.** Em app.netlify.com/drop, arraste esta pasta. O Netlify devolve o endereço
    (`https://<nome>.netlify.app`). Para mudar o texto ou as perguntas depois, edite o `index.html`
    e arraste de novo. Um endereço da Critério (ex.: `questionario.grupocriterio.com.br`) pode ser

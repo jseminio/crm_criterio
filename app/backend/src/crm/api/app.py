@@ -35,6 +35,7 @@ from crm.api.contatos import roteador_de_empresas
 from crm.api.sdr import roteador as roteador_do_sdr
 from crm.api.propostas import roteador_de_propostas
 from crm.api.questionarios import fonte_real, roteador_de_questionarios
+from crm.questionario.endereco import BuscaDeEndereco, endereco_pelo_cnpj
 from crm.questionario.fonte import FonteDeQuestionarios
 from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
 from crm.db.base import agora
@@ -112,6 +113,7 @@ def criar_app(
     servicos: Callable[[], Servicos] | None = None,
     servicos_de_analise: Callable[[], ServicosDeAnalise] | None = None,
     fonte_de_questionarios: Callable[[], FonteDeQuestionarios | None] | None = None,
+    busca_de_endereco: BuscaDeEndereco | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede."""
@@ -144,7 +146,10 @@ def criar_app(
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
     api.include_router(roteador_do_sdr(obter_sessao))
-    api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real))
+    # Endereço pelo CNPJ na importação do questionário: a BrasilAPI no uso real; no teste (que passa a
+    # própria `fabrica`), só se o teste mandar uma busca — teste não sai para a rede.
+    endereco = busca_de_endereco or (None if fabrica is not None else endereco_pelo_cnpj)
+    api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real, endereco))
     api.include_router(roteador_de_propostas(obter_sessao))
     return api
 

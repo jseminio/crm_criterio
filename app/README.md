@@ -551,6 +551,23 @@ pontual). Antes, só a carteira recorrente era "Cliente". Agora:
 - A sugestão "prospect que já é cliente" passou a comparar os grupos **sem empresa** (prospects e clientes
   não recorrentes) com os clientes da carteira, para não perder as duplicatas depois da promoção.
 
+## Questionário preenche pessoa, empresa e oportunidade (01/10/2026)
+
+Pedido de Karine: continua pelo botão **"Buscar questionários"** no Funil, e cada questionário novo já
+preenche tudo sozinho.
+
+- **Oportunidade** nasce ligada à **empresa** do CNPJ (`oportunidade.empresa_id`), também em "criar
+  nova"; "anexar" só preenche a empresa se a oportunidade ainda não tiver.
+- **Pessoa:** se o e-mail do contato já está na base (em qualquer empresa), a pessoa é reaproveitada —
+  ganha o vínculo com esta empresa e só os campos vazios (cargo, telefone) são preenchidos. Sem isso,
+  nasce a pessoa nova, como antes.
+- **Endereço:** o questionário não pergunta o endereço; ele vem do **cadastro público do CNPJ**
+  (BrasilAPI, `crm/questionario/endereco.py`), só nos campos vazios. Sai do CRM apenas o CNPJ. Falha de
+  rede ou CNPJ não achado não impede a importação: o "o que fez" avisa "Endereço não encontrado pelo
+  CNPJ". A BrasilAPI recusa o agente padrão do Python (403); o CRM se identifica como `CRM-Criterio/1.0`.
+- Nos testes não há rede: `criar_app(fabrica=...)` não busca endereço, a menos que o teste passe
+  `busca_de_endereco`.
+
 ## Oportunidade ligada a uma empresa da base (01/10/2026)
 
 Pedido de Karine, amostra aprovada. Em **Funil > Nova oportunidade** a empresa é escolhida na base

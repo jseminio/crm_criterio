@@ -18,6 +18,7 @@ from crm.db.base import agora
 from crm.db.modelos import GrupoEconomico, Oportunidade, QuestionarioRecebido
 from crm.domain.listas import SituacaoDoQuestionario
 from crm.questionario import importacao
+from crm.questionario.endereco import BuscaDeEndereco
 from crm.questionario.fonte import (
     VARIAVEIS, BuscaFalhou, FonteDaFuncao, FonteDeQuestionarios, FonteSupabase, e_funcao, ler_configuracao,
 )
@@ -94,7 +95,9 @@ class QuestionarioDaOportunidade(BaseModel):
 def roteador_de_questionarios(
     obter_sessao: Callable[[], Iterator[Session]],
     fonte: Callable[[], FonteDeQuestionarios | None] = fonte_real,
+    buscar_endereco: BuscaDeEndereco | None = None,
 ) -> APIRouter:
+    """`buscar_endereco`: endereço pelo CNPJ ao importar (Karine, 01/10/2026). None = não busca."""
     r = APIRouter(tags=["questionário"])
 
     def _resumo(sessao: Session, q: QuestionarioRecebido) -> QuestionarioResumo:
@@ -129,7 +132,7 @@ def roteador_de_questionarios(
             q = sessao.scalar(sa.select(QuestionarioRecebido).where(QuestionarioRecebido.externo_id == externo))
             if q is None:
                 try:
-                    q = importacao.importar(sessao, linha)
+                    q = importacao.importar(sessao, linha, buscar_endereco)
                 except (importacao.LinhaInvalida, KeyError, ValueError) as falha:
                     sessao.rollback()  # só esta linha: as anteriores já foram gravadas
                     avisos.append(f"Questionário {externo or 'sem id'} ficou de fora: {falha}. Ele continua no site.")

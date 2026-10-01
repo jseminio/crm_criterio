@@ -6,6 +6,7 @@ import type { Listas, MudancaDePreco, OportunidadeDetalhe } from "../api/tipos";
 import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { DIRECIONADORES_DE_PORTE } from "../componentes/direcionadoresDePorte";
 import { Etiqueta } from "../componentes/Etiqueta";
+import { PropostaDaOportunidade } from "../componentes/PropostaDaOportunidade";
 import { QuestionarioDaOportunidade } from "../componentes/QuestionarioDaOportunidade";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro } from "../componentes/estados";
@@ -279,7 +280,7 @@ export function DetalheDaOportunidade({
   const [rascunho, definirRascunho] = useState<Record<string, string>>({});
   const [convertendoEmContrato, definirConvertendoEmContrato] = useState(false);
   const [avisoDeContrato, definirAvisoDeContrato] = useState<string | null>(null);
-  const [aba, definirAba] = useState<"cadastro" | "volumetria" | "historico">("cadastro");
+  const [aba, definirAba] = useState<"cadastro" | "volumetria" | "proposta" | "historico">("cadastro");
 
   const carregar = () => {
     definirErro(null);
@@ -415,10 +416,11 @@ export function DetalheDaOportunidade({
                 {convertendoEmContrato ? "Convertendo…" : "Converter em contrato"}
               </button>
             )}
-            {/* Uma ação primária por painel — regra 2 do PAD-002. */}
+            {/* Uma ação primária por painel — regra 2 do PAD-002. Na aba Proposta a primária é
+                "Gerar PowerPoint", e salvar a oportunidade fica secundário. */}
             <button
               type="button"
-              className="botao botao-primario"
+              className={`botao ${aba === "proposta" ? "botao-secundario" : "botao-primario"}`}
               onClick={salvar}
               disabled={salvando || exigeDataDeAceite}
             >
@@ -462,6 +464,15 @@ export function DetalheDaOportunidade({
               onClick={() => definirAba("volumetria")}
             >
               Volumetria e porte
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className="aba"
+              aria-selected={aba === "proposta"}
+              onClick={() => definirAba("proposta")}
+            >
+              Proposta
             </button>
             <button
               type="button"
@@ -733,6 +744,16 @@ export function DetalheDaOportunidade({
               mudar={mudar}
               alternar={alternar}
               listas={listas}
+            />
+          )}
+
+          {aba === "proposta" && (
+            <PropostaDaOportunidade
+              oportunidadeId={id}
+              aoEnviar={() => {
+                carregar();
+                aoSalvar();
+              }}
             />
           )}
 

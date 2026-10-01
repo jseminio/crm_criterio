@@ -26,6 +26,9 @@ const TOM_POR_SITUACAO: Record<string, string> = {
   "cliente novo": "ganho",
   "empresa já no CRM": "andamento",
   "precisa de você": "espera",
+  // Proposta em PowerPoint (01/10/2026)
+  "gerada, não enviada": "espera",
+  enviada: "ganho",
   Suspenso: "espera",
   "A preparar": "neutra",
   Pesquisando: "andamento",

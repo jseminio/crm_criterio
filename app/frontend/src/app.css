@@ -753,6 +753,33 @@
 .resultado-do-cliente td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
 .parametros-grupo { display: flex; flex-direction: column; gap: var(--e2); margin-bottom: var(--e4); }
 
+/* Proposta em PowerPoint (01/10/2026) */
+.proposta-da-oportunidade { display: grid; gap: var(--e3); }
+.proposta-da-oportunidade .campo { margin: 0; }
+.proposta-titulo { font-size: 14px; margin: var(--e3) 0 0; }
+.proposta-conta { background: var(--surface-sunken); border-radius: var(--raio-md); padding: var(--e3) var(--e4);
+  font-size: 13px; line-height: 1.6; }
+.proposta-conta p { margin: 0; }
+/* auto-fit: duas colunas no painel lateral (460 px), três na tela de Configurações. */
+.proposta-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--e3); align-items: start; }
+.proposta-grade-fixa { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.proposta-acoes-da-linha { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e1); }
+.proposta-acoes-da-linha .link-de-tabela { white-space: nowrap; }
+.proposta-grade-2 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.proposta-caixa { border: 1px solid var(--borda); border-radius: var(--raio-md); padding: var(--e2) var(--e3);
+  display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.proposta-valor { font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.proposta-perfil { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--e2) var(--e3); margin: 0;
+  font-size: 13px; }
+.proposta-perfil dt { color: var(--texto-fraco); }
+.proposta-perfil dd { margin: 0; font-weight: 600; }
+.proposta-acoes { display: flex; gap: var(--e3); align-items: center; flex-wrap: wrap; }
+.proposta-envio { display: flex; gap: var(--e2); align-items: end; flex-wrap: wrap; margin-top: var(--e2); }
+.matrizes-de-proposta .tabela { margin-bottom: var(--e3); }
+.matrizes-de-proposta .proposta-grade { max-width: 760px; }
+.marcador-falta { color: var(--perda); }
+.marcador-ok { color: var(--ganho); }
+
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

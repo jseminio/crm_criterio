@@ -43,6 +43,7 @@ from crm.domain.listas import (
     SituacaoContrato,
     SituacaoDoQuestionario,
     SituacaoEmpresa,
+    TipoDeMatriz,
     SituacaoGrupo,
     SituacaoLead,
     Temperatura,
@@ -1248,3 +1249,61 @@ class QuestionarioRecebido(CarimboMixin, Base):
     marcado_na_origem_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     """Quando o Supabase aceitou a marca de importado. Vazio = a marca falhou; na próxima busca ele
     volta e o CRM só tenta marcar de novo."""
+
+
+class MatrizDeProposta(Base):
+    """Um PowerPoint de proposta subido em Configurações › Propostas (01/10/2026). Trocar a matriz é subir
+    outra: a anterior fica, para que uma proposta já gerada saia de novo exatamente igual.
+
+    **Imutável de propósito**, como `HistoricoDePreco`: não herda o carimbo de alteração."""
+
+    __tablename__ = "matriz_de_proposta"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tipo: Mapped[TipoDeMatriz] = mapped_column(coluna_lista(TipoDeMatriz), nullable=False, index=True)
+    nome_arquivo: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    conteudo_base64: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    """O .pptx em base64 (texto, para o backup lógico levar junto, como o PDF do questionário)."""
+    enviada_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+    enviada_por: Mapped[str] = mapped_column(sa.String(60), nullable=False)
+    faltando: Mapped[list[str]] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+    """Marcadores obrigatórios que não estão no arquivo. Não vazio = matriz não usada até trocar."""
+    desconhecidos: Mapped[list[str]] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+    """Marcadores que o CRM não conhece (erro de digitação): também impedem o uso."""
+
+
+class ConfiguracaoDeProposta(CarimboMixin, Base):
+    """Uma linha só: o próximo número da sequência PROP CCE RJ, quem revisa e envia, e o preço de
+    tabela dos três planos da matriz Financeiro. A alíquota é o imposto dos Parâmetros."""
+
+    __tablename__ = "configuracao_de_proposta"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    proximo_numero: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    revisores: Mapped[list[str]] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+    plano_bpo: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    plano_plus: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    plano_cfo: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+
+
+class Proposta(CarimboMixin, Base):
+    """Uma proposta gerada em PowerPoint. O número (PROP CCE RJ 154.2026) é único e não volta: gerar
+    de novo antes de enviar regrava a mesma proposta; depois de enviada, gerar abre número novo.
+    `valores` guarda tudo o que foi preenchido, para baixar de novo exatamente igual."""
+
+    __tablename__ = "proposta"
+    __table_args__ = (sa.UniqueConstraint("ano", "numero", name="uq_proposta_ano_numero"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    oportunidade_id: Mapped[int] = mapped_column(sa.ForeignKey("oportunidade.id"), nullable=False, index=True)
+    numero: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    ano: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False)
+    matriz_id: Mapped[int] = mapped_column(sa.ForeignKey("matriz_de_proposta.id"), nullable=False)
+    valores: Mapped[dict] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+    valor_liquido: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    """Total mensal líquido (Contábil + DP); vazio na matriz Financeiro, que mostra três planos."""
+    valor_bruto: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    gerada_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+    enviada_em: Mapped[date | None] = mapped_column(sa.Date)
+    enviada_por: Mapped[str | None] = mapped_column(sa.String(60))
+

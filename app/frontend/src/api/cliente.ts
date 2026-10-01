@@ -54,6 +54,13 @@ import type {
   QuestionarioDaOportunidade,
   QuestionarioResumo,
   ResultadoDaBusca,
+  AbaDaProposta,
+  ConfiguracaoDeProposta,
+  EntradaDaProposta,
+  MatrizesDeProposta,
+  MatrizResumo,
+  PropostaResumo,
+  TipoDeMatriz,
 } from "./tipos";
 
 export class ErroDaApi extends Error {
@@ -120,8 +127,8 @@ export interface ResumoDeBackup {
   total: number;
 }
 
-/** O arquivo de backup vai cru no corpo, não em JSON. */
-async function enviarArquivo(caminho: string, arquivo: File, cabecalhos: Record<string, string> = {}) {
+/** O arquivo (backup, matriz de proposta) vai cru no corpo, não em JSON. */
+async function enviarArquivo<T = ResumoDeBackup>(caminho: string, arquivo: File, cabecalhos: Record<string, string> = {}): Promise<T> {
   let resposta: Response;
   try {
     resposta = await fetch(caminho, { method: "POST", body: arquivo, headers: cabecalhos });
@@ -138,7 +145,7 @@ async function enviarArquivo(caminho: string, arquivo: File, cabecalhos: Record<
     }
     throw new ErroDaApi(resposta.status, detalhe);
   }
-  return (await resposta.json()) as ResumoDeBackup;
+  return (await resposta.json()) as T;
 }
 
 export const api = {
@@ -244,6 +251,21 @@ export const api = {
   questionarios: () => pedir<QuestionarioResumo[]>("/api/questionarios"),
   resolverQuestionario: (id: number, acao: "anexar" | "criar") =>
     pedir<QuestionarioResumo>(`/api/questionarios/${id}/resolver`, { method: "POST", body: JSON.stringify({ acao }) }),
+
+  abaDaProposta: (oportunidadeId: number) => pedir<AbaDaProposta>(`/api/oportunidades/${oportunidadeId}/proposta`),
+  gerarProposta: (oportunidadeId: number, entrada: EntradaDaProposta) =>
+    pedir<PropostaResumo>(`/api/oportunidades/${oportunidadeId}/proposta`, { method: "POST", body: JSON.stringify(entrada) }),
+  marcarPropostaEnviada: (propostaId: number, por: string, em: string) =>
+    pedir<PropostaResumo>(`/api/propostas/${propostaId}/enviada`, { method: "POST", body: JSON.stringify({ por, em }) }),
+  matrizesDeProposta: () => pedir<MatrizesDeProposta>("/api/propostas/matrizes"),
+  subirMatriz: (tipo: TipoDeMatriz, arquivo: File, enviadaPor: string) =>
+    enviarArquivo<MatrizResumo>(
+      comParametros(`/api/propostas/matrizes/${encodeURIComponent(tipo)}`, { nome_arquivo: arquivo.name, enviada_por: enviadaPor }),
+      arquivo,
+    ),
+  configuracaoDeProposta: () => pedir<ConfiguracaoDeProposta>("/api/propostas/configuracao"),
+  editarConfiguracaoDeProposta: (c: Omit<ConfiguracaoDeProposta, "imposto" | "ultimo_usado">) =>
+    pedir<ConfiguracaoDeProposta>("/api/propostas/configuracao", { method: "PUT", body: JSON.stringify(c) }),
 
   criarOportunidade: (oportunidade: Record<string, unknown>) =>
     pedir<OportunidadeDetalhe>("/api/oportunidades", {

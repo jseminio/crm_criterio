@@ -53,6 +53,71 @@ PYTHONDONTWRITEBYTECODE=1 ~/.venvs/criterio-crm/bin/python -m pytest
 > build versionado por engano. Pelo mesmo motivo o pytest roda sem cache em
 > disco (`-p no:cacheprovider`).
 
+## Proposta em PowerPoint (01/10/2026)
+
+Na oportunidade, a aba **Proposta** monta a proposta a partir de uma **matriz em PowerPoint** e baixa
+o .pptx. Eduardo ou Karine revisam, ajustam à mão se preciso, salvam como PDF no PowerPoint e
+enviam. A proposta fica em PowerPoint justamente para isso: dá para mudar um detalhe e reenviar.
+
+- **Matriz pelo questionário:** pediu só Financeiro → matriz **Financeiro** (três planos de preço de
+  tabela); qualquer outra combinação → matriz **Contábil** (Contábil/Fiscal + DP). Dá para trocar na aba.
+- **Preço sugerido** (matriz Contábil): a mesma conta do honorário calculado da Carteira, aberta na
+  tela. Horas do porte × (1 + atrito) × custo/hora ÷ (1 − imposto − margem alvo) dá o **bruto**;
+  × (1 − imposto) dá o **líquido sugerido**. Disciplina entra 3 (cliente novo não tem nota);
+  complexidade ou risco sem nota também entram 3, e a tela diz isso. Sem porte, não há sugestão.
+- **Líquido e bruto:** a proposta mostra o líquido (o que vai no contrato) e o bruto com a alíquota
+  estimada, prática da Critério para a Reforma Tributária. Bruto = líquido ÷ (1 − alíquota),
+  **arredondado ao múltiplo de R$ 50 mais próximo** (NRH: 6.900 → 7.750). A alíquota é o imposto de
+  Carteira › Parâmetros de cálculo (11%): uma fonte só.
+- **Numeração PROP CCE RJ:** sequência única para as duas matrizes, começando em **154** (a última
+  da planilha foi a 153.2026); o ano vem da data. Gerar de novo **antes de enviar** regrava a mesma
+  proposta, com o mesmo número; depois de enviada, gerar abre número novo. Número usado nunca volta.
+- **Marcar como enviada:** pede quem enviou (Eduardo ou Karine) e a data. A oportunidade em
+  "Enviar proposta" passa a "Em avaliação pela empresa"; na matriz Contábil, o total líquido vira o
+  preço mensal, com linha no Histórico de preço.
+- **Baixar de novo** sai igual, com a matriz e os valores da época, mesmo depois de trocar a matriz.
+
+**Configurações › Propostas:** subir e trocar as matrizes, próximo número, quem revisa e envia, e
+o preço de tabela dos planos financeiros. Matriz com marcador obrigatório faltando, ou com
+marcador desconhecido (erro de digitação), fica gravada mas **não é usada** até subir a corrigida.
+A lista completa de marcadores está na própria tela ("Lista de marcadores").
+
+### Pôr os marcadores nas matrizes oficiais
+
+As matrizes oficiais estão no SharePoint Comercial (Kit Contábil: *01_Proposta BPO Full_Mar.26 -
+Template*; Kit Financeiro: *Proposta_BPO_Financeiro_slide13_corrigido*). Numa **cópia** de cada uma,
+troque no PowerPoint o texto da esquerda pelo marcador da direita e suba em Configurações › Propostas.
+
+| Onde (matriz Contábil) | Hoje | Marcador |
+|---|---|---|
+| Capa | `[Nome do Cliente]` | `{{cliente}}` |
+| Capa | `PROP CCE RJ [00X].2026` | `PROP CCE RJ {{numero}}` |
+| Carta | `Prezado Sr. [NOME]` | `{{tratamento}}` |
+| Contextualização | o parágrafo inteiro | `{{contextualizacao}}`, sozinho no parágrafo |
+| Perfil | `[QUANTIDADE]` transações / `R$ [VALOR]/ano` / `[QUANTIDADE]` bancos | `{{movimentacao}}` / `{{faturamento}}/ano` / `{{instituicoes}}` |
+| Perfil | `[MEIOS]` CLT + PJs / `[REGIME]` / `[00.000.000/0000-00]` / `[ERP / SISTEMA]` | `{{funcionarios}}` / `{{regime}}` / `{{cnpj}}` / `{{sistema}}` |
+| Perfil | `[SEGMENTO]` / `[X] empresa(s) \| [CIDADE/UF]` | `{{segmento}}` / `{{empresas}} \| {{localidade}}` |
+| Honorários | `[V1]` / `[V2]` | `{{valor_contabil}}` / `{{valor_dp}}` |
+| Honorários | `até XX horas` (Contábil) / `até XX horas` (DP) / `até 20 horas` (total) | `{{horas_contabil}}` / `{{horas_dp}}` / `{{horas_total}}` |
+| Honorários | `Valor Líquido: [V3]` / `Valor Bruto: [V3]` | `Valor Líquido: {{valor_liquido}}` / `Valor Bruto: {{valor_bruto}}` |
+
+| Onde (matriz Financeiro) | Hoje | Marcador |
+|---|---|---|
+| Capa e carta | `[Nome do Cliente]` / `[00X]` / `Prezado(a) Sr(a). [NOME]` | `{{cliente}}` / `{{numero}}` / `{{tratamento}}` |
+| Contextualização | o texto inteiro | `{{contextualizacao}}`, sozinho no parágrafo |
+| Perfil | `[NOME DO CLIENTE]` / `[Segmento de atuação do cliente]` / `[Sistema financeiro utilizado]` | `{{cliente}}` / `{{segmento}}` / `{{sistema}}` |
+| Perfil | os "A validar" de documentos, faturamento, bancos, meios de pagamento, regime e CNPJ | `{{volume_documentos}}`, `{{faturamento}}`, `{{instituicoes}}`, `{{meios_de_pagamento}}`, `{{regime}}`, `{{cnpj}}` |
+| Honorários | `R$ 5.000` / `R$ 7.000` / `R$ 9.000` | `{{plano_bpo}}` / `{{plano_plus}}` / `{{plano_cfo}}` |
+
+Aproveite a cópia para corrigir o que já saiu errado em propostas enviadas: na Contábil,
+"assessorial"; na Financeiro, "2 hora por mês", "até 1 usuários", "To dos", "Este proposta" e o
+Perfil numerado 5 antes de Honorários 4. Texto escrito para cada cliente que não tem marcador (o
+"[XX] anos" de mercado, o resumo do negócio) continua sendo ajustado no PowerPoint.
+
+**Para usar nesta máquina:** `git pull`, depois
+`cd backend && ~/.venvs/criterio-crm/bin/pip install -e ".[dev]"` (instala o `python-pptx`) e
+`~/.venvs/criterio-crm/bin/alembic upgrade head` (cria as três tabelas novas, sem tocar no que existe).
+
 ## Questionário do site vira oportunidade (01/10/2026)
 
 O cliente preenche o questionário para proposta no site (Lovable), que grava na tabela

@@ -33,6 +33,7 @@ from crm.api.classificacao import ServicosDeAnalise, roteador as roteador_de_car
 from crm.api.contatos import roteador as roteador_de_contatos
 from crm.api.contatos import roteador_de_empresas
 from crm.api.sdr import roteador as roteador_do_sdr
+from crm.api.propostas import roteador_de_propostas
 from crm.api.questionarios import fonte_real, roteador_de_questionarios
 from crm.questionario.fonte import FonteDeQuestionarios
 from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
@@ -142,6 +143,7 @@ def criar_app(
     api.include_router(roteador_de_empresas(obter_sessao))
     api.include_router(roteador_do_sdr(obter_sessao))
     api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real))
+    api.include_router(roteador_de_propostas(obter_sessao))
     return api
 
 

@@ -15,7 +15,7 @@ o CRM busca de lá com a chave secreta ("Buscar questionários" no Funil).
      CRM_QUESTIONARIO_URL=https://xxxx.supabase.co
      CRM_QUESTIONARIO_CHAVE=sb_secret_…
      ```
-3. **Logomarca.** Ponha `logo_branca.png` nesta pasta (a mesma do site atual). Sem ela a página
+3. **Logomarca.** `logo_branca.png` já está aqui: letras brancas, fundo transparente (feita a partir da logomarca oficial). Sem ela a página
    funciona, só sem a logo no topo e no PDF.
 4. **Publicar.** Em app.netlify.com/drop, arraste esta pasta. O Netlify devolve o endereço
    (`https://<nome>.netlify.app`). Para mudar o texto ou as perguntas depois, edite o `index.html`

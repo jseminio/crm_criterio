@@ -126,9 +126,12 @@ ainda não entrou e marca `importado_crm_em` lá. O CRM **busca**; o Supabase nu
 continua só em `127.0.0.1`.
 
 - **Configuração:** `CRM_QUESTIONARIO_URL` e `CRM_QUESTIONARIO_CHAVE` no `backend/.env` (ver
-  `.env.example`). A chave é a **secreta** do projeto Supabase: a tabela só aceita inserir pela
-  chave pública (conferido em 01/10/2026: RLS ligado, uma única política, de INSERT com o
-  consentimento LGPD marcado), então ninguém de fora lê as respostas.
+  `.env.example`). O banco do site é administrado pelo Lovable e a chave secreta do Supabase não
+  fica à vista, então o caminho é a **função do site** `questionarios-crm`: a URL termina em
+  `/functions/v1/questionarios-crm` e a "chave" é uma senha nossa (`openssl rand -hex 32`), a mesma
+  guardada no Lovable como segredo `CRM_QUESTIONARIO_SENHA`. A função só entrega os pendentes e marca
+  os importados; sem a senha, recusa. Com a chave secreta de um Supabase próprio, a URL do projeto
+  também funciona (o CRM escolhe pelo endereço). O código da função está em `site/questionarios-crm/index.ts`.
 - **O CNPJ é a identidade.** Empresa nova cria grupo (Prospect, origem "Questionário do cliente"),
   empresa, contato e a oportunidade em "Enviar proposta". Empresa já cadastrada leva a oportunidade
   ao grupo dela (ao que ficou, se foi fundido). Grupo homônimo sem o CNPJ é só avisado: juntar é

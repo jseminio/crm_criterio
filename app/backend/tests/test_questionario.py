@@ -6,6 +6,7 @@ Dados fictícios. O Supabase é simulado: nenhum teste sai da máquina.
 from __future__ import annotations
 
 import base64
+import json
 from datetime import date, datetime
 
 import httpx2 as httpx
@@ -17,7 +18,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from crm.api.app import criar_app
 from crm.db.modelos import Empresa, GrupoEconomico, Oportunidade, PessoaContato, QuestionarioRecebido
 from crm.domain.listas import Origem, Situacao, SituacaoGrupo
-from crm.questionario.fonte import BuscaFalhou, ConfiguracaoDoQuestionario, FonteSupabase, ler_configuracao
+from crm.questionario.fonte import BuscaFalhou, ConfiguracaoDoQuestionario, FonteDaFuncao, FonteSupabase, ler_configuracao
 from crm.questionario.leitura import ler
 
 CNPJ_ALFA = "12345678000190"
@@ -159,6 +160,63 @@ class TestFonteSupabase:
         monkeypatch.setenv("CRM_QUESTIONARIO_URL", "https://exemplo.supabase.co/")
         monkeypatch.setenv("CRM_QUESTIONARIO_CHAVE", "sb_secret_abc")
         assert ler_configuracao().url == "https://exemplo.supabase.co"
+
+
+URL_DA_FUNCAO = "https://exemplo.supabase.co/functions/v1/questionarios-crm"
+
+
+class TestFonteDaFuncao:
+    """O banco do site é do Lovable e a chave secreta não fica à vista: a função do site entrega os
+    pendentes e marca os importados, com a senha combinada (01/10/2026)."""
+
+    def _fonte(self, resposta, senha="senha-de-teste"):
+        pedidos = []
+
+        def responder(pedido):
+            pedidos.append(pedido)
+            return resposta(pedido)
+
+        http = httpx.Client(transport=httpx.MockTransport(responder))
+        return FonteDaFuncao(ConfiguracaoDoQuestionario(URL_DA_FUNCAO, senha), http), pedidos
+
+    def test_busca_com_a_senha_no_cabecalho(self):
+        f, pedidos = self._fonte(lambda p: httpx.Response(200, json=[{"id": "x"}]))
+        assert f.novos() == [{"id": "x"}]
+        p = pedidos[0]
+        assert p.method == "GET" and str(p.url) == URL_DA_FUNCAO
+        assert p.headers["x-crm-senha"] == "senha-de-teste" and "apikey" not in p.headers
+
+    def test_marca_importado_com_post(self):
+        f, pedidos = self._fonte(lambda p: httpx.Response(204))
+        f.marcar_importado("q-1", datetime(2026, 10, 1, 9, 0))
+        p = pedidos[0]
+        assert p.method == "POST" and json.loads(p.content) == {"id": "q-1", "importado_crm_em": "2026-10-01T09:00:00"}
+
+    def test_senha_recusada_diz_o_que_fazer_sem_mostrar_a_senha(self):
+        f, _ = self._fonte(lambda p: httpx.Response(401), senha="segredo-123")
+        with pytest.raises(BuscaFalhou) as erro:
+            f.novos()
+        assert "CRM_QUESTIONARIO_SENHA" in str(erro.value) and "segredo-123" not in str(erro.value)
+        with pytest.raises(BuscaFalhou):
+            f.marcar_importado("q-1", datetime(2026, 10, 1))
+
+    @pytest.mark.parametrize("resposta, trecho", [
+        (lambda p: httpx.Response(500), "HTTP 500"),
+        (lambda p: httpx.Response(200, json={"erro": "x"}), "não é a lista"),
+    ])
+    def test_resposta_estranha(self, resposta, trecho):
+        f, _ = self._fonte(resposta)
+        with pytest.raises(BuscaFalhou) as erro:
+            f.novos()
+        assert trecho in str(erro.value)
+
+    def test_o_endereco_escolhe_o_caminho(self, monkeypatch):
+        from crm.api.questionarios import fonte_real
+        monkeypatch.setenv("CRM_QUESTIONARIO_CHAVE", "senha-de-teste")
+        monkeypatch.setenv("CRM_QUESTIONARIO_URL", URL_DA_FUNCAO)
+        assert isinstance(fonte_real(), FonteDaFuncao)
+        monkeypatch.setenv("CRM_QUESTIONARIO_URL", "https://exemplo.supabase.co")
+        assert isinstance(fonte_real(), FonteSupabase)
 
 
 class TestBuscar:

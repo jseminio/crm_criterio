@@ -5,6 +5,7 @@
  * CRM — o servidor recusa pedidos que chegam por túnel.
  */
 
+import { MatrizesDeProposta } from "../componentes/MatrizesDeProposta";
 import { useState } from "react";
 import { ErroDaApi, api } from "../api/cliente";
 import type { ResumoDeBackup } from "../api/cliente";
@@ -212,6 +213,7 @@ export function Configuracoes() {
         )}
         {feito && <p role="status">{feito}</p>}
       </section>
+      <MatrizesDeProposta />
       <PedidosDeServicoNovo />
     </div>
   );

@@ -9,17 +9,12 @@ import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { AbaDaProposta, EntradaDaProposta, PropostaResumo, TipoDeMatriz } from "../api/tipos";
 import { data, dataHora, dinheiro, fracaoEmPercentual } from "../formato";
+import { brutoPrevio } from "../proposta";
 import { Etiqueta } from "./Etiqueta";
 import { Carregando, Erro } from "./estados";
 
 const virgula = (v: string | number) => String(v).replace(".", ",");
 const numero = (v: string | null | undefined) => (v === null || v === undefined || v === "" ? null : Number(v));
-
-/** Prévia do bruto: líquido ÷ (1 − alíquota), ao múltiplo de R$ 50 mais próximo. O valor que vale é o
- * que a API grava ao gerar; a regra é a mesma (`crm.proposta.conta.bruto_de`). */
-export function brutoPrevio(liquido: number, imposto: number): number {
-  return Math.round(liquido / (1 - imposto) / 50) * 50;
-}
 
 const PERFIL: Record<TipoDeMatriz, [string, string, string?][]> = {
   Contábil: [

@@ -17,7 +17,7 @@ from crm.agente.envio import EnvioFalhou
 from crm.agente.sdr import AgenteFalhou, Preparo
 from crm.api.abordagens import Servicos
 from crm.api.app import criar_app
-from crm.db.modelos import Empresa, ExecucaoDoAgente, GrupoEconomico, PessoaContato
+from crm.db.modelos import Empresa, ExecucaoDoAgente, GrupoEconomico, PessoaContato, VinculoDeContato
 from crm.domain.listas import SituacaoGrupo
 
 PREPARO = Preparo(
@@ -254,7 +254,7 @@ def test_contato_da_empresa_entra_na_ficha_sem_email_nem_telefone(cliente, ambie
     sessao.add_all(
         [
             PessoaContato(
-                empresa_id=empresa.id, nome="Bia", cargo="Controller",
+                vinculos=[VinculoDeContato(empresa_id=empresa.id)], nome="Bia", cargo="Controller",
                 email="bia@omega.com.br", telefone="21999990000",
             ),
             PessoaContato(grupo_id=abordagem["grupo_id"], nome="Caio"),

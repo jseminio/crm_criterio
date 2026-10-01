@@ -248,6 +248,18 @@ export function Funil({ listas }: { listas: Listas | null }) {
               </button>
             </div>
             <BotaoBuscarQuestionarios estado={questionarios} />
+            {visao === "grade" && (
+              <a
+                className="botao botao-secundario"
+                href={api.enderecoDaExportacaoDoFunil({
+                  ...paraConsulta(filtros),
+                  situacao: situacao ? [situacao] : undefined,
+                })}
+                title="Baixa em Excel as oportunidades da Grade, com os filtros aplicados"
+              >
+                Exportar para Excel
+              </a>
+            )}
             <button type="button" className="botao botao-primario" onClick={() => definirCriando(true)}>
               Nova oportunidade
             </button>

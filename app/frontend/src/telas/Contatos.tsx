@@ -4,6 +4,9 @@
  * telefone), sem depender de acento nem de caixa. Cliente = empresa (CNPJ); prospect = grupo, ou
  * a empresa quando já existe. A coluna de lacunas diz o que falta para poder falar com a pessoa
  * e mandar correspondência.
+ *
+ * Base única de contatos (30/09/2026, pedido de Karine): "Nova pessoa" cadastra sem empresa, e
+ * "Nova empresa" vincula quem já está cadastrado. Uma pessoa pode estar em várias empresas.
  */
 
 import { useEffect, useState } from "react";
@@ -13,8 +16,18 @@ import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj as formatarCnpj, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
+import { DetalheDaPessoa } from "./DetalheDaPessoa";
 import { DetalheDoContato } from "./DetalheDoContato";
+import { NovaEmpresa } from "./NovaEmpresa";
 import { NovaPessoa } from "./NovaPessoa";
+
+/** As empresas da pessoa nesta lista, com ★ na principal; sem nenhuma, o grupo ou "Sem empresa". */
+function empresasDaPessoa(p: PessoaComOrigem): string {
+  if (p.empresas && p.empresas.length > 0) {
+    return p.empresas.map((e) => `${e.principal ? "★ " : ""}${e.razao_social}`).join(", ");
+  }
+  return p.grupo_nome ?? "Sem empresa";
+}
 
 type Modo = "empresa" | "pessoa";
 const ROTULO: Record<TipoDeContato, string> = { cliente: "Clientes", prospect: "Prospects" };
@@ -45,6 +58,8 @@ export function Contatos({ listas }: { listas: Listas | null }) {
   const [soComLacunas, definirSoComLacunas] = useState(false);
   const [aberto, definirAberto] = useState<EntidadeDeContato | null>(null);
   const [cadastrando, definirCadastrando] = useState(false);
+  const [cadastrandoEmpresa, definirCadastrandoEmpresa] = useState(false);
+  const [pessoaAberta, definirPessoaAberta] = useState<PessoaComOrigem | null>(null);
   const { ordenacao: ordenacaoDeEmpresas, alternar: alternarOrdenacaoDeEmpresas } = usarOrdenacao();
   const { ordenacao: ordenacaoDePessoas, alternar: alternarOrdenacaoDePessoas } = usarOrdenacao();
   const busca = useAtrasado(texto);
@@ -70,7 +85,10 @@ export function Contatos({ listas }: { listas: Listas | null }) {
   return (
     <>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--e2)" }}>
-        <button type="button" className="botao botao-primario" onClick={() => definirCadastrando(true)}>Nova pessoa</button>
+        <div className="sugestao-acoes">
+          <button type="button" className="botao botao-primario" onClick={() => definirCadastrando(true)}>Nova pessoa</button>
+          <button type="button" className="botao botao-primario" onClick={() => definirCadastrandoEmpresa(true)}>Nova empresa</button>
+        </div>
       </div>
 
       <div className="abas" role="tablist" aria-label="Clientes e prospects">
@@ -180,17 +198,17 @@ export function Contatos({ listas }: { listas: Listas | null }) {
               cargo: (p) => p.cargo,
               email: (p) => p.email,
               telefone: (p) => p.telefone,
-              empresa: (p) => p.razao_social ?? p.grupo_nome,
+              empresa: (p) => empresasDaPessoa(p),
             }).map((p) => (
               <tr key={p.id}>
                 <td>
-                  <strong>{p.nome}</strong>
+                  <button type="button" className="link-de-tabela" onClick={() => definirPessoaAberta(p)}><strong>{p.nome}</strong></button>
                   {p.nao_contatar && <span className="etiqueta etiqueta-perda" style={{ marginLeft: 6 }}>Não contatar</span>}
                 </td>
                 <td>{p.cargo ?? "—"}</td>
                 <td>{p.email ?? "—"}</td>
                 <td>{p.telefone ?? "—"}</td>
-                <td>{p.razao_social ?? p.grupo_nome}{p.razao_social && p.razao_social !== p.grupo_nome && <span className="numero-nota"> · {p.grupo_nome}</span>}</td>
+                <td>{p.empresas && p.empresas.length > 0 || p.grupo_nome ? empresasDaPessoa(p) : <span className="numero-nota">— Sem empresa</span>}</td>
               </tr>
             ))}
           </tbody>
@@ -200,6 +218,17 @@ export function Contatos({ listas }: { listas: Listas | null }) {
       {total !== undefined && total > 0 && <p className="numero-nota">{total} resultado{total === 1 ? "" : "s"}</p>}
 
       {cadastrando && <NovaPessoa listas={listas} aoFechar={() => definirCadastrando(false)} aoCriar={recarregar} />}
+
+      {cadastrandoEmpresa && <NovaEmpresa aoFechar={() => definirCadastrandoEmpresa(false)} aoCriar={recarregar} />}
+
+      {pessoaAberta && (
+        <DetalheDaPessoa
+          pessoa={pessoas.dados?.itens.find((p) => p.id === pessoaAberta.id) ?? pessoaAberta}
+          listas={listas}
+          aoFechar={() => definirPessoaAberta(null)}
+          aoMudar={recarregar}
+        />
+      )}
 
       {aberta && <DetalheDoContato entidade={aberta} listas={listas} aoFechar={() => definirAberto(null)} aoMudar={recarregar} />}
     </>

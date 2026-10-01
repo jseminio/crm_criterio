@@ -217,6 +217,26 @@ class TestAbaDaProposta:
         assert a["sugestao"] is None and "volumetria" in a["sem_sugestao"]
         assert a["rascunho"]["tratamento"] == "Prezado(a) Sr(a). [NOME]" and a["tem_dp"]
 
+    def test_sem_questionario_o_tratamento_usa_o_contato_principal_das_empresas(self, cliente, fabrica):
+        """Contato é ligado às empresas do grupo, não ao grupo (01/10/2026)."""
+        with fabrica() as s:
+            from crm.db.modelos import Empresa, GrupoEconomico, PessoaContato, VinculoDeContato
+            from crm.domain.listas import SituacaoGrupo
+            g = GrupoEconomico(nome="Grupo Delta", situacao=SituacaoGrupo.PROSPECT)
+            s.add(g)
+            s.flush()
+            e = Empresa(grupo_id=g.id, razao_social="Delta Ltda")
+            s.add_all([
+                PessoaContato(nome="Bia", vinculos=[VinculoDeContato(empresa=e)]),
+                PessoaContato(nome="Caio", vinculos=[VinculoDeContato(empresa=e, principal=True)]),
+            ])
+            o = Oportunidade(grupo_id=g.id, nome="Delta", situacao=Situacao.ENVIAR_PROPOSTA)
+            s.add(o)
+            s.commit()
+            oid = o.id
+        a = cliente.get(f"/api/oportunidades/{oid}/proposta").json()
+        assert "Caio" in a["rascunho"]["tratamento"]
+
     def test_oportunidade_inexistente(self, cliente):
         assert cliente.get("/api/oportunidades/999/proposta").status_code == 404
 

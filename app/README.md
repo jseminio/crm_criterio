@@ -551,6 +551,25 @@ pontual). Antes, só a carteira recorrente era "Cliente". Agora:
 - A sugestão "prospect que já é cliente" passou a comparar os grupos **sem empresa** (prospects e clientes
   não recorrentes) com os clientes da carteira, para não perder as duplicatas depois da promoção.
 
+## Oportunidade ligada a uma empresa da base (01/10/2026)
+
+Pedido de Karine, amostra aprovada. Em **Funil > Nova oportunidade** a empresa é escolhida na base
+de empresas — ao clicar no campo a lista aparece, e a busca acha por **nome fantasia, razão social ou
+CNPJ** (com ou sem pontuação). O **grupo vem da empresa**; o campo "Grupo (cliente)" saiu. O Funil
+**não cadastra empresa**: quem não está na base aparece como "Empresa não encontrada — cadastre em
+Contatos > Nova empresa", e o botão "Criar oportunidade" só libera com empresa escolhida. Ao escolher,
+o nome da oportunidade é preenchido com a razão social e continua editável.
+
+- **Editar depois:** no detalhe da oportunidade, **nome** e **empresa** são editáveis (busca e
+  "Trocar"); trocar a empresa leva o grupo junto. A oportunidade que **já virou contrato não troca de
+  empresa** (409). O contrato passa a nascer com a empresa da oportunidade.
+- **Banco:** `oportunidade.empresa_id` (migração `b7d2e9f4a1c8`). As oportunidades antigas cujo grupo
+  tem **uma única empresa** receberam essa empresa (decisão de Karine); as demais ficam em branco
+  para escolher no detalhe. Excluir uma empresa deixa as oportunidades dela sem empresa (o grupo fica).
+- **API:** `GET /api/empresas/busca`; `POST /api/oportunidades` aceita `empresa_id` (quando vem, o
+  grupo é o da empresa e `grupo_id`/`nome_do_grupo` são ignorados — o caminho antigo continua para
+  integrações); `PATCH /api/oportunidades/{id}` aceita `nome` e `empresa_id`.
+
 ## Datas no padrão brasileiro (01/10/2026)
 
 Pedido de Karine: os campos de data apareciam como mm/dd/aaaa. Motivo: o `<input type="date">` do

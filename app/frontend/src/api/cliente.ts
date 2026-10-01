@@ -7,6 +7,7 @@ import type {
   EnderecoDeContato,
   FusaoFeita,
   EntidadeDeContato,
+  EmpresaEncontrada,
   PaginaDeContatos,
   PessoaComOrigem,
   PessoaDeContato,
@@ -174,6 +175,10 @@ export const api = {
 
   editarEmpresa: (id: number, mudancas: Record<string, unknown>) =>
     pedir<EnderecoDeContato>(`/api/empresas/${id}`, { method: "PATCH", body: JSON.stringify(mudancas) }),
+
+  /** A base de empresas, por nome, razão social ou CNPJ — para escolher a da oportunidade. */
+  buscarEmpresas: (busca: string) =>
+    pedir<EmpresaEncontrada[]>(comParametros("/api/empresas/busca", { busca })),
 
   /** Toda a base de contatos (clientes e prospects), por nome, e-mail ou telefone. */
   buscarPessoas: (busca: string) =>

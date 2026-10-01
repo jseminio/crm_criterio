@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { Listas, MudancaDePreco, OportunidadeDetalhe } from "../api/tipos";
+import type { EmpresaEncontrada, Listas, MudancaDePreco, OportunidadeDetalhe } from "../api/tipos";
 import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { DIRECIONADORES_DE_PORTE } from "../componentes/direcionadoresDePorte";
 import { Etiqueta } from "../componentes/Etiqueta";
@@ -12,6 +12,7 @@ import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro } from "../componentes/estados";
 import { dataHora, dinheiro } from "../formato";
 import { CampoDeData } from "../componentes/CampoDeData";
+import { BuscaDeEmpresa } from "../componentes/BuscaDeEmpresa";
 
 function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
@@ -276,6 +277,7 @@ export function DetalheDaOportunidade({
   aoSalvar: () => void;
 }) {
   const [detalhe, definirDetalhe] = useState<OportunidadeDetalhe | null>(null);
+  const [empresaEscolhida, definirEmpresaEscolhida] = useState<EmpresaEncontrada | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
   const [salvando, definirSalvando] = useState(false);
   const [rascunho, definirRascunho] = useState<Record<string, string>>({});
@@ -289,7 +291,13 @@ export function DetalheDaOportunidade({
       .oportunidade(id)
       .then((d) => {
         definirDetalhe(d);
+        definirEmpresaEscolhida(d.empresa_id ? {
+          id: d.empresa_id, razao_social: d.empresa_razao_social ?? "", nome_fantasia: null,
+          cnpj: d.empresa_cnpj ?? null, grupo_id: d.grupo_id, grupo_nome: d.grupo_nome ?? "", tipo: "prospect",
+        } : null);
         definirRascunho({
+          nome: d.nome,
+          empresa_id: d.empresa_id?.toString() ?? "",
           situacao: situacaoInicial ?? d.situacao,
           temperatura: d.temperatura ?? "",
           motivo_recusa: d.motivo_recusa ?? "",
@@ -492,6 +500,22 @@ export function DetalheDaOportunidade({
           {aba === "cadastro" && (
           <>
           <div className="formulario">
+            <BuscaDeEmpresa
+              key={`${detalhe.id}-${detalhe.empresa_id ?? "sem"}`}
+              id="d-empresa"
+              rotulo="Empresa"
+              escolhida={empresaEscolhida}
+              aoEscolher={(e) => { definirEmpresaEscolhida(e); mudar("empresa_id", String(e.id)); }}
+              desabilitado={detalhe.tem_contrato}
+              ajuda={detalhe.tem_contrato
+                ? "Esta oportunidade já virou contrato: a empresa não troca mais por aqui."
+                : empresaEscolhida ? undefined : "Escolha a empresa na base (nome, razão social ou CNPJ). Não achou? Cadastre em Contatos > Nova empresa."}
+            />
+            <div className="campo-bloco">
+              <label className="campo-rotulo" htmlFor="d-nome">Nome da oportunidade</label>
+              <input id="d-nome" className="entrada" maxLength={200} value={rascunho.nome ?? ""}
+                onChange={(e) => mudar("nome", e.target.value)} />
+            </div>
             <div className="campo-bloco">
               <label className="campo-rotulo" htmlFor="d-situacao">
                 Situação

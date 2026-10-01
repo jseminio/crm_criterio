@@ -1,8 +1,9 @@
 /** A proposta nascendo direto no CRM — sem passar pela planilha nem por um
  * lead. Decisão de Eduardo em 22/09/2026 (E4).
  *
- * O grupo é reaproveitado pelo nome, ou nasce um novo — mesmo padrão da
- * conversão de lead: um campo de texto só, sem seletor de grupo existente.
+ * A empresa é escolhida na base de empresas (nome, razão social ou CNPJ) e o grupo
+ * vem dela; o Funil não cadastra empresa — quem não está na base é cadastrado antes,
+ * em Contatos > Nova empresa (Karine, 01/10/2026).
  *
  * Serviço recorrente (C1) pede a quantidade de parcelas, e o preço anual
  * passa a ser mensal × parcelas, travado. Pedido de Karine em 30/09/2026; o
@@ -15,7 +16,8 @@
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { Listas, ServicoDoCatalogo } from "../api/tipos";
+import type { EmpresaEncontrada, Listas, ServicoDoCatalogo } from "../api/tipos";
+import { BuscaDeEmpresa } from "./BuscaDeEmpresa";
 import { precoPelasParcelas } from "../parcelas";
 import { usarDados } from "../usarDados";
 import { EscolhaDeServico } from "./CatalogoDeServicos";
@@ -28,7 +30,6 @@ function hoje(): string {
 
 const CAMPOS_VAZIOS = {
   nome: "",
-  nome_do_grupo: "",
   servico: "",
   servico_descricao: "",
   servico_tema: "",
@@ -56,6 +57,15 @@ export function NovaOportunidade({
   const [campos, definirCampos] = useState(CAMPOS_VAZIOS);
   const [erro, definirErro] = useState<string | null>(null);
   const [salvando, definirSalvando] = useState(false);
+  const [empresa, definirEmpresa] = useState<EmpresaEncontrada | null>(null);
+  const escolherEmpresa = (e: EmpresaEncontrada) => {
+    // O nome acompanha a empresa enquanto ninguém o personalizou.
+    definirCampos((atual) => ({
+      ...atual,
+      nome: atual.nome.trim() === "" || atual.nome === empresa?.razao_social ? e.razao_social : atual.nome,
+    }));
+    definirEmpresa(e);
+  };
   const { dados: catalogo } = usarDados<ServicoDoCatalogo[]>(() => api.servicos(), []);
   const recorrente =
     catalogo?.find((s) => s.nome === campos.servico)?.recorrente ?? false;
@@ -74,7 +84,7 @@ export function NovaOportunidade({
       const corpo = Object.fromEntries(
         Object.entries(valores).filter(([, v]) => v !== ""),
       );
-      await api.criarOportunidade(corpo);
+      await api.criarOportunidade({ ...corpo, empresa_id: empresa?.id });
       aoCriar();
       aoFechar();
     } catch (falha) {
@@ -134,7 +144,7 @@ export function NovaOportunidade({
             type="button"
             className="botao botao-primario"
             onClick={salvar}
-            disabled={salvando || campos.nome.trim() === ""}
+            disabled={salvando || campos.nome.trim() === "" || empresa === null}
           >
             {salvando ? "Salvando…" : "Criar oportunidade"}
           </button>
@@ -148,10 +158,14 @@ export function NovaOportunidade({
       )}
 
       <div className="formulario">
+        <BuscaDeEmpresa
+          id="n-empresa"
+          rotulo="Empresa"
+          escolhida={empresa}
+          aoEscolher={escolherEmpresa}
+          ajuda={empresa ? undefined : "Não achou? Cadastre em Contatos > Nova empresa."}
+        />
         {campo("nome", "Nome da oportunidade", { placeholder: "BPO Financeiro — Delta Ltda" })}
-        {campo("nome_do_grupo", "Grupo (cliente)", {
-          placeholder: "Se ficar em branco, usa o nome acima",
-        })}
 
         <div className="formulario-duplo">
           <EscolhaDeServico

@@ -16,7 +16,11 @@ import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(), questionarioDaOportunidade: vi.fn().mockResolvedValue(null), servicos: vi.fn().mockResolvedValue([
+  return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(),
+    buscarEmpresas: vi.fn().mockResolvedValue([
+      { id: 9, razao_social: "Beta Serviços Ltda", nome_fantasia: null, cnpj: "11444777000161",
+        grupo_id: 2, grupo_nome: "Grupo Beta", tipo: "cliente" },
+    ]), questionarioDaOportunidade: vi.fn().mockResolvedValue(null), servicos: vi.fn().mockResolvedValue([
         { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
           para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],
           fora_do_perfil: ["MEI"], transbordo: "Comercial · BPO (C1)", nomes_antigos: ["BPO Contábil"], rascunho: true, temas: [] },
@@ -378,5 +382,33 @@ describe("Histórico de preço e origem da volumetria (E4, 25/09/2026)", () => {
     const [, mudancas] = vi.mocked(api.editarOportunidade).mock.calls[0];
     expect(mudancas.origem_da_volumetria).toEqual({ documentos_fiscais_mes: "Questionário" });
     expect(Object.keys(mudancas).some((k) => k.startsWith("origem_") && k !== "origem_da_volumetria")).toBe(false);
+  });
+
+  describe("nome e empresa editáveis (01/10/2026)", () => {
+    it("edita o nome e troca a empresa pela base; vai no salvar", async () => {
+      vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
+      await abrir(oportunidade({ empresa_id: 5, empresa_razao_social: "Alfa Ltda", empresa_cnpj: "11222333000181" }));
+      expect(screen.getByText("Alfa Ltda")).toBeInTheDocument();
+      const nome = screen.getByLabelText("Nome da oportunidade");
+      await userEvent.clear(nome);
+      await userEvent.type(nome, "BPO Contábil — Alfa");
+      await userEvent.click(screen.getByRole("button", { name: "Trocar" }));
+      await userEvent.click(await screen.findByRole("button", { name: /Beta Serviços Ltda/ }));
+      await userEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+      await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledOnce());
+      expect(vi.mocked(api.editarOportunidade).mock.calls[0][1]).toMatchObject({ nome: "BPO Contábil — Alfa", empresa_id: "9" });
+    });
+
+    it("quem já virou contrato não troca de empresa", async () => {
+      await abrir(oportunidade({ empresa_id: 5, empresa_razao_social: "Alfa Ltda", tem_contrato: true }));
+      expect(screen.queryByRole("button", { name: "Trocar" })).toBeNull();
+      expect(screen.getByText(/já virou contrato/)).toBeInTheDocument();
+    });
+
+    it("antiga sem empresa: pede para escolher na base", async () => {
+      await abrir(oportunidade({ empresa_id: null }));
+      expect(screen.getByLabelText("Empresa")).toBeInTheDocument();
+      expect(screen.getByText(/Escolha a empresa na base/)).toBeInTheDocument();
+    });
   });
 });

@@ -11,7 +11,12 @@ import { NovaOportunidade } from "./NovaOportunidade";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { criarOportunidade: vi.fn(), servicos: vi.fn().mockResolvedValue([
+  return { ...real, api: { criarOportunidade: vi.fn(),
+    buscarEmpresas: vi.fn().mockResolvedValue([
+      { id: 7, razao_social: "Delta Engenharia Ltda", nome_fantasia: "Delta", cnpj: "11222333000181",
+        grupo_id: 3, grupo_nome: "Grupo Delta", tipo: "prospect" },
+    ]),
+    servicos: vi.fn().mockResolvedValue([
         { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
           para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],
           fora_do_perfil: ["MEI"], transbordo: "Comercial · BPO (C1)", nomes_antigos: ["BPO Contábil"], rascunho: true, temas: [] },
@@ -39,6 +44,15 @@ const LISTAS: Listas = {
   indices_de_reajuste: ["IPCA (IBGE)", "IGP-M (FGV)", "Sem reajuste"],
 };
 
+/** A empresa vem da base (01/10/2026): escolhe a Delta e então dá o nome. */
+async function escolherEmpresaEDarNome(nome: string) {
+  await userEvent.click(screen.getByLabelText("Empresa"));
+  await userEvent.click(await screen.findByRole("button", { name: /Delta Engenharia Ltda/ }));
+  const campo = screen.getByLabelText("Nome da oportunidade");
+  await userEvent.clear(campo);
+  await userEvent.type(campo, nome);
+}
+
 describe("NovaOportunidade", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -62,7 +76,7 @@ describe("NovaOportunidade", () => {
     const aoCriar = vi.fn();
     render(<NovaOportunidade listas={LISTAS} aoFechar={() => {}} aoCriar={aoCriar} />);
 
-    await userEvent.type(screen.getByLabelText("Nome da oportunidade"), "Delta Engenharia");
+    await escolherEmpresaEDarNome("Delta Engenharia");
     expect(screen.getByRole("button", { name: /criar oportunidade/i })).toBeEnabled();
 
     await userEvent.click(screen.getByRole("button", { name: /criar oportunidade/i }));
@@ -80,7 +94,7 @@ describe("NovaOportunidade", () => {
     vi.mocked(api.criarOportunidade).mockResolvedValue({} as OportunidadeDetalhe);
     render(<NovaOportunidade listas={LISTAS} aoFechar={() => {}} aoCriar={() => {}} />);
 
-    await userEvent.type(screen.getByLabelText("Nome da oportunidade"), "Delta Engenharia");
+    await escolherEmpresaEDarNome("Delta Engenharia");
     await userEvent.click(screen.getByRole("button", { name: /^Serviço/ }));
     await userEvent.click(await screen.findByRole("option", { name: "Auditoria" }));
     await userEvent.click(screen.getByRole("button", { name: "Usar este serviço" }));
@@ -95,7 +109,7 @@ describe("NovaOportunidade", () => {
     render(<NovaOportunidade listas={LISTAS} aoFechar={() => {}} aoCriar={() => {}} />);
 
     expect(screen.queryByLabelText("Quantidade de parcelas")).not.toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText("Nome da oportunidade"), "Delta");
+    await escolherEmpresaEDarNome("Delta");
     await userEvent.click(screen.getByRole("button", { name: /^Serviço/ }));
     await userEvent.click(await screen.findByRole("option", { name: "BPO Contábil e Fiscal" }));
     await userEvent.click(screen.getByRole("button", { name: "Usar este serviço" }));
@@ -119,7 +133,7 @@ describe("NovaOportunidade", () => {
     vi.mocked(api.criarOportunidade).mockResolvedValue({} as OportunidadeDetalhe);
     render(<NovaOportunidade listas={LISTAS} aoFechar={() => {}} aoCriar={() => {}} />);
 
-    await userEvent.type(screen.getByLabelText("Nome da oportunidade"), "Delta");
+    await escolherEmpresaEDarNome("Delta");
     await userEvent.click(screen.getByRole("button", { name: /^Serviço/ }));
     await userEvent.click(await screen.findByRole("option", { name: "Auditoria" }));
     await userEvent.click(screen.getByRole("button", { name: "Usar este serviço" }));
@@ -145,7 +159,7 @@ describe("NovaOportunidade", () => {
       "IGP-M (FGV)",
       "Sem reajuste",
     ]);
-    await userEvent.type(screen.getByLabelText("Nome da oportunidade"), "Delta");
+    await escolherEmpresaEDarNome("Delta");
     await userEvent.selectOptions(reajuste, "IPCA (IBGE)");
     await userEvent.click(screen.getByRole("button", { name: /criar oportunidade/i }));
 
@@ -165,10 +179,37 @@ describe("NovaOportunidade", () => {
     const aoFechar = vi.fn();
     render(<NovaOportunidade listas={LISTAS} aoFechar={aoFechar} aoCriar={() => {}} />);
 
-    await userEvent.type(screen.getByLabelText("Nome da oportunidade"), "Épsilon");
+    await escolherEmpresaEDarNome("Épsilon");
     await userEvent.click(screen.getByRole("button", { name: /criar oportunidade/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Falha ao salvar."));
     expect(aoFechar).not.toHaveBeenCalled();
+  });
+
+  it("sem empresa escolhida não cria; escolher a empresa preenche o nome e vai no pedido", async () => {
+    vi.mocked(api.criarOportunidade).mockResolvedValue({} as OportunidadeDetalhe);
+    render(<NovaOportunidade listas={LISTAS} aoFechar={() => {}} aoCriar={() => {}} />);
+    await userEvent.type(screen.getByLabelText("Nome da oportunidade"), "Só o nome");
+    expect(screen.getByRole("button", { name: /criar oportunidade/i })).toBeDisabled();
+    expect(screen.getByText(/Contatos > Nova empresa/)).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText("Nome da oportunidade"));
+    await userEvent.click(screen.getByLabelText("Empresa"));
+    expect(api.buscarEmpresas).toHaveBeenCalled();
+    await userEvent.click(await screen.findByRole("button", { name: /Delta Engenharia Ltda/ }));
+    expect(screen.getByLabelText("Nome da oportunidade")).toHaveValue("Delta Engenharia Ltda");
+    expect(screen.getByRole("status")).toHaveTextContent("Grupo Delta");
+    await userEvent.click(screen.getByRole("button", { name: /criar oportunidade/i }));
+    await waitFor(() => expect(api.criarOportunidade).toHaveBeenCalledOnce());
+    expect(vi.mocked(api.criarOportunidade).mock.calls[0][0]).toMatchObject({ empresa_id: 7, nome: "Delta Engenharia Ltda" });
+    expect(vi.mocked(api.criarOportunidade).mock.calls[0][0]).not.toHaveProperty("nome_do_grupo");
+  });
+
+  it("empresa que não está na base: avisa para cadastrar em Contatos", async () => {
+    const padrao = vi.mocked(api.buscarEmpresas).getMockImplementation();
+    vi.mocked(api.buscarEmpresas).mockResolvedValue([]);
+    render(<NovaOportunidade listas={LISTAS} aoFechar={() => {}} aoCriar={() => {}} />);
+    await userEvent.type(screen.getByLabelText("Empresa"), "zzz");
+    expect(await screen.findByText(/Empresa não encontrada/)).toBeInTheDocument();
+    if (padrao) vi.mocked(api.buscarEmpresas).mockImplementation(padrao);
   });
 });

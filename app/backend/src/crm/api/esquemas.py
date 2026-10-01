@@ -215,6 +215,10 @@ class OportunidadeResumo(Base):
     nome: str
     grupo_id: int
     grupo_nome: str | None = None
+    empresa_id: int | None = None
+    """A empresa (CNPJ) da oportunidade; o grupo vem dela (01/10/2026)."""
+    empresa_razao_social: str | None = None
+    empresa_cnpj: str | None = None
     situacao: Situacao
     temperatura: Temperatura | None = None
     servico: str | None = None
@@ -254,6 +258,8 @@ class MudancaDePreco(Base):
 
 
 class OportunidadeDetalhe(OportunidadeResumo):
+    tem_contrato: bool = False
+    """Já virou contrato: a empresa não troca mais por aqui."""
     canal: str | None = None
     linha_servico: LinhaServico | None = None
     servico_descricao: str | None = None
@@ -297,12 +303,18 @@ class OportunidadeDetalhe(OportunidadeResumo):
 class OportunidadeEdicao(BaseModel):
     """O que a tela pode mudar. Tudo opcional: só o que vier é alterado.
 
+    Nome e empresa entraram em 01/10/2026 (Karine): trocar a empresa leva o grupo
+    junto, e a oportunidade que já virou contrato não troca de empresa.
+
     Preço, serviço e data de originação entraram em 22/09/2026 (E4): a
     proposta já pode nascer e ser ajustada direto no CRM, não só na planilha.
     O campo mudado aqui entra em `campos_do_crm` (mesmo mecanismo que já
     protegia situação/temperatura) — a recarga da planilha não sobrescreve de
     volta.
     """
+
+    nome: str | None = Field(default=None, min_length=1, max_length=200)
+    empresa_id: int | None = None
 
     situacao: Situacao | None = None
     temperatura: Temperatura | None = None
@@ -357,6 +369,9 @@ class OportunidadeNova(BaseModel):
     """
 
     nome: str = Field(min_length=1, max_length=200)
+    empresa_id: int | None = None
+    """A empresa escolhida na base de empresas; quando vem, o grupo é o dela e
+    `grupo_id`/`nome_do_grupo` são ignorados. A tela exige (Karine, 01/10/2026)."""
     grupo_id: int | None = None
     nome_do_grupo: str | None = Field(default=None, max_length=200)
     servico: str | None = Field(default=None, max_length=120)

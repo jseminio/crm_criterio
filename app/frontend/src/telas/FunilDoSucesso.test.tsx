@@ -70,6 +70,7 @@ const coluna = (nome: string) => screen.getByRole("region", { name: nome });
 describe("Funil do Sucesso do Cliente (02/10/2026)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    localStorage.clear();
     vi.mocked(api.funilDoSucesso).mockResolvedValue(FUNIL);
     vi.mocked(api.reunioesDoGrupo).mockResolvedValue([]);
     vi.mocked(api.responsaveisPorAjuste).mockResolvedValue([
@@ -77,21 +78,46 @@ describe("Funil do Sucesso do Cliente (02/10/2026)", () => {
     ]);
   });
 
-  it("põe cada grupo na coluna certa, com o atraso em texto", async () => {
+  it("uma coluna por etapa do fluxograma, com quem participa e o que se faz", async () => {
     render(<FunilDoSucesso />);
     await screen.findByText("Grupo Novo");
-    expect(within(coluna("Contrato")).getByText("Grupo Novo")).toBeInTheDocument();
-    expect(within(coluna("Contrato")).getByText("2 de 3 itens feitos")).toBeInTheDocument();
-    expect(within(coluna("Em dia")).getByText("Próxima: Anual até 01/05/2027")).toBeInTheDocument();
-    const atrasada = coluna("Atrasada");
-    expect(within(atrasada).getByText("⚠ Trimestral venceu em 01/08/2026 (62 d)")).toBeInTheDocument();
-    expect(within(atrasada).getByText("e mais 1 reunião atrasada")).toBeInTheDocument();
-    // a mais atrasada primeiro, sem classe por último
-    expect(within(atrasada).getAllByRole("button").map((b) => b.querySelector(".cartao-grupo")?.textContent))
-      .toEqual(["Grupo Atrasado", "Grupo Sem Classe"]);
-    expect(within(atrasada).getByText(/Sem classe: avalie o Score/)).toBeInTheDocument();
+    expect(screen.getAllByRole("region").map((r) => r.getAttribute("aria-label")))
+      .toEqual(["Contrato", "Handover", "Kickoff", "Mensal", "Trimestral", "Anual"]);
+    const contrato = coluna("Contrato");
+    expect(within(contrato).getByText("Comercial & Cliente")).toBeInTheDocument();
+    expect(within(contrato).getByText("Emitir a proposta comercial")).toBeInTheDocument();
+    expect(within(contrato).getByText("2 de 3 itens feitos")).toBeInTheDocument();
+    expect(within(coluna("Anual")).getByText("Renovação")).toBeInTheDocument();
     expect(within(coluna("Handover")).getByText("Nenhum grupo nesta etapa.")).toBeInTheDocument();
     expect(screen.getByText(/A: Mensal, Trimestral, Anual · B: Trimestral, Anual · C: Anual/)).toBeInTheDocument();
+  });
+
+  it("em curso, o grupo aparece em cada reunião da classe, vencidas no topo", async () => {
+    render(<FunilDoSucesso />);
+    await screen.findByText("Grupo Novo");
+    const trimestral = coluna("Trimestral");
+    expect(within(trimestral).getByText("⚠ venceu em 01/08/2026 (62 d)")).toBeInTheDocument();
+    const anual = coluna("Anual");
+    expect(within(anual).getByText("2 grupos")).toBeInTheDocument();
+    expect(within(anual).getByText("· ⚠ 1 vencida")).toBeInTheDocument();
+    expect(within(anual).getAllByRole("button").map((b) => b.querySelector(".cartao-grupo")?.textContent))
+      .toEqual(["Grupo Atrasado", "Grupo Em Dia"]);
+    expect(within(anual).getByText("⚠ nenhuma registrada ainda")).toBeInTheDocument();
+    expect(within(anual).getByText("até 01/05/2027")).toBeInTheDocument();
+    expect(within(coluna("Mensal")).getByText("Nenhum grupo nesta etapa.")).toBeInTheDocument();
+    // sem classe não entra em coluna de reunião: fica no aviso, clicável
+    expect(screen.getByText(/Sem classe, sem reunião cobrada/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Grupo Sem Classe" })).toBeInTheDocument();
+  });
+
+  it("recolhe e mostra o que se faz em cada etapa, e lembra a escolha", async () => {
+    const { unmount } = render(<FunilDoSucesso />);
+    await screen.findByText("Grupo Novo");
+    await userEvent.click(screen.getByRole("button", { name: "Recolher o que se faz em cada etapa" }));
+    expect(screen.queryByText("Emitir a proposta comercial")).not.toBeInTheDocument();
+    unmount();
+    render(<FunilDoSucesso />);
+    expect(await screen.findByRole("button", { name: "Mostrar o que se faz em cada etapa" })).toBeInTheDocument();
   });
 
   it("a busca filtra e, sem resultado, oferece limpar", async () => {
@@ -122,8 +148,9 @@ describe("Funil do Sucesso do Cliente (02/10/2026)", () => {
   it("em curso: registra a reunião com a pauta do tipo já preenchida", async () => {
     vi.mocked(api.registrarReuniao).mockResolvedValue(FUNIL.grupos[2]);
     render(<FunilDoSucesso />);
-    await userEvent.click(await screen.findByText("Grupo Atrasado"));
-    expect(screen.getByLabelText("Tipo")).toHaveValue("trimestral"); // a primeira atrasada
+    await screen.findByText("Grupo Novo");
+    await userEvent.click(within(coluna("Trimestral")).getByText("Grupo Atrasado"));
+    expect(screen.getByLabelText("Tipo")).toHaveValue("trimestral"); // aberto pela coluna da Trimestral
     expect(screen.getByLabelText("Pauta")).toHaveValue("• PRA e KPIs");
     expect(screen.getByText("⚠ registre a primeira")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Decisões do cliente"), { target: { value: "Abrir filial em 2027" } });
@@ -132,6 +159,14 @@ describe("Funil do Sucesso do Cliente (02/10/2026)", () => {
       tipo: "trimestral", participantes: "Gestor & Cliente", decisoes: "Abrir filial em 2027", dashboard: "", ajustes: [],
     }));
     expect(await screen.findByRole("status")).toHaveTextContent("Reunião trimestral");
+  });
+
+  it("aberto pela coluna da Anual, o painel já vem na Anual", async () => {
+    render(<FunilDoSucesso />);
+    await screen.findByText("Grupo Novo");
+    await userEvent.click(within(coluna("Anual")).getByText("Grupo Atrasado"));
+    expect(screen.getByLabelText("Tipo")).toHaveValue("anual");
+    expect(screen.getByLabelText("Pauta")).toHaveValue("• Renovação");
   });
 
   it("o motivo da recusa do servidor aparece", async () => {

@@ -113,11 +113,14 @@ function Historico({ f, g }: { f: Funil; g: Grupo }) {
 }
 
 export function PainelEmCurso({
-  f, g, titulo, subtitulo, aoFechar, aoMudar,
-}: { f: Funil; g: Grupo; titulo: string; subtitulo: string; aoFechar: () => void; aoMudar: () => void }) {
+  f, g, tipoPedido = null, titulo, subtitulo, aoFechar, aoMudar,
+}: {
+  f: Funil; g: Grupo; tipoPedido?: string | null; titulo: string; subtitulo: string; aoFechar: () => void; aoMudar: () => void;
+}) {
   const { pode } = usarAcesso();
   const edita = pode("sucesso.editar");
-  const sugerido = g.reunioes.find((r) => r.atrasada)?.tipo ?? g.reunioes[0]?.tipo ?? f.tipos[0].chave;
+  // Aberto pela coluna de uma reunião, já vem nela; senão, a primeira vencida, senão a primeira da classe.
+  const sugerido = tipoPedido ?? g.reunioes.find((r) => r.atrasada)?.tipo ?? g.reunioes[0]?.tipo ?? f.tipos[0].chave;
   const tipoInicial = f.tipos.find((t) => t.chave === sugerido);
   const hoje = new Date().toLocaleDateString("sv");
   const vazio = {

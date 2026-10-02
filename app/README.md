@@ -16,6 +16,24 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Funil do Sucesso do Cliente no formato do fluxograma (02/10/2026)
+
+Aprovado por Eduardo em 02/10/2026. O funil passou a ter **uma coluna por etapa do fluxograma**:
+Contrato → Handover → Kickoff (implantação) e Mensal → Bimestral → Trimestral → Anual (em curso).
+O cabeçalho de cada coluna é a seta do fluxograma, com quem participa e o que se faz ali (o botão
+"Recolher o que se faz em cada etapa" esconde os itens, e o navegador lembra a escolha).
+
+- **Implantação:** igual a antes; o grupo fica numa etapa só e anda pelo checklist.
+- **Em curso:** o grupo aparece em **cada reunião que a classe dele pede** (A nas quatro, B na
+  Trimestral e na Anual, C só na Anual). Em cada coluna, as vencidas vêm no topo, com ⚠ e há quantos
+  dias; depois, pela data. O cabeçalho conta os grupos e as vencidas. Clicar no cartão abre o painel
+  já naquela reunião.
+- **Sem classe:** não entra em coluna de reunião; aparece num aviso acima das colunas, clicável.
+- **Cliente anterior ao CRM (opção A):** as reuniões contam do início do funil, **02/10/2026**:
+  primeira Mensal em 02/11, Bimestral em 02/12, Trimestral em 02/01/2027, Anual em 02/10/2027. Antes,
+  toda a carteira antiga aparecia vencida só por não ter reunião registrada. Cada reunião registrada
+  recalcula a próxima a partir dela. Sem migração.
+
 ## Ata da reunião e ajustes da área técnica (02/10/2026)
 
 Aprovado por Eduardo em 02/10/2026. A ata existe para a **área técnica** fazer os ajustes que a reunião
@@ -58,12 +76,13 @@ suspenso ou aguardando assinatura, numa destas colunas:
   (os pontos sensíveis da abordagem) ficou no Handover; o que se faz com o cliente (apresentação da
   Critério, carta de rescisão e termo de transferência, lista de documentos, fluxo financeiro, KYC),
   no Kickoff. Contrato novo começa em Contrato; contrato anterior ao CRM já entra em curso.
-- **Em curso:** **Em dia** ou **Atrasada**, pelas reuniões de resultado que a classe do Score pede
-  (a da leitura mais recente). Cadência aceita por Eduardo: **A** mensal, bimestral, trimestral e
+- **Em curso:** pelas reuniões de resultado que a classe do Score pede (a da leitura mais recente);
+  desde 02/10/2026, uma coluna por reunião (ver "Funil do Sucesso do Cliente no formato do
+  fluxograma", acima). Cadência aceita por Eduardo: **A** mensal, bimestral, trimestral e
   anual; **B** trimestral e anual; **C** anual. Cada reunião vence 1, 2, 3 ou 12 meses depois da
   última daquele tipo; sem nenhuma, conta da entrada em curso (o fim do kickoff). O cliente anterior
-  ao CRM sem nenhuma registrada aparece como atrasado, "nenhuma registrada ainda", até a primeira.
-  Grupo sem classe também fica em Atrasada, com "Sem classe: avalie o Score na Saúde da carteira".
+  ao CRM conta do início do funil, 02/10/2026 (opção A, ver acima). Grupo sem classe fica num aviso,
+  "Sem classe: avalie o Score na Saúde da carteira".
   Atraso sempre com ⚠ e texto.
 
 O objetivo das reuniões (Eduardo, 02/10/2026) é apresentar um dashboard com os principais números do
@@ -268,7 +287,7 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.137** no backend e **486** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Testes | **1.138** no backend e **489** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
 | Banco | PostgreSQL 18 local, 40 tabelas, migrações até `b8e4f1a6d3c7` (ata e ajustes da área técnica, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 136 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens e SDR da IA) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |

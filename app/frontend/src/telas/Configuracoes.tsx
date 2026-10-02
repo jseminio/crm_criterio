@@ -11,6 +11,7 @@
 
 import { HistoricoDeAlteracoes } from "../componentes/HistoricoDeAlteracoes";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
+import { CadenciaDeReunioes } from "../componentes/CadenciaDeReunioes";
 import { MetasDosIndicadores } from "../componentes/MetasDosIndicadores";
 import { MatrizesDeProposta } from "../componentes/MatrizesDeProposta";
 import { PerfisEAcesso } from "../componentes/PerfisEAcesso";
@@ -199,7 +200,12 @@ export function Configuracoes({ listas = null }: { listas?: Listas | null }) {
         ))}
       </div>
       {aba === "perfis" && <PerfisEAcesso />}
-      {aba === "metas" && <MetasDosIndicadores />}
+      {aba === "metas" && (
+        <>
+          <MetasDosIndicadores />
+          <CadenciaDeReunioes />
+        </>
+      )}
       {aba === "historico" && <HistoricoDeAlteracoes />}
       {aba === "backup" && (
       <>

@@ -76,6 +76,11 @@ import type {
   SecaoDeRespostas,
   SituacaoDoPainel,
   Metas,
+  CadenciaDeReunioes,
+  FunilDoSucesso,
+  GrupoNoFunilDoSucesso,
+  NovaReuniaoDeResultado,
+  ReuniaoDeResultado,
 } from "./tipos";
 
 export class ErroDaApi extends Error {
@@ -557,6 +562,17 @@ export const api = {
   metas: () => pedir<Metas>("/api/metas"),
   mudarMetas: (metas: { mrr?: { meta: string; alerta: string }; conversao?: { meta: string; alerta: string } }) =>
     pedir<Metas>("/api/metas", { method: "PUT", body: JSON.stringify(metas) }),
+  funilDoSucesso: () => pedir<FunilDoSucesso>("/api/sucesso/funil"),
+  marcarItemDoSucesso: (grupoId: number, item: string, feito: boolean) =>
+    pedir<GrupoNoFunilDoSucesso>(`/api/sucesso/grupos/${grupoId}/itens`, { method: "PATCH", body: JSON.stringify({ item, feito }) }),
+  concluirEtapaDoSucesso: (grupoId: number) =>
+    pedir<GrupoNoFunilDoSucesso>(`/api/sucesso/grupos/${grupoId}/concluir-etapa`, { method: "POST" }),
+  reunioesDoGrupo: (grupoId: number) => pedir<ReuniaoDeResultado[]>(`/api/sucesso/grupos/${grupoId}/reunioes`),
+  registrarReuniao: (grupoId: number, reuniao: NovaReuniaoDeResultado) =>
+    pedir<GrupoNoFunilDoSucesso>(`/api/sucesso/grupos/${grupoId}/reunioes`, { method: "POST", body: JSON.stringify(reuniao) }),
+  cadenciaDeReunioes: () => pedir<CadenciaDeReunioes>("/api/sucesso/cadencia"),
+  mudarCadenciaDeReunioes: (cadencia: Record<string, string[]>) =>
+    pedir<CadenciaDeReunioes>("/api/sucesso/cadencia", { method: "PUT", body: JSON.stringify({ cadencia }) }),
   aprovacoes: () => pedir<Aprovacao[]>("/api/aprovacoes"),
   aprovar: (id: number) => pedir<Aprovacao>(`/api/aprovacoes/${id}/aprovar`, { method: "POST" }),
   recusar: (id: number, motivo: string) =>

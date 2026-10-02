@@ -35,6 +35,7 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     ("carteira", "Saúde da carteira", (
         ("ver", "ver"), ("avaliar", "avaliar e calcular"), ("parametros", "parâmetros"), ("exportar", "exportar"),
     )),
+    ("sucesso", "Funil do Sucesso do Cliente", (("ver", "ver"), ("editar", "marcar etapas e registrar reuniões"))),
     ("abordagens", "Abordagens", (("ver", "ver"), ("editar", "preparar, editar e descartar"), ("aprovar", "aprovar e marcar enviada"))),
     ("sdr", "SDR da IA", (("ver", "ver"), ("editar", "registrar conversas"), ("parametros", "parâmetros e custos"))),
     ("conferencia", "Conferência", (("ver", "ver"),)),
@@ -125,6 +126,11 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/carteira/.+", ("carteira.ver",)),
     ("POST|PATCH", r"/api/carteira/(parametros|periodo/janela)", ("carteira.parametros",)),
     ("POST|PUT|PATCH", r"/api/carteira/.+", ("carteira.avaliar",)),
+    # funil do sucesso do cliente
+    ("GET", r"/api/sucesso/cadencia", ("sucesso.ver", "configuracoes.metas")),
+    ("PUT", r"/api/sucesso/cadencia", ("configuracoes.metas",)),
+    ("GET", r"/api/sucesso/(funil|grupos/\d+/reunioes)", ("sucesso.ver",)),
+    ("PATCH|POST", r"/api/sucesso/grupos/\d+/(itens|concluir-etapa|reunioes)", ("sucesso.editar",)),
     # abordagens do agente SDR
     ("GET", r"/api/abordagens(/resumo|/\d+)?", ("abordagens.ver",)),
     ("POST", r"/api/abordagens/\d+/(aprovar|marcar-enviada)", ("abordagens.aprovar",)),

@@ -1490,3 +1490,56 @@ class MetaDeIndicador(Base):
     alerta: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
     alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
     alterado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+
+class JornadaDoCliente(CarimboMixin, Base):
+    """Em que etapa do Funil do Sucesso do Cliente o grupo está (02/10/2026, aprovado por Eduardo) e
+    quais itens do checklist já foram feitos. Regras em `crm.domain.sucesso`.
+
+    Sem a linha, o grupo com contrato valendo está em **Contrato** — ou **Em curso**, se o contrato é
+    anterior ao CRM (o cliente já foi implantado). A linha nasce na primeira marcação."""
+
+    __tablename__ = "jornada_do_cliente"
+
+    grupo_id: Mapped[int] = mapped_column(sa.ForeignKey("grupo_economico.id"), primary_key=True)
+    etapa: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    itens_feitos: Mapped[list] = mapped_column(_JSON, nullable=False, default=list)
+    """As chaves dos itens marcados, de todas as etapas (`crm.domain.sucesso.CHECKLIST`)."""
+    etapa_desde: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    em_curso_desde: Mapped[date | None] = mapped_column(sa.Date)
+    """Quando o kickoff terminou: é daí que se contam as primeiras reuniões de resultado."""
+    alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
+
+
+class ReuniaoDeResultado(CarimboMixin, Base):
+    """Uma reunião de resultado feita com o cliente (02/10/2026, aprovado por Eduardo). O objetivo é
+    apresentar os números do cliente para ele decidir; por isso guarda as decisões e os próximos
+    passos. O dashboard é um link ou caminho, opcional: ainda não existe (Eduardo, 02/10/2026)."""
+
+    __tablename__ = "reuniao_de_resultado"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    grupo_id: Mapped[int] = mapped_column(sa.ForeignKey("grupo_economico.id"), nullable=False, index=True)
+    tipo: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    """mensal · bimestral · trimestral · anual"""
+    data: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    participantes: Mapped[str | None] = mapped_column(sa.String(300))
+    pauta: Mapped[str | None] = mapped_column(sa.Text)
+    dashboard: Mapped[str | None] = mapped_column(sa.String(400))
+    decisoes: Mapped[str | None] = mapped_column(sa.Text)
+    proximos_passos: Mapped[str | None] = mapped_column(sa.Text)
+    registrada_por: Mapped[str | None] = mapped_column(sa.String(200))
+
+    grupo: Mapped[GrupoEconomico] = relationship()
+
+
+class CadenciaDeReuniao(Base):
+    """Quais reuniões de resultado cada classe tem, editável em Configurações › Metas (02/10/2026).
+    Sem a linha, vale `crm.domain.sucesso.CADENCIA_PADRAO`."""
+
+    __tablename__ = "cadencia_de_reuniao"
+
+    classe: Mapped[str] = mapped_column(sa.String(1), primary_key=True)
+    tipos: Mapped[list] = mapped_column(_JSON, nullable=False, default=list)
+    alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
+    alterado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))

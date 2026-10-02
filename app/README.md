@@ -16,6 +16,38 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Funil do Sucesso do Cliente (02/10/2026)
+
+Aprovado por Eduardo em 02/10/2026, a partir do fluxograma "Macroprocesso — Comercial & Sucesso do
+Cliente". Terceira aba de **Sucesso do Cliente**. Entra todo grupo (não fundido) com contrato ativo,
+suspenso ou aguardando assinatura, numa destas colunas:
+
+- **Implantação:** **Contrato** (Comercial & Cliente) → **Handover** (Comercial) → **Kickoff** (Gestor &
+  Cliente). Cada etapa tem o checklist do fluxograma; "Concluir etapa" só libera com todos os itens
+  marcados. O fluxograma junta Handover e Kickoff numa caixa só: o que o comercial passa adiante
+  (os pontos sensíveis da abordagem) ficou no Handover; o que se faz com o cliente (apresentação da
+  Critério, carta de rescisão e termo de transferência, lista de documentos, fluxo financeiro, KYC),
+  no Kickoff. Contrato novo começa em Contrato; contrato anterior ao CRM já entra em curso.
+- **Em curso:** **Em dia** ou **Atrasada**, pelas reuniões de resultado que a classe do Score pede
+  (a da leitura mais recente). Cadência aceita por Eduardo: **A** mensal, bimestral, trimestral e
+  anual; **B** trimestral e anual; **C** anual. Cada reunião vence 1, 2, 3 ou 12 meses depois da
+  última daquele tipo; sem nenhuma, conta da entrada em curso (o fim do kickoff). O cliente anterior
+  ao CRM sem nenhuma registrada aparece como atrasado, "nenhuma registrada ainda", até a primeira.
+  Grupo sem classe também fica em Atrasada, com "Sem classe: avalie o Score na Saúde da carteira".
+  Atraso sempre com ⚠ e texto.
+
+O objetivo das reuniões (Eduardo, 02/10/2026) é apresentar um dashboard com os principais números do
+cliente para ele tomar decisões mais arrojadas. Por isso "Registrar reunião" guarda tipo, data,
+participantes, pauta (já preenchida com os itens do fluxograma; a da **Anual** — resultados do ano,
+renovação e reajuste, NPS — é sugestão, a confirmar), **decisões do cliente** e **próximos passos**.
+O dashboard é um link opcional: ainda não existe. A data não pode ser futura.
+
+A cadência muda em **Configurações › Metas** ("Reuniões de resultado por classe"), com histórico.
+Funcionalidades novas: "Funil do Sucesso do Cliente: ver" e "marcar etapas e registrar reuniões",
+só do Administrador até alguém liberar em Perfis e acesso. Rotas em `/api/sucesso/…`. Migração
+`a7d3e5f9c2b4`, só aditiva (tabelas `jornada_do_cliente`, `reuniao_de_resultado` e
+`cadencia_de_reuniao`, já com a cadência aceita). **Rode `alembic upgrade head`**, com o backup antes.
+
 ## Menu reorganizado e Configurações em abas (02/10/2026)
 
 Aprovado por Eduardo em 02/10/2026. O menu ficou: **Agenda · Contatos · Funil comercial · Sucesso do Cliente ·
@@ -23,9 +55,8 @@ SDR - Abordagens e conhecimento · Configurações**.
 
 - **Funil comercial** (era "Funil") em abas: **Oportunidades** (o funil de sempre) · **Questionários**.
 - **Sucesso do Cliente** (era "Saúde da Carteira", antes "Carteira") em abas: **Saúde da carteira** ·
-  **Gestão de contratos** (era o menu Contratos). O **Funil do Sucesso do Cliente** (comercial,
-  onboarding e as reuniões mensais, trimestrais e anuais pelo Score) entra como terceira aba numa
-  entrega própria. O atalho da Agenda para contratos abre direto em Gestão de contratos.
+  **Gestão de contratos** (era o menu Contratos) · **Funil do Sucesso do Cliente** (entrou na
+  entrega seguinte, ver acima). O atalho da Agenda para contratos abre direto em Gestão de contratos.
 - As permissões não mudaram: cada aba segue a sua (`funil.ver`, `questionarios.ver`, `carteira.ver`,
   `contratos.ver`). O perfil Comercial vê Sucesso do Cliente só com Gestão de contratos.
 
@@ -207,12 +238,12 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.101** no backend e **460** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
-| Banco | PostgreSQL 18 local, 36 tabelas, migrações até `f6c2d8a4b1e9` (metas dos indicadores, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
-| API | 124 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
-| Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira e Gestão de contratos), SDR - Abordagens e conhecimento (Abordagens e SDR da IA) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
+| Testes | **1.123** no backend e **478** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Banco | PostgreSQL 18 local, 39 tabelas, migrações até `a7d3e5f9c2b4` (funil do sucesso do cliente, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
+| API | 131 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
+| Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens e SDR da IA) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos; faltam a nuvem e o backup fora da máquina |
-| Fora do ar | **E1:** nuvem em região brasileira (custo a estimar antes de contratar) e backup fora da máquina com restauração testada. Login, perfis e histórico já estão no código, à espera do registro no Microsoft Entra. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto, implantação |
+| Fora do ar | **E1:** nuvem em região brasileira (custo a estimar antes de contratar) e backup fora da máquina com restauração testada. Login, perfis e histórico já estão no código, à espera do registro no Microsoft Entra. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto. O dashboard do cliente para as reuniões de resultado (fonte dos números e ferramenta a decidir) |
 
 ## Como rodar
 

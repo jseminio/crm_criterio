@@ -46,7 +46,7 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     chave: "carteira",
     rotulo: "Sucesso do Cliente",
     titulo: "Sucesso do Cliente",
-    descricao: "A saúde da carteira e a gestão dos contratos.",
+    descricao: "A saúde da carteira, a gestão dos contratos e o funil do sucesso do cliente.",
   },
   {
     chave: "abordagens",
@@ -74,7 +74,7 @@ export default function App() {
         : t.chave === "funil"
           ? pode("funil.ver", "questionarios.ver")
           : t.chave === "carteira"
-            ? pode("carteira.ver", "contratos.ver")
+            ? pode("carteira.ver", "contratos.ver", "sucesso.ver")
             : pode(`${t.chave}.ver`),
   );
   const [escolhida, definirTela] = useState<Tela>("funil");

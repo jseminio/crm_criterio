@@ -514,6 +514,12 @@ export interface Mrr {
   contratos_da_carteira_anterior: number;
   cobertura_completa: boolean;
   aviso: string;
+  /** KPI oficial: meta R$ 400 mil, alerta abaixo de R$ 200 mil. */
+  meta: string;
+  alerta: string;
+  /** Só com a carteira inteira no CRM; com o MRR parcial, null (não se compara). */
+  contra_a_meta: "abaixo_do_alerta" | "entre" | "na_meta" | null;
+  falta_para_a_meta: string | null;
 }
 
 export type TipoDeContato = "cliente" | "prospect";

@@ -145,8 +145,8 @@ class MovimentoDeMrrResposta(Base):
 
 class MrrResposta(Base):
     """O MRR dos **contratos registrados no CRM** — parcial enquanto a carteira anterior
-    não estiver carregada. `cobertura_completa` fica sempre `False` por enquanto: é o
-    aviso de que este número não se compara com a meta de R$ 400 mil."""
+    não estiver carregada (`cobertura_completa` falso: não se compara com a meta). Com
+    ela, vem a comparação com a meta e o alerta oficiais."""
 
     atual: MrrAtualResposta
     movimento: MovimentoDeMrrResposta
@@ -155,6 +155,12 @@ class MrrResposta(Base):
     """Quantos vieram da carga da planilha de saúde da carteira (sem data de assinatura)."""
     cobertura_completa: bool
     aviso: str
+    meta: Decimal
+    alerta: Decimal
+    contra_a_meta: str | None = None
+    """"abaixo_do_alerta", "entre" ou "na_meta"; `None` com o MRR parcial (não se compara)."""
+    falta_para_a_meta: Decimal | None = None
+    """Quanto falta para R$ 400 mil (zero se já atingiu); `None` com o MRR parcial."""
 
 
 class ItemDaAgendaResposta(Base):

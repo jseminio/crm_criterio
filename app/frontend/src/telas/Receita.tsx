@@ -1,8 +1,8 @@
 /** O MRR dos contratos registrados no CRM, e o que o moveu no período.
  *
- * **Parcial, e a tela diz isso sempre.** O KPI oficial de MRR é a receita da carteira
- * inteira; aqui só entram os contratos registrados no CRM, e a carteira anterior ainda
- * não foi carregada (Etapa 3). Por isso o número **não é comparado com a meta**.
+ * O KPI oficial de MRR é a receita da carteira inteira. Sem a carteira anterior ao CRM
+ * carregada, o número é **parcial**, a tela diz isso e **não compara com a meta**. Com ela,
+ * compara com a meta (R$ 400 mil) e o alerta (R$ 200 mil), com ícone e texto (02/10/2026).
  * Churn vem separado por quem decidiu: cliente (churn) e Critério (saída organizada).
  */
 
@@ -26,6 +26,12 @@ export function inicioDoPeriodo(p: Periodo, hoje = new Date()): string {
   if (p === "trimestre") return iso(new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1));
   return iso(new Date(hoje.getFullYear(), 0, 1));
 }
+
+const SITUACAO_DA_META = {
+  na_meta: ["✓ Na meta", "ganho"],
+  entre: ["Entre o alerta e a meta", "espera"],
+  abaixo_do_alerta: ["⚠ Abaixo do alerta", "perda"],
+} as const;
 
 function Linha({ rotulo, valor, sinal, nota }: { rotulo: string; valor: string; sinal?: "+" | "−"; nota?: string }) {
   return (
@@ -52,15 +58,25 @@ export function Receita() {
   const { atual, movimento: m } = dados;
 
   return (
-    <section className="numero receita" aria-label="MRR dos contratos registrados">
+    <section className="numero receita" aria-label={dados.cobertura_completa ? "MRR da carteira" : "MRR dos contratos registrados"}>
       <div className="recado" role="note">
         <strong>{dados.cobertura_completa ? "Confira a fonte." : "MRR parcial."}</strong> {dados.aviso}
       </div>
 
       <div className="receita-topo">
         <div>
-          <h3 className="numero-rotulo">MRR dos contratos registrados</h3>
+          <h3 className="numero-rotulo">{dados.cobertura_completa ? "MRR da carteira" : "MRR dos contratos registrados"}</h3>
           <p className="numero-valor">{dinheiro(atual.valor)}</p>
+          {dados.contra_a_meta && (
+            <p className="receita-meta">
+              <span className={`etiqueta etiqueta-${SITUACAO_DA_META[dados.contra_a_meta][1]}`}>
+                {SITUACAO_DA_META[dados.contra_a_meta][0]}
+              </span>{" "}
+              {dados.contra_a_meta === "na_meta"
+                ? `meta de ${dinheiro(dados.meta)} atingida`
+                : `falta ${dinheiro(dados.falta_para_a_meta)} para a meta de ${dinheiro(dados.meta)} · alerta abaixo de ${dinheiro(dados.alerta)}`}
+            </p>
+          )}
           <div className="numero-detalhe">
             <p>
               {atual.contratos} contrato{atual.contratos === 1 ? "" : "s"} ativo{atual.contratos === 1 ? "" : "s"}

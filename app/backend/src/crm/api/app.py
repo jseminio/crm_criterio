@@ -16,6 +16,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from datetime import date
+from decimal import Decimal
 from typing import Callable, Iterator, Literal
 
 import sqlalchemy as sa
@@ -893,8 +894,8 @@ def _registrar(api: FastAPI) -> None:
         """MRR dos contratos registrados no CRM e o que o moveu no período.
 
         Sem `de`/`ate`, vale o mês corrente até hoje. `hoje` existe para teste.
-        **Parcial**: a carteira anterior ao CRM não está aqui (Etapa 3). Ver
-        `crm.domain.mrr`.
+        **Parcial** enquanto a carteira anterior ao CRM não for carregada; com ela, vem
+        a comparação com a meta (R$ 400 mil) e o alerta (R$ 200 mil). Ver `crm.domain.mrr`.
         """
         dia = hoje or date.today()
         fim = ate or dia
@@ -906,8 +907,14 @@ def _registrar(api: FastAPI) -> None:
         contratos = list(sessao.scalars(sa.select(Contrato)))
         da_carteira = sum(1 for c in contratos if c.anterior_ao_crm)
         mov = regras_de_mrr.movimento(contratos, inicio, fim, dia)
+        atual = regras_de_mrr.mrr_atual(contratos)
+        completa = da_carteira > 0
         return e.MrrResposta(
-            atual=e.MrrAtualResposta.model_validate(regras_de_mrr.mrr_atual(contratos)),
+            meta=regras_de_mrr.META_DE_MRR,
+            alerta=regras_de_mrr.ALERTA_DE_MRR,
+            contra_a_meta=regras_de_mrr.contra_a_meta(atual.valor) if completa else None,
+            falta_para_a_meta=max(regras_de_mrr.META_DE_MRR - atual.valor, Decimal("0")) if completa else None,
+            atual=e.MrrAtualResposta.model_validate(atual),
             movimento=e.MovimentoDeMrrResposta(
                 de=mov.de, ate=mov.ate, mrr_inicio=mov.mrr_inicio, novo=mov.novo,
                 expansao=mov.expansao, reajuste=mov.reajuste, contracao=mov.contracao,
@@ -917,7 +924,7 @@ def _registrar(api: FastAPI) -> None:
             ),
             contratos_registrados=len(contratos),
             contratos_da_carteira_anterior=da_carteira,
-            cobertura_completa=da_carteira > 0,
+            cobertura_completa=completa,
             aviso=(
                 "Inclui a carteira anterior ao CRM, carregada da planilha de saúde da carteira "
                 f"({da_carteira} contratos, sem data de assinatura), mais o que foi registrado depois. "

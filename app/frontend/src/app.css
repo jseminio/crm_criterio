@@ -914,6 +914,8 @@
 .recado-alcada { background: var(--espera-suave); border-color: var(--espera); }
 .sem-quebra { white-space: nowrap; }
 
+.receita-meta { margin: var(--e1) 0 var(--e2); font-size: 13px; color: var(--texto-medio); display: flex; flex-wrap: wrap; gap: var(--e1) var(--e2); align-items: center; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

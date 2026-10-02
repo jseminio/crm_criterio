@@ -18,7 +18,8 @@ const mrr = (o: Partial<Mrr> = {}, mov: Partial<Mrr["movimento"]> = {}, atual: P
     contracao: "0.00", churn_cliente: "0.00", churn_criterio: "0.00", churn: "0.00", mrr_fim: "0.00",
     variacao: "0.00", nrr: null, grr: null, ...mov,
   },
-  contratos_registrados: 0, contratos_da_carteira_anterior: 0, cobertura_completa: false, aviso: AVISO, ...o,
+  contratos_registrados: 0, contratos_da_carteira_anterior: 0, cobertura_completa: false, aviso: AVISO,
+  meta: "400000", alerta: "200000", contra_a_meta: null, falta_para_a_meta: null, ...o,
 });
 
 describe("Receita (MRR)", () => {
@@ -55,6 +56,26 @@ describe("Receita (MRR)", () => {
     render(<Receita />);
     expect(await screen.findByText("Confira a fonte.")).toBeInTheDocument();
     expect(screen.queryByText(/MRR parcial/)).toBeNull();
+  });
+
+  it("com a carteira inteira compara com a meta oficial, com ícone e texto", async () => {
+    vi.mocked(api.mrr).mockResolvedValue(mrr(
+      { cobertura_completa: true, contratos_da_carteira_anterior: 58, aviso: "Inclui a carteira anterior ao CRM.",
+        contra_a_meta: "entre", falta_para_a_meta: "173658.80" },
+      {}, { valor: "226341.20", contratos: 58 },
+    ));
+    render(<Receita />);
+    expect(await screen.findByText("MRR da carteira")).toBeInTheDocument();
+    expect(screen.getByText("Entre o alerta e a meta")).toHaveClass("etiqueta-espera");
+    expect(screen.getByText(/falta R\$ 173\.658,80 para a meta de R\$ 400\.000,00/)).toBeInTheDocument();
+  });
+
+  it("MRR parcial não se compara com a meta", async () => {
+    vi.mocked(api.mrr).mockResolvedValue(mrr({ contratos_registrados: 2 }, {}, { valor: "9000.00", contratos: 2 }));
+    render(<Receita />);
+    await screen.findByText(/MRR parcial/);
+    expect(screen.queryByText(/para a meta/)).toBeNull();
+    expect(screen.queryByText(/Abaixo do alerta/)).toBeNull();
   });
 
   it("sem contrato nenhum, diz que ainda não há, não só mostra zero", async () => {

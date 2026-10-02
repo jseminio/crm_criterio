@@ -1321,6 +1321,14 @@ class TestMrrComCarteiraAnterior:
         assert c["atual"]["valor"] == "3000.00" and c["contratos_da_carteira_anterior"] == 1
         assert c["cobertura_completa"] is True and "Inclui a carteira anterior" in c["aviso"]
         assert (c["movimento"]["mrr_inicio"], c["movimento"]["novo"]) == ("3000.00", "0.00")
+        # Com a carteira inteira, compara com o KPI oficial (meta R$ 400 mil, alerta < R$ 200 mil).
+        assert (c["meta"], c["alerta"], c["contra_a_meta"], c["falta_para_a_meta"]) == (
+            "400000", "200000", "abaixo_do_alerta", "397000.00")
+
+    def test_sem_a_carteira_anterior_nao_compara_com_a_meta(self, cliente):
+        c = cliente.get("/api/mrr", params={"hoje": "2026-09-25"}).json()
+        assert c["cobertura_completa"] is False
+        assert (c["contra_a_meta"], c["falta_para_a_meta"]) == (None, None)
 
     def test_contrato_da_carteira_anterior_ativa_sem_data_de_assinatura(self, cliente, sessao, carteira):
         from crm.db.modelos import Contrato

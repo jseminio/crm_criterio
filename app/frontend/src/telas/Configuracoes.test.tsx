@@ -41,22 +41,55 @@ async function escolherArquivo() {
   await screen.findByText(/arquivo íntegro/i);
 }
 
+/** Configurações abre em abas (02/10/2026): cada teste abre a aba do assunto. */
+function abrirAba(nome: string) {
+  render(<Configuracoes />);
+  fireEvent.click(screen.getByRole("tab", { name: nome }));
+}
+
+describe("abas de Configurações", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.resetAllMocks();
+    vi.mocked(api.pedidosDeServicoNovo).mockResolvedValue([]);
+    semMatrizes();
+  });
+
+  it("mostra as seis abas na ordem aprovada e abre na primeira", async () => {
+    render(<Configuracoes />);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "Perfis e acesso", "Metas", "Propostas", "Histórico de alterações", "Backup", "Serviços pedidos",
+    ]);
+    expect(screen.getByRole("tab", { name: "Perfis e acesso" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText(/Baixar backup completo/)).toBeNull();
+  });
+
+  it("troca o conteúdo pela aba e lembra a escolhida", () => {
+    abrirAba("Backup");
+    expect(screen.getByRole("link", { name: /baixar backup completo/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Perfis e acesso" })).toBeNull();
+    render(<Configuracoes />);
+    expect(screen.getAllByRole("tab", { name: "Backup" })[1]).toHaveAttribute("aria-selected", "true");
+  });
+});
+
 describe("Configurações", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.resetAllMocks();
     vi.mocked(api.pedidosDeServicoNovo).mockResolvedValue([]);
     semMatrizes();
   });
 
   it("oferece o download do backup completo", () => {
-    render(<Configuracoes />);
+    abrirAba("Backup");
     const link = screen.getByRole("link", { name: /baixar backup completo/i });
     expect(link).toHaveAttribute("href", "/api/backup/exportar");
   });
 
   it("confere o arquivo antes de liberar a importação", async () => {
     vi.mocked(api.verificarBackup).mockResolvedValue(RESUMO);
-    render(<Configuracoes />);
+    abrirAba("Backup");
     expect(screen.queryByRole("button", { name: "Importar" })).toBeNull();
     await escolherArquivo();
     expect(screen.getByText("oportunidade")).toBeInTheDocument();
@@ -66,7 +99,7 @@ describe("Configurações", () => {
   it("mostra o erro de um arquivo inválido e não libera a importação", async () => {
     const { ErroDaApi } = await import("../api/cliente");
     vi.mocked(api.verificarBackup).mockRejectedValue(new ErroDaApi(422, "Arquivo corrompido."));
-    render(<Configuracoes />);
+    abrirAba("Backup");
     fireEvent.change(screen.getByLabelText(/arquivo de backup/i), { target: { files: [arquivo()] } });
     expect(await screen.findByRole("alert")).toHaveTextContent("Arquivo corrompido.");
     expect(screen.queryByRole("button", { name: "Importar" })).toBeNull();
@@ -75,7 +108,7 @@ describe("Configurações", () => {
   it("substituir só libera depois de digitar SUBSTITUIR", async () => {
     vi.mocked(api.verificarBackup).mockResolvedValue(RESUMO);
     vi.mocked(api.importarBackup).mockResolvedValue(RESUMO);
-    render(<Configuracoes />);
+    abrirAba("Backup");
     await escolherArquivo();
     fireEvent.click(screen.getByLabelText(/substituir os dados atuais/i));
     const botao = screen.getByRole("button", { name: "Importar" });
@@ -89,11 +122,12 @@ describe("Configurações", () => {
 });
 
 describe("pedidos de serviço novo", () => {
+  beforeEach(() => localStorage.clear());
   it("lista o que o lead pediu fora do catálogo", async () => {
     vi.mocked(api.pedidosDeServicoNovo).mockResolvedValue([
       { onde: "Lead", id: 3, nome: "Lead da feira", descricao: "Perícia contábil judicial", registrado_em: "2026-09-27T15:00:00Z" },
     ]);
-    render(<Configuracoes />);
+    abrirAba("Serviços pedidos");
 
     const linha = (await screen.findByText("Perícia contábil judicial")).closest("tr")!;
     expect(within(linha).getByText("Lead da feira")).toBeInTheDocument();
@@ -102,7 +136,7 @@ describe("pedidos de serviço novo", () => {
 
   it("sem pedido explica de onde eles vêm", async () => {
     vi.mocked(api.pedidosDeServicoNovo).mockResolvedValue([]);
-    render(<Configuracoes />);
+    abrirAba("Serviços pedidos");
 
     expect(await screen.findByText(/Nenhum pedido ainda/)).toBeInTheDocument();
   });

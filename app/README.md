@@ -16,6 +16,17 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Configurações em abas (02/10/2026)
+
+Aprovado por Eduardo em 02/10/2026: Configurações deixa de ser uma página longa e passa a ter abas,
+nesta ordem: **Perfis e acesso · Metas · Propostas · Histórico de alterações · Backup · Serviços
+pedidos**. Cada aba só aparece para quem tem a funcionalidade dela ("Serviços pedidos", só leitura,
+aparece para quem vê Configurações). Abre na primeira aba visível, e o navegador lembra a última
+escolhida. O conteúdo de cada seção não mudou.
+
+No mesmo dia, a pedido de Eduardo, o menu **Carteira** passou a se chamar **Saúde da Carteira** (também na
+tabela de Perfis e acesso). A permissão continua `carteira.*`: nenhum perfil precisa ser refeito.
+
 ## Metas dos indicadores editáveis (02/10/2026)
 
 Aprovado por Eduardo em 02/10/2026: a meta e o alerta deixaram de ser fixos no código.
@@ -182,7 +193,7 @@ Atualizado em 02/10/2026.
 | Testes | **1.101** no backend e **460** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
 | Banco | PostgreSQL 18 local, 36 tabelas, migrações até `f6c2d8a4b1e9` (metas dos indicadores, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 124 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
-| Telas | Agenda, Contatos, Funil (kanban e grade, exportar para Excel), Questionários, Grupos, Contratos, Carteira, Abordagens, SDR da IA, Conferência e Configurações. React com TypeScript, em `../frontend` |
+| Telas | Agenda, Contatos, Funil (kanban e grade, exportar para Excel), Questionários, Grupos, Contratos, Saúde da Carteira, Abordagens, SDR da IA, Conferência e Configurações. React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos; faltam a nuvem e o backup fora da máquina |
 | Fora do ar | **E1:** nuvem em região brasileira (custo a estimar antes de contratar) e backup fora da máquina com restauração testada. Login, perfis e histórico já estão no código, à espera do registro no Microsoft Entra. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto, implantação |
 

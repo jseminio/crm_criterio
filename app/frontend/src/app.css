@@ -282,7 +282,7 @@
 .aba { appearance: none; border: 0; background: transparent; cursor: pointer; font-weight: 500;
   padding: var(--e2) var(--e4); color: var(--texto-medio); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .aba:hover { color: var(--texto-forte); }
-.aba[aria-selected="true"] { color: var(--texto-forte); border-bottom-color: var(--azul-noturno); }
+.aba[aria-selected="true"] { color: var(--texto-forte); border-bottom-color: var(--azul-noturno); font-weight: 600; }
 .aba-contagem { font-variant-numeric: tabular-nums; color: var(--texto-fraco); margin-left: var(--e1); }
 .detalhe-abas-de-apoio { margin-top: var(--e2); }
 .detalhe-abas-de-apoio .abas { margin-bottom: var(--e3); }

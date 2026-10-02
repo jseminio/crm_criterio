@@ -72,7 +72,7 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
   },
   {
     chave: "carteira",
-    rotulo: "Carteira",
+    rotulo: "Saúde da Carteira",
     titulo: "Classificação da carteira",
     descricao: "Classe, Score e eixo de ação por grupo, e o índice de saúde (ISC).",
   },
@@ -98,7 +98,7 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     chave: "configuracoes",
     rotulo: "Configurações",
     titulo: "Configurações",
-    descricao: "Perfis e acesso, metas, histórico de alterações, propostas, backup e pedidos de serviço fora do catálogo.",
+    descricao: "Perfis e acesso, metas, propostas, histórico de alterações, backup e serviços pedidos fora do catálogo.",
   },
 ];
 

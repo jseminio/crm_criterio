@@ -16,6 +16,36 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Ata da reunião e ajustes da área técnica (02/10/2026)
+
+Aprovado por Eduardo em 02/10/2026. A ata existe para a **área técnica** fazer os ajustes que a reunião
+de resultado identificou.
+
+- **Montar a ata:** no painel do cliente em curso (Funil do Sucesso do Cliente), cole a transcrição ou
+  as notas do **Granola** e clique "Montar a ata com a IA". O CRM manda a transcrição à API da
+  Anthropic (Claude Opus 5.5, saída em JSON garantido, fallback automático se recusar) e devolve um
+  **rascunho**: resumo, decisões do cliente, **ajustes para a área técnica**, pendências do cliente e
+  pontos sensíveis. Nada é gravado: o gestor revisa, escolhe o **responsável** (obrigatório) e o
+  prazo de cada ajuste, inclui ou tira ajustes, e só então clica "Registrar reunião". Custa centavos
+  de dólar por ata (a tela mostra a estimativa). Sem `ANTHROPIC_API_KEY` no `.env`, avisa e não monta
+  nada; a reunião pode ser registrada à mão.
+- **Transcrição:** fica guardada no banco com a reunião (dado de cliente: só no banco, nunca no
+  repositório nem no histórico de alterações). O histórico mostra só que ela existe.
+- **Ajustes na Agenda:** cada ajuste aparece na **Agenda** do responsável, com prazo e ⚠ quando
+  vence. Ele marca **Feito** (com observação, se quiser) e pode reabrir. O cartão do cliente no funil
+  e o painel mostram "N ajustes pendentes · ⚠ atrasados".
+- **Copiar a ata:** cada reunião do histórico tem o botão, que põe o texto pronto para colar no Teams
+  ou num e-mail.
+- **Perfil novo Área técnica** (criado pela migração): só vê os próprios ajustes na Agenda e marca
+  feito. Para o Bruno, o Jefferson e os outros técnicos entrarem: Configurações › Perfis e acesso,
+  incluir a conta Microsoft de cada um com o perfil Área técnica. Só quem tem esse perfil (ou o
+  Administrador) aparece na lista de responsáveis. Funcionalidades novas: "Ajustes da área técnica:
+  ver os de todos" e "ver os seus e marcar feito"; quem vê o Funil do Sucesso também vê todos.
+- Rotas: `POST /api/sucesso/grupos/{id}/ata` (rascunho), `GET /api/ajustes`,
+  `GET /api/ajustes/responsaveis`, `POST /api/ajustes/{id}/feito` e `/reabrir`. Migração
+  `b8e4f1a6d3c7`, só aditiva (colunas novas na reunião, tabela `ajuste_tecnico`, perfil Área técnica).
+  **Rode `alembic upgrade head`**, com o backup antes.
+
 ## Funil do Sucesso do Cliente (02/10/2026)
 
 Aprovado por Eduardo em 02/10/2026, a partir do fluxograma "Macroprocesso — Comercial & Sucesso do
@@ -238,12 +268,12 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.123** no backend e **478** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
-| Banco | PostgreSQL 18 local, 39 tabelas, migrações até `a7d3e5f9c2b4` (funil do sucesso do cliente, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
-| API | 131 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
+| Testes | **1.137** no backend e **486** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Banco | PostgreSQL 18 local, 40 tabelas, migrações até `b8e4f1a6d3c7` (ata e ajustes da área técnica, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
+| API | 136 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens e SDR da IA) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos; faltam a nuvem e o backup fora da máquina |
-| Fora do ar | **E1:** nuvem em região brasileira (custo a estimar antes de contratar) e backup fora da máquina com restauração testada. Login, perfis e histórico já estão no código, à espera do registro no Microsoft Entra. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto. O dashboard do cliente para as reuniões de resultado (fonte dos números e ferramenta a decidir) |
+| Fora do ar | **E1:** nuvem em região brasileira (custo a estimar antes de contratar) e backup fora da máquina com restauração testada. Login, perfis e histórico já estão no código, à espera do registro no Microsoft Entra. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto. O dashboard do cliente para as reuniões de resultado (fonte dos números e ferramenta a decidir). Buscar a transcrição direto no Granola, sem colar (depende de o plano do Granola ter API) |
 
 ## Como rodar
 

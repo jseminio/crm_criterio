@@ -1525,6 +1525,10 @@ export interface GrupoNoFunilDoSucesso {
   /** Só em curso: em_dia · atrasada · sem_classe. */
   situacao: "em_dia" | "atrasada" | "sem_classe" | null;
   reunioes: ReuniaoDevida[];
+  ajustes_pendentes: number;
+  /** Pendentes com prazo vencido. */
+  ajustes_atrasados: number;
+  ajustes_feitos: number;
 }
 
 export interface FunilDoSucesso {
@@ -1542,10 +1546,48 @@ export interface ReuniaoDeResultado {
   participantes: string | null;
   pauta: string | null;
   dashboard: string | null;
+  resumo: string | null;
   decisoes: string | null;
+  pendencias_do_cliente: string | null;
+  pontos_sensiveis: string | null;
   proximos_passos: string | null;
+  tem_transcricao: boolean;
   registrada_por: string | null;
   criado_em: string;
+  ajustes: AjusteTecnico[];
+}
+
+/** Um ajuste que a reunião identificou e a área técnica faz (02/10/2026). */
+export interface AjusteTecnico {
+  id: number;
+  reuniao_id: number;
+  reuniao_tipo: string;
+  reuniao_data: string;
+  grupo_id: number;
+  grupo_nome: string;
+  descricao: string;
+  responsavel_email: string;
+  responsavel_nome: string | null;
+  prazo: string | null;
+  feito_em: string | null;
+  feito_por: string | null;
+  observacao: string | null;
+}
+
+export interface ResponsavelPorAjuste {
+  email: string;
+  nome: string | null;
+  perfil: string;
+}
+
+/** Rascunho da ata pela IA: nada é gravado até registrar a reunião. */
+export interface RascunhoDaAta {
+  resumo: string;
+  decisoes_do_cliente: string[];
+  ajustes: { descricao: string; prazo: string | null }[];
+  pendencias_do_cliente: string[];
+  pontos_sensiveis: string[];
+  custo_usd: string | null;
 }
 
 export interface NovaReuniaoDeResultado {
@@ -1554,8 +1596,13 @@ export interface NovaReuniaoDeResultado {
   participantes?: string;
   pauta?: string;
   dashboard?: string;
+  resumo?: string;
   decisoes?: string;
+  pendencias_do_cliente?: string;
+  pontos_sensiveis?: string;
   proximos_passos?: string;
+  transcricao?: string;
+  ajustes?: { descricao: string; responsavel_email: string; prazo: string | null }[];
 }
 
 export interface CadenciaDeReunioes {

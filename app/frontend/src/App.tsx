@@ -12,6 +12,7 @@ import { Configuracoes } from "./telas/Configuracoes";
 import { SdrEAbordagens } from "./telas/SdrEAbordagens";
 import { FunilEQuestionarios } from "./telas/FunilEQuestionarios";
 import { SucessoDoCliente, type AbaDoSucesso } from "./telas/SucessoDoCliente";
+import { AjustesDaAreaTecnica } from "./componentes/AjustesDaAreaTecnica";
 import { usarDados } from "./usarDados";
 import { VERSAO } from "./versao";
 
@@ -75,7 +76,9 @@ export default function App() {
           ? pode("funil.ver", "questionarios.ver")
           : t.chave === "carteira"
             ? pode("carteira.ver", "contratos.ver", "sucesso.ver")
-            : pode(`${t.chave}.ver`),
+            : t.chave === "agenda"
+              ? pode("agenda.ver", "ajustes.ver", "ajustes.concluir")
+              : pode(`${t.chave}.ver`),
   );
   const [escolhida, definirTela] = useState<Tela>("funil");
   // Atalho de outra tela para uma aba (a Agenda abre os contratos): a aba pedida e uma chave para reabrir.
@@ -135,7 +138,8 @@ export default function App() {
               O seu perfil ({eu.perfil}) ainda não libera nenhum menu. Peça a quem administra em Configurações › Perfis e acesso.
             </p>
           )}
-          {visiveis.length > 0 && tela === "agenda" && <Agenda
+          {visiveis.length > 0 && tela === "agenda" && pode("ajustes.ver", "ajustes.concluir") && <AjustesDaAreaTecnica />}
+          {visiveis.length > 0 && tela === "agenda" && pode("agenda.ver") && <Agenda
               listas={listas}
               aoAbrirLeads={() => definirTela("funil")}
               aoAbrirContratos={() => {

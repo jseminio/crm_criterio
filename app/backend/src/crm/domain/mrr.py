@@ -2,9 +2,10 @@
 
 **O que este número cobre — e o que não cobre.** O KPI oficial "MRR" é a receita
 recorrente contratada da **carteira inteira** (R$ 226.341 em 19/09/2026, numa planilha
-fora do CRM). Aqui só entram os **contratos registrados no CRM**. Enquanto a carteira
-anterior não for carregada (Etapa 3), este MRR é **parcial** e **não deve ser comparado
-com a meta de R$ 400 mil**. A tela e a API dizem isso junto do número.
+fora do CRM). Aqui entram os **contratos registrados no CRM**. Enquanto a carteira
+anterior não for carregada, este MRR é **parcial** e **não deve ser comparado com a meta
+de R$ 400 mil**. Com ela carregada (`importar_carteira.py`), o CRM compara com a meta e
+com o alerta oficiais (02/10/2026, aprovado por Eduardo). A tela e a API dizem isso junto do número.
 
 Regras (decisão de Eduardo em 26/09/2026: a vigência começa na assinatura):
 
@@ -36,7 +37,20 @@ from typing import Iterable, Protocol
 
 from crm.domain.listas import IniciativaDoEncerramento, SituacaoContrato, TipoDeEventoDeContrato
 
-__all__ = ["MrrAtual", "Movimento", "mrr_atual", "movimento", "mrr_em"]
+__all__ = ["ALERTA_DE_MRR", "META_DE_MRR", "MrrAtual", "Movimento", "contra_a_meta", "mrr_atual", "movimento", "mrr_em"]
+
+META_DE_MRR = Decimal("400000")
+"""KPI oficial "MRR" (planilha "KPI de Head de Novos Negócios"): meta R$ 400 mil."""
+ALERTA_DE_MRR = Decimal("200000")
+"""Abaixo disto, alerta."""
+
+
+def contra_a_meta(valor: Decimal) -> str:
+    """"abaixo_do_alerta" (< R$ 200 mil), "entre" ou "na_meta" (>= R$ 400 mil). Só vale com a
+    carteira inteira no CRM: com o MRR parcial, quem chama não compara."""
+    if valor >= META_DE_MRR:
+        return "na_meta"
+    return "abaixo_do_alerta" if valor < ALERTA_DE_MRR else "entre"
 
 ZERO = Decimal("0.00")
 CENTAVOS = Decimal("0.01")

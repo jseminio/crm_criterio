@@ -169,7 +169,7 @@ Atualizado em 02/10/2026.
 | Banco | PostgreSQL 18 local, 35 tabelas, migrações até `e3a9c6b4d2f1` (pedidos de aprovação e menu Questionários, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 122 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Telas | Agenda, Contatos, Funil (kanban e grade, exportar para Excel), Questionários, Grupos, Contratos, Carteira, Abordagens, SDR da IA, Conferência e Configurações. React com TypeScript, em `../frontend` |
-| Incrementos | E2, E3 e E4 prontos. E5 quase todo: falta o MRR da carteira inteira, que depende de carregar os contratos de antes do CRM |
+| Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos; faltam a nuvem e o backup fora da máquina |
 | Fora do ar | **E1:** nuvem em região brasileira (custo a estimar antes de contratar) e backup fora da máquina com restauração testada. Login, perfis e histórico já estão no código, à espera do registro no Microsoft Entra. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto, implantação |
 
 ## Como rodar
@@ -859,11 +859,14 @@ R$ 226.341 (MRR oficial de 19/09/2026). Conferir antes de tratar o MRR do CRM co
 `GET /api/mrr` e o painel no topo de **Contratos** (`crm/domain/mrr.py`). Sem parâmetros, vale o
 mês corrente até hoje; `de`/`ate` mudam o período (não passa de hoje).
 
-**⚠️ É parcial, e a tela e a API dizem isso sempre** (`cobertura_completa: false`). O KPI oficial
-de MRR é a receita da **carteira inteira** (R$ 226.341 em 19/09/2026, em planilha fora do CRM);
-aqui só entram os contratos registrados no CRM, e a carteira anterior ainda não foi carregada
-(Etapa 3). Por isso o número **não é comparado com a meta de R$ 400 mil** nem com o alerta de
-R$ 200 mil: seria um "atingimento" enganoso. Hoje há **0 contratos**, então o MRR é R$ 0,00.
+**Parcial ou da carteira inteira, e a tela diz qual.** O KPI oficial de MRR é a receita da
+**carteira inteira** (R$ 226.341 em 19/09/2026). Sem a carteira anterior ao CRM carregada
+(`importar_carteira.py`, ver acima), só entram os contratos registrados no CRM: o painel diz
+"MRR parcial" e **não compara com a meta** (seria um "atingimento" enganoso). Com ela
+carregada (`cobertura_completa: true`), o painel vira **"MRR da carteira"** e compara com o KPI
+oficial (aprovado por Eduardo em 02/10/2026): **meta R$ 400 mil, alerta abaixo de R$ 200 mil**,
+com etiqueta de ícone e texto (⚠ abaixo do alerta · entre o alerta e a meta · ✓ na meta) e
+quanto falta para a meta. A API devolve `meta`, `alerta`, `contra_a_meta` e `falta_para_a_meta`.
 
 - **MRR atual** = preço mensal dos contratos **Ativos**. **Suspenso** aparece à parte. Contrato sem
   preço mensal (só anual) **fica de fora** e é contado: não se inventa "anual ÷ 12".
@@ -875,7 +878,7 @@ R$ 200 mil: seria um "atingimento" enganoso. Hoje há **0 contratos**, então o 
   **não são calculáveis** (nunca 0%).
 - MRR em qualquer data = MRR atual − o movimento líquido desde então.
 
-**Fora:** comparação com a meta, MRR da carteira anterior (Etapa 3), e a inadimplência (o KPI oficial
+**Fora:** a inadimplência (o KPI oficial
 conta receita contratada, e 41% dela estava travada por inadimplência em 19/09/2026: o MRR pode estar
 saudável enquanto o caixa não entra).
 

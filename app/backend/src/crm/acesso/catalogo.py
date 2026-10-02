@@ -32,7 +32,7 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         ("ver", "ver"), ("editar", "editar"), ("eventos", "registrar evento"),
         ("aprovar", "aprovar eventos acima da alçada"),
     )),
-    ("carteira", "Carteira", (
+    ("carteira", "Saúde da Carteira", (
         ("ver", "ver"), ("avaliar", "avaliar e calcular"), ("parametros", "parâmetros"), ("exportar", "exportar"),
     )),
     ("abordagens", "Abordagens", (("ver", "ver"), ("editar", "preparar, editar e descartar"), ("aprovar", "aprovar e marcar enviada"))),

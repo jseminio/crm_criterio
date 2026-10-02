@@ -1,4 +1,7 @@
-/** Configurações: backup lógico dos dados.
+/** Configurações, em abas (aprovado por Eduardo em 02/10/2026): perfis e acesso, metas, propostas,
+ * histórico de alterações, backup e serviços pedidos. Cada aba só aparece para quem pode vê-la.
+ *
+ * Backup lógico dos dados:
  *
  * Exporta e importa **os dados**, não o banco: o mesmo arquivo serve para levar
  * o CRM a outra máquina ou guardar uma cópia. Só funciona direto na máquina do
@@ -103,8 +106,41 @@ function Tabelas({ resumo }: { resumo: ResumoDeBackup }) {
   );
 }
 
+type Aba = "perfis" | "metas" | "propostas" | "historico" | "backup" | "servicos";
+
+/** As abas, na ordem aprovada por Eduardo em 02/10/2026, com a funcionalidade que libera cada uma.
+ * "Serviços pedidos" é só leitura e aparece para quem vê Configurações. */
+const ABAS: { chave: Aba; rotulo: string; permissao: string | null }[] = [
+  { chave: "perfis", rotulo: "Perfis e acesso", permissao: "configuracoes.perfis" },
+  { chave: "metas", rotulo: "Metas", permissao: "configuracoes.metas" },
+  { chave: "propostas", rotulo: "Propostas", permissao: "configuracoes.propostas" },
+  { chave: "historico", rotulo: "Histórico de alterações", permissao: "configuracoes.historico" },
+  { chave: "backup", rotulo: "Backup", permissao: "configuracoes.backup" },
+  { chave: "servicos", rotulo: "Serviços pedidos", permissao: null },
+];
+const CHAVE_DA_ABA = "crm.configuracoes.aba";
+
+function abaGuardada(): Aba | null {
+  try {
+    return localStorage.getItem(CHAVE_DA_ABA) as Aba | null;
+  } catch {
+    return null;
+  }
+}
+
 export function Configuracoes() {
   const { pode } = usarAcesso();
+  const visiveis = ABAS.filter((a) => a.permissao === null || pode(a.permissao));
+  const [escolhida, definirEscolhida] = useState<Aba | null>(abaGuardada);
+  const aba = visiveis.some((a) => a.chave === escolhida) ? escolhida! : visiveis[0].chave;
+  const escolherAba = (nova: Aba) => {
+    definirEscolhida(nova);
+    try {
+      localStorage.setItem(CHAVE_DA_ABA, nova);
+    } catch {
+      /* sem armazenamento: vale só nesta visita */
+    }
+  };
   const [arquivo, definirArquivo] = useState<File | null>(null);
   const [resumo, definirResumo] = useState<ResumoDeBackup | null>(null);
   const [substituir, definirSubstituir] = useState(false);
@@ -148,10 +184,17 @@ export function Configuracoes() {
 
   return (
     <div className="configuracoes" style={{ display: "grid", gap: "var(--e4)", maxWidth: 960 }}>
-      {pode("configuracoes.perfis") && <PerfisEAcesso />}
-      {pode("configuracoes.metas") && <MetasDosIndicadores />}
-      {pode("configuracoes.historico") && <HistoricoDeAlteracoes />}
-      {pode("configuracoes.backup") && (
+      <div className="abas" role="tablist" aria-label="Seções de Configurações">
+        {visiveis.map((a) => (
+          <button key={a.chave} type="button" role="tab" className="aba" aria-selected={aba === a.chave} onClick={() => escolherAba(a.chave)}>
+            {a.rotulo}
+          </button>
+        ))}
+      </div>
+      {aba === "perfis" && <PerfisEAcesso />}
+      {aba === "metas" && <MetasDosIndicadores />}
+      {aba === "historico" && <HistoricoDeAlteracoes />}
+      {aba === "backup" && (
       <>
       <section className="numero">
         <h3 className="numero-rotulo">Exportar</h3>
@@ -226,8 +269,8 @@ export function Configuracoes() {
       </section>
       </>
       )}
-      {pode("configuracoes.propostas") && <MatrizesDeProposta />}
-      <PedidosDeServicoNovo />
+      {aba === "propostas" && <MatrizesDeProposta />}
+      {aba === "servicos" && <PedidosDeServicoNovo />}
     </div>
   );
 }

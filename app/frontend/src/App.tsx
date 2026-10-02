@@ -6,17 +6,14 @@ import "./app.css";
 import { api } from "./api/cliente";
 import { usarAcesso } from "./entrada";
 import type { Listas } from "./api/tipos";
-import { Abordagens } from "./telas/Abordagens";
 import { Agenda } from "./telas/Agenda";
-import { Conferencia } from "./telas/Conferencia";
 import { Carteira } from "./telas/Carteira";
 import { Contatos } from "./telas/Contatos";
 import { Configuracoes } from "./telas/Configuracoes";
 import { Contratos } from "./telas/Contratos";
 import { Funil } from "./telas/Funil";
-import { Grupos } from "./telas/Grupos";
 import { Questionarios } from "./telas/Questionarios";
-import { Sdr } from "./telas/Sdr";
+import { SdrEAbordagens } from "./telas/SdrEAbordagens";
 import { usarDados } from "./usarDados";
 import { VERSAO } from "./versao";
 
@@ -25,12 +22,9 @@ type Tela =
   | "contatos"
   | "funil"
   | "questionarios"
-  | "grupos"
   | "contratos"
   | "carteira"
   | "abordagens"
-  | "sdr"
-  | "conferencia"
   | "configuracoes";
 
 const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[] = [
@@ -59,12 +53,6 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     descricao: "Tudo o que chegou pelo questionário do site, do recebimento à proposta.",
   },
   {
-    chave: "grupos",
-    rotulo: "Grupos",
-    titulo: "Grupos econômicos",
-    descricao: "O cliente é o grupo. Junte os que a planilha separou.",
-  },
-  {
     chave: "contratos",
     rotulo: "Contratos",
     titulo: "Contratos",
@@ -78,27 +66,15 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
   },
   {
     chave: "abordagens",
-    rotulo: "Abordagens",
-    titulo: "Abordagens",
-    descricao: "O agente SDR prepara a ficha e o rascunho. Nada sai sem a sua aprovação.",
-  },
-  {
-    chave: "sdr",
-    rotulo: "SDR da IA",
-    titulo: "Qualificação pela IA",
-    descricao: "Leads de tráfego pago e frios: quantos a IA qualificou, descartou ou passou para a equipe.",
-  },
-  {
-    chave: "conferencia",
-    rotulo: "Conferência",
-    titulo: "Conferência da carga",
-    descricao: "O que entrou da planilha, o que ficou pendente e o que foi ajustado.",
+    rotulo: "SDR - Abordagens e conhecimento",
+    titulo: "SDR · Abordagens e conhecimento",
+    descricao: "A prospecção do agente SDR e a qualificação de leads pela SDR de IA.",
   },
   {
     chave: "configuracoes",
     rotulo: "Configurações",
     titulo: "Configurações",
-    descricao: "Perfis e acesso, metas, propostas, histórico de alterações, backup e serviços pedidos fora do catálogo.",
+    descricao: "Perfis e acesso, metas, propostas, grupos, conferência da carga, histórico, backup e serviços pedidos.",
   },
 ];
 
@@ -107,8 +83,11 @@ export default function App() {
   // Menu sem nenhuma funcionalidade liberada no perfil não aparece (E1, 02/10/2026).
   const visiveis = TELAS.filter((t) =>
     t.chave === "configuracoes"
-      ? pode("configuracoes.propostas", "configuracoes.backup", "configuracoes.perfis", "configuracoes.historico", "configuracoes.metas")
-      : pode(`${t.chave}.ver`),
+      ? pode("configuracoes.propostas", "configuracoes.backup", "configuracoes.perfis", "configuracoes.historico", "configuracoes.metas",
+          "grupos.ver", "conferencia.ver")
+      : t.chave === "abordagens"
+        ? pode("abordagens.ver", "sdr.ver")
+        : pode(`${t.chave}.ver`),
   );
   const [escolhida, definirTela] = useState<Tela>("funil");
   const tela = visiveis.some((t) => t.chave === escolhida) ? escolhida : (visiveis[0]?.chave ?? escolhida);
@@ -174,13 +153,10 @@ export default function App() {
           {visiveis.length > 0 && tela === "contatos" && <Contatos listas={listas} />}
           {visiveis.length > 0 && tela === "funil" && <Funil listas={listas} />}
           {visiveis.length > 0 && tela === "questionarios" && <Questionarios listas={listas} />}
-          {visiveis.length > 0 && tela === "grupos" && <Grupos listas={listas} />}
           {visiveis.length > 0 && tela === "contratos" && <Contratos listas={listas} />}
           {visiveis.length > 0 && tela === "carteira" && <Carteira listas={listas} />}
-          {visiveis.length > 0 && tela === "abordagens" && <Abordagens />}
-          {visiveis.length > 0 && tela === "sdr" && <Sdr listas={listas} />}
-          {visiveis.length > 0 && tela === "conferencia" && <Conferencia listas={listas} />}
-          {visiveis.length > 0 && tela === "configuracoes" && <Configuracoes />}
+          {visiveis.length > 0 && tela === "abordagens" && <SdrEAbordagens listas={listas} />}
+          {visiveis.length > 0 && tela === "configuracoes" && <Configuracoes listas={listas} />}
         </main>
       </div>
     </div>

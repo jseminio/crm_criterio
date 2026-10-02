@@ -924,6 +924,9 @@
 .metas-campo { display: grid; gap: var(--e1); font-size: 12.5px; color: var(--texto-medio); }
 @media (max-width: 760px) { .metas-linha { grid-template-columns: 1fr 1fr; } .metas-linha > strong, .metas-linha > .campo-ajuda { grid-column: 1 / -1; } }
 
+/* Configurações em abas: a fileira de abas usa a largura toda; o conteúdo dos formulários, até 960px. */
+.configuracoes-estreita > :not([role="tablist"]) { max-width: 960px; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -69,6 +69,25 @@ describe("api", () => {
     });
   });
 
+  it("recusa da validação (detail em lista) diz o campo e o motivo, em vez de só o código", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      respostaJson({
+        detail: [
+          { loc: ["body", "contextualizacao"], type: "string_type", msg: "Input should be a valid string" },
+          { loc: ["body", "valor_contabil"], type: "decimal_max_places", msg: "x", ctx: { decimal_places: 2 } },
+          { loc: ["body", "campo_novo"], type: "algo", msg: "Mensagem do servidor" },
+        ],
+      }, 422),
+    );
+
+    await expect(api.listas()).rejects.toMatchObject({
+      status: 422,
+      message:
+        "Contextualização: não pode ficar em branco; Honorário Contábil/Fiscal: use no máximo 2 casas decimais; " +
+        "campo_novo: Mensagem do servidor",
+    });
+  });
+
   it("um erro sem corpo em JSON ainda vira ErroDaApi, com mensagem genérica", async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response("erro interno do servidor", { status: 500 }),

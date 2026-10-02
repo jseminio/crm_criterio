@@ -67,8 +67,10 @@ from crm.db.modelos import (
     Lead,
     OcorrenciaDeCarga,
     Oportunidade,
+    OportunidadeExcluida,
     PendenciaDaProposta,
     Proposta,
+    QuestionarioRecebido,
 )
 from crm.db.sessao import criar_engine, criar_fabrica_de_sessao, url_do_banco
 from crm.domain import indicadores as regras_de_indicadores
@@ -1209,6 +1211,56 @@ def _registrar(api: FastAPI) -> None:
             oportunidade.grupo.situacao = SituacaoGrupo.CLIENTE
         sessao.flush()
         return _detalhe_de(oportunidade, oportunidade.grupo.nome)
+
+    def _o_que_a_exclusao_leva(sessao: Session, o: Oportunidade) -> dict:
+        """O que some junto e o que impede, para a tela avisar antes de confirmar (02/10/2026)."""
+        contrato = sessao.scalar(sa.select(Contrato.id).where(Contrato.oportunidade_id == o.id).limit(1))
+        propostas = list(sessao.scalars(sa.select(Proposta).where(Proposta.oportunidade_id == o.id).order_by(Proposta.id)))
+        enviadas = [p for p in propostas if p.enviada_em is not None]
+        questionarios = sessao.scalar(sa.select(sa.func.count()).select_from(QuestionarioRecebido).where(
+            sa.or_(QuestionarioRecebido.oportunidade_id == o.id, QuestionarioRecebido.oportunidade_em_aberto_id == o.id)))
+        motivo = None
+        if contrato is not None:
+            motivo = "Esta oportunidade virou contrato e não pode ser excluída."
+        elif enviadas:
+            motivo = f"Esta oportunidade tem proposta enviada ao cliente ({enviadas[0].numero}.{enviadas[0].ano}) e não pode ser excluída."
+        return {
+            "pode_excluir": motivo is None, "motivo": motivo,
+            "propostas": [f"{p.numero}.{p.ano}" for p in propostas if p.enviada_em is None],
+            "questionarios": questionarios or 0, "da_planilha": bool(o.chave_origem),
+        }
+
+    @api.get("/api/oportunidades/{oportunidade_id}/exclusao", tags=["funil"])
+    def antes_de_excluir(oportunidade_id: int, sessao: Session = Depends(obter_sessao)) -> dict:
+        o = sessao.get(Oportunidade, oportunidade_id)
+        if o is None:
+            raise HTTPException(404, "oportunidade não encontrada")
+        return _o_que_a_exclusao_leva(sessao, o)
+
+    @api.delete("/api/oportunidades/{oportunidade_id}", status_code=204, tags=["funil"])
+    def excluir_oportunidade(oportunidade_id: int, sessao: Session = Depends(obter_sessao)) -> None:
+        """Tira a oportunidade do Funil. Irreversível: a tela confirma antes. Pedido de Karine em
+        02/10/2026. Contrato ou proposta já enviada impedem. Vão junto as propostas não enviadas, o
+        histórico de preço e as pendências; o questionário e o lead ficam, sem o vínculo. A da
+        planilha fica lembrada em `OportunidadeExcluida`, para a recarga não a recriar."""
+        o = sessao.get(Oportunidade, oportunidade_id)
+        if o is None:
+            raise HTTPException(404, "oportunidade não encontrada")
+        exame = _o_que_a_exclusao_leva(sessao, o)
+        if not exame["pode_excluir"]:
+            raise HTTPException(409, exame["motivo"])
+        sessao.execute(sa.delete(PendenciaDaProposta).where(PendenciaDaProposta.oportunidade_id == o.id))
+        sessao.execute(sa.delete(Proposta).where(Proposta.oportunidade_id == o.id))
+        sessao.execute(sa.delete(HistoricoDePreco).where(HistoricoDePreco.oportunidade_id == o.id))
+        sessao.execute(sa.update(QuestionarioRecebido).where(QuestionarioRecebido.oportunidade_id == o.id).values(oportunidade_id=None))
+        sessao.execute(sa.update(QuestionarioRecebido).where(QuestionarioRecebido.oportunidade_em_aberto_id == o.id)
+                       .values(oportunidade_em_aberto_id=None))
+        sessao.execute(sa.update(Lead).where(Lead.convertido_em_id == o.id).values(convertido_em_id=None))
+        if o.chave_origem and sessao.scalar(sa.select(OportunidadeExcluida.id).where(
+                OportunidadeExcluida.chave_origem == o.chave_origem)) is None:
+            sessao.add(OportunidadeExcluida(chave_origem=o.chave_origem, nome=o.nome[:200]))
+        sessao.delete(o)
+        sessao.flush()
 
     @api.post(
         "/api/oportunidades/{oportunidade_id}/converter-em-contrato",

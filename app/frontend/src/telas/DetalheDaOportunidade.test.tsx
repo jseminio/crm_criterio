@@ -16,7 +16,9 @@ import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(), pendencias: vi.fn(), ficha: vi.fn(),
+  return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(),
+    excluirOportunidade: vi.fn(),
+    antesDeExcluirOportunidade: vi.fn().mockResolvedValue({ pode_excluir: true, motivo: null, propostas: [], questionarios: 0, da_planilha: false }), pendencias: vi.fn(), ficha: vi.fn(),
     historico: vi.fn().mockResolvedValue([]),
     buscarEmpresas: vi.fn().mockResolvedValue([
       { id: 9, razao_social: "Beta Serviços Ltda", nome_fantasia: null, cnpj: "11444777000161",
@@ -420,6 +422,37 @@ describe("Histórico de preço e origem da volumetria (E4, 25/09/2026)", () => {
       await abrir(oportunidade({ empresa_id: null }));
       expect(screen.getByLabelText("Empresa")).toBeInTheDocument();
       expect(screen.getByText(/Escolha a empresa na base/)).toBeInTheDocument();
+    });
+  });
+
+  describe("excluir oportunidade (02/10/2026)", () => {
+    it("pede confirmação, diz o que some junto e só então exclui", async () => {
+      vi.mocked(api.antesDeExcluirOportunidade).mockResolvedValueOnce({
+        pode_excluir: true, motivo: null, propostas: ["154.2026"], questionarios: 1, da_planilha: false,
+      });
+      vi.mocked(api.excluirOportunidade).mockResolvedValue(undefined);
+      const aoSalvar = await abrir(oportunidade({ nome: "Rizi Dental" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Excluir oportunidade" }));
+      expect(api.excluirOportunidade).not.toHaveBeenCalled();
+      const dialogo = screen.getByRole("alertdialog", { name: "Excluir oportunidade" });
+      expect(dialogo).toHaveTextContent('"Rizi Dental" sai do Funil junto com a proposta gerada 154.2026 (não enviada)');
+      expect(dialogo).toHaveTextContent("O questionário recebido fica guardado");
+      expect(dialogo).toHaveTextContent("Não dá para desfazer");
+      await userEvent.click(within(dialogo).getByRole("button", { name: "Cancelar" }));
+      expect(api.excluirOportunidade).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole("button", { name: "Excluir oportunidade" }));
+      await userEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+      await waitFor(() => expect(api.excluirOportunidade).toHaveBeenCalledWith(1));
+      expect(aoSalvar).toHaveBeenCalled();
+    });
+
+    it("contrato impede e o motivo aparece no lugar do botão", async () => {
+      vi.mocked(api.antesDeExcluirOportunidade).mockResolvedValueOnce({
+        pode_excluir: false, motivo: "Esta oportunidade virou contrato e não pode ser excluída.", propostas: [], questionarios: 0, da_planilha: false,
+      });
+      await abrir(oportunidade());
+      expect(await screen.findByText(/virou contrato e não pode ser excluída/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Excluir oportunidade" })).toBeNull();
     });
   });
 });

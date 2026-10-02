@@ -8,6 +8,7 @@ import type {
   FusaoFeita,
   EntidadeDeContato,
   EmpresaEncontrada,
+  ExclusaoDeOportunidade,
   PaginaDeContatos,
   PessoaComOrigem,
   PessoaDeContato,
@@ -493,6 +494,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(oportunidade),
     }),
+
+  /** O que some junto e o que impede a exclusão (02/10/2026). */
+  antesDeExcluirOportunidade: (id: number) => pedir<ExclusaoDeOportunidade>(`/api/oportunidades/${id}/exclusao`),
+  /** Irreversível: a tela confirma antes. Contrato ou proposta enviada impedem (409). */
+  excluirOportunidade: (id: number) => pedir<unknown>(`/api/oportunidades/${id}`, { method: "DELETE" }),
 
   editarOportunidade: (id: number, mudancas: Record<string, unknown>) =>
     pedir<OportunidadeDetalhe>(`/api/oportunidades/${id}`, {

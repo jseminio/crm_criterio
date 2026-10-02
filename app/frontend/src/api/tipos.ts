@@ -548,6 +548,16 @@ export interface Mrr {
 export type TipoDeContato = "cliente" | "prospect";
 
 /** Uma empresa em que a pessoa está — a pessoa pode estar em várias (30/09/2026). */
+/** O que a exclusão de uma oportunidade leva e o que a impede (02/10/2026). */
+export interface ExclusaoDeOportunidade {
+  pode_excluir: boolean;
+  motivo: string | null;
+  /** Propostas geradas e ainda não enviadas, que somem junto ("154.2026"). */
+  propostas: string[];
+  questionarios: number;
+  da_planilha: boolean;
+}
+
 /** Uma empresa da base, para escolher a da oportunidade (01/10/2026). */
 export interface EmpresaEncontrada {
   id: number;

@@ -15,6 +15,7 @@ import { Carregando, Erro } from "../componentes/estados";
 import { dataHora, dinheiro } from "../formato";
 import { CampoDeData } from "../componentes/CampoDeData";
 import { BuscaDeEmpresa } from "../componentes/BuscaDeEmpresa";
+import { ExclusaoDaOportunidade } from "../componentes/ExclusaoDaOportunidade";
 import { usarAcesso } from "../entrada";
 import { HistoricoDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 
@@ -788,6 +789,9 @@ export function DetalheDaOportunidade({
           </>
           )}
 
+          {aba === "cadastro" && (
+            <ExclusaoDaOportunidade id={id} nome={detalhe.nome} aoExcluir={() => { aoSalvar(); aoFechar(); }} />
+          )}
           {aba === "volumetria" && <QuestionarioDaOportunidade oportunidadeId={id} />}
           {aba === "volumetria" && (
             <VolumetriaEPorte

@@ -16,6 +16,23 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Excluir oportunidade do Funil (02/10/2026)
+
+Pedido de Karine, aprovado. O botão **"Excluir oportunidade"** fica no fim do painel da oportunidade
+(aba Cadastro), com confirmação em dois passos dizendo o que some junto.
+
+- **Travas:** oportunidade que **virou contrato** ou que tem **proposta enviada ao cliente** não sai;
+  o motivo aparece no lugar do botão (409 na API).
+- **Vão junto:** as propostas geradas e **não enviadas**, o histórico de preço e as pendências da
+  proposta. **Ficam:** o questionário recebido (sem o vínculo), o lead (sem o "convertido em"), a
+  empresa, o grupo e os contatos.
+- **Da planilha:** a exclusão é lembrada em `oportunidade_excluida` (migração `d4a8c2e6f1b9`), pela
+  chave de origem; a recarga não a recria — conta a linha como "sem mudança", para a conta da
+  conferência fechar, e avisa em "Ajustado sozinho".
+- API: `GET /api/oportunidades/{id}/exclusao` (o que some e o que impede) e
+  `DELETE /api/oportunidades/{id}`. Permissão nova `funil.excluir` ("excluir oportunidade"); o perfil
+  Comercial que já existe no banco não a tem — com o login ligado, o administrador marca em Perfis.
+
 ## Contrato bruto ou líquido, e o MRR em bruto (02/10/2026)
 
 Aprovado por Eduardo em 02/10/2026, no lugar de uma "data do valor líquido": cada contrato diz se o

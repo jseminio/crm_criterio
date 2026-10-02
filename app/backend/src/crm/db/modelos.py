@@ -57,6 +57,7 @@ from crm.domain.listas import (
 )
 
 __all__ = [
+    "OportunidadeExcluida",
     "GrupoEconomico",
     "Empresa",
     "PessoaContato",
@@ -721,6 +722,21 @@ class FusaoDeGrupos(Base):
     principal_situacao_depois: Mapped[str] = mapped_column(sa.String(40), nullable=False)
     principal_data_entrada_antes: Mapped[date | None] = mapped_column(sa.Date)
     principal_data_entrada_depois: Mapped[date | None] = mapped_column(sa.Date)
+
+
+class OportunidadeExcluida(Base):
+    """Oportunidade da planilha que alguém excluiu no CRM: a recarga não a traz de volta.
+
+    Pedido de Karine em 02/10/2026. Guarda a chave de origem (a mesma identidade que a carga usa,
+    `crm.carga.identidade`) e o nome, para a conferência dizer o que deixou de recriar.
+    """
+
+    __tablename__ = "oportunidade_excluida"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chave_origem: Mapped[str] = mapped_column(sa.String(400), unique=True, nullable=False)
+    nome: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    excluida_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
 
 
 class HistoricoDePreco(Base):

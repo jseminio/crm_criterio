@@ -20,6 +20,7 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     ("funil", "Funil comercial", (
         ("ver", "ver"),
         ("editar", "criar e editar oportunidade e lead"),
+        ("excluir", "excluir oportunidade"),
         ("proposta", "montar e gerar proposta"),
         ("enviar_proposta", "marcar proposta enviada"),
         ("converter", "converter em contrato"),
@@ -94,6 +95,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("POST", r"/api/oportunidades", ("funil.editar",)),
     ("GET", r"/api/oportunidades/\d+(/(ficha|pendencias|proposta|questionario))?", ("funil.ver", "agenda.ver")),
     ("PATCH", r"/api/oportunidades/\d+", ("funil.editar",)),
+    ("GET", r"/api/oportunidades/\d+/exclusao", ("funil.ver",)),
+    ("DELETE", r"/api/oportunidades/\d+", ("funil.excluir",)),
     ("POST", r"/api/oportunidades/\d+/converter-em-contrato", ("funil.converter",)),
     ("PUT", r"/api/oportunidades/\d+/ficha/[^/]+", ("funil.editar", "funil.proposta")),
     ("POST|PATCH", r"/api/oportunidades/\d+/pendencias(/[^/]+)?", ("funil.editar", "funil.proposta")),

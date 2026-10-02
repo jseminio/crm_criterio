@@ -34,6 +34,7 @@ from crm.db.modelos import (
     GrupoEconomico,
     OcorrenciaDeCarga,
     Oportunidade,
+    OportunidadeExcluida,
 )
 from crm.domain.listas import (
     ORIGEM_DA_MUDANCA_NA_RECARGA,
@@ -271,6 +272,18 @@ def importar(sessao: Session, propostas: Iterable[Proposta]) -> ResultadoImporta
         existente = sessao.scalar(
             sa.select(Oportunidade).where(Oportunidade.chave_origem == chave)
         )
+
+        # Excluída no CRM (02/10/2026): a recarga não recria. Conta como "sem mudança" — ela
+        # continua excluída — para a conta da conferência fechar, e avisa na conferência.
+        if existente is None and sessao.scalar(
+            sa.select(OportunidadeExcluida.id).where(OportunidadeExcluida.chave_origem == chave)
+        ):
+            resultado.inalteradas += 1
+            resultado.ocorrencias.append(Ocorrencia(
+                TipoDeOcorrencia.AJUSTE, proposta.linha, "oportunidade excluída",
+                f'"{proposta.nome_oportunidade}" foi excluída no CRM; a recarga não a recria',
+            ))
+            continue
 
         if existente is None:
             grupo = _grupo_para(sessao, proposta.nome_oportunidade, cache_de_grupos, resultado)

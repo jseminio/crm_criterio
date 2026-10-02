@@ -12,13 +12,14 @@ vi.mock("../api/cliente", async () => {
     ...real,
     api: {
       funilDoSucesso: vi.fn(), marcarItemDoSucesso: vi.fn(), concluirEtapaDoSucesso: vi.fn(),
-      reunioesDoGrupo: vi.fn(), registrarReuniao: vi.fn(),
+      reunioesDoGrupo: vi.fn(), registrarReuniao: vi.fn(), montarAta: vi.fn(), responsaveisPorAjuste: vi.fn(),
     },
   };
 });
 
 const grupo = (g: Partial<GrupoNoFunilDoSucesso> & { grupo_id: number; nome: string }): GrupoNoFunilDoSucesso => ({
-  etapa: "em_curso", classe: null, itens_feitos: [], etapa_desde: null, em_curso_desde: null, situacao: null, reunioes: [], ...g,
+  etapa: "em_curso", classe: null, itens_feitos: [], etapa_desde: null, em_curso_desde: null, situacao: null, reunioes: [],
+  ajustes_pendentes: 0, ajustes_atrasados: 0, ajustes_feitos: 0, ...g,
 });
 
 const FUNIL: Funil = {
@@ -71,6 +72,9 @@ describe("Funil do Sucesso do Cliente (02/10/2026)", () => {
     vi.resetAllMocks();
     vi.mocked(api.funilDoSucesso).mockResolvedValue(FUNIL);
     vi.mocked(api.reunioesDoGrupo).mockResolvedValue([]);
+    vi.mocked(api.responsaveisPorAjuste).mockResolvedValue([
+      { email: "bruno@grupocriterio.com.br", nome: "Bruno Soares", perfil: "Área técnica" },
+    ]);
   });
 
   it("põe cada grupo na coluna certa, com o atraso em texto", async () => {
@@ -125,7 +129,7 @@ describe("Funil do Sucesso do Cliente (02/10/2026)", () => {
     fireEvent.change(screen.getByLabelText("Decisões do cliente"), { target: { value: "Abrir filial em 2027" } });
     await userEvent.click(screen.getByRole("button", { name: "Registrar reunião" }));
     expect(api.registrarReuniao).toHaveBeenCalledWith(3, expect.objectContaining({
-      tipo: "trimestral", participantes: "Gestor & Cliente", decisoes: "Abrir filial em 2027", dashboard: "",
+      tipo: "trimestral", participantes: "Gestor & Cliente", decisoes: "Abrir filial em 2027", dashboard: "", ajustes: [],
     }));
     expect(await screen.findByRole("status")).toHaveTextContent("Reunião trimestral");
   });

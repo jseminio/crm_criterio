@@ -5,6 +5,7 @@ o checklist da implantação e as reuniões de resultado com cadência pela clas
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from datetime import date, datetime
 
 import sqlalchemy as sa
@@ -12,15 +13,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from crm.agente.ata import MODELO_PADRAO as MODELO_DA_ATA, ClienteDaApi, escrever_ata
+from crm.agente.config import ler_configuracao
+from crm.agente.erros import mensagem_de_falha
+from crm.agente.sdr import AgenteFalhou, Uso
 from crm.api.acesso import quem_fez
+from crm.api.ajustes import AjusteResposta, resposta_do_ajuste, responsaveis_possiveis
 from crm.db.base import agora
 from crm.db.modelos import (
-    CadenciaDeReuniao, ClassificacaoDoGrupo, Contrato, GrupoEconomico, JornadaDoCliente, ReuniaoDeResultado,
+    AjusteTecnico, CadenciaDeReuniao, ClassificacaoDoGrupo, Contrato, GrupoEconomico, JornadaDoCliente,
+    ReuniaoDeResultado,
 )
 from crm.domain import sucesso as regra
 from crm.domain.listas import SituacaoContrato
 
-__all__ = ["roteador_do_sucesso"]
+__all__ = ["ServicosDaAta", "roteador_do_sucesso", "servicos_da_ata_reais"]
 
 _VALENDO = (SituacaoContrato.AGUARDANDO_ASSINATURA, SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO)
 _CLASSES = ("A", "B", "C")
@@ -66,6 +73,10 @@ class GrupoNoFunil(BaseModel):
     """Só em curso: "em_dia", "atrasada" (alguma reunião vencida ou nunca registrada) ou "sem_classe"
     (sem leitura do Score, não há cadência para cobrar)."""
     reunioes: list[DevidaResposta]
+    ajustes_pendentes: int = 0
+    ajustes_atrasados: int = 0
+    """Pendentes com prazo vencido."""
+    ajustes_feitos: int = 0
 
 
 class FunilDoSucesso(BaseModel):
@@ -85,10 +96,21 @@ class ReuniaoResposta(BaseModel):
     participantes: str | None
     pauta: str | None
     dashboard: str | None
+    resumo: str | None
     decisoes: str | None
+    pendencias_do_cliente: str | None
+    pontos_sensiveis: str | None
     proximos_passos: str | None
+    tem_transcricao: bool
     registrada_por: str | None
     criado_em: datetime
+    ajustes: list[AjusteResposta]
+
+
+class NovoAjuste(BaseModel):
+    descricao: str = Field(min_length=3)
+    responsavel_email: str = Field(min_length=3, max_length=200)
+    prazo: date | None = None
 
 
 class NovaReuniao(BaseModel):
@@ -97,8 +119,59 @@ class NovaReuniao(BaseModel):
     participantes: str | None = Field(default=None, max_length=300)
     pauta: str | None = None
     dashboard: str | None = Field(default=None, max_length=400)
+    resumo: str | None = None
     decisoes: str | None = None
+    pendencias_do_cliente: str | None = None
+    pontos_sensiveis: str | None = None
     proximos_passos: str | None = None
+    transcricao: str | None = None
+    ajustes: list[NovoAjuste] = []
+
+
+class PedidoDeAta(BaseModel):
+    tipo: str
+    data: date
+    participantes: str | None = Field(default=None, max_length=300)
+    transcricao: str = Field(min_length=50, max_length=400_000)
+
+
+class AjusteSugerido(BaseModel):
+    descricao: str
+    prazo: date | None
+
+
+class RascunhoDaAtaResposta(BaseModel):
+    resumo: str
+    decisoes_do_cliente: list[str]
+    ajustes: list[AjusteSugerido]
+    pendencias_do_cliente: list[str]
+    pontos_sensiveis: list[str]
+    custo_usd: str | None
+
+
+@dataclass(frozen=True)
+class ServicosDaAta:
+    """O que a ata usa de fora do banco: o teste troca por um cliente falso, sem chave nem rede."""
+
+    cliente: Callable[[], ClienteDaApi]
+    modelo: str = MODELO_DA_ATA
+
+
+def servicos_da_ata_reais() -> ServicosDaAta:
+    """A chave lida do `.env` a cada uso, como a análise da carteira."""
+    config = ler_configuracao()
+
+    def cliente() -> ClienteDaApi:
+        if not config.chave:
+            raise AgenteFalhou(
+                "A chave da API da Anthropic não está no .env (ANTHROPIC_API_KEY). "
+                "Coloque a chave e tente de novo; nada foi gerado."
+            )
+        import anthropic
+
+        return anthropic.Anthropic(api_key=config.chave)
+
+    return ServicosDaAta(cliente=cliente)
 
 
 class MarcarItem(BaseModel):
@@ -126,7 +199,21 @@ def cadencia_vigente(sessao: Session) -> dict[str, list[str]]:
     return {cl: gravadas.get(cl, list(regra.CADENCIA_PADRAO[cl])) for cl in _CLASSES}
 
 
-def roteador_do_sucesso(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
+def _resposta_da_reuniao(reuniao: ReuniaoDeResultado) -> ReuniaoResposta:
+    return ReuniaoResposta(
+        id=reuniao.id, tipo=reuniao.tipo, data=reuniao.data, participantes=reuniao.participantes,
+        pauta=reuniao.pauta, dashboard=reuniao.dashboard, resumo=reuniao.resumo, decisoes=reuniao.decisoes,
+        pendencias_do_cliente=reuniao.pendencias_do_cliente, pontos_sensiveis=reuniao.pontos_sensiveis,
+        proximos_passos=reuniao.proximos_passos, tem_transcricao=bool(reuniao.transcricao),
+        registrada_por=reuniao.registrada_por, criado_em=reuniao.criado_em,
+        ajustes=[resposta_do_ajuste(a) for a in reuniao.ajustes],
+    )
+
+
+def roteador_do_sucesso(
+    obter_sessao: Callable[[], Iterator[Session]],
+    servicos_da_ata: Callable[[], ServicosDaAta] = servicos_da_ata_reais,
+) -> APIRouter:
     r = APIRouter(prefix="/api/sucesso", tags=["sucesso"])
 
     def _grupos(sessao: Session, so: int | None = None) -> list[tuple[GrupoEconomico, bool]]:
@@ -161,9 +248,24 @@ def roteador_do_sucesso(obter_sessao: Callable[[], Iterator[Session]]) -> APIRou
             ultimas.setdefault(grupo_id, {})[tipo] = dia
         return ultimas
 
+    def _ajustes(sessao: Session, hoje: date) -> dict[int, tuple[int, int, int]]:
+        """Grupo → (pendentes, pendentes com prazo vencido, feitos)."""
+        contagem: dict[int, list[int]] = {}
+        for grupo_id, prazo, feito_em in sessao.execute(
+            sa.select(AjusteTecnico.grupo_id, AjusteTecnico.prazo, AjusteTecnico.feito_em)
+        ):
+            c = contagem.setdefault(grupo_id, [0, 0, 0])
+            if feito_em is not None:
+                c[2] += 1
+            else:
+                c[0] += 1
+                c[1] += prazo is not None and prazo < hoje
+        return {g: (p, a, f) for g, (p, a, f) in contagem.items()}
+
     def _no_funil(
         g: GrupoEconomico, anterior: bool, jornada: JornadaDoCliente | None, classe: str | None,
         ultimas: dict[str, date], cadencia: dict[str, list[str]], hoje: date,
+        ajustes: tuple[int, int, int] = (0, 0, 0),
     ) -> GrupoNoFunil:
         etapa = jornada.etapa if jornada else ("em_curso" if anterior else "contrato")
         em_curso_desde = jornada.em_curso_desde if jornada else None
@@ -180,6 +282,7 @@ def roteador_do_sucesso(obter_sessao: Callable[[], Iterator[Session]]) -> APIRou
             itens_feitos=list(jornada.itens_feitos) if jornada else [],
             etapa_desde=jornada.etapa_desde if jornada else None, em_curso_desde=em_curso_desde,
             situacao=situacao, reunioes=[DevidaResposta(**d.__dict__) for d in devidas],
+            ajustes_pendentes=ajustes[0], ajustes_atrasados=ajustes[1], ajustes_feitos=ajustes[2],
         )
 
     def _um(sessao: Session, grupo_id: int, hoje: date) -> GrupoNoFunil:
@@ -190,6 +293,7 @@ def roteador_do_sucesso(obter_sessao: Callable[[], Iterator[Session]]) -> APIRou
         return _no_funil(
             g, anterior, sessao.get(JornadaDoCliente, grupo_id), _classes(sessao).get(grupo_id),
             _ultimas(sessao).get(grupo_id, {}), cadencia_vigente(sessao), hoje,
+            _ajustes(sessao, hoje).get(grupo_id, (0, 0, 0)),
         )
 
     def _jornada(sessao: Session, grupo_id: int, hoje: date) -> tuple[JornadaDoCliente, GrupoNoFunil]:
@@ -207,13 +311,15 @@ def roteador_do_sucesso(obter_sessao: Callable[[], Iterator[Session]]) -> APIRou
         dia = hoje or date.today()
         jornadas = {j.grupo_id: j for j in sessao.scalars(sa.select(JornadaDoCliente))}
         classes, ultimas, cadencia = _classes(sessao), _ultimas(sessao), cadencia_vigente(sessao)
+        ajustes = _ajustes(sessao, dia)
         return FunilDoSucesso(
             etapas=[EtapaResposta(chave=c, nome=n, participantes=p) for c, n, p in regra.ETAPAS],
             checklist={e: [ItemResposta(chave=c, rotulo=r_) for c, r_ in itens] for e, itens in regra.CHECKLIST.items()},
             tipos=[TipoResposta(chave=t.chave, nome=t.nome, meses=t.meses, participantes=t.participantes, pauta=list(t.pauta))
                    for t in regra.TIPOS_DE_REUNIAO],
             cadencia=cadencia,
-            grupos=[_no_funil(g, anterior, jornadas.get(g.id), classes.get(g.id), ultimas.get(g.id, {}), cadencia, dia)
+            grupos=[_no_funil(g, anterior, jornadas.get(g.id), classes.get(g.id), ultimas.get(g.id, {}), cadencia, dia,
+                              ajustes.get(g.id, (0, 0, 0)))
                     for g, anterior in _grupos(sessao)],
         )
 
@@ -253,12 +359,38 @@ def roteador_do_sucesso(obter_sessao: Callable[[], Iterator[Session]]) -> APIRou
         return _um(sessao, grupo_id, hoje)
 
     @r.get("/grupos/{grupo_id}/reunioes", response_model=list[ReuniaoResposta])
-    def reunioes(grupo_id: int, sessao: Session = Depends(obter_sessao)) -> list[ReuniaoDeResultado]:
-        """Da mais recente para a mais antiga."""
-        return list(sessao.scalars(
+    def reunioes(grupo_id: int, sessao: Session = Depends(obter_sessao)) -> list[ReuniaoResposta]:
+        """Da mais recente para a mais antiga, com os ajustes de cada uma. A transcrição não vem: só se
+        ela existe (é longa, e quem consulta quer a ata)."""
+        return [_resposta_da_reuniao(x) for x in sessao.scalars(
             sa.select(ReuniaoDeResultado).where(ReuniaoDeResultado.grupo_id == grupo_id)
             .order_by(ReuniaoDeResultado.data.desc(), ReuniaoDeResultado.id.desc())
-        ))
+        )]
+
+    @r.post("/grupos/{grupo_id}/ata", response_model=RascunhoDaAtaResposta)
+    def montar_ata(grupo_id: int, corpo: PedidoDeAta, sessao: Session = Depends(obter_sessao)) -> RascunhoDaAtaResposta:
+        """Rascunho da ata pela IA a partir da transcrição do Granola. **Não grava nada**: a tela mostra
+        para o gestor revisar, escolher os responsáveis e registrar a reunião."""
+        tipo = regra.tipo(corpo.tipo)
+        if tipo is None:
+            raise HTTPException(422, "Tipo de reunião desconhecido")
+        grupo = _um(sessao, grupo_id, date.today())
+        servicos = servicos_da_ata()
+        uso = Uso(modelo=servicos.modelo)
+        try:
+            rascunho = escrever_ata(
+                servicos.cliente(), servicos.modelo, cliente=grupo.nome, tipo=tipo.nome,
+                data=corpo.data.strftime("%d/%m/%Y"), participantes=_texto(corpo.participantes),
+                transcricao=corpo.transcricao.strip(), uso=uso,
+            )
+        except Exception as falha:  # noqa: BLE001 — a mensagem é para a pessoa, sem dado do cliente
+            raise HTTPException(502, mensagem_de_falha(falha)) from falha
+        return RascunhoDaAtaResposta(
+            resumo=rascunho.resumo, decisoes_do_cliente=rascunho.decisoes_do_cliente,
+            ajustes=[AjusteSugerido(descricao=a["descricao"], prazo=a["prazo"]) for a in rascunho.ajustes],
+            pendencias_do_cliente=rascunho.pendencias_do_cliente, pontos_sensiveis=rascunho.pontos_sensiveis,
+            custo_usd=f"{uso.custo_usd:.4f}" if uso.custo_usd is not None else None,
+        )
 
     @r.post("/grupos/{grupo_id}/reunioes", response_model=GrupoNoFunil, status_code=201)
     def registrar(grupo_id: int, corpo: NovaReuniao, sessao: Session = Depends(obter_sessao)) -> GrupoNoFunil:
@@ -270,11 +402,26 @@ def roteador_do_sucesso(obter_sessao: Callable[[], Iterator[Session]]) -> APIRou
             raise HTTPException(422, "A data da reunião não pode ser futura: registre depois de feita")
         if _um(sessao, grupo_id, hoje).etapa != "em_curso":
             raise HTTPException(422, "As reuniões de resultado começam quando o grupo entra em curso, depois do kickoff")
-        sessao.add(ReuniaoDeResultado(
+        possiveis = {u.email.lower(): u for u in responsaveis_possiveis(sessao)} if corpo.ajustes else {}
+        for a in corpo.ajustes:
+            if a.responsavel_email.lower() not in possiveis:
+                raise HTTPException(422, f"Responsável sem acesso aos ajustes: {a.responsavel_email}. "
+                                         "Libere em Configurações › Perfis e acesso (perfil Área técnica).")
+        reuniao = ReuniaoDeResultado(
             grupo_id=grupo_id, tipo=corpo.tipo, data=corpo.data, participantes=_texto(corpo.participantes),
-            pauta=_texto(corpo.pauta), dashboard=_texto(corpo.dashboard), decisoes=_texto(corpo.decisoes),
-            proximos_passos=_texto(corpo.proximos_passos), registrada_por=quem_fez("") or None,
-        ))
+            pauta=_texto(corpo.pauta), dashboard=_texto(corpo.dashboard), resumo=_texto(corpo.resumo),
+            decisoes=_texto(corpo.decisoes), pendencias_do_cliente=_texto(corpo.pendencias_do_cliente),
+            pontos_sensiveis=_texto(corpo.pontos_sensiveis), proximos_passos=_texto(corpo.proximos_passos),
+            transcricao=_texto(corpo.transcricao), registrada_por=quem_fez("") or None,
+        )
+        sessao.add(reuniao)
+        sessao.flush()
+        for a in corpo.ajustes:
+            u = possiveis[a.responsavel_email.lower()]
+            sessao.add(AjusteTecnico(
+                reuniao_id=reuniao.id, grupo_id=grupo_id, descricao=a.descricao.strip(),
+                responsavel_email=u.email, responsavel_nome=u.nome, prazo=a.prazo,
+            ))
         sessao.flush()
         return _um(sessao, grupo_id, hoje)
 

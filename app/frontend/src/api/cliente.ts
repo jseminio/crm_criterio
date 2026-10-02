@@ -76,8 +76,11 @@ import type {
   SecaoDeRespostas,
   SituacaoDoPainel,
   Metas,
+  AjusteTecnico,
   CadenciaDeReunioes,
   FunilDoSucesso,
+  RascunhoDaAta,
+  ResponsavelPorAjuste,
   GrupoNoFunilDoSucesso,
   NovaReuniaoDeResultado,
   ReuniaoDeResultado,
@@ -570,6 +573,14 @@ export const api = {
   reunioesDoGrupo: (grupoId: number) => pedir<ReuniaoDeResultado[]>(`/api/sucesso/grupos/${grupoId}/reunioes`),
   registrarReuniao: (grupoId: number, reuniao: NovaReuniaoDeResultado) =>
     pedir<GrupoNoFunilDoSucesso>(`/api/sucesso/grupos/${grupoId}/reunioes`, { method: "POST", body: JSON.stringify(reuniao) }),
+  montarAta: (grupoId: number, pedido: { tipo: string; data: string; participantes?: string; transcricao: string }) =>
+    pedir<RascunhoDaAta>(`/api/sucesso/grupos/${grupoId}/ata`, { method: "POST", body: JSON.stringify(pedido) }),
+  responsaveisPorAjuste: () => pedir<ResponsavelPorAjuste[]>("/api/ajustes/responsaveis"),
+  ajustes: (situacao: "pendentes" | "feitos" | "todos" = "pendentes") =>
+    pedir<AjusteTecnico[]>(`/api/ajustes?situacao=${situacao}`),
+  marcarAjusteFeito: (id: number, observacao: string) =>
+    pedir<AjusteTecnico>(`/api/ajustes/${id}/feito`, { method: "POST", body: JSON.stringify({ observacao }) }),
+  reabrirAjuste: (id: number) => pedir<AjusteTecnico>(`/api/ajustes/${id}/reabrir`, { method: "POST" }),
   cadenciaDeReunioes: () => pedir<CadenciaDeReunioes>("/api/sucesso/cadencia"),
   mudarCadenciaDeReunioes: (cadencia: Record<string, string[]>) =>
     pedir<CadenciaDeReunioes>("/api/sucesso/cadencia", { method: "PUT", body: JSON.stringify({ cadencia }) }),

@@ -25,7 +25,7 @@ from crm.db.base import agora
 __all__ = ["UsuarioAtual", "usuario_atual", "ligar"]
 
 # Campos que não dizem nada a quem lê o histórico, ou que são grandes demais para ele.
-_IGNORADOS = {"criado_em", "atualizado_em", "conteudo_base64", "pdf_base64", "respostas", "avaliacao_do_site", "campos_do_crm"}
+_IGNORADOS = {"criado_em", "atualizado_em", "conteudo_base64", "pdf_base64", "respostas", "avaliacao_do_site", "campos_do_crm", "transcricao"}
 _TABELAS_IGNORADAS = {"registro_de_alteracao", "execucao_de_carga", "ocorrencia_de_carga"}
 _LIMITE = 1000
 

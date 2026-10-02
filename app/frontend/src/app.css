@@ -952,6 +952,27 @@
 .cadencia td, .cadencia th { text-align: center; }
 .cadencia td:first-child, .cadencia th:first-child { text-align: left; }
 
+/* ------------------------------------------------- ata e ajustes da área técnica (02/10/2026) */
+.ata-transcricao { padding: var(--e3); border: 1px dashed var(--borda-forte); border-radius: var(--raio-sm); background: var(--surface-sunken); }
+.ata-ajustes { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--e3); }
+.ata-ajustes > li { display: grid; gap: var(--e2); padding: var(--e3); border: 1px solid var(--borda); border-radius: var(--raio-sm); }
+/* fieldset cresce até o conteúdo por padrão (min-width: min-content): sem isto a linha do ajuste estoura o painel. */
+.painel-corpo .formulario { min-width: 0; }
+.ata-ajuste-linha { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: var(--e2); align-items: center; }
+.ata-ajuste-linha > * { min-width: 0; }
+.ata-ajuste-linha .selecao { width: 100%; }
+.sucesso-historico-topo { display: flex; justify-content: space-between; align-items: baseline; gap: var(--e2); }
+.sucesso-ajustes { margin: var(--e1) 0 0; padding-left: var(--e5); display: grid; gap: var(--e1); font-size: 13px; }
+.sucesso-ajustes .celula-fonte { display: block; }
+.ajustes { display: grid; gap: var(--e3); margin-bottom: var(--e4); }
+.ajustes-topo { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--e3); }
+.ajustes-topo .numero-rotulo { margin: 0; }
+.ajustes-lista { list-style: none; padding: 0; margin: 0; display: grid; }
+.ajuste { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--e3); padding: var(--e3) 0; border-top: 1px solid var(--borda); }
+.ajuste-texto { display: grid; gap: var(--e1); flex: 1 1 360px; min-width: 0; }
+.ajuste-texto .celula-fonte { display: block; }
+.ajuste-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

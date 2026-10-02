@@ -1529,7 +1529,35 @@ class ReuniaoDeResultado(CarimboMixin, Base):
     decisoes: Mapped[str | None] = mapped_column(sa.Text)
     proximos_passos: Mapped[str | None] = mapped_column(sa.Text)
     registrada_por: Mapped[str | None] = mapped_column(sa.String(200))
+    resumo: Mapped[str | None] = mapped_column(sa.Text)
+    pendencias_do_cliente: Mapped[str | None] = mapped_column(sa.Text)
+    pontos_sensiveis: Mapped[str | None] = mapped_column(sa.Text)
+    transcricao: Mapped[str | None] = mapped_column(sa.Text)
+    """A transcrição do Granola colada para montar a ata (02/10/2026). Dado de cliente: só no banco."""
 
+    grupo: Mapped[GrupoEconomico] = relationship()
+    ajustes: Mapped[list["AjusteTecnico"]] = relationship(back_populates="reuniao", order_by="AjusteTecnico.id")
+
+
+class AjusteTecnico(CarimboMixin, Base):
+    """Um ajuste que a reunião de resultado identificou e a área técnica precisa fazer (aprovado por
+    Eduardo em 02/10/2026). Nasce da ata, com responsável e prazo escolhidos pelo gestor; aparece na
+    Agenda do responsável, que marca feito. Não se apaga: reaberto volta a pendente."""
+
+    __tablename__ = "ajuste_tecnico"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reuniao_id: Mapped[int] = mapped_column(sa.ForeignKey("reuniao_de_resultado.id"), nullable=False, index=True)
+    grupo_id: Mapped[int] = mapped_column(sa.ForeignKey("grupo_economico.id"), nullable=False, index=True)
+    descricao: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    responsavel_email: Mapped[str] = mapped_column(sa.String(200), nullable=False, index=True)
+    responsavel_nome: Mapped[str | None] = mapped_column(sa.String(200))
+    prazo: Mapped[date | None] = mapped_column(sa.Date)
+    feito_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    feito_por: Mapped[str | None] = mapped_column(sa.String(200))
+    observacao: Mapped[str | None] = mapped_column(sa.String(500))
+
+    reuniao: Mapped[ReuniaoDeResultado] = relationship(back_populates="ajustes")
     grupo: Mapped[GrupoEconomico] = relationship()
 
 

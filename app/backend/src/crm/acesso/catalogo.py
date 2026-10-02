@@ -36,6 +36,7 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         ("ver", "ver"), ("avaliar", "avaliar e calcular"), ("parametros", "parâmetros"), ("exportar", "exportar"),
     )),
     ("sucesso", "Funil do Sucesso do Cliente", (("ver", "ver"), ("editar", "marcar etapas e registrar reuniões"))),
+    ("ajustes", "Ajustes da área técnica", (("ver", "ver os de todos"), ("concluir", "ver os seus e marcar feito"))),
     ("abordagens", "Abordagens", (("ver", "ver"), ("editar", "preparar, editar e descartar"), ("aprovar", "aprovar e marcar enviada"))),
     ("sdr", "SDR da IA", (("ver", "ver"), ("editar", "registrar conversas"), ("parametros", "parâmetros e custos"))),
     ("conferencia", "Conferência", (("ver", "ver"),)),
@@ -130,7 +131,11 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/sucesso/cadencia", ("sucesso.ver", "configuracoes.metas")),
     ("PUT", r"/api/sucesso/cadencia", ("configuracoes.metas",)),
     ("GET", r"/api/sucesso/(funil|grupos/\d+/reunioes)", ("sucesso.ver",)),
-    ("PATCH|POST", r"/api/sucesso/grupos/\d+/(itens|concluir-etapa|reunioes)", ("sucesso.editar",)),
+    ("PATCH|POST", r"/api/sucesso/grupos/\d+/(itens|concluir-etapa|reunioes|ata)", ("sucesso.editar",)),
+    # ajustes da área técnica (a rota confere: quem só marca feito vê os seus)
+    ("GET", r"/api/ajustes/responsaveis", ("sucesso.editar",)),
+    ("GET", r"/api/ajustes", ("ajustes.ver", "ajustes.concluir", "sucesso.ver")),
+    ("POST", r"/api/ajustes/\d+/(feito|reabrir)", ("ajustes.concluir",)),
     # abordagens do agente SDR
     ("GET", r"/api/abordagens(/resumo|/\d+)?", ("abordagens.ver",)),
     ("POST", r"/api/abordagens/\d+/(aprovar|marcar-enviada)", ("abordagens.aprovar",)),

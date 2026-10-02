@@ -168,6 +168,30 @@ def test_valor_que_este_crm_nao_conhece_explica_em_vez_de_quebrar(com_dados):
         assert c.execute(sa.select(sa.func.count()).select_from(GrupoEconomico)).scalar() == 0
 
 
+def test_backup_le_o_banco_como_ele_esta_antes_de_migrar(com_dados):
+    """Logo depois de um `git pull` com migração nova e antes do `alembic upgrade head`: o banco ainda
+    tem uma coluna que o código já não tem, e não tem uma que o código já tem. O backup não quebra e
+    leva a coluna antiga junto (02/10/2026: quebrava com `UndefinedColumn`)."""
+    import json
+
+    with com_dados.begin() as c:
+        c.execute(sa.text("ALTER TABLE oportunidade ADD COLUMN coluna_antiga VARCHAR(20)"))
+        c.execute(sa.text("UPDATE oportunidade SET coluna_antiga = 'guardar'"))
+        c.execute(sa.text("ALTER TABLE oportunidade DROP COLUMN observacao"))  # o código ainda tem
+    arquivo = _zip(com_dados)
+    with zipfile.ZipFile(arquivo) as zf:
+        manifesto = json.loads(zf.read("manifesto.json"))
+        linha = json.loads(zf.read("dados/oportunidade.jsonl").splitlines()[0])
+    assert "coluna_antiga" in manifesto["tabelas"]["oportunidade"]["colunas"]
+    assert "observacao" not in manifesto["tabelas"]["oportunidade"]["colunas"]
+    assert linha["coluna_antiga"] == "guardar"
+    assert "alembic_version" not in manifesto["tabelas"]
+    # Importar esse backup num código que não conhece a coluna avisa, em vez de perdê-la calado.
+    arquivo.seek(0)
+    with pytest.raises(ErroDeBackup, match="oportunidade.coluna_antiga"):
+        importar(_motor_vazio(), arquivo)
+
+
 def test_arquivo_qualquer_nao_e_backup():
     with pytest.raises(ErroDeBackup, match="não é um backup"):
         verificar(io.BytesIO(b"lixo"))

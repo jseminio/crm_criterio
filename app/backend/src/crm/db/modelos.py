@@ -792,6 +792,10 @@ class Contrato(CarimboMixin, Base):
     escopo: Mapped[str | None] = mapped_column(sa.String(200))
     preco_mensal: Mapped[Decimal | None] = mapped_column(DINHEIRO)
     preco_anual: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    base_do_valor: Mapped[str | None] = mapped_column(sa.String(10))
+    """"bruto" ou "liquido" (02/10/2026, aprovado por Eduardo): se o preço do contrato já inclui o
+    imposto. O MRR soma em bruto; o líquido entra com o imposto dos Parâmetros. Vazio = não informado
+    (soma como está, com aviso). Contrato que nasce de proposta do CRM é líquido."""
 
     data_inicio: Mapped[date | None] = mapped_column(sa.Date)
     data_fim: Mapped[date | None] = mapped_column(sa.Date)

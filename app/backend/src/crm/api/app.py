@@ -42,7 +42,7 @@ from crm.api.sucesso import ServicosDaAta, roteador_do_sucesso, servicos_da_ata_
 from crm.domain.alcada import motivo_da_alcada
 from crm.api.abordagens import Servicos, roteador_de_abordagens, servicos_reais
 from crm.api.backup import roteador as roteador_de_backup
-from crm.api.classificacao import ServicosDeAnalise, roteador as roteador_de_carteira, servicos_de_analise_reais
+from crm.api.classificacao import ServicosDeAnalise, parametros_vigentes, roteador as roteador_de_carteira, servicos_de_analise_reais
 from crm.api.contatos import roteador as roteador_de_contatos
 from crm.api.contatos import roteador_de_empresas
 from crm.api.sdr import roteador as roteador_do_sdr
@@ -68,6 +68,7 @@ from crm.db.modelos import (
     OcorrenciaDeCarga,
     Oportunidade,
     PendenciaDaProposta,
+    Proposta,
 )
 from crm.db.sessao import criar_engine, criar_fabrica_de_sessao, url_do_banco
 from crm.domain import indicadores as regras_de_indicadores
@@ -912,8 +913,13 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(422, "só há MRR até hoje")
         if inicio > fim:
             raise HTTPException(422, "o início do período não pode ser depois do fim")
-        contratos = list(sessao.scalars(sa.select(Contrato)))
-        da_carteira = sum(1 for c in contratos if c.anterior_ao_crm)
+        registrados = list(sessao.scalars(sa.select(Contrato)))
+        da_carteira = sum(1 for c in registrados if c.anterior_ao_crm)
+        # Sempre em bruto (02/10/2026): o líquido entra com o imposto dos Parâmetros de cálculo.
+        imposto = parametros_vigentes(sessao)[1].imposto
+        contratos = regras_de_mrr.em_bruto(registrados, imposto)
+        somados = [c for c in registrados if c.situacao in (SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO)
+                   and c.preco_mensal and c.preco_mensal > 0]
         mov = regras_de_mrr.movimento(contratos, inicio, fim, dia)
         atual = regras_de_mrr.mrr_atual(contratos)
         completa = da_carteira > 0
@@ -931,8 +937,11 @@ def _registrar(api: FastAPI) -> None:
                 churn=mov.churn, mrr_fim=mov.mrr_fim, variacao=mov.variacao,
                 nrr=mov.nrr, grr=mov.grr,
             ),
-            contratos_registrados=len(contratos),
+            contratos_registrados=len(registrados),
             contratos_da_carteira_anterior=da_carteira,
+            imposto=imposto,
+            contratos_liquidos=sum(1 for c in somados if c.base_do_valor == "liquido"),
+            contratos_sem_base=sum(1 for c in somados if c.base_do_valor is None),
             cobertura_completa=completa,
             aviso=(
                 "Inclui a carteira anterior ao CRM, carregada da planilha de saúde da carteira "
@@ -1235,6 +1244,11 @@ def _registrar(api: FastAPI) -> None:
             escopo=corpo.escopo or oportunidade.servico,
             preco_mensal=corpo.preco_mensal or oportunidade.preco_mensal,
             preco_anual=corpo.preco_anual or oportunidade.preco_anual,
+            # A proposta do CRM grava o líquido no preço da oportunidade (01/10/2026): o contrato
+            # que nasce dela é líquido. Sem proposta, ninguém sabe: fica para a pessoa dizer.
+            base_do_valor="liquido" if sessao.scalar(
+                sa.select(Proposta.id).where(Proposta.oportunidade_id == oportunidade.id,
+                                             Proposta.valor_liquido.is_not(None)).limit(1)) else None,
             # A vigência começa na assinatura (decisão de 25/09/2026): o contrato
             # nasce sem data de início; quem assina é que a preenche.
             data_inicio=corpo.data_inicio,
@@ -1302,7 +1316,9 @@ def _registrar(api: FastAPI) -> None:
 
         # Encerrado não se mexe mais — nem por evento, nem por edição. Sem isto, um
         # salvar voltava a situação para Ativo e destravava preço e data de fim.
-        if contrato.situacao is SituacaoContrato.ENCERRADO and reais:
+        # Bruto ou líquido é como o valor se lê, não uma mudança no contrato: vale até no encerrado
+        # (o churn dele também entra no MRR em bruto).
+        if contrato.situacao is SituacaoContrato.ENCERRADO and set(reais) - {"base_do_valor"}:
             raise HTTPException(422, "contrato encerrado não se mexe mais")
         if mudancas.get("situacao") is SituacaoContrato.ENCERRADO and contrato.situacao is not SituacaoContrato.ENCERRADO:
             raise HTTPException(422, "para encerrar, registre um evento de Encerramento com o motivo")

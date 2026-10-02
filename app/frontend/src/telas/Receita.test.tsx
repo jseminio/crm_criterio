@@ -18,7 +18,7 @@ const mrr = (o: Partial<Mrr> = {}, mov: Partial<Mrr["movimento"]> = {}, atual: P
     contracao: "0.00", churn_cliente: "0.00", churn_criterio: "0.00", churn: "0.00", mrr_fim: "0.00",
     variacao: "0.00", nrr: null, grr: null, ...mov,
   },
-  contratos_registrados: 0, contratos_da_carteira_anterior: 0, cobertura_completa: false, aviso: AVISO,
+  contratos_registrados: 0, contratos_da_carteira_anterior: 0, cobertura_completa: false, aviso: AVISO, imposto: "0.11", contratos_liquidos: 0, contratos_sem_base: 0,
   meta: "400000", alerta: "200000", contra_a_meta: null, falta_para_a_meta: null, ...o,
 });
 
@@ -132,4 +132,11 @@ describe("inicioDoPeriodo", () => {
   it("trimestre: dia 1 de dois meses antes", () => expect(inicioDoPeriodo("trimestre", hoje)).toBe("2026-07-01"));
   it("ano: 1º de janeiro", () => expect(inicioDoPeriodo("ano", hoje)).toBe("2026-01-01"));
   it("trimestre cruza o ano sem quebrar", () => expect(inicioDoPeriodo("trimestre", new Date(2026, 0, 10))).toBe("2025-11-01"));
+
+  it("diz quantos líquidos entraram com o imposto e quantos estão sem bruto/líquido", async () => {
+    vi.mocked(api.mrr).mockResolvedValue(mrr({ contratos_liquidos: 3, contratos_sem_base: 1 }));
+    render(<Receita />);
+    expect(await screen.findByText(/Somado em bruto: 3 contratos líquidos entraram com o imposto de 11% · ⚠ 1 sem bruto ou líquido informado, somado como está/))
+      .toBeInTheDocument();
+  });
 });

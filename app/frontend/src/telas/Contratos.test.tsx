@@ -18,7 +18,7 @@ vi.mock("../api/cliente", async () => {
 
 const resumo = (o: Partial<ContratoResumo> = {}): ContratoResumo => ({
   id: 7, grupo_id: 1, grupo_nome: "Alfa", oportunidade_id: 1, escopo: "BPO", preco_mensal: "1000.00",
-  preco_anual: "12000.00", empresa_id: null, anterior_ao_crm: false, data_inicio: null, data_fim: null, situacao: "Aguardando assinatura", signatario: null, ...o,
+  preco_anual: "12000.00", base_do_valor: null, empresa_id: null, anterior_ao_crm: false, data_inicio: null, data_fim: null, situacao: "Aguardando assinatura", signatario: null, ...o,
 });
 const detalhe = (o: Partial<ContratoDetalhe> = {}): ContratoDetalhe => ({ ...resumo(o), documento_assinado: null, observacao: null, eventos: [], ...o } as ContratoDetalhe);
 
@@ -31,7 +31,10 @@ async function abrir(c: Partial<ContratoDetalhe> = {}) {
 }
 
 describe("Contratos — vigência na assinatura (25/09/2026)", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.mrr).mockResolvedValue(null as never);
+  });
 
   it("o campo de início se chama data da assinatura", async () => {
     await abrir();
@@ -81,7 +84,10 @@ describe("Contratos — vigência na assinatura (25/09/2026)", () => {
 });
 
 describe("Contratos — mudanças de situação permitidas (01/10/2026)", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.mrr).mockResolvedValue(null as never);
+  });
 
   const opcoes = () =>
     Array.from(screen.getByLabelText("Situação", { selector: "#c-situacao" }).querySelectorAll("option")).map((o) => o.textContent);
@@ -107,6 +113,37 @@ describe("Contratos — mudanças de situação permitidas (01/10/2026)", () => 
     expect(screen.getByRole("button", { name: /salvar alterações/i })).toBeDisabled();
     expect(screen.getByText(/contrato encerrado: nada mais muda/i)).toBeInTheDocument();
     expect(screen.queryByText(/só mudam por um evento/i)).toBeNull();
+  });
+
+  it("bruto ou líquido: escolhe em cada contrato, até no encerrado, e a lista avisa quando falta", async () => {
+    vi.mocked(api.editarContrato).mockResolvedValue(detalhe() as never);
+    vi.mocked(api.mrr).mockResolvedValue({
+      atual: { valor: "0.00", contratos: 0, suspenso_valor: "0.00", suspenso_contratos: 0, sem_preco_mensal: 0, grupos: 0,
+        ticket_por_grupo: null, mediana_por_grupo: null },
+      movimento: { de: "2026-10-01", ate: "2026-10-02", mrr_inicio: "0.00", novo: "0.00", expansao: "0.00", reajuste: "0.00",
+        contracao: "0.00", churn_cliente: "0.00", churn_criterio: "0.00", churn: "0.00", mrr_fim: "0.00", variacao: "0.00", nrr: null, grr: null },
+      contratos_registrados: 1, contratos_da_carteira_anterior: 0, cobertura_completa: false, aviso: "parcial",
+      meta: "400000", alerta: "200000", contra_a_meta: null, falta_para_a_meta: null,
+      imposto: "0.11", contratos_liquidos: 0, contratos_sem_base: 1,
+    });
+    await abrir({ situacao: "Encerrado", data_inicio: "2026-03-01", preco_mensal: "8900.00" });
+    expect(screen.getByText("⚠ bruto ou líquido?")).toBeInTheDocument();
+    const salvar = screen.getByRole("button", { name: /salvar alterações/i });
+    expect(salvar).toBeDisabled();
+    await userEvent.click(screen.getByLabelText("Líquido (sem o imposto)"));
+    expect(await screen.findByText(/Entra no MRR como R\$\s*10\.000,00 bruto, com o imposto de 11%/)).toBeInTheDocument();
+    expect(salvar).toBeEnabled();
+    await userEvent.click(salvar);
+    expect(api.editarContrato).toHaveBeenCalledWith(7, expect.objectContaining({ base_do_valor: "liquido" }));
+  });
+
+  it("a lista mostra se o preço é bruto ou líquido", async () => {
+    vi.mocked(api.contratos).mockResolvedValue({ total: 2, itens: [
+      resumo({ id: 1, base_do_valor: "liquido" }), resumo({ id: 2, grupo_nome: "Beta", base_do_valor: "bruto" }),
+    ] } as never);
+    render(<Contratos listas={null} />);
+    expect(await screen.findByText("líquido")).toBeInTheDocument();
+    expect(screen.getByText("bruto")).toBeInTheDocument();
   });
 
   it("o fim trava pelo que está gravado, não pelo que veio da lista (Renovação)", async () => {

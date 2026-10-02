@@ -10,7 +10,7 @@ import { useState } from "react";
 import { api } from "../api/cliente";
 import type { Mrr } from "../api/tipos";
 import { Carregando, Erro } from "../componentes/estados";
-import { data, dinheiro, percentual } from "../formato";
+import { aliquota, data, dinheiro, percentual } from "../formato";
 import { usarDados } from "../usarDados";
 
 type Periodo = "mes" | "trimestre" | "ano";
@@ -48,9 +48,10 @@ function Linha({ rotulo, valor, sinal, nota }: { rotulo: string; valor: string; 
   );
 }
 
-export function Receita() {
+/** `versao` muda quando um contrato é salvo ou recebe evento: o MRR é recalculado na hora. */
+export function Receita({ versao = 0 }: { versao?: number }) {
   const [periodo, definirPeriodo] = useState<Periodo>("mes");
-  const { dados, carregando, erro, recarregar } = usarDados<Mrr>(() => api.mrr(inicioDoPeriodo(periodo)), [periodo]);
+  const { dados, carregando, erro, recarregar } = usarDados<Mrr>(() => api.mrr(inicioDoPeriodo(periodo)), [periodo, versao]);
 
   if (carregando && !dados) return <Carregando rotulo="Calculando o MRR" />;
   if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
@@ -87,6 +88,16 @@ export function Receita() {
                 Ticket médio por grupo <strong>{dinheiro(atual.ticket_por_grupo)}</strong>
                 {" · "}mediana <strong>{dinheiro(atual.mediana_por_grupo)}</strong>
                 {" · "}{atual.grupos} grupo{atual.grupos === 1 ? "" : "s"}
+              </p>
+            )}
+            {(dados.contratos_liquidos > 0 || dados.contratos_sem_base > 0) && (
+              <p className="numero-nota">
+                Somado em bruto
+                {dados.contratos_liquidos > 0 &&
+                  `: ${dados.contratos_liquidos} contrato${dados.contratos_liquidos === 1 ? " líquido entrou" : "s líquidos entraram"} com o imposto de ${aliquota(dados.imposto)}`}
+                {dados.contratos_sem_base > 0 &&
+                  ` · ⚠ ${dados.contratos_sem_base} sem bruto ou líquido informado, ${dados.contratos_sem_base === 1 ? "somado como está" : "somados como estão"} (marque em cada contrato)`}
+                .
               </p>
             )}
             {atual.sem_preco_mensal > 0 && (

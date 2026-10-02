@@ -16,6 +16,24 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Contrato bruto ou líquido, e o MRR em bruto (02/10/2026)
+
+Aprovado por Eduardo em 02/10/2026, no lugar de uma "data do valor líquido": cada contrato diz se o
+preço mensal é **Líquido (sem o imposto)** ou **Bruto (com o imposto)**, na tela do contrato (Gestão
+de contratos › Abrir). Vale até para contrato assinado ou encerrado: é como o valor se lê, não uma
+mudança de preço. A lista mostra "líquido", "bruto" ou "⚠ bruto ou líquido?" embaixo do preço.
+
+- **O MRR soma tudo em bruto.** O contrato líquido entra com o imposto dos Parâmetros de cálculo:
+  `bruto = líquido ÷ (1 − imposto)`, ao centavo (ex.: 8.000 líquido com 11% = 8.988,76). O preço e
+  os eventos (reajuste, expansão, contração, encerramento) são convertidos do mesmo jeito, para o
+  NRR e o GRR não misturarem bases. Aqui não se arredonda a R$ 50 como na proposta.
+- O contrato sem bruto/líquido informado entra **como está**, e o painel avisa quantos são. O painel
+  também diz quantos líquidos entraram com o imposto, e recalcula assim que um contrato é salvo.
+- Contrato que nasce de uma oportunidade com **proposta gerada no CRM** já entra como líquido (a
+  proposta grava o líquido no preço). A migração `c9f2a7d4e1b8` faz o mesmo com os que já existem;
+  os outros ficam em branco para a pessoa marcar. **Rode `alembic upgrade head`**, com o backup antes.
+- A receita em contrato da Saúde da carteira continua somando o preço como está (não mudou aqui).
+
 ## Funil do Sucesso do Cliente no formato do fluxograma (02/10/2026)
 
 Aprovado por Eduardo em 02/10/2026. O funil passou a ter **uma coluna por etapa do fluxograma**:
@@ -287,8 +305,8 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.138** no backend e **489** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
-| Banco | PostgreSQL 18 local, 40 tabelas, migrações até `b8e4f1a6d3c7` (ata e ajustes da área técnica, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
+| Testes | **1.143** no backend e **492** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Banco | PostgreSQL 18 local, 40 tabelas, migrações até `c9f2a7d4e1b8` (contrato bruto ou líquido, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 136 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens e SDR da IA) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos; faltam a nuvem e o backup fora da máquina |

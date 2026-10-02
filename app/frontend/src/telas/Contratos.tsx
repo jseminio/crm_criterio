@@ -6,12 +6,12 @@
 
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { ContratoDetalhe, ContratoResumo, Listas, Pagina } from "../api/tipos";
+import type { ContratoDetalhe, ContratoResumo, Listas, Mrr, Pagina } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
-import { data, dinheiro } from "../formato";
+import { aliquota, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
 import { EventosDeContrato } from "./EventosDeContrato";
 import { Receita } from "./Receita";
@@ -19,6 +19,17 @@ import { CampoDeData } from "../componentes/CampoDeData";
 import { AlteracoesDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 
 const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "Encerrado"];
+
+/** O valor em bruto: líquido ÷ (1 − imposto), ao centavo, como o MRR soma (02/10/2026). */
+export function brutoDoLiquido(liquido: string, imposto: string): number {
+  return Math.round((Number(liquido) / (1 - Number(imposto))) * 100) / 100;
+}
+
+function BaseDoValor({ base }: { base: ContratoResumo["base_do_valor"] }) {
+  if (base === "liquido") return <span className="celula-fonte">líquido</span>;
+  if (base === "bruto") return <span className="celula-fonte">bruto</span>;
+  return <span className="celula-fonte cartao-prazo-atrasado">⚠ bruto ou líquido?</span>;
+}
 
 function EdicaoDeContrato({
   contrato,
@@ -41,7 +52,10 @@ function EdicaoDeContrato({
     data_fim: contrato.data_fim ?? "",
     situacao: contrato.situacao,
     signatario: contrato.signatario ?? "",
+    base_do_valor: contrato.base_do_valor ?? "",
   });
+  // A alíquota vem do MRR (Parâmetros de cálculo), para mostrar quanto o líquido vale em bruto.
+  const { dados: mrr } = usarDados<Mrr>(() => api.mrr(), []);
   const [erro, definirErro] = useState<string | null>(null);
   const [salvando, definirSalvando] = useState(false);
   const [detalhe, definirDetalhe] = useState<ContratoDetalhe | null>(null);
@@ -116,7 +130,7 @@ function EdicaoDeContrato({
             type="button"
             className="botao botao-primario"
             onClick={salvar}
-            disabled={salvando || semAssinatura || encerrado}
+            disabled={salvando || semAssinatura || (encerrado && rascunho.base_do_valor === (contrato.base_do_valor ?? ""))}
           >
             {salvando ? "Salvando…" : "Salvar alterações"}
           </button>
@@ -197,8 +211,27 @@ function EdicaoDeContrato({
             />
           </div>
         </div>
+        <fieldset className="campo-bloco base-do-valor">
+          <legend className="campo-rotulo">O preço mensal é</legend>
+          <div className="base-do-valor-opcoes">
+            {(["liquido", "bruto"] as const).map((b) => (
+              <label key={b}>
+                <input type="radio" name="c-base" value={b} checked={rascunho.base_do_valor === b}
+                  onChange={() => mudar("base_do_valor", b)} />
+                {b === "liquido" ? "Líquido (sem o imposto)" : "Bruto (com o imposto)"}
+              </label>
+            ))}
+          </div>
+          <p className="campo-ajuda">
+            {rascunho.base_do_valor === "liquido" && rascunho.preco_mensal && mrr
+              ? `Entra no MRR como ${dinheiro(String(brutoDoLiquido(rascunho.preco_mensal, mrr.imposto)))} bruto, com o imposto de ${aliquota(mrr.imposto)}.`
+              : rascunho.base_do_valor === "bruto"
+                ? "Entra no MRR como está."
+                : "⚠ Não informado: o MRR soma como está. Vale também para contrato assinado ou encerrado."}
+          </p>
+        </fieldset>
         {encerrado && (
-          <p className="campo-ajuda">Contrato encerrado: nada mais muda, nem por evento nem aqui.</p>
+          <p className="campo-ajuda">Contrato encerrado: nada mais muda, nem por evento nem aqui (só o bruto ou líquido).</p>
         )}
         {assinado && (
           <p className="campo-ajuda">
@@ -260,6 +293,7 @@ function EdicaoDeContrato({
 export function Contratos({ listas }: { listas: Listas | null }) {
   const [situacao, definirSituacao] = useState("");
   const [editando, definirEditando] = useState<ContratoResumo | null>(null);
+  const [versaoDoMrr, definirVersaoDoMrr] = useState(0);
   const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
 
   const { dados, carregando, erro, recarregar } = usarDados<Pagina<ContratoResumo>>(
@@ -272,7 +306,7 @@ export function Contratos({ listas }: { listas: Listas | null }) {
 
   return (
     <>
-      <Receita />
+      <Receita versao={versaoDoMrr} />
 
       <div className="filtros">
         <div className="campo">
@@ -334,7 +368,10 @@ export function Contratos({ listas }: { listas: Listas | null }) {
                 <td>
                   <Etiqueta texto={contrato.situacao} />
                 </td>
-                <td>{dinheiro(contrato.preco_mensal)}</td>
+                <td>
+                  {dinheiro(contrato.preco_mensal)}
+                  {contrato.preco_mensal && <BaseDoValor base={contrato.base_do_valor} />}
+                </td>
                 <td>
                   {contrato.data_inicio
                     ? data(contrato.data_inicio)
@@ -364,7 +401,10 @@ export function Contratos({ listas }: { listas: Listas | null }) {
           motivos={listas?.motivos_de_encerramento ?? []}
           iniciativas={listas?.iniciativas_de_encerramento ?? []}
           aoFechar={() => definirEditando(null)}
-          aoSalvar={recarregar}
+          aoSalvar={() => {
+            recarregar();
+            definirVersaoDoMrr((v) => v + 1);
+          }}
         />
       )}
     </>

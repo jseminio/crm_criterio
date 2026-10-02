@@ -76,6 +76,18 @@ def _tabelas() -> list[sa.Table]:
     return list(Base.metadata.sorted_tables)
 
 
+def _tabelas_do_banco(conexao: sa.Connection) -> list[sa.Table]:
+    """As tabelas e colunas que estão de fato no banco, lidas dele, na ordem pai antes de filho.
+
+    O backup sai daqui, e não do modelo do código (02/10/2026): logo depois de um `git pull` com
+    migração nova, o código já tem colunas que o banco ainda não tem (o backup quebrava) ou já não
+    tem colunas que o banco ainda guarda (o backup sairia sem elas, calado). Backup é para antes
+    de migrar, então ele precisa ler o banco como ele está."""
+    meta = sa.MetaData()
+    meta.reflect(bind=conexao)
+    return [t for t in meta.sorted_tables if t.name != "alembic_version"]
+
+
 def _revisao(conexao: sa.Connection) -> str | None:
     try:
         return conexao.execute(sa.text("SELECT version_num FROM alembic_version")).scalar()
@@ -96,7 +108,7 @@ def exportar(engine: sa.Engine, destino: Path | BinaryIO) -> ResumoDeBackup:
     with engine.connect() as conexao, conexao.begin():
         revisao = _revisao(conexao)
         with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as zf:
-            for tabela in _tabelas():
+            for tabela in _tabelas_do_banco(conexao):
                 digest = hashlib.sha256()
                 buffer = io.BytesIO()
                 n = 0
@@ -217,6 +229,19 @@ def importar(engine: sa.Engine, origem: Path | BinaryIO, *, substituir: bool = F
     desconhecidas = set(manifesto["tabelas"]) - conhecidas
     if desconhecidas:
         raise ErroDeBackup(f"O backup tem tabelas que este CRM não conhece: {sorted(desconhecidas)}.")
+    # Coluna do backup que o código não tem seria descartada calada na importação.
+    colunas_do_codigo = {t.name: {c.name for c in t.columns} for t in tabelas}
+    sobrando = sorted(
+        f"{nome}.{coluna}"
+        for nome, info in manifesto["tabelas"].items()
+        for coluna in info.get("colunas", [])
+        if coluna not in colunas_do_codigo[nome]
+    )
+    if sobrando:
+        raise ErroDeBackup(
+            f"O backup tem colunas que este código não conhece: {', '.join(sobrando)}. Ele foi feito "
+            "numa versão anterior do esquema; restaure com o código e o banco nessa mesma versão."
+        )
 
     with zf, engine.connect() as conexao, conexao.begin():
         revisao_destino = _revisao(conexao)

@@ -902,6 +902,12 @@ Na tela, **Configurações** faz o mesmo: baixar o backup, conferir o arquivo e 
 
 - **Tudo ou nada:** a importação roda numa transação; qualquer erro desfaz por inteiro.
 - **Recusa destino com dados** e esquema de outra revisão (rode `alembic upgrade head` antes).
+- **Backup antes de migrar (02/10/2026):** o `exportar` lê as tabelas e colunas que estão no
+  banco, não as do código. Pode e deve rodar depois do `git pull` e antes do
+  `alembic upgrade head` — antes quebrava com `UndefinedColumn` e, no caso inverso, sairia sem a
+  coluna que a migração ia transformar. Para restaurar um backup de esquema anterior, volte o
+  código para a mesma versão: a importação recusa coluna que o código não conhece, em vez de
+  descartá-la calada.
 - **Só na máquina do CRM:** as rotas `/api/backup/*` recusam pedido que chegue por
   túnel (ngrok) ou host que não seja `localhost`, porque o arquivo tem todos os dados
   de cliente e a API não tem login.

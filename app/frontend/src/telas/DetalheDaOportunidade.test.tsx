@@ -7,7 +7,7 @@
  * sobrevive à recarga, senão a garantia existe no banco e ninguém sabe dela.
  */
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
@@ -16,7 +16,7 @@ import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(),
+  return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(), pendencias: vi.fn(), ficha: vi.fn(),
     buscarEmpresas: vi.fn().mockResolvedValue([
       { id: 9, razao_social: "Beta Serviços Ltda", nome_fantasia: null, cnpj: "11444777000161",
         grupo_id: 2, grupo_nome: "Grupo Beta", tipo: "cliente" },
@@ -120,6 +120,16 @@ describe("DetalheDaOportunidade", () => {
     render(<DetalheDaOportunidade id={1} listas={LISTAS} aoFechar={() => {}} aoSalvar={() => {}} />);
 
     expect(screen.getByRole("status")).toHaveTextContent("Abrindo a oportunidade");
+  });
+
+  it("a aba Proposta conta o que falta, e a Ficha fica entre Volumetria e Proposta", async () => {
+    vi.mocked(api.pendencias).mockResolvedValue({ abertas: 3, atrasadas: 1, feitas: 0, revisores: ["Eduardo"], itens: [] });
+    await abrir(oportunidade());
+    const abas = screen.getByRole("tablist", { name: "Seções da oportunidade" });
+    await waitFor(() => expect(within(abas).getAllByRole("tab")[3]).toHaveTextContent(/^Proposta\s*· 3 pendentes$/));
+    expect(within(abas).getAllByRole("tab").map((t) => t.textContent?.replace(/\s+/g, " ").trim())).toEqual([
+      "Cadastro", "Volumetria e porte", "Ficha", "Proposta · 3 pendentes", "Histórico de preço",
+    ]);
   });
 
   it("avisa que a edição sobrevive à recarga da planilha", async () => {

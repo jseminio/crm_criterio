@@ -33,6 +33,7 @@ from crm.api.classificacao import ServicosDeAnalise, roteador as roteador_de_car
 from crm.api.contatos import roteador as roteador_de_contatos
 from crm.api.contatos import roteador_de_empresas
 from crm.api.sdr import roteador as roteador_do_sdr
+from crm.api.ficha import pendencias_de, roteador_da_ficha
 from crm.api.propostas import roteador_de_propostas
 from crm.api.questionarios import fonte_real, roteador_de_questionarios
 from crm.questionario.endereco import BuscaDeEndereco, endereco_pelo_cnpj
@@ -52,6 +53,7 @@ from crm.db.modelos import (
     Lead,
     OcorrenciaDeCarga,
     Oportunidade,
+    PendenciaDaProposta,
 )
 from crm.db.sessao import criar_engine, criar_fabrica_de_sessao, url_do_banco
 from crm.domain import indicadores as regras_de_indicadores
@@ -151,6 +153,7 @@ def criar_app(
     endereco = busca_de_endereco or (None if fabrica is not None else endereco_pelo_cnpj)
     api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real, endereco))
     api.include_router(roteador_de_propostas(obter_sessao))
+    api.include_router(roteador_da_ficha(obter_sessao))
     return api
 
 
@@ -853,7 +856,21 @@ def _registrar(api: FastAPI) -> None:
                 )
             )
         ]
-        itens = regras_da_agenda.montar(oportunidades=em_aberto, leads=leads, hoje=dia, contratos=em_vigor)
+        # Pendência da proposta com prazo (E4): só a de oportunidade em aberto, e a automática só
+        # enquanto a regra continuar aberta. Sem `captador`, como o contrato: o dono é o responsável.
+        pendentes = []
+        if not captador:
+            com_prazo = sessao.scalars(
+                sa.select(Oportunidade).join(PendenciaDaProposta, PendenciaDaProposta.oportunidade_id == Oportunidade.id)
+                .where(PendenciaDaProposta.prazo.is_not(None), PendenciaDaProposta.feita_em.is_(None)).distinct()
+            )
+            for o in com_prazo:
+                if not o.situacao.decidida:
+                    pendentes += [(i, o, o.grupo.nome) for i in pendencias_de(sessao, o)]
+        itens = regras_da_agenda.montar(
+            oportunidades=em_aberto, leads=leads, hoje=dia, contratos=em_vigor,
+            pendencias=[(n, *t) for n, t in enumerate(pendentes, start=1)],
+        )
         contagens = {b: 0 for b in regras_da_agenda.BALDES}
         for i in itens:
             contagens[i.balde] += 1

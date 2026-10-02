@@ -428,7 +428,7 @@ export interface CenariosDeTicket {
 export type BaldeDaAgenda = "atrasada" | "hoje" | "proximos_7_dias" | "depois" | "sem_data" | "sem_acao";
 
 export interface ItemDaAgenda {
-  tipo: "oportunidade" | "lead" | "contrato";
+  tipo: "oportunidade" | "lead" | "contrato" | "pendencia";
   id: number;
   titulo: string;
   subtitulo: string | null;
@@ -441,6 +441,8 @@ export interface ItemDaAgenda {
   balde: BaldeDaAgenda;
   dias_de_atraso: number;
   dias_desde_o_envio: number | null;
+  /** Na pendência da proposta, a oportunidade a abrir (o `id` é o da pendência). */
+  oportunidade_id?: number | null;
 }
 
 /** A fila de follow-up. `contagens` traz todos os baldes, mesmo os vazios. */
@@ -1285,4 +1287,68 @@ export interface MarcadorDeProposta {
 export interface MatrizesDeProposta {
   em_uso: Record<TipoDeMatriz, MatrizResumo | null>;
   marcadores: MarcadorDeProposta[];
+}
+
+/* ---------------------------------------------------------- ficha e pendências (E4, 02/10/2026) */
+
+export type TipoDeCampoDaFicha = "texto" | "texto_longo" | "numero" | "data" | "uma" | "varias";
+
+export interface CampoDaFicha {
+  chave: string;
+  rotulo: string;
+  tipo: TipoDeCampoDaFicha;
+  opcoes: string[];
+  sub: boolean;
+  valor: string | string[] | null;
+  /** "Questionário", "Entrevista" ou null (sem resposta). */
+  origem: "Questionário" | "Entrevista" | null;
+  por: string | null;
+  em: string | null;
+}
+
+export interface SecaoDaFicha {
+  numero: number;
+  titulo: string;
+  no_escopo: boolean;
+  /** A seção 9 (implantação) e as fora do escopo não contam como pendência da proposta. */
+  conta_pendencia: boolean;
+  respondidas: number;
+  total: number;
+  campos: CampoDaFicha[];
+}
+
+export interface Ficha {
+  questionario_em: string | null;
+  respondidas: number;
+  total: number;
+  revisores: string[];
+  secoes: SecaoDaFicha[];
+}
+
+export interface PendenciaDaProposta {
+  /** Regra automática ("volumes", "porte"…) ou "manual-<id>". */
+  chave: string;
+  descricao: string;
+  automatica: boolean;
+  aberta: boolean;
+  responsavel: string | null;
+  prazo: string | null;
+  dias_de_atraso: number;
+  feita_em: string | null;
+  feita_por: string | null;
+}
+
+export interface PendenciasDaProposta {
+  abertas: number;
+  atrasadas: number;
+  feitas: number;
+  revisores: string[];
+  itens: PendenciaDaProposta[];
+}
+
+export interface MudancaDePendencia {
+  responsavel?: string | null;
+  prazo?: string | null;
+  feita?: boolean;
+  por: string;
 }

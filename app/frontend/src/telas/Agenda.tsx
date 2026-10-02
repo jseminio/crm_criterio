@@ -71,7 +71,10 @@ function Linha({
         </button>
         {item.subtitulo && <span className="numero-nota">{item.subtitulo}</span>}
         <span className="agenda-etiquetas">
-          <Etiqueta texto={item.tipo === "lead" ? "Lead" : item.tipo === "contrato" ? "Contrato" : item.situacao} tipo="neutra" />
+          <Etiqueta
+            texto={item.tipo === "lead" ? "Lead" : item.tipo === "contrato" ? "Contrato" : item.tipo === "pendencia" ? "Pendência da proposta" : item.situacao}
+            tipo="neutra"
+          />
           <Etiqueta texto={item.temperatura} tipo="temperatura" />
           {item.captador && <Etiqueta texto={item.captador} tipo="neutra" />}
         </span>
@@ -109,6 +112,7 @@ function Linha({
               ? `${item.proxima_acao} · ${data(item.proxima_acao_em)}`
               : "Defina a próxima ação na tela Funil."}
             {item.tipo === "contrato" && " · abra em Contratos para renovar."}
+            {item.tipo === "pendencia" && " · abra a oportunidade, aba Proposta."}
           </span>
         </div>
       )}
@@ -159,7 +163,7 @@ export function Agenda({
       <div className="recado">{info.explicacao}</div>
 
       {doBalde.length === 0 ? (
-        <VazioSemDados titulo={`Nada em “${info.rotulo}”`} explicacao="Nenhuma oportunidade ou lead neste balde agora." />
+        <VazioSemDados titulo={`Nada em “${info.rotulo}”`} explicacao="Nada neste balde agora: oportunidade, lead, contrato ou pendência de proposta." />
       ) : (
         <ul className="agenda">
           {doBalde.map((item) => (
@@ -167,7 +171,11 @@ export function Agenda({
               key={`${item.tipo}-${item.id}`}
               item={item}
               aoAbrir={() =>
-                item.tipo === "lead" ? aoAbrirLeads() : item.tipo === "contrato" ? aoAbrirContratos() : definirAberta(item.id)
+                item.tipo === "lead"
+                  ? aoAbrirLeads()
+                  : item.tipo === "contrato"
+                    ? aoAbrirContratos()
+                    : definirAberta(item.tipo === "pendencia" ? (item.oportunidade_id ?? item.id) : item.id)
               }
               aoSalvar={recarregar}
             />

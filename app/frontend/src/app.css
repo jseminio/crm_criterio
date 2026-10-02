@@ -816,6 +816,42 @@
 .busca-empresa-item:hover, .busca-empresa-item:focus { background: var(--surface-sunken); }
 .busca-empresa-vazio { padding: var(--e2); margin: 0; }
 
+
+/* ------------------------------------------- ficha e o que falta para a proposta (E4, 02/10/2026) */
+.ficha { display: grid; gap: var(--e3); }
+.ficha-resumo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e4); margin: 0; }
+.ficha-barra { flex: 1 1 120px; min-width: 100px; height: 6px; background: var(--surface-sunken); border-radius: 999px; overflow: hidden; }
+.ficha-barra i { display: block; height: 100%; background: var(--andamento); }
+.ficha-quem { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); }
+.ficha-secao { border: 1px solid var(--borda); border-radius: var(--raio-md); background: var(--surface-card); }
+.ficha-secao > summary { cursor: pointer; padding: var(--e3); display: flex; justify-content: space-between; align-items: center; gap: var(--e3); }
+.ficha-secao-nome { font-weight: 600; }
+.ficha-secao-nome small { color: var(--texto-fraco); font-weight: 400; margin-right: var(--e1); font-variant-numeric: tabular-nums; }
+.ficha-campos { border-top: 1px solid var(--borda); padding: var(--e3); display: grid; gap: var(--e3); }
+.ficha-pergunta { display: grid; gap: var(--e1); min-width: 0; }
+.ficha-pergunta-sub { padding-left: var(--e4); border-left: 2px solid var(--borda); }
+.ficha-valor { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center; }
+.ficha-valor > .entrada, .ficha-valor > .selecao, .ficha-valor > textarea { flex: 1 1 220px; min-width: 0; }
+.ficha-origem { font-size: 11px; color: var(--texto-fraco); white-space: nowrap; }
+.ficha-origem strong { color: var(--texto-medio); font-weight: 600; }
+.ficha-opcoes { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e3); flex: 1 1 220px; }
+.ficha-opcao { display: inline-flex; gap: var(--e1); align-items: center; font-size: 13px; }
+
+.falta { display: grid; gap: var(--e2); margin-bottom: var(--e5); padding-bottom: var(--e4); border-bottom: 1px solid var(--borda); }
+.falta-resumo { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--e2) var(--e4); align-items: center; margin: 0; }
+.falta-lista { list-style: none; margin: 0; padding: 0; border: 1px solid var(--borda); border-radius: var(--raio-md); }
+.falta-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--e1) var(--e3); padding: var(--e3); border-top: 1px solid var(--borda); }
+.falta-item:first-child { border-top: 0; }
+.falta-marca { width: 18px; height: 18px; margin: 2px 0 0; }
+.falta-marca-auto { border: 1.5px dotted var(--borda-forte); border-radius: 4px; display: grid; place-items: center; font-size: 12px; color: var(--ganho); }
+.falta-titulo { font-weight: 500; }
+.falta-item-feito .falta-titulo { text-decoration: line-through; color: var(--texto-fraco); }
+.falta-meta { grid-column: 2; display: flex; flex-wrap: wrap; gap: var(--e2) var(--e3); align-items: center; font-size: 12px; color: var(--texto-medio); }
+.falta-prazo { display: inline-flex; gap: var(--e1); align-items: center; }
+.falta-nova { display: flex; flex-wrap: wrap; gap: var(--e2); }
+.falta-nova .entrada { flex: 1 1 260px; min-width: 0; }
+.aba-pendentes { color: var(--espera); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

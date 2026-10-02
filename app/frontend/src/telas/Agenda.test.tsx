@@ -88,6 +88,24 @@ describe("Agenda", () => {
     expect(screen.queryByRole("button", { name: "Salvar" })).toBeNull();
   });
 
+  it("pendência da proposta aparece com o responsável e abre a oportunidade", async () => {
+    vi.mocked(api.agenda).mockResolvedValue(
+      agenda(
+        [item({ tipo: "pendencia", id: 1, oportunidade_id: 42, captador: "Karine", balde: "atrasada", dias_de_atraso: 2,
+          proxima_acao: "Pendência da proposta: Pedir o contrato atual", proxima_acao_em: "2026-09-23", dias_desde_o_envio: null })],
+        { atrasada: 1 },
+      ),
+    );
+    vi.mocked(api.oportunidade).mockReturnValue(new Promise(() => {}));
+    render(<Agenda listas={null} aoAbrirLeads={vi.fn()} />);
+    expect(await screen.findByText("Pendência da proposta")).toBeInTheDocument();
+    expect(screen.getByText("Karine")).toBeInTheDocument();
+    expect(screen.getByText(/Pedir o contrato atual · 23\/09\/2026 · abra a oportunidade, aba Proposta/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Salvar" })).toBeNull(); // não se edita na linha
+    await userEvent.click(screen.getByRole("button", { name: "Grupo Alfa" }));
+    expect(api.oportunidade).toHaveBeenCalledWith(42);
+  });
+
   it("balde vazio diz que está vazio", async () => {
     vi.mocked(api.agenda).mockResolvedValue(agenda([item({})], { sem_acao: 1 }));
     render(<Agenda listas={null} aoAbrirLeads={vi.fn()} />);

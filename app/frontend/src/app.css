@@ -990,6 +990,11 @@
 .base-do-valor-opcoes label { display: flex; align-items: center; gap: var(--e1); }
 td > .celula-fonte { display: block; }
 
+/* ------------------------------------------------- busca automática dos questionários (02/10/2026) */
+.busca-automatica { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3);
+  padding: var(--e2) var(--e3); border: 1px solid var(--borda); border-radius: var(--raio-sm); background: var(--surface-card); }
+.busca-automatica-erro { flex-basis: 100%; max-width: none; margin: 0; text-align: left; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

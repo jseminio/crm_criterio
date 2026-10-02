@@ -1247,6 +1247,18 @@ export interface SecaoDeRespostas {
   respostas: { rotulo: string; valor: string }[];
 }
 
+/** A busca automática dos questionários (02/10/2026): a última, a próxima e a falha, se houve. */
+export interface EstadoDaBusca {
+  automatica: boolean;
+  intervalo_minutos: number;
+  ultima_em: string | null;
+  ultima_manual: boolean;
+  novos: number;
+  erro: string | null;
+  avisos: string[];
+  proxima_em: string | null;
+}
+
 export interface ResultadoDaBusca {
   buscado_em: string;
   novos: QuestionarioResumo[];

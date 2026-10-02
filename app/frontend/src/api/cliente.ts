@@ -78,6 +78,7 @@ import type {
   Metas,
   AjusteTecnico,
   CadenciaDeReunioes,
+  EstadoDaBusca,
   FunilDoSucesso,
   RascunhoDaAta,
   ResponsavelPorAjuste,
@@ -453,6 +454,7 @@ export const api = {
     pedir<QuestionarioDaOportunidade | null>(`/api/oportunidades/${id}/questionario`),
   buscarQuestionarios: () => pedir<ResultadoDaBusca>("/api/questionarios/buscar", { method: "POST" }),
   questionarios: () => pedir<QuestionarioResumo[]>("/api/questionarios"),
+  estadoDaBusca: () => pedir<EstadoDaBusca>("/api/questionarios/busca"),
   painelDeQuestionarios: (filtros: { dias?: number | null; servico?: string; porte?: string; situacao?: SituacaoDoPainel | "" }) =>
     pedir<PainelDeQuestionarios>(comParametros("/api/questionarios/painel", { ...filtros })),
   respostasDoQuestionario: (id: number) => pedir<SecaoDeRespostas[]>(`/api/questionarios/${id}/respostas`),

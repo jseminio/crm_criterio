@@ -11,7 +11,7 @@ vi.mock("../api/cliente", async () => {
   return {
     ...real,
     api: {
-      painelDeQuestionarios: vi.fn(), respostasDoQuestionario: vi.fn(), resolverQuestionario: vi.fn(),
+      painelDeQuestionarios: vi.fn(), respostasDoQuestionario: vi.fn(), resolverQuestionario: vi.fn(), estadoDaBusca: vi.fn(), buscarQuestionarios: vi.fn(),
       aprovacoes: vi.fn(), aprovar: vi.fn(), recusar: vi.fn(),
     },
   };

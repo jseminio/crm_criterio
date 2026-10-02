@@ -1489,3 +1489,77 @@ export interface Alteracao {
   antes: string | null;
   depois: string | null;
 }
+
+/** Funil do Sucesso do Cliente (02/10/2026): etapas, checklist e reuniões de resultado pela classe. */
+export interface EtapaDoSucesso {
+  chave: string;
+  nome: string;
+  participantes: string | null;
+}
+
+export interface TipoDeReuniao {
+  chave: string;
+  nome: string;
+  meses: number;
+  participantes: string;
+  pauta: string[];
+}
+
+export interface ReuniaoDevida {
+  tipo: string;
+  ultima: string | null;
+  /** Vazia: nenhuma registrada e sem data de entrada em curso (cliente anterior ao CRM). */
+  proxima: string | null;
+  atrasada: boolean;
+  dias_de_atraso: number | null;
+}
+
+export interface GrupoNoFunilDoSucesso {
+  grupo_id: number;
+  nome: string;
+  etapa: string;
+  classe: string | null;
+  itens_feitos: string[];
+  etapa_desde: string | null;
+  em_curso_desde: string | null;
+  /** Só em curso: em_dia · atrasada · sem_classe. */
+  situacao: "em_dia" | "atrasada" | "sem_classe" | null;
+  reunioes: ReuniaoDevida[];
+}
+
+export interface FunilDoSucesso {
+  etapas: EtapaDoSucesso[];
+  checklist: Record<string, { chave: string; rotulo: string }[]>;
+  tipos: TipoDeReuniao[];
+  cadencia: Record<string, string[]>;
+  grupos: GrupoNoFunilDoSucesso[];
+}
+
+export interface ReuniaoDeResultado {
+  id: number;
+  tipo: string;
+  data: string;
+  participantes: string | null;
+  pauta: string | null;
+  dashboard: string | null;
+  decisoes: string | null;
+  proximos_passos: string | null;
+  registrada_por: string | null;
+  criado_em: string;
+}
+
+export interface NovaReuniaoDeResultado {
+  tipo: string;
+  data: string;
+  participantes?: string;
+  pauta?: string;
+  dashboard?: string;
+  decisoes?: string;
+  proximos_passos?: string;
+}
+
+export interface CadenciaDeReunioes {
+  cadencia: Record<string, string[]>;
+  alterado_por: string | null;
+  alterado_em: string | null;
+}

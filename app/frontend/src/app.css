@@ -927,6 +927,31 @@
 /* Configurações em abas: a fileira de abas usa a largura toda; o conteúdo dos formulários, até 960px. */
 .configuracoes-estreita > :not([role="tablist"]) { max-width: 960px; }
 
+/* ------------------------------------------------- funil do sucesso do cliente (02/10/2026) */
+.sucesso { display: grid; gap: var(--e3); }
+.sucesso-topo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e3); }
+.sucesso-kanban { gap: var(--e5); }
+/* Cinco colunas cabem na largura: a implantação ocupa 3 partes, em curso 2; abaixo de 190px por
+   coluna, rola na horizontal como o funil comercial. */
+.sucesso-fase { display: grid; gap: var(--e2); align-content: start; min-width: 0; }
+.sucesso-fase:first-child { flex: 3 1 0; }
+.sucesso-fase:last-child { flex: 2 1 0; }
+.sucesso-fase-nome { margin: 0; font-size: 12px; font-weight: 600; color: var(--texto-medio); text-transform: uppercase;
+  letter-spacing: .04em; padding-bottom: var(--e1); border-bottom: 2px solid var(--borda-forte); }
+.sucesso-fase-colunas { display: flex; gap: var(--e3); align-items: flex-start; }
+.sucesso-kanban .coluna { min-width: 190px; max-width: none; flex: 1 1 0; }
+.cartao-clicavel { cursor: pointer; font: inherit; color: inherit; }
+.cartao-clicavel:active { cursor: pointer; }
+.sucesso-checklist { border: 0; padding: 0; margin: 0; display: grid; gap: var(--e2); }
+.sucesso-checklist label { display: flex; gap: var(--e2); align-items: flex-start; font-size: 14px; line-height: 1.4; }
+.sucesso-checklist input { margin-top: 3px; }
+.painel-corpo .formulario { border: 0; padding: 0; margin: 0; }
+.sucesso-historico { list-style: none; padding: 0; margin: var(--e2) 0 0; display: grid; gap: var(--e3); }
+.sucesso-historico li { display: grid; gap: var(--e1); padding: var(--e3); border: 1px solid var(--borda); border-radius: var(--raio-sm); }
+.sucesso-historico p { margin: 0; font-size: 13px; white-space: pre-wrap; }
+.cadencia td, .cadencia th { text-align: center; }
+.cadencia td:first-child, .cadencia th:first-child { text-align: left; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

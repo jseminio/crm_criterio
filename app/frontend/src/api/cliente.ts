@@ -73,6 +73,61 @@ export class ErroDaApi extends Error {
   }
 }
 
+/** Nome de campo como aparece na tela; o que não estiver aqui sai com o nome técnico. */
+const ROTULO_DO_CAMPO: Record<string, string> = {
+  cliente: "Cliente",
+  tratamento: "Tratamento",
+  contextualizacao: "Contextualização",
+  valor_contabil: "Honorário Contábil/Fiscal",
+  valor_dp: "Honorário DP",
+  horas_contabil: "Horas Contábil/Fiscal",
+  horas_dp: "Horas DP",
+  plano_bpo: "Plano BPO Financeiro",
+  plano_plus: "Plano BPO Financeiro PLUS",
+  plano_cfo: "Plano CFO as a Service",
+};
+
+type ErroDeValidacao = { loc?: unknown[]; type?: string; msg?: string; ctx?: Record<string, unknown> };
+
+function motivo(e: ErroDeValidacao): string {
+  const ctx = e.ctx ?? {};
+  switch (e.type) {
+    case "missing":
+    case "string_type":
+    case "string_too_short":
+      return "não pode ficar em branco";
+    case "string_too_long":
+      return `texto longo demais (máximo de ${ctx.max_length} caracteres)`;
+    case "decimal_max_places":
+      return "use no máximo 2 casas decimais";
+    case "decimal_max_digits":
+    case "decimal_whole_digits":
+    case "less_than_equal":
+      return "valor alto demais";
+    case "greater_than_equal":
+      return "não pode ser negativo";
+    case "greater_than":
+      return "precisa ser maior que zero";
+    case "decimal_parsing":
+    case "int_parsing":
+    case "int_from_float":
+      return "não é um número válido";
+    default:
+      return e.msg ?? "valor inválido";
+  }
+}
+
+/** A recusa da validação do FastAPI (422 com `detail` em lista) vira frase: "Campo: motivo". Sem
+ * isto a tela mostrava só "Erro 422", sem dizer o que corrigir. */
+export function explicarValidacao(detalhes: ErroDeValidacao[]): string {
+  return detalhes
+    .map((e) => {
+      const campo = String((e.loc ?? []).filter((x) => x !== "body").at(-1) ?? "");
+      return `${ROTULO_DO_CAMPO[campo] ?? (campo || "Pedido")}: ${motivo(e)}`;
+    })
+    .join("; ");
+}
+
 async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T> {
   let resposta: Response;
   try {
@@ -91,6 +146,7 @@ async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T> {
     try {
       const corpo = await resposta.json();
       if (typeof corpo?.detail === "string") detalhe = corpo.detail;
+      else if (Array.isArray(corpo?.detail) && corpo.detail.length) detalhe = explicarValidacao(corpo.detail);
     } catch {
       /* resposta sem JSON: fica o texto genérico */
     }
@@ -141,6 +197,7 @@ async function enviarArquivo<T = ResumoDeBackup>(caminho: string, arquivo: File,
     try {
       const corpo = await resposta.json();
       if (typeof corpo?.detail === "string") detalhe = corpo.detail;
+      else if (Array.isArray(corpo?.detail) && corpo.detail.length) detalhe = explicarValidacao(corpo.detail);
     } catch {
       /* sem JSON */
     }

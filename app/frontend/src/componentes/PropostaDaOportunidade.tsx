@@ -10,6 +10,7 @@ import { api, ErroDaApi } from "../api/cliente";
 import type { AbaDaProposta, EntradaDaProposta, PropostaResumo, TipoDeMatriz } from "../api/tipos";
 import { data, dataHora, dinheiro, fracaoEmPercentual } from "../formato";
 import { brutoPrevio } from "../proposta";
+import { CampoDeValor } from "./CampoDeValor";
 import { Etiqueta } from "./Etiqueta";
 import { Carregando, Erro } from "./estados";
 
@@ -121,8 +122,6 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
     : !aba.matrizes[entrada.matriz]!.utilizavel
       ? `A matriz ${entrada.matriz} em uso tem marcador faltando ou errado: corrija em Configurações › Propostas.`
       : null;
-  const texto = (campo: keyof EntradaDaProposta) => (e: { target: { value: string } }) =>
-    mudar(campo, (e.target.value === "" ? null : e.target.value) as never);
   const inteiro = (campo: "horas_contabil" | "horas_dp") => (e: { target: { value: string } }) =>
     mudar(campo, e.target.value === "" ? null : Number(e.target.value));
 
@@ -144,7 +143,10 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
       definirEditado(false);
       definirRestaurado(null);
       baixar(p);
-      definirAviso(`Proposta ${p.numero} gerada: o PowerPoint está sendo baixado. Revise, salve como PDF e envie.`);
+      definirAviso(
+        `✓ Proposta ${p.numero} gerada. O arquivo ${p.arquivo} foi para a pasta Downloads do navegador. ` +
+          `Se não apareceu, use "Baixar de novo", logo abaixo. Revise, salve como PDF e envie.`,
+      );
       carregar();
     } catch (falha) {
       definirErro(falha instanceof ErroDaApi ? falha.message : "Falha ao gerar a proposta.");
@@ -159,7 +161,7 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
     try {
       const p = await api.marcarPropostaEnviada(enviando.id, enviando.por, enviando.em);
       definirEnviando(null);
-      definirAviso(`Proposta ${p.numero} marcada como enviada por ${p.enviada_por} em ${data(p.enviada_em)}.`);
+      definirAviso(`✓ Proposta ${p.numero} marcada como enviada por ${p.enviada_por} em ${data(p.enviada_em)}.`);
       carregar();
       aoEnviar();
     } catch (falha) {
@@ -169,8 +171,6 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
 
   return (
     <section className="proposta-da-oportunidade" aria-label="Proposta">
-      {erro && <p className="estado estado-erro estado-texto" role="alert">{erro}</p>}
-      {aviso && <p className="recado" role="status">{aviso}</p>}
       {restaurado && (
         <p className="recado">
           Rascunho ainda não gerado, guardado em {dataHora(restaurado)}.{" "}
@@ -220,11 +220,11 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
           <div className="proposta-grade proposta-grade-fixa">
             <label className="campo">
               <span className="campo-rotulo">Contábil / Fiscal (R$/mês)</span>
-              <input className="entrada" type="number" min="0" step="0.01" value={entrada.valor_contabil ?? ""} onChange={texto("valor_contabil")} />
+              <CampoDeValor value={entrada.valor_contabil} aoMudar={(v) => mudar("valor_contabil", v)} />
             </label>
             <label className="campo">
               <span className="campo-rotulo">Departamento Pessoal (R$/mês)</span>
-              <input className="entrada" type="number" min="0" step="0.01" value={entrada.valor_dp ?? ""} onChange={texto("valor_dp")} />
+              <CampoDeValor value={entrada.valor_dp} aoMudar={(v) => mudar("valor_dp", v)} />
             </label>
             <label className="campo">
               <span className="campo-rotulo">Horas de consulta/ano: Contábil</span>
@@ -260,7 +260,7 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
               ([campo, rotulo]) => (
                 <label className="campo" key={campo}>
                   <span className="campo-rotulo">{rotulo}</span>
-                  <input className="entrada" type="number" min="0" step="0.01" value={entrada[campo] ?? ""} onChange={texto(campo)} />
+                  <CampoDeValor value={entrada[campo]} aoMudar={(v) => mudar(campo, v)} />
                 </label>
               ),
             )}
@@ -319,6 +319,8 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
           </span>
         )}
       </div>
+      {erro && <p className="estado estado-erro estado-texto proposta-resultado" role="alert">✗ {erro}</p>}
+      {aviso && <p className="recado proposta-resultado" role="status">{aviso}</p>}
       <p className="campo-ajuda">
         O que você digita aqui fica guardado neste navegador até gerar o PowerPoint, mesmo trocando de aba.
         "Salvar alterações", no rodapé, grava só os dados da oportunidade.

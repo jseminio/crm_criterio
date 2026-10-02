@@ -76,6 +76,10 @@ enviam. A proposta fica em PowerPoint justamente para isso: dá para mudar um de
   "Enviar proposta" passa a "Em avaliação pela empresa"; na matriz Contábil, o total líquido vira o
   preço mensal, com linha no Histórico de preço.
 - **Baixar de novo** sai igual, com a matriz e os valores da época, mesmo depois de trocar a matriz.
+- **Valores no padrão brasileiro** (02/10/2026): os honorários e os planos aceitam `3.287,38`,
+  `3287,38` ou `3287`; valor que não dá para ler avisa no campo e fica em branco, em vez de valer o
+  número anterior escondido. O resultado de **Gerar PowerPoint** aparece logo abaixo do botão, com
+  o nome do arquivo e a pasta Downloads; a recusa da validação diz o campo e o motivo.
 
 **Configurações › Propostas:** subir e trocar as matrizes, próximo número, quem revisa e envia, e
 o preço de tabela dos planos financeiros. Matriz com marcador obrigatório faltando, ou com

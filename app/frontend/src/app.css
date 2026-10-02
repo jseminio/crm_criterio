@@ -777,6 +777,8 @@
 .proposta-perfil dd { margin: 0; font-weight: 600; }
 .proposta-bloqueio { color: var(--perda); font-size: 13px; font-weight: 500; }
 .proposta-acoes { display: flex; gap: var(--e3); align-items: center; flex-wrap: wrap; }
+/* Resultado de Gerar/Marcar como enviada: logo abaixo do botão, onde o clique aconteceu (02/10/2026). */
+.proposta-resultado { margin: var(--e3) 0 0; }
 .proposta-envio { display: flex; gap: var(--e2); align-items: end; flex-wrap: wrap; margin-top: var(--e2); }
 .matrizes-de-proposta .tabela { margin-bottom: var(--e3); }
 .matrizes-de-proposta .proposta-grade { max-width: 760px; }

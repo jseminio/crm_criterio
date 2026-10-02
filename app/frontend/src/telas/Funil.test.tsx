@@ -328,7 +328,8 @@ describe("fusão Kanban/Grade (27/09/2026)", () => {
       empregados_clt: null, admissoes_desligamentos_mes: null, cnpjs_no_escopo: null, tomadores_de_servico: null,
       servicos_contratados_alem_do_primeiro: 0, tem_consolidacao_de_grupo: false, e_auditada: false,
       porte: null, porte_definido_por: null, porte_definido_em: null, sugestao_de_porte: null,
-      origem_da_volumetria: null, linha_planilha: null,
+      origem_da_volumetria: {}, linha_planilha: null,
+      linha_servico: null, valor_mensalizado: null, origem: "CRM",
     } as OportunidadeDetalhe);
 
     await fireEvent.click(screen.getByRole("button", { name: "☰ Grade" }));

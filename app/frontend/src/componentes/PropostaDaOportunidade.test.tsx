@@ -97,6 +97,49 @@ describe("aba Proposta", () => {
     clique.mockRestore();
   });
 
+  it("aceita o valor no padrão brasileiro e manda o decimal para a API", async () => {
+    vi.mocked(api.gerarProposta).mockResolvedValue(GERADA);
+    const clique = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
+    const campo = await screen.findByLabelText("Contábil / Fiscal (R$/mês)");
+    fireEvent.change(campo, { target: { value: "3.287,38" } });
+    fireEvent.blur(campo);
+    expect(campo).toHaveValue("3.287,38");
+    expect(screen.getByText("Total líquido").closest("div")).toHaveTextContent("R$ 3.287,38");
+    fireEvent.change(screen.getByLabelText("Horas de consulta/ano: Contábil"), { target: { value: "10" } });
+    await userEvent.click(screen.getByRole("button", { name: "Gerar PowerPoint" }));
+    expect(api.gerarProposta).toHaveBeenCalledWith(10, expect.objectContaining({ valor_contabil: "3287.38" }));
+    clique.mockRestore();
+  });
+
+  it("valor que não dá para ler avisa no próprio campo e não deixa o anterior valendo", async () => {
+    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
+    const campo = await screen.findByLabelText("Contábil / Fiscal (R$/mês)");
+    fireEvent.change(campo, { target: { value: "1600" } });
+    fireEvent.change(campo, { target: { value: "3,2,1" } });
+    expect(campo).toHaveValue("3,2,1");
+    expect(screen.getByRole("alert")).toHaveTextContent("Valor inválido: escreva como 3.287,38");
+    // o 1600 de antes não fica valendo escondido
+    expect(screen.getByText("Total líquido").closest("div")).toHaveTextContent("R$ 0,00");
+  });
+
+  it("o resultado de gerar aparece logo abaixo do botão, com o nome do arquivo e a pasta", async () => {
+    vi.mocked(api.gerarProposta).mockResolvedValue(GERADA);
+    const clique = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText("Contábil / Fiscal (R$/mês)"), { target: { value: "1600" } });
+    fireEvent.change(screen.getByLabelText("Horas de consulta/ano: Contábil"), { target: { value: "6" } });
+    const botao = screen.getByRole("button", { name: "Gerar PowerPoint" });
+    await userEvent.click(botao);
+    const recado = await screen.findByRole("status");
+    expect(recado).toHaveTextContent(
+      "✓ Proposta 154.2026 gerada. O arquivo Exemplo Alfa_Proposta BPO Contabil_154.2026.pptx foi para a pasta Downloads do navegador.",
+    );
+    // depois do botão na página, não lá no alto do painel
+    expect(botao.compareDocumentPosition(recado) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    clique.mockRestore();
+  });
+
   it("marca como enviada dizendo quem e quando", async () => {
     vi.mocked(api.abaDaProposta).mockResolvedValue({ ...ABA, propostas: [GERADA] });
     vi.mocked(api.marcarPropostaEnviada).mockResolvedValue({ ...GERADA, enviada_em: "2026-10-01", enviada_por: "Karine" });
@@ -114,7 +157,7 @@ describe("aba Proposta", () => {
   it("matriz Financeiro mostra os planos; sem matriz não deixa gerar", async () => {
     render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
     await userEvent.click(await screen.findByRole("button", { name: "usar a Financeiro" }));
-    expect(screen.getByLabelText("2 · BPO Financeiro PLUS")).toHaveValue(7000);
+    expect(screen.getByLabelText("2 · BPO Financeiro PLUS")).toHaveValue("7.000,00");
     expect(screen.queryByText(/Custo de servir/)).toBeNull();
     expect(screen.getByText(/ainda não há matriz Financeiro/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Gerar PowerPoint" })).toBeDisabled();
@@ -136,7 +179,7 @@ describe("aba Proposta", () => {
     primeiro.unmount(); // trocar de aba ou salvar a oportunidade desmonta a aba
 
     render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
-    expect(await screen.findByLabelText("Contábil / Fiscal (R$/mês)")).toHaveValue(4500);
+    expect(await screen.findByLabelText("Contábil / Fiscal (R$/mês)")).toHaveValue("4.500");
     expect(screen.getByLabelText("Horas de consulta/ano: Contábil")).toHaveValue(6);
     expect(screen.getByText(/Rascunho ainda não gerado/)).toBeInTheDocument();
 
@@ -151,9 +194,9 @@ describe("aba Proposta", () => {
   it("descartar o rascunho volta ao sugerido", async () => {
     localStorage.setItem("crm.proposta.rascunho.10", JSON.stringify({ entrada: { ...ABA.rascunho, valor_contabil: "999" }, salvo_em: "2026-10-01T10:00:00" }));
     render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
-    expect(await screen.findByLabelText("Contábil / Fiscal (R$/mês)")).toHaveValue(999);
+    expect(await screen.findByLabelText("Contábil / Fiscal (R$/mês)")).toHaveValue("999");
     await userEvent.click(screen.getByRole("button", { name: "descartar e voltar ao sugerido" }));
-    expect(screen.getByLabelText("Contábil / Fiscal (R$/mês)")).toHaveValue(null);
+    expect(screen.getByLabelText("Contábil / Fiscal (R$/mês)")).toHaveValue("");
     expect(localStorage.getItem("crm.proposta.rascunho.10")).toBeNull();
   });
 

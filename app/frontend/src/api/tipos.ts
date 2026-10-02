@@ -302,6 +302,8 @@ export interface ContratoResumo {
   escopo: string | null;
   preco_mensal: string | null;
   preco_anual: string | null;
+  /** Se o preço já inclui o imposto (02/10/2026). Null = não informado. */
+  base_do_valor: "bruto" | "liquido" | null;
   data_inicio: string | null;
   data_fim: string | null;
   situacao: string;
@@ -536,6 +538,11 @@ export interface Mrr {
   /** Só com a carteira inteira no CRM; com o MRR parcial, null (não se compara). */
   contra_a_meta: "abaixo_do_alerta" | "entre" | "na_meta" | null;
   falta_para_a_meta: string | null;
+  /** O MRR soma em bruto: os líquidos entram com este imposto (Parâmetros de cálculo). */
+  imposto: string;
+  contratos_liquidos: number;
+  /** Sem bruto/líquido informado: somados como estão. */
+  contratos_sem_base: number;
 }
 
 export type TipoDeContato = "cliente" | "prospect";

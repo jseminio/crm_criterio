@@ -25,19 +25,25 @@ Regras (decisão de Eduardo em 26/09/2026: a vigência começa na assinatura):
 
 MRR em qualquer data = MRR atual − o movimento líquido desde essa data. Só vale para datas
 até hoje.
+
+**Sempre em bruto** (02/10/2026, aprovado por Eduardo): o contrato marcado como líquido entra com o
+imposto, `líquido ÷ (1 − imposto)`, ao centavo, no preço e nos eventos (`em_bruto`). Aqui não se
+arredonda a R$ 50 como na proposta: o arredondamento é para o cliente ler, não para somar.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from statistics import median
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Iterable, Protocol
 
 from crm.domain.listas import IniciativaDoEncerramento, SituacaoContrato, TipoDeEventoDeContrato
 
-__all__ = ["ALERTA_DE_MRR", "META_DE_MRR", "MrrAtual", "Movimento", "contra_a_meta", "mrr_atual", "movimento", "mrr_em"]
+__all__ = [
+    "ALERTA_DE_MRR", "META_DE_MRR", "MrrAtual", "Movimento", "contra_a_meta", "em_bruto", "mrr_atual", "movimento", "mrr_em",
+]
 
 META_DE_MRR = Decimal("400000")
 """KPI oficial "MRR" (planilha "KPI de Head de Novos Negócios"): meta R$ 400 mil. É o padrão: o
@@ -75,6 +81,48 @@ class _Contrato(Protocol):
     data_inicio: date | None
     """`None` só na carteira anterior ao CRM: existe desde antes de qualquer período."""
     eventos: list[_Evento]
+
+
+@dataclass(frozen=True)
+class _EventoEmBruto:
+    tipo: TipoDeEventoDeContrato
+    data_do_evento: date
+    preco_mensal_anterior: Decimal | None
+    preco_mensal_novo: Decimal | None
+    iniciativa: IniciativaDoEncerramento | None
+    id: int
+
+
+@dataclass(frozen=True)
+class _ContratoEmBruto:
+    id: int
+    grupo_id: int
+    situacao: SituacaoContrato
+    preco_mensal: Decimal | None
+    data_inicio: date | None
+    eventos: list[_EventoEmBruto] = field(default_factory=list)
+
+
+def em_bruto(contratos: Iterable[_Contrato], imposto: Decimal) -> list[_ContratoEmBruto]:
+    """Os contratos com os valores em bruto: o marcado `base_do_valor == "liquido"` tem preço e
+    eventos divididos por (1 − imposto); os demais ficam como estão."""
+    if not Decimal(0) <= imposto < 1:
+        raise ValueError("o imposto precisa estar entre 0 e 100%")
+
+    def converter(v: Decimal | None, liquido: bool) -> Decimal | None:
+        if v is None or not liquido:
+            return v
+        return (Decimal(v) / (1 - imposto)).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
+
+    lista = []
+    for c in contratos:
+        liq = getattr(c, "base_do_valor", None) == "liquido"
+        lista.append(_ContratoEmBruto(
+            c.id, c.grupo_id, c.situacao, converter(c.preco_mensal, liq), c.data_inicio,
+            [_EventoEmBruto(e.tipo, e.data_do_evento, converter(e.preco_mensal_anterior, liq),
+                            converter(e.preco_mensal_novo, liq), e.iniciativa, e.id) for e in c.eventos],
+        ))
+    return lista
 
 
 @dataclass(frozen=True)

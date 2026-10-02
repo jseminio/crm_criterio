@@ -41,6 +41,11 @@ export function prazo(iso: string | null | undefined): { texto: string; atrasado
   return { texto: `em ${dias} d`, atrasado: false };
 }
 
+/** Uma alíquota em fração ("0.11") como porcentagem: "11%"; "0.1125" vira "11,25%". */
+export function aliquota(fracao: string): string {
+  return `${(Math.round(Number(fracao) * 10000) / 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+}
+
 /** "38.1" (a API devolve ponto decimal) vira "38,1%". */
 export function percentual(valor: string | null | undefined): string {
   if (valor === null || valor === undefined || valor === "") return "—";

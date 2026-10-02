@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -161,6 +162,12 @@ class MrrResposta(Base):
     """"abaixo_do_alerta", "entre" ou "na_meta"; `None` com o MRR parcial (não se compara)."""
     falta_para_a_meta: Decimal | None = None
     """Quanto falta para R$ 400 mil (zero se já atingiu); `None` com o MRR parcial."""
+    imposto: Decimal = Decimal("0")
+    """A alíquota (Parâmetros de cálculo) que levou os contratos líquidos para bruto."""
+    contratos_liquidos: int = 0
+    """Ativos e suspensos com preço marcados como líquidos: entraram no MRR com o imposto."""
+    contratos_sem_base: int = 0
+    """Ativos e suspensos com preço sem bruto/líquido informado: somados como estão."""
 
 
 class ItemDaAgendaResposta(Base):
@@ -498,6 +505,8 @@ class ContratoResumo(Base):
     escopo: str | None = None
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
+    base_do_valor: Literal["bruto", "liquido"] | None = None
+    """Se o preço já inclui o imposto. Vazio = não informado."""
     data_inicio: date | None = None
     data_fim: date | None = None
     situacao: SituacaoContrato
@@ -584,6 +593,7 @@ class ContratoEdicao(BaseModel):
     escopo: str | None = Field(default=None, max_length=200)
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
+    base_do_valor: Literal["bruto", "liquido"] | None = None
     data_inicio: date | None = None
     data_fim: date | None = None
     situacao: SituacaoContrato | None = None

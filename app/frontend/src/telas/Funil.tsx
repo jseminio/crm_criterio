@@ -131,7 +131,7 @@ export function Funil({ listas }: { listas: Listas | null }) {
     ],
   );
 
-  const { dados, carregando, erro, recarregar } = visao === "kanban" ? kanban : grade;
+  const { carregando, erro, recarregar } = visao === "kanban" ? kanban : grade;
   const questionarios = usarQuestionarios(recarregar);
   const total = visao === "kanban"
     ? (kanban.dados?.reduce((soma, coluna) => soma + coluna.quantas, 0) ?? 0)

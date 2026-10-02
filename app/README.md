@@ -756,6 +756,10 @@ saudável enquanto o caixa não entra).
   encerrado (409), não. Evento não pode ser anterior à assinatura.
 - **Depois de assinado, preço e data de fim só mudam por evento** (o `PATCH` recusa com 422); e
   **encerrar só por evento com motivo**. O rascunho inteiro com os mesmos valores não conta como mudança.
+- **Situação pelo `PATCH`** (regra aprovada por Eduardo em 01/10/2026): **Encerrado não se mexe
+  mais**, nem a situação nem campo nenhum (422); **assinado só alterna entre Ativo e Suspenso**,
+  sem voltar para "Aguardando assinatura" — essa volta destravava o preço, e a volta para Ativo o
+  deixava trocado sem evento. A tela só oferece as situações permitidas e trava tudo no encerrado.
 
 `POST /api/contratos/{id}/eventos` valida, grava o evento **com o antes e o depois** e aplica o
 efeito no contrato, tudo na mesma transação (`crm/domain/eventos_de_contrato.py`):

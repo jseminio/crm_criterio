@@ -113,20 +113,25 @@ def cliente(engine, ids):
         yield c
 
 
-def _grupo(cliente, grupo_id: int) -> dict:
-    return next(g for g in cliente.get("/api/sucesso/funil", headers=ADMIN).json()["grupos"] if g["grupo_id"] == grupo_id)
+def _grupo(cliente, grupo_id: int, hoje: date | None = None) -> dict:
+    params = {"hoje": hoje.isoformat()} if hoje else {}
+    return next(g for g in cliente.get("/api/sucesso/funil", headers=ADMIN, params=params).json()["grupos"]
+                if g["grupo_id"] == grupo_id)
 
 
 def test_entram_os_grupos_com_contrato_valendo_na_etapa_certa(cliente, ids):
-    f = cliente.get("/api/sucesso/funil", headers=ADMIN).json()
+    f = cliente.get("/api/sucesso/funil", headers=ADMIN, params={"hoje": "2026-10-15"}).json()
     assert [e["chave"] for e in f["etapas"]] == ["contrato", "handover", "kickoff", "em_curso"]
     por_nome = {g["nome"]: g for g in f["grupos"]}
     assert set(por_nome) == {"Antigo A", "Novo", "Sem classe"}
     assert (por_nome["Novo"]["etapa"], por_nome["Novo"]["situacao"]) == ("contrato", None)
     antigo = por_nome["Antigo A"]
-    assert (antigo["etapa"], antigo["classe"], antigo["situacao"]) == ("em_curso", "A", "atrasada")
-    assert [r["tipo"] for r in antigo["reunioes"]] == ["mensal", "bimestral", "trimestral", "anual"]
-    assert all(r["proxima"] is None and r["atrasada"] for r in antigo["reunioes"])  # nenhuma registrada ainda
+    assert (antigo["etapa"], antigo["classe"], antigo["situacao"]) == ("em_curso", "A", "em_dia")
+    # Anterior ao CRM sem reunião registrada: conta do início do funil, 02/10/2026 (opção A).
+    assert antigo["em_curso_desde"] == "2026-10-02"
+    assert [(r["tipo"], r["proxima"], r["atrasada"]) for r in antigo["reunioes"]] == [
+        ("mensal", "2026-11-02", False), ("bimestral", "2026-12-02", False),
+        ("trimestral", "2027-01-02", False), ("anual", "2027-10-02", False)]
     assert (por_nome["Sem classe"]["situacao"], por_nome["Sem classe"]["reunioes"]) == ("sem_classe", [])
     assert len(f["checklist"]["kickoff"]) == 5 and f["cadencia"]["C"] == ["anual"]
 
@@ -161,6 +166,11 @@ def test_desmarcar_item_impede_concluir(cliente, ids):
     assert r.status_code == 422 and "Assinar o contrato comercial" in r.json()["detail"]
 
 
+def test_anterior_ao_crm_vence_a_partir_do_inicio_do_funil(cliente, ids):
+    mensal = _grupo(cliente, ids["antigo"], date(2026, 11, 20))["reunioes"][0]
+    assert (mensal["tipo"], mensal["proxima"], mensal["atrasada"], mensal["dias_de_atraso"]) == ("mensal", "2026-11-02", True, 18)
+
+
 def test_registrar_reuniao_tira_o_atraso_daquele_tipo(cliente, ids, engine):
     g = ids["antigo"]
     ontem = HOJE - timedelta(days=1)
@@ -171,7 +181,6 @@ def test_registrar_reuniao_tira_o_atraso_daquele_tipo(cliente, ids, engine):
     assert r.status_code == 201, r.text
     mensal = next(x for x in r.json()["reunioes"] if x["tipo"] == "mensal")
     assert (mensal["ultima"], mensal["proxima"], mensal["atrasada"]) == (ontem.isoformat(), regra.mais_meses(ontem, 1).isoformat(), False)
-    assert r.json()["situacao"] == "atrasada"  # as outras três continuam sem registro
     lista = cliente.get(f"/api/sucesso/grupos/{g}/reunioes", headers=ADMIN).json()
     assert (lista[0]["decisoes"], lista[0]["proximos_passos"], lista[0]["registrada_por"]) == (
         "Renegociar a dívida bancária", None, "Eduardo Luiz")
@@ -179,7 +188,14 @@ def test_registrar_reuniao_tira_o_atraso_daquele_tipo(cliente, ids, engine):
         for tipo in ("bimestral", "trimestral", "anual"):
             s.add(ReuniaoDeResultado(grupo_id=g, tipo=tipo, data=ontem))
         s.commit()
-    assert _grupo(cliente, g)["situacao"] == "em_dia"
+    # Bem depois do início do funil: só não vence o que foi registrado.
+    depois = date(2027, 6, 1)
+    assert _grupo(cliente, g, depois)["situacao"] == "atrasada"
+    with Session(engine) as s:
+        for tipo in ("mensal", "bimestral", "trimestral", "anual"):
+            s.add(ReuniaoDeResultado(grupo_id=g, tipo=tipo, data=date(2027, 5, 31)))
+        s.commit()
+    assert _grupo(cliente, g, depois)["situacao"] == "em_dia"
 
 
 @pytest.mark.parametrize("grupo, corpo, trecho", [

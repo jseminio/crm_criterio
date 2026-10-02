@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import date
 
 __all__ = [
-    "CADENCIA_PADRAO", "CHECKLIST", "ETAPAS", "TIPOS_DE_REUNIAO", "TipoDeReuniao", "ReuniaoDevida",
+    "CADENCIA_PADRAO", "CHECKLIST", "ETAPAS", "INICIO_DO_FUNIL", "TIPOS_DE_REUNIAO", "TipoDeReuniao", "ReuniaoDevida",
     "devidas", "mais_meses", "proxima_etapa", "tipo",
 ]
 
@@ -90,6 +90,10 @@ TIPOS_DE_REUNIAO: tuple[TipoDeReuniao, ...] = (
     )),
 )
 _POR_CHAVE = {t.chave: t for t in TIPOS_DE_REUNIAO}
+
+INICIO_DO_FUNIL = date(2026, 10, 2)
+"""Para o cliente anterior ao CRM, as reuniões contam daqui (opção A, aprovada por Eduardo em
+02/10/2026): sem isto, toda a carteira antiga aparecia vencida só por não ter reunião registrada."""
 
 CADENCIA_PADRAO: dict[str, tuple[str, ...]] = {
     "A": ("mensal", "bimestral", "trimestral", "anual"),

@@ -69,6 +69,7 @@ class GrupoNoFunil(BaseModel):
     etapa_desde: date | None
     """Vazia para o cliente anterior ao CRM, que já entra em curso."""
     em_curso_desde: date | None
+    """Do fim do kickoff; para o cliente anterior ao CRM, o início do funil (02/10/2026)."""
     situacao: str | None
     """Só em curso: "em_dia", "atrasada" (alguma reunião vencida ou nunca registrada) ou "sem_classe"
     (sem leitura do Score, não há cadência para cobrar)."""
@@ -268,7 +269,9 @@ def roteador_do_sucesso(
         ajustes: tuple[int, int, int] = (0, 0, 0),
     ) -> GrupoNoFunil:
         etapa = jornada.etapa if jornada else ("em_curso" if anterior else "contrato")
-        em_curso_desde = jornada.em_curso_desde if jornada else None
+        # Quem entrou em curso pelo kickoff conta dali; o cliente anterior ao CRM, do início do funil.
+        em_curso_desde = (jornada.em_curso_desde if jornada else None) or (
+            regra.INICIO_DO_FUNIL if etapa == "em_curso" else None)
         devidas: list[regra.ReuniaoDevida] = []
         situacao = None
         if etapa == "em_curso":

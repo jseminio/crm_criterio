@@ -7,13 +7,11 @@ import { api } from "./api/cliente";
 import { usarAcesso } from "./entrada";
 import type { Listas } from "./api/tipos";
 import { Agenda } from "./telas/Agenda";
-import { Carteira } from "./telas/Carteira";
 import { Contatos } from "./telas/Contatos";
 import { Configuracoes } from "./telas/Configuracoes";
-import { Contratos } from "./telas/Contratos";
-import { Funil } from "./telas/Funil";
-import { Questionarios } from "./telas/Questionarios";
 import { SdrEAbordagens } from "./telas/SdrEAbordagens";
+import { FunilEQuestionarios } from "./telas/FunilEQuestionarios";
+import { SucessoDoCliente, type AbaDoSucesso } from "./telas/SucessoDoCliente";
 import { usarDados } from "./usarDados";
 import { VERSAO } from "./versao";
 
@@ -21,8 +19,6 @@ type Tela =
   | "agenda"
   | "contatos"
   | "funil"
-  | "questionarios"
-  | "contratos"
   | "carteira"
   | "abordagens"
   | "configuracoes";
@@ -42,27 +38,15 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
   },
   {
     chave: "funil",
-    rotulo: "Funil",
+    rotulo: "Funil comercial",
     titulo: "Funil comercial",
-    descricao: "Kanban ou grade — arraste um cartão ou abra a linha para mover a oportunidade.",
-  },
-  {
-    chave: "questionarios",
-    rotulo: "Questionários",
-    titulo: "Questionários",
-    descricao: "Tudo o que chegou pelo questionário do site, do recebimento à proposta.",
-  },
-  {
-    chave: "contratos",
-    rotulo: "Contratos",
-    titulo: "Contratos",
-    descricao: "O que a oportunidade aceita virou — começo da Etapa 2.",
+    descricao: "Oportunidades em kanban ou grade, e os questionários que chegaram pelo site.",
   },
   {
     chave: "carteira",
-    rotulo: "Saúde da Carteira",
-    titulo: "Classificação da carteira",
-    descricao: "Classe, Score e eixo de ação por grupo, e o índice de saúde (ISC).",
+    rotulo: "Sucesso do Cliente",
+    titulo: "Sucesso do Cliente",
+    descricao: "A saúde da carteira e a gestão dos contratos.",
   },
   {
     chave: "abordagens",
@@ -87,9 +71,15 @@ export default function App() {
           "grupos.ver", "conferencia.ver")
       : t.chave === "abordagens"
         ? pode("abordagens.ver", "sdr.ver")
-        : pode(`${t.chave}.ver`),
+        : t.chave === "funil"
+          ? pode("funil.ver", "questionarios.ver")
+          : t.chave === "carteira"
+            ? pode("carteira.ver", "contratos.ver")
+            : pode(`${t.chave}.ver`),
   );
   const [escolhida, definirTela] = useState<Tela>("funil");
+  // Atalho de outra tela para uma aba (a Agenda abre os contratos): a aba pedida e uma chave para reabrir.
+  const [abaDoSucesso, definirAbaDoSucesso] = useState<{ aba: AbaDoSucesso; vez: number } | null>(null);
   const tela = visiveis.some((t) => t.chave === escolhida) ? escolhida : (visiveis[0]?.chave ?? escolhida);
   const { dados: listas } = usarDados<Listas>(() => api.listas(), []);
   const atual = TELAS.find((t) => t.chave === tela)!;
@@ -148,13 +138,16 @@ export default function App() {
           {visiveis.length > 0 && tela === "agenda" && <Agenda
               listas={listas}
               aoAbrirLeads={() => definirTela("funil")}
-              aoAbrirContratos={() => definirTela("contratos")}
+              aoAbrirContratos={() => {
+                definirAbaDoSucesso((a) => ({ aba: "contratos", vez: (a?.vez ?? 0) + 1 }));
+                definirTela("carteira");
+              }}
             />}
           {visiveis.length > 0 && tela === "contatos" && <Contatos listas={listas} />}
-          {visiveis.length > 0 && tela === "funil" && <Funil listas={listas} />}
-          {visiveis.length > 0 && tela === "questionarios" && <Questionarios listas={listas} />}
-          {visiveis.length > 0 && tela === "contratos" && <Contratos listas={listas} />}
-          {visiveis.length > 0 && tela === "carteira" && <Carteira listas={listas} />}
+          {visiveis.length > 0 && tela === "funil" && <FunilEQuestionarios listas={listas} />}
+          {visiveis.length > 0 && tela === "carteira" && (
+            <SucessoDoCliente key={abaDoSucesso?.vez ?? 0} listas={listas} abaPedida={abaDoSucesso?.aba ?? null} />
+          )}
           {visiveis.length > 0 && tela === "abordagens" && <SdrEAbordagens listas={listas} />}
           {visiveis.length > 0 && tela === "configuracoes" && <Configuracoes listas={listas} />}
         </main>

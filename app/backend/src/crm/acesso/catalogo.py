@@ -17,7 +17,7 @@ __all__ = ["MENUS", "PERMISSOES", "PUBLICAS", "ROTAS", "permissoes_da_rota", "pe
 MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     ("agenda", "Agenda", (("ver", "ver"),)),
     ("contatos", "Contatos", (("ver", "ver"), ("editar", "criar e editar"), ("excluir", "excluir"))),
-    ("funil", "Funil", (
+    ("funil", "Funil comercial", (
         ("ver", "ver"),
         ("editar", "criar e editar oportunidade e lead"),
         ("proposta", "montar e gerar proposta"),
@@ -28,11 +28,11 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     )),
     ("questionarios", "Questionários", (("ver", "ver"),)),
     ("grupos", "Grupos", (("ver", "ver"), ("editar", "editar"), ("fundir", "fundir e desfazer fusão"))),
-    ("contratos", "Contratos", (
+    ("contratos", "Gestão de contratos", (
         ("ver", "ver"), ("editar", "editar"), ("eventos", "registrar evento"),
         ("aprovar", "aprovar eventos acima da alçada"),
     )),
-    ("carteira", "Saúde da Carteira", (
+    ("carteira", "Saúde da carteira", (
         ("ver", "ver"), ("avaliar", "avaliar e calcular"), ("parametros", "parâmetros"), ("exportar", "exportar"),
     )),
     ("abordagens", "Abordagens", (("ver", "ver"), ("editar", "preparar, editar e descartar"), ("aprovar", "aprovar e marcar enviada"))),

@@ -17,6 +17,7 @@ import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
   return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(), pendencias: vi.fn(), ficha: vi.fn(),
+    historico: vi.fn().mockResolvedValue([]),
     buscarEmpresas: vi.fn().mockResolvedValue([
       { id: 9, razao_social: "Beta Serviços Ltda", nome_fantasia: null, cnpj: "11444777000161",
         grupo_id: 2, grupo_nome: "Grupo Beta", tipo: "cliente" },
@@ -128,7 +129,7 @@ describe("DetalheDaOportunidade", () => {
     const abas = screen.getByRole("tablist", { name: "Seções da oportunidade" });
     await waitFor(() => expect(within(abas).getAllByRole("tab")[3]).toHaveTextContent(/^Proposta\s*· 3 pendentes$/));
     expect(within(abas).getAllByRole("tab").map((t) => t.textContent?.replace(/\s+/g, " ").trim())).toEqual([
-      "Cadastro", "Volumetria e porte", "Ficha", "Proposta · 3 pendentes", "Histórico de preço",
+      "Cadastro", "Volumetria e porte", "Ficha", "Proposta · 3 pendentes", "Histórico",
     ]);
   });
 
@@ -331,7 +332,7 @@ describe("Histórico de preço e origem da volumetria (E4, 25/09/2026)", () => {
 
   async function abrirHistorico(o: Parameters<typeof oportunidade>[0] = {}) {
     await abrir(oportunidade(o));
-    await userEvent.click(screen.getByRole("tab", { name: /histórico de preço/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /^histórico/i }));
   }
 
   it("sem mudança de preço, diz que o preço ainda não mudou", async () => {

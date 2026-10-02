@@ -7,6 +7,8 @@ import { api } from "../api/cliente";
 import { ExclusaoConfirmada } from "../componentes/ExclusaoConfirmada";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { FormularioDePessoa } from "./DetalheDoContato";
+import { SEM_PERMISSAO, usarAcesso } from "../entrada";
+import { AlteracoesDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 
 export function DetalheDaPessoa({
   pessoa,
@@ -19,6 +21,7 @@ export function DetalheDaPessoa({
   aoFechar: () => void;
   aoMudar: () => void;
 }) {
+  const { pode } = usarAcesso();
   const empresas = pessoa.empresas ?? [];
   const salvar = async (corpo: Record<string, unknown>) => {
     await api.editarContato(pessoa.id, corpo);
@@ -59,6 +62,7 @@ export function DetalheDaPessoa({
 
       <ExclusaoConfirmada
         rotulo="Excluir contato"
+        bloqueio={pode("contatos.excluir") ? null : SEM_PERMISSAO}
         aviso={empresas.length === 0
           ? `${pessoa.nome} sai da base de contatos.`
           : empresas.length === 1
@@ -70,6 +74,7 @@ export function DetalheDaPessoa({
           aoFechar();
         }}
       />
+      <AlteracoesDoRegistro tabela="pessoa_contato" id={pessoa.id} />
     </PainelLateral>
   );
 }

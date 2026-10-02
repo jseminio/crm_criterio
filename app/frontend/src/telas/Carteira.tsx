@@ -17,6 +17,8 @@ import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/
 import { cnpj, data, defasagem, dinheiro, fracaoEmPercentual } from "../formato";
 import { usarDados } from "../usarDados";
 import { RevisaoMensal } from "./RevisaoMensal";
+import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
+import { usarAcesso } from "../entrada";
 
 const decimais = (v: string, n: number) =>
   Number(v).toLocaleString("pt-BR", { minimumFractionDigits: n, maximumFractionDigits: n });
@@ -216,6 +218,7 @@ function AnaliseDaIA() {
 }
 
 export function Carteira({ listas }: { listas: Listas | null }) {
+  const { pode } = usarAcesso();
   const { dados, carregando, erro, recarregar } = usarDados<ClassificacaoDaCarteira>(() => api.classificacaoDaCarteira(), []);
   // O eixo efetivo é o do campo "Eixo de ação", a não ser que o chip de inadimplentes esteja
   // ligado (aí ele manda, mas sem apagar o que estava no campo — desligar o chip volta pra ele).
@@ -378,13 +381,13 @@ export function Carteira({ listas }: { listas: Listas | null }) {
           </select>
         </label>
         <div className="carteira-ferramentas" style={{ marginLeft: "auto" }}>
-          <a
+          {pode("carteira.exportar") && <LinkDeArquivo
             className="botao botao-secundario"
             href="/api/carteira/exportar"
             title="Baixa o histórico completo da carteira em Excel, com fórmula viva de Score e Classe, para conferência"
           >
             Exportar para conferência
-          </a>
+          </LinkDeArquivo>}
           <Recolhivel titulo="Parâmetros de cálculo" resumo="janela de rentabilidade, pesos do Score, cortes e a matriz de horas por Porte">
             <JanelaDeRentabilidade
               key={dados.periodo?.id ?? "sem-periodo"}

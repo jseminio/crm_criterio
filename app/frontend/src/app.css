@@ -852,6 +852,44 @@
 .falta-nova .entrada { flex: 1 1 260px; min-width: 0; }
 .aba-pendentes { color: var(--espera); }
 
+/* ------------------------------------------------------------ entrada (E1, 02/10/2026) */
+.login { min-height: 100%; display: grid; place-items: center; background: var(--surface-brand); color: var(--texto-sobre-marca); padding: var(--e6) var(--e4); }
+.login-caixa { display: grid; gap: var(--e4); justify-items: center; text-align: center; max-width: 340px; }
+.login-marca { font-family: var(--fonte-titulo); font-size: 30px; }
+.login-marca span { display: block; font-family: var(--fonte-ui); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--texto-sobre-marca-fraco); margin-top: var(--e1); }
+.login-botao { display: inline-flex; gap: var(--e3); align-items: center; font: inherit; font-weight: 500; background: var(--branco); color: var(--azul-noturno); border: 0; border-radius: var(--raio-sm); padding: var(--e3) var(--e4); cursor: pointer; }
+.login-botao:focus-visible { outline: 2px solid var(--azul-gelo); outline-offset: 2px; }
+.login-ms { width: 16px; height: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.login-ms i:nth-child(1) { background: #f25022; } .login-ms i:nth-child(2) { background: #7fba00; }
+.login-ms i:nth-child(3) { background: #00a4ef; } .login-ms i:nth-child(4) { background: #ffb900; }
+.login-nota { color: var(--texto-sobre-marca-fraco); font-size: 13px; margin: 0; }
+.login-erro { background: var(--perda-suave); color: var(--perda); border: 1px solid var(--perda); border-radius: var(--raio-sm); padding: var(--e3); font-size: 13px; text-align: left; margin: 0; }
+.quem-entrou { margin-top: auto; border-top: 1px solid rgba(255,255,255,.16); padding-top: var(--e3); display: grid; gap: var(--e1); font-size: 12px; color: var(--texto-sobre-marca-fraco); }
+.quem-entrou strong { color: var(--texto-sobre-marca); font-size: 13px; }
+.quem-entrou-sair { justify-self: start; background: none; border: 0; padding: 0; color: var(--texto-sobre-marca); text-decoration: underline; font: inherit; cursor: pointer; }
+.acao-sem-permissao { font-size: 12px; color: var(--texto-fraco); }
+
+/* Perfis e acesso, histórico de alterações (E1, 02/10/2026) */
+.perfis-lista { display: flex; flex-wrap: wrap; gap: var(--e2); margin: var(--e3) 0 var(--e2); }
+.perfis-chip { font: inherit; font-size: 13px; padding: var(--e1) var(--e3); border: 1px solid var(--borda); border-radius: 999px; background: var(--surface-card); color: var(--texto-medio); cursor: pointer; }
+.perfis-chip[aria-selected="true"] { border: 2px solid var(--azul-noturno); color: var(--texto-forte); font-weight: 600; background: var(--andamento-suave); }
+.perfis-chip:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.perfis-novo { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center; margin: var(--e2) 0 var(--e3); }
+.perfis-novo .entrada { flex: 1 1 260px; max-width: 360px; }
+.perfis-tabela td, .perfis-tabela th { vertical-align: top; }
+.perfis-tabela td:nth-child(2) { text-align: center; width: 110px; }
+.perfis-funcoes { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e4); font-size: 13px; }
+.perfis-funcoes label { display: inline-flex; align-items: center; gap: var(--e1); cursor: pointer; }
+.perfis-acoes { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center; margin-top: var(--e3); }
+.perfis-subtitulo { font-size: 14px; margin: var(--e5) 0 var(--e2); color: var(--texto-forte); }
+.historico-filtros { display: flex; flex-wrap: wrap; gap: var(--e2) var(--e3); align-items: center; margin: var(--e3) 0; }
+.historico-periodo { display: inline-flex; flex-wrap: wrap; gap: var(--e2); align-items: center; font-size: 13px; color: var(--texto-medio); }
+.historico-mudanca { font-size: 13px; overflow-wrap: anywhere; max-width: 420px; }
+.historico-antes { color: var(--texto-fraco); text-decoration: line-through; }
+.historico-depois { color: var(--texto-forte); font-weight: 600; }
+.historico-do-registro { margin-top: var(--e4); font-size: 13px; }
+.historico-do-registro > summary { cursor: pointer; color: var(--texto-forte); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

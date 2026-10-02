@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/cliente";
 import type { QuestionarioDaOportunidade as Questionario } from "../api/tipos";
 import { dataHora } from "../formato";
+import { LinkDeArquivo } from "./LinkDeArquivo";
 
 const lista = (fatores: { rotulo: string }[]) => (fatores.length ? fatores.map((f) => f.rotulo).join(", ") : "nenhum fator");
 
@@ -26,7 +27,7 @@ export function QuestionarioDaOportunidade({ oportunidadeId }: { oportunidadeId:
         Veio do <strong>questionário</strong> enviado em {dataHora(q.recebido_em)} por {q.contato_nome}
         {q.contato_cargo ? `, ${q.contato_cargo}` : ""} (versão {q.versao}).{" "}
         {q.tem_pdf ? (
-          <a href={`/api/questionarios/${q.id}/pdf`} target="_blank" rel="noreferrer">Ver PDF</a>
+          <LinkDeArquivo href={`/api/questionarios/${q.id}/pdf`} novaAba>Ver PDF</LinkDeArquivo>
         ) : (
           "Chegou sem PDF."
         )}

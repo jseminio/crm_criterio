@@ -16,6 +16,73 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Entrada pela conta Microsoft, perfis e histórico de alterações (E1, 02/10/2026)
+
+Amostra aprovada por Eduardo em 02/10/2026.
+
+- **Entrada:** cada pessoa entra com a conta Microsoft da Critério (Microsoft Entra). O CRM
+  não guarda senha: a Microsoft confere quem é; o CRM decide o que a pessoa pode. Cada pedido à
+  API leva o token, que a API confere (assinatura, emissor, público e validade) antes de tudo.
+- **Sem a configuração, nada muda:** sem `CRM_ENTRA_TENANT_ID` e `CRM_ENTRA_CLIENT_ID` no
+  `backend/.env`, o CRM segue sem login, só na máquina, como antes. O rodapé do menu avisa.
+- **Perfis por funcionalidade dentro de cada menu**, com a opção de liberar o menu inteiro
+  (pedido de Eduardo). Menu sem nenhuma funcionalidade liberada não aparece. Os perfis
+  iniciais: **Administrador** (tudo, inclusive o que for criado depois; não se muda) e
+  **Comercial** (o comercial inteiro, sem converter em contrato, sem Carteira e sem
+  Configurações; contratos e grupos só para ver). Os outros se criam na tela, em
+  **Configurações › Perfis e acesso**, onde também se libera cada conta e se tira o acesso.
+  Precisa sobrar pelo menos um Administrador ativo.
+- **A API confere tudo, a tela só ajuda:** toda rota está num mapa de permissões
+  (`crm/acesso/catalogo.py`); rota fora do mapa é **recusada** (um teste garante que nenhuma
+  fica de fora). A tela esconde ou trava o que o perfil não libera e diz o porquê; se algo
+  escapar, a API responde "O seu perfil não libera esta ação."
+- **Histórico de alterações por usuário:** toda gravação feita por quem entrou vira linha no
+  histórico: quem, quando, o quê, o campo, o antes e o depois (criou, alterou, excluiu). Não se
+  edita nem se apaga. Começa quando o login entra no ar: o que veio antes não tem autor (decisão
+  de Eduardo). Aparece em **Configurações › Histórico de alterações** (filtro por pessoa, tela e
+  período, no dia de Brasília) e no painel da oportunidade (aba **Histórico**), do contato, da
+  empresa e do contrato (**Histórico de alterações**, recolhido no fim). Arquivos (matriz,
+  PDF) e respostas de questionário não entram campo a campo, só o registro.
+- **"Quem preenche" sai de cena:** com login, a ficha, a lista do que falta e a matriz de
+  proposta gravam o nome de quem entrou; os seletores de nome somem.
+- **Downloads** (backup, Excel, PowerPoint, PDF) passam a levar o token.
+- Migração `d8b2f5a1c3e7`, só aditiva (tabelas `perfil`, `usuario` e `registro_de_alteracao`,
+  com os dois perfis iniciais). Dependência nova no backend: `pyjwt[crypto]`; na tela,
+  `@azure/msal-browser`.
+
+### Ligar a entrada pela conta Microsoft (passo a passo, uma vez)
+
+Feito por quem administra o Microsoft 365 da Critério, no portal do Azure
+(`portal.azure.com`). Nada aqui é pago, nem pede segredo: o CRM usa o fluxo de aplicativo de
+página única (com PKCE), sem senha de aplicativo.
+
+1. **Microsoft Entra ID › Registros de aplicativo › Novo registro.** Nome: `Critério CRM`.
+   Tipos de conta: **somente contas deste diretório organizacional**. URI de redirecionamento:
+   plataforma **Aplicativo de página única (SPA)**, endereço `http://localhost:5173/`.
+2. Na **Visão geral**, anote o **ID do aplicativo (cliente)** e o **ID do diretório
+   (locatário)**.
+3. **Expor uma API › Adicionar** o URI de ID do aplicativo (aceite o sugerido,
+   `api://<ID do aplicativo>`) e **Adicionar um escopo**: nome `acesso`, quem pode consentir
+   **Administradores e usuários**, nome de exibição "Acessar o Critério CRM".
+4. **Permissões de API › Adicionar uma permissão › Minhas APIs › Critério CRM › `acesso`**, e
+   depois **Conceder consentimento do administrador**.
+5. **Manifesto:** ponha `"requestedAccessTokenVersion": 2` (no editor antigo,
+   `"accessTokenAcceptedVersion": 2`) e salve. Sem isso a Microsoft emite o token no formato
+   antigo e a API recusa ("A entrada expirou ou não vale").
+6. No `backend/.env` (nunca no código):
+
+   ```
+   CRM_ENTRA_TENANT_ID=<ID do diretório>
+   CRM_ENTRA_CLIENT_ID=<ID do aplicativo>
+   CRM_ADMINISTRADORES=eduardo@grupocriterio.com.br
+   ```
+
+7. Pare e suba o CRM de novo (`./iniciar.sh`). Entre com a conta de Eduardo: ela nasce
+   Administrador. Em **Configurações › Perfis e acesso**, libere a Karine no perfil Comercial.
+
+Para usar pelo túnel (ngrok), acrescente o endereço do túnel, com `/` no fim, como mais um URI
+de redirecionamento SPA no passo 1.
+
 ## Ficha e "o que falta para a proposta" (E4, 02/10/2026)
 
 Amostra aprovada por Eduardo em 02/10/2026. Fecha os dois itens do E4 que faltavam no
@@ -38,7 +105,8 @@ e a lista do que falta para a proposta, com responsável e prazo.
 - **Decisões de Eduardo (02/10/2026):** a lista **não bloqueia** o "Gerar PowerPoint"; pendência
   aberta **com prazo entra na Agenda**, no balde do prazo, com o responsável; a **seção 9** aparece na
   ficha mas **não conta** como pendência (é levantada no kick-off).
-- **Quem preenche:** sem login (E1), a pessoa escolhe o nome uma vez (o navegador lembra).
+- **Quem preenche:** sem login, a pessoa escolhe o nome uma vez (o navegador lembra). Com o login
+  do E1, vale o nome de quem entrou e o seletor some.
 - Migração `c4e1a7d2f9b3`, só aditiva (coluna `oportunidade.ficha` e tabela
   `pendencia_da_proposta`): **rode `alembic upgrade head`**, com o backup antes.
 
@@ -66,12 +134,12 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.060** no backend e **428** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
-| Banco | PostgreSQL 18 local, 31 tabelas, migrações até `c4e1a7d2f9b3` (ficha e pendências da proposta, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
-| API | ~100 rotas, em `127.0.0.1:8000`, **sem login**: só na máquina do CRM até o E1 |
+| Testes | **1.069** no backend e **441** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Banco | PostgreSQL 18 local, 34 tabelas, migrações até `d8b2f5a1c3e7` (perfis, pessoas e histórico de alterações, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
+| API | 117 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Telas | Agenda, Contatos, Funil (kanban e grade, exportar para Excel), Grupos, Contratos, Carteira, Abordagens, SDR da IA, Conferência e Configurações. React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3 e E4 prontos. E5 quase todo: falta o MRR da carteira inteira, que depende de carregar os contratos de antes do CRM |
-| Fora do ar | **E1:** nuvem em região brasileira, login com a conta Microsoft, perfis de acesso, histórico de alterações por usuário, backup fora da máquina com restauração testada. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto, implantação |
+| Fora do ar | **E1:** nuvem em região brasileira (custo a estimar antes de contratar) e backup fora da máquina com restauração testada. Login, perfis e histórico já estão no código, à espera do registro no Microsoft Entra. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto, implantação |
 
 ## Como rodar
 
@@ -868,7 +936,7 @@ oportunidade mostra o histórico, do mais recente para o mais antigo.
 
 - A linha só nasce quando o valor **muda de fato**; salvar o painel sem mexer no preço não cria nada.
 - É **imutável** (não herda o carimbo de alteração) e a API não tem rota para editá-la.
-- Ainda não registra **quem** mudou: não há login. Entra com o E1.
+- Até o E1 não registrava **quem** mudou. Com a entrada pela conta Microsoft ligada, o histórico de alterações registra (ver "Entrada pela conta Microsoft").
 
 **Origem da volumetria.** Cada um dos nove direcionadores da régua de porte pode dizer se
 veio da **entrevista** ou do **questionário** (`origem_da_volumetria`, um mapa por
@@ -982,8 +1050,8 @@ cd backend && ~/.venvs/criterio-crm/bin/python scripts/servir.py
 cd frontend && npm install && npm run dev
 ```
 
-A API escuta **só em `127.0.0.1`**, de propósito: não tem login. Não a exponha na
-rede antes do E1.
+A API escuta **só em `127.0.0.1`**, de propósito. Sem a entrada pela conta Microsoft
+configurada, ela não tem login: não a exponha na rede assim.
 
 Conferir a carga contra uma planilha real — **lê e mostra, não grava nada**:
 

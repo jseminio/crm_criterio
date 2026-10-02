@@ -1381,3 +1381,59 @@ class PendenciaDaProposta(CarimboMixin, Base):
     criada_por: Mapped[str] = mapped_column(sa.String(60), nullable=False)
     feita_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     feita_por: Mapped[str | None] = mapped_column(sa.String(60))
+
+
+class Perfil(CarimboMixin, Base):
+    """Um perfil de acesso (E1, 02/10/2026): as funcionalidades que ele libera em cada menu, como
+    `"funil.converter"` (`crm.acesso.catalogo`). O Administrador tem tudo, inclusive o que vier depois."""
+
+    __tablename__ = "perfil"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nome: Mapped[str] = mapped_column(sa.String(60), nullable=False, unique=True)
+    administrador: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False, server_default=sa.false())
+    permissoes: Mapped[list[str]] = mapped_column(
+        sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list, server_default=sa.text("'[]'")
+    )
+
+
+class Usuario(CarimboMixin, Base):
+    """Quem pode entrar no CRM: a conta Microsoft (o e-mail) e o perfil. A Microsoft confere quem é; o
+    CRM decide o que pode. Desativar tira o acesso sem apagar o histórico de quem a pessoa foi."""
+
+    __tablename__ = "usuario"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(sa.String(200), nullable=False, unique=True)
+    """Sempre em minúsculas, como a conta Microsoft entra."""
+    nome: Mapped[str | None] = mapped_column(sa.String(200))
+    """O nome que a Microsoft informa na primeira entrada; até lá, vazio."""
+    perfil_id: Mapped[int] = mapped_column(sa.ForeignKey("perfil.id"), nullable=False, index=True)
+    ativo: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=True, server_default=sa.true())
+    liberado_por: Mapped[str | None] = mapped_column(sa.String(200))
+
+    perfil: Mapped[Perfil] = relationship()
+
+
+class RegistroDeAlteracao(Base):
+    """O histórico de alterações por usuário (E1, 02/10/2026): uma linha por campo que mudou, com quem,
+    quando, antes e depois. Gravado sozinho a cada gravação no banco (`crm.acesso.auditoria`) quando há
+    alguém identificado. **Não se edita nem se apaga**: não herda o carimbo de alteração."""
+
+    __tablename__ = "registro_de_alteracao"
+    __table_args__ = (sa.Index("ix_registro_de_alteracao_tabela_registro", "tabela", "registro_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    quando: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=agora, index=True)
+    usuario_email: Mapped[str] = mapped_column(sa.String(200), nullable=False, index=True)
+    usuario_nome: Mapped[str | None] = mapped_column(sa.String(200))
+    acao: Mapped[str] = mapped_column(sa.String(10), nullable=False)
+    """criou · alterou · excluiu"""
+    tabela: Mapped[str] = mapped_column(sa.String(60), nullable=False)
+    registro_id: Mapped[int | None] = mapped_column(sa.Integer)
+    descricao: Mapped[str | None] = mapped_column(sa.String(200))
+    """Como o registro aparece para as pessoas: o nome da oportunidade, a razão social…"""
+    campo: Mapped[str | None] = mapped_column(sa.String(60))
+    antes: Mapped[str | None] = mapped_column(sa.Text)
+    depois: Mapped[str | None] = mapped_column(sa.Text)
+    rota: Mapped[str | None] = mapped_column(sa.String(200))

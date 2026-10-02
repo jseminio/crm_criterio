@@ -17,6 +17,8 @@ import { CampoDeGrupo } from "../componentes/CampoDeGrupo";
 import { ExclusaoConfirmada } from "../componentes/ExclusaoConfirmada";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { dinheiro } from "../formato";
+import { SEM_PERMISSAO, usarAcesso } from "../entrada";
+import { AlteracoesDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 
 const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
 
@@ -192,6 +194,7 @@ export function DetalheDoContato({
   aoFechar: () => void;
   aoMudar: () => void;
 }) {
+  const { pode } = usarAcesso();
   const [editando, definirEditando] = useState<number | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
   const papeis = listas?.papeis_de_contato ?? [];
@@ -306,7 +309,7 @@ export function DetalheDoContato({
           <Endereco key={entidade.empresa_id} entidade={entidade} aoMudar={aoMudar} />
           <ExclusaoConfirmada
             rotulo="Excluir empresa"
-            bloqueio={entidade.tem_contrato ? "Esta empresa tem contrato e não pode ser excluída. Encerre ou mova o contrato antes." : null}
+            bloqueio={entidade.tem_contrato ? "Esta empresa tem contrato e não pode ser excluída. Encerre ou mova o contrato antes." : pode("contatos.excluir") ? null : SEM_PERMISSAO}
             aviso={(() => {
               const vinculados = entidade.contatos.length;
               return vinculados
@@ -319,6 +322,7 @@ export function DetalheDoContato({
               aoFechar();
             }}
           />
+          <AlteracoesDoRegistro tabela="empresa" id={entidade.empresa_id} />
         </>
       ) : (
         <div className="recado">

@@ -6,13 +6,15 @@
  */
 
 import { useEffect, useState } from "react";
-import { api, ErroDaApi } from "../api/cliente";
+import { api, baixarArquivo, entradaLigada, ErroDaApi } from "../api/cliente";
 import type { AbaDaProposta, EntradaDaProposta, PropostaResumo, TipoDeMatriz } from "../api/tipos";
 import { data, dataHora, dinheiro, fracaoEmPercentual } from "../formato";
 import { brutoPrevio } from "../proposta";
 import { CampoDeValor } from "./CampoDeValor";
 import { Etiqueta } from "./Etiqueta";
 import { Carregando, Erro } from "./estados";
+import { LinkDeArquivo } from "./LinkDeArquivo";
+import { SEM_PERMISSAO, usarAcesso } from "../entrada";
 
 const virgula = (v: string | number) => String(v).replace(".", ",");
 const numero = (v: string | null | undefined) => (v === null || v === undefined || v === "" ? null : Number(v));
@@ -35,7 +37,14 @@ function hoje(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function baixar(proposta: PropostaResumo) {
+function baixar(proposta: PropostaResumo, aoFalhar: (mensagem: string) => void) {
+  // Com login, o download leva o token (um link comum não leva).
+  if (entradaLigada()) {
+    baixarArquivo(`/api/propostas/${proposta.id}/pptx`, proposta.arquivo).catch((f) =>
+      aoFalhar(`A proposta foi gerada, mas o download falhou (${f instanceof ErroDaApi ? f.message : "sem resposta"}). Use "Baixar de novo", logo abaixo.`),
+    );
+    return;
+  }
   // O nome do arquivo vem do cabeçalho da API; o link só sai da página depois que o navegador o usou.
   const a = document.createElement("a");
   a.href = `/api/propostas/${proposta.id}/pptx`;
@@ -86,6 +95,7 @@ export function PropostaDaOportunidade({
   /** Gerar fecha o item "Proposta ainda não gerada" do que falta (E4). */
   aoGerar?: () => void;
 }) {
+  const { pode } = usarAcesso();
   const [aba, definirAba] = useState<AbaDaProposta | null>(null);
   const [entrada, definirEntrada] = useState<EntradaDaProposta | null>(null);
   const [erroAoAbrir, definirErroAoAbrir] = useState<string | null>(null);
@@ -151,7 +161,7 @@ export function PropostaDaOportunidade({
       apagarRascunho(oportunidadeId);
       definirEditado(false);
       definirRestaurado(null);
-      baixar(p);
+      baixar(p, definirErro);
       definirAviso(
         `✓ Proposta ${p.numero} gerada. O arquivo ${p.arquivo} foi para a pasta Downloads do navegador. ` +
           `Se não apareceu, use "Baixar de novo", logo abaixo. Revise, salve como PDF e envie.`,
@@ -316,10 +326,12 @@ export function PropostaDaOportunidade({
       </dl>
 
       <div className="proposta-acoes">
-        <button type="button" className="botao botao-primario" onClick={gerar} disabled={gerando || !!semMatriz}>
+        <button type="button" className="botao botao-primario" onClick={gerar} disabled={gerando || !!semMatriz || !pode("funil.proposta")}>
           {gerando ? "Gerando…" : "Gerar PowerPoint"}
         </button>
-        {semMatriz ? (
+        {!pode("funil.proposta") ? (
+          <span className="proposta-bloqueio" role="note">⚠ {SEM_PERMISSAO}</span>
+        ) : semMatriz ? (
           <span className="proposta-bloqueio" role="note">⚠ {semMatriz}</span>
         ) : (
           <span className="campo-ajuda">
@@ -364,10 +376,10 @@ export function PropostaDaOportunidade({
                 </td>
                 <td>
                   <div className="proposta-acoes-da-linha">
-                  <a className="link-de-tabela" href={`/api/propostas/${p.id}/pptx`} download={p.arquivo}>
+                  <LinkDeArquivo className="link-de-tabela" href={`/api/propostas/${p.id}/pptx`} nome={p.arquivo}>
                     Baixar de novo
-                  </a>
-                  {!p.enviada_em && (
+                  </LinkDeArquivo>
+                  {!p.enviada_em && pode("funil.enviar_proposta") && (
                     <>
                       <button type="button" className="link-de-tabela" onClick={() => definirEnviando({ id: p.id, por: aba.revisores[0] ?? "", em: hoje() })}>
                         Marcar como enviada

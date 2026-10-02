@@ -57,8 +57,14 @@ import type {
   ResultadoDaBusca,
   AbaDaProposta,
   ConfiguracaoDeProposta,
+  Alteracao,
+  ConfiguracaoDeEntrada,
   EntradaDaProposta,
+  Eu,
   Ficha,
+  MenuDoCatalogo,
+  PerfilDeAcesso,
+  UsuarioDoCrm,
   MudancaDePendencia,
   PendenciasDaProposta,
   MatrizesDeProposta,
@@ -74,6 +80,72 @@ export class ErroDaApi extends Error {
     super(mensagem);
     this.status = status;
   }
+}
+
+/* ------------------------------------------------ entrada (E1, 02/10/2026) */
+
+/** Com a entrada pela Microsoft, quem dá o token é o `Entrada` (src/entrada.tsx). Sem login, fica
+ * vazio e os pedidos saem como antes. */
+let fornecedorDeToken: (() => Promise<string | null>) | null = null;
+let aoPerderEntrada: (() => void) | null = null;
+
+export function definirEntrada(fornecedor: (() => Promise<string | null>) | null, perdeu: (() => void) | null = null) {
+  fornecedorDeToken = fornecedor;
+  aoPerderEntrada = perdeu;
+}
+
+async function cabecalhoDeEntrada(): Promise<Record<string, string>> {
+  const token = fornecedorDeToken ? await fornecedorDeToken() : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** Com login, um link comum não leva o token: os downloads passam pelo `baixarArquivo`. */
+export function entradaLigada(): boolean {
+  return fornecedorDeToken !== null;
+}
+
+function avisarSePerdeu(status: number) {
+  if (status === 401 && aoPerderEntrada) aoPerderEntrada();
+}
+
+/** Baixa um arquivo da API levando a entrada junto (um link comum não leva o token). O nome vem do
+ * cabeçalho da resposta; sem ele, o `sugerido`. */
+export async function baixarArquivo(caminho: string, sugerido = "arquivo", novaAba = false): Promise<void> {
+  let resposta: Response;
+  try {
+    resposta = await fetch(caminho, { headers: await cabecalhoDeEntrada() });
+  } catch {
+    throw new ErroDaApi(0, "Não consegui falar com o servidor. Ele está no ar?");
+  }
+  if (!resposta.ok) {
+    avisarSePerdeu(resposta.status);
+    let detalhe = `Erro ${resposta.status}`;
+    try {
+      const corpo = await resposta.json();
+      if (typeof corpo?.detail === "string") detalhe = corpo.detail;
+    } catch {
+      /* sem JSON */
+    }
+    throw new ErroDaApi(resposta.status, detalhe);
+  }
+  const disposicao = resposta.headers.get("content-disposition") ?? "";
+  const codificado = /filename\*=UTF-8''([^;]+)/i.exec(disposicao)?.[1];
+  const nome = (codificado && decodeURIComponent(codificado)) || /filename="?([^";]+)"?/i.exec(disposicao)?.[1] || sugerido;
+  const url = URL.createObjectURL(await resposta.blob());
+  if (novaAba) {
+    window.open(url, "_blank", "noopener");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
+  }
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nome;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 1000);
 }
 
 /** Nome de campo como aparece na tela; o que não estiver aqui sai com o nome técnico. */
@@ -136,7 +208,7 @@ async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T> {
   try {
     resposta = await fetch(caminho, {
       ...opcoes,
-      headers: { "Content-Type": "application/json", ...opcoes?.headers },
+      headers: { "Content-Type": "application/json", ...(await cabecalhoDeEntrada()), ...opcoes?.headers },
     });
   } catch {
     // Distinguir "servidor fora do ar" de "servidor recusou" importa: a
@@ -145,6 +217,7 @@ async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T> {
   }
 
   if (!resposta.ok) {
+    avisarSePerdeu(resposta.status);
     let detalhe = `Erro ${resposta.status}`;
     try {
       const corpo = await resposta.json();
@@ -191,11 +264,12 @@ export interface ResumoDeBackup {
 async function enviarArquivo<T = ResumoDeBackup>(caminho: string, arquivo: File, cabecalhos: Record<string, string> = {}): Promise<T> {
   let resposta: Response;
   try {
-    resposta = await fetch(caminho, { method: "POST", body: arquivo, headers: cabecalhos });
+    resposta = await fetch(caminho, { method: "POST", body: arquivo, headers: { ...(await cabecalhoDeEntrada()), ...cabecalhos } });
   } catch {
     throw new ErroDaApi(0, "Não consegui falar com o servidor. Ele está no ar?");
   }
   if (!resposta.ok) {
+    avisarSePerdeu(resposta.status);
     let detalhe = `Erro ${resposta.status}`;
     try {
       const corpo = await resposta.json();
@@ -210,6 +284,22 @@ async function enviarArquivo<T = ResumoDeBackup>(caminho: string, arquivo: File,
 }
 
 export const api = {
+  entrada: () => pedir<ConfiguracaoDeEntrada>("/api/acesso/entrada"),
+  eu: () => pedir<Eu>("/api/eu"),
+  catalogoDeAcesso: () => pedir<MenuDoCatalogo[]>("/api/acesso/catalogo"),
+  perfis: () => pedir<PerfilDeAcesso[]>("/api/acesso/perfis"),
+  criarPerfil: (nome: string, permissoes: string[]) =>
+    pedir<PerfilDeAcesso>("/api/acesso/perfis", { method: "POST", body: JSON.stringify({ nome, permissoes }) }),
+  mudarPerfil: (id: number, mudanca: { nome?: string; permissoes?: string[] }) =>
+    pedir<PerfilDeAcesso>(`/api/acesso/perfis/${id}`, { method: "PATCH", body: JSON.stringify(mudanca) }),
+  usuarios: () => pedir<UsuarioDoCrm[]>("/api/acesso/usuarios"),
+  liberarUsuario: (email: string, perfilId: number) =>
+    pedir<UsuarioDoCrm>("/api/acesso/usuarios", { method: "POST", body: JSON.stringify({ email, perfil_id: perfilId }) }),
+  mudarUsuario: (id: number, mudanca: { perfil_id?: number; ativo?: boolean }) =>
+    pedir<UsuarioDoCrm>(`/api/acesso/usuarios/${id}`, { method: "PATCH", body: JSON.stringify(mudanca) }),
+  historico: (filtros: { usuario?: string; tabela?: string; registro_id?: number; de?: string; ate?: string; limite?: number }) =>
+    pedir<Alteracao[]>(comParametros("/api/historico", filtros)),
+
   verificarBackup: (arquivo: File) => enviarArquivo("/api/backup/verificar", arquivo),
 
   importarBackup: (arquivo: File, substituir: boolean) =>

@@ -20,6 +20,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, defer
 
+from crm.acesso.auditoria import usuario_atual
+from crm.api.acesso import quem_fez
 from crm.api.classificacao import janela_vigente, parametros_vigentes
 from crm.db.base import agora
 from crm.db.modelos import (
@@ -410,7 +412,9 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         """O corpo é o .pptx. Fica gravada mesmo com marcador faltando, para a tela mostrar o que
         corrigir; nesse caso não é usada para gerar."""
         config = _configuracao(sessao)
-        if enviada_por not in config.revisores:
+        if usuario_atual.get() is not None:  # com login, quem sobe é quem entrou
+            enviada_por = quem_fez(enviada_por)[:60]
+        elif enviada_por not in config.revisores:
             raise HTTPException(422, f"quem sobe a matriz é {', '.join(config.revisores)}")
         if not nome_arquivo.lower().endswith(".pptx"):
             raise HTTPException(422, "a matriz precisa ser um PowerPoint .pptx")

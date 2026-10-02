@@ -16,6 +16,7 @@ import { usarDados } from "../usarDados";
 import { EventosDeContrato } from "./EventosDeContrato";
 import { Receita } from "./Receita";
 import { CampoDeData } from "../componentes/CampoDeData";
+import { AlteracoesDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 
 const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "Encerrado"];
 
@@ -251,6 +252,7 @@ function EdicaoDeContrato({
         Sem assinatura eletrônica ainda (Clicksign fica para depois) e sem renovação automática:
         a vigência começa na data da assinatura que você informa aqui.
       </div>
+      <AlteracoesDoRegistro tabela="contrato" id={contrato.id} />
     </PainelLateral>
   );
 }

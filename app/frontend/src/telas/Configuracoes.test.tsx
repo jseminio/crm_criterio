@@ -55,10 +55,10 @@ describe("abas de Configurações", () => {
     semMatrizes();
   });
 
-  it("mostra as seis abas na ordem aprovada e abre na primeira", async () => {
+  it("mostra as oito abas na ordem aprovada e abre na primeira", async () => {
     render(<Configuracoes />);
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
-      "Perfis e acesso", "Metas", "Propostas", "Histórico de alterações", "Backup", "Serviços pedidos",
+      "Perfis e acesso", "Metas", "Propostas", "Grupos", "Conferência", "Histórico", "Backup", "Serviços pedidos",
     ]);
     expect(screen.getByRole("tab", { name: "Perfis e acesso" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByText(/Baixar backup completo/)).toBeNull();
@@ -142,3 +142,17 @@ describe("pedidos de serviço novo", () => {
   });
 });
 
+
+describe("Configurações para o perfil Comercial (02/10/2026)", () => {
+  it("vê só Grupos, Conferência e Serviços pedidos", async () => {
+    vi.mocked(api.pedidosDeServicoNovo).mockResolvedValue([]);
+    const { ProvedorDeAcesso } = await import("../entrada");
+    render(
+      <ProvedorDeAcesso eu={{ modo: "microsoft", email: "k@grupocriterio.com.br", nome: "Karine", perfil: "Comercial", administrador: false,
+        permissoes: ["grupos.ver", "conferencia.ver"] }}>
+        <Configuracoes />
+      </ProvedorDeAcesso>,
+    );
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Grupos", "Conferência", "Serviços pedidos"]);
+  });
+});

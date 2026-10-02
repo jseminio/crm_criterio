@@ -1,5 +1,6 @@
 /** Configurações, em abas (aprovado por Eduardo em 02/10/2026): perfis e acesso, metas, propostas,
- * histórico de alterações, backup e serviços pedidos. Cada aba só aparece para quem pode vê-la.
+ * grupos, conferência, histórico de alterações, backup e serviços pedidos. Cada aba só aparece para
+ * quem pode vê-la.
  *
  * Backup lógico dos dados:
  *
@@ -14,10 +15,12 @@ import { MetasDosIndicadores } from "../componentes/MetasDosIndicadores";
 import { MatrizesDeProposta } from "../componentes/MatrizesDeProposta";
 import { PerfisEAcesso } from "../componentes/PerfisEAcesso";
 import { usarAcesso } from "../entrada";
+import { Conferencia } from "./Conferencia";
+import { Grupos } from "./Grupos";
 import { useState } from "react";
 import { ErroDaApi, api } from "../api/cliente";
 import type { ResumoDeBackup } from "../api/cliente";
-import type { PedidoDeServicoNovo } from "../api/tipos";
+import type { Listas, PedidoDeServicoNovo } from "../api/tipos";
 import { Carregando, Erro } from "../componentes/estados";
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { dataHora } from "../formato";
@@ -106,7 +109,7 @@ function Tabelas({ resumo }: { resumo: ResumoDeBackup }) {
   );
 }
 
-type Aba = "perfis" | "metas" | "propostas" | "historico" | "backup" | "servicos";
+type Aba = "perfis" | "metas" | "propostas" | "grupos" | "conferencia" | "historico" | "backup" | "servicos";
 
 /** As abas, na ordem aprovada por Eduardo em 02/10/2026, com a funcionalidade que libera cada uma.
  * "Serviços pedidos" é só leitura e aparece para quem vê Configurações. */
@@ -114,7 +117,10 @@ const ABAS: { chave: Aba; rotulo: string; permissao: string | null }[] = [
   { chave: "perfis", rotulo: "Perfis e acesso", permissao: "configuracoes.perfis" },
   { chave: "metas", rotulo: "Metas", permissao: "configuracoes.metas" },
   { chave: "propostas", rotulo: "Propostas", permissao: "configuracoes.propostas" },
-  { chave: "historico", rotulo: "Histórico de alterações", permissao: "configuracoes.historico" },
+  // Grupos e Conferência saíram do menu e viraram abas (aprovado por Eduardo em 02/10/2026).
+  { chave: "grupos", rotulo: "Grupos", permissao: "grupos.ver" },
+  { chave: "conferencia", rotulo: "Conferência", permissao: "conferencia.ver" },
+  { chave: "historico", rotulo: "Histórico", permissao: "configuracoes.historico" },
   { chave: "backup", rotulo: "Backup", permissao: "configuracoes.backup" },
   { chave: "servicos", rotulo: "Serviços pedidos", permissao: null },
 ];
@@ -128,7 +134,7 @@ function abaGuardada(): Aba | null {
   }
 }
 
-export function Configuracoes() {
+export function Configuracoes({ listas = null }: { listas?: Listas | null }) {
   const { pode } = usarAcesso();
   const visiveis = ABAS.filter((a) => a.permissao === null || pode(a.permissao));
   const [escolhida, definirEscolhida] = useState<Aba | null>(abaGuardada);
@@ -183,7 +189,8 @@ export function Configuracoes() {
   const podeImportar = !!resumo && !ocupado && (!substituir || confirmacao === "SUBSTITUIR");
 
   return (
-    <div className="configuracoes" style={{ display: "grid", gap: "var(--e4)", maxWidth: 960 }}>
+    // As abas usam a largura toda; os formulários ficam estreitos e as tabelas de Grupos e Conferência, largas.
+    <div className={`configuracoes${aba === "grupos" || aba === "conferencia" ? "" : " configuracoes-estreita"}`} style={{ display: "grid", gap: "var(--e4)" }}>
       <div className="abas" role="tablist" aria-label="Seções de Configurações">
         {visiveis.map((a) => (
           <button key={a.chave} type="button" role="tab" className="aba" aria-selected={aba === a.chave} onClick={() => escolherAba(a.chave)}>
@@ -270,6 +277,18 @@ export function Configuracoes() {
       </>
       )}
       {aba === "propostas" && <MatrizesDeProposta />}
+      {aba === "grupos" && (
+        <>
+          <p className="campo-ajuda" style={{ margin: 0 }}>O cliente é o grupo. Junte os que a planilha separou.</p>
+          <Grupos listas={listas} />
+        </>
+      )}
+      {aba === "conferencia" && (
+        <>
+          <p className="campo-ajuda" style={{ margin: 0 }}>O que entrou da planilha, o que ficou pendente e o que foi ajustado.</p>
+          <Conferencia listas={listas} />
+        </>
+      )}
       {aba === "servicos" && <PedidosDeServicoNovo />}
     </div>
   );

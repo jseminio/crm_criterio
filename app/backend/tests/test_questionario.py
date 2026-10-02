@@ -378,3 +378,49 @@ class TestPdfEDetalhe:
         sessao.add(o)
         sessao.commit()
         assert cliente.get(f"/api/oportunidades/{o.id}/questionario").json() is None
+
+
+class TestPainel:
+    """O menu Questionários (amostra aprovada por Eduardo em 02/10/2026)."""
+
+    def test_dias_uteis_pulam_o_fim_de_semana(self):
+        from crm.api.questionarios import dias_uteis_entre
+        assert dias_uteis_entre(date(2026, 10, 2), date(2026, 10, 2)) == 0  # sexta → sexta
+        assert dias_uteis_entre(date(2026, 10, 2), date(2026, 10, 5)) == 1  # sexta → segunda
+        assert dias_uteis_entre(date(2026, 9, 28), date(2026, 10, 9)) == 9  # duas semanas menos o dia de partida
+
+    def test_situacao_vem_da_oportunidade_e_os_numeros_seguem_os_filtros(self, cliente, fonte, sessao):
+        fonte.linhas = [linha(), linha("q-2", cnpj="98.765.432/0001-10", razao_social="Beta Engenharia Ltda",
+                                       criado_em="2026-09-29T12:00:00+00:00")]
+        novos = {q["razao_social"]: q for q in _buscar(cliente)["novos"]}
+        beta = sessao.get(Oportunidade, novos["Beta Engenharia Ltda"]["oportunidade_id"])
+        beta.situacao = Situacao.ACEITA
+        sessao.commit()
+
+        d = cliente.get("/api/questionarios/painel", params={"dias": 3660}).json()
+        por_nome = {x["razao_social"]: x for x in d["itens"]}
+        alfa = por_nome["Exemplo Alfa Comércio Ltda"]
+        assert alfa["situacao_do_painel"] == "aguardando_proposta" and alfa["dias_uteis_aguardando"] >= 0
+        assert alfa["servicos"] == ["Contábil", "Fiscal"]
+        assert por_nome["Beta Engenharia Ltda"]["situacao_do_painel"] == "aceita"
+        n = d["numeros"]
+        assert (n["recebidos"], n["aguardando"], n["enviados"], n["precisam_de_voce"]) == (2, 1, 1, 0)
+        assert n["recebidos_antes"] == 0 and n["media_de_dias_ate_a_proposta"] is None
+
+        so_aceitas = cliente.get("/api/questionarios/painel", params={"dias": 3660, "situacao": "aceita"}).json()
+        assert [x["razao_social"] for x in so_aceitas["itens"]] == ["Beta Engenharia Ltda"]
+        assert so_aceitas["numeros"]["recebidos"] == 2  # a situação filtra a tabela, não os números
+        tudo = cliente.get("/api/questionarios/painel", params={"dias": 0}).json()["numeros"]
+        assert tudo["recebidos"] == 2 and tudo["recebidos_antes"] is None
+        financeiro = cliente.get("/api/questionarios/painel", params={"dias": 3660, "servico": "Financeiro"}).json()
+        assert financeiro["itens"] == [] and financeiro["numeros"]["recebidos"] == 0
+        assert cliente.get("/api/questionarios/painel", params={"situacao": "voando"}).status_code == 422
+
+    def test_respostas_por_secao_so_o_que_foi_respondido_e_no_escopo(self, cliente):
+        q = _buscar(cliente)["novos"][0]
+        secoes = cliente.get(f"/api/questionarios/{q['id']}/respostas").json()
+        numeros = [s["numero"] for s in secoes]
+        assert 6 not in numeros and 7 not in numeros  # Folha e Financeiro não foram pedidos
+        vol = next(s for s in secoes if s["numero"] == 3)
+        assert {"rotulo": "Notas fiscais emitidas (serviço / produto)", "valor": "40"} in vol["respostas"]
+        assert all(r["valor"] for s in secoes for r in s["respostas"])

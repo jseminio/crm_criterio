@@ -36,6 +36,7 @@ from crm.domain.listas import (
     MotivoDeEncerramento,
     TipoDeEventoDeContrato,
     TipoDeOcorrencia,
+    SituacaoDaAprovacao,
 )
 
 __all__ = [
@@ -517,11 +518,41 @@ class EventoDeContratoResposta(Base):
     data_fim_nova: date | None = None
 
 
+class AprovacaoResposta(Base):
+    """Um evento acima da alçada, esperando ou já decidido (02/10/2026)."""
+
+    id: int
+    contrato_id: int
+    grupo_nome: str | None = None
+    tipo: TipoDeEventoDeContrato
+    data_do_evento: date
+    descricao: str | None = None
+    preco_mensal_anterior: Decimal | None = None
+    preco_mensal_novo: Decimal | None = None
+    preco_anual_anterior: Decimal | None = None
+    preco_anual_novo: Decimal | None = None
+    escopo_anterior: str | None = None
+    escopo_novo: str | None = None
+    motivo: str
+    pedido_por: str
+    pedido_em: datetime
+    situacao: SituacaoDaAprovacao
+    decidido_por: str | None = None
+    decidido_em: datetime | None = None
+    motivo_da_recusa: str | None = None
+
+
+class Recusa(BaseModel):
+    motivo: str = Field(min_length=3, max_length=500)
+
+
 class ContratoDetalhe(ContratoResumo):
     documento_assinado: str | None = None
     observacao: str | None = None
     eventos: list[EventoDeContratoResposta] = []
     """Mais recente primeiro."""
+    aprovacao_pendente: AprovacaoResposta | None = None
+    """Evento acima da alçada esperando quem aprova: o contrato não recebe outro até a decisão."""
 
 
 class EventoDeContratoNovo(BaseModel):

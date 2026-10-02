@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ErroDaApi } from "../api/cliente";
 import type { ContratoDetalhe } from "../api/tipos";
+import { ProvedorDeAcesso } from "../entrada";
 import { EventosDeContrato } from "./EventosDeContrato";
 
 vi.mock("../api/cliente", async () => {
@@ -144,5 +145,61 @@ describe("EventosDeContrato", () => {
     await userEvent.click(screen.getByRole("button", { name: /confirmar expansão/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Expansão aumenta o valor.");
     expect(screen.getByLabelText("Novo preço mensal")).toHaveValue(900);
+  });
+});
+
+describe("alçada nos eventos (02/10/2026)", () => {
+  const KARINE = {
+    modo: "microsoft" as const, email: "karine@grupocriterio.com.br", nome: "Karine", perfil: "Contratos",
+    administrador: false, permissoes: ["contratos.ver", "contratos.eventos"],
+  };
+  beforeEach(() => vi.clearAllMocks());
+
+  it("acima da alçada avisa antes e o botão vira 'Enviar para aprovação'", async () => {
+    vi.mocked(api.registrarEventoDeContrato).mockResolvedValue(contrato({
+      aprovacao_pendente: {
+        id: 1, contrato_id: 7, grupo_nome: "Alfa", tipo: "Contração", data_do_evento: "2026-10-02", descricao: null,
+        preco_mensal_anterior: "1000.00", preco_mensal_novo: "800.00", preco_anual_anterior: null, preco_anual_novo: null,
+        escopo_anterior: null, escopo_novo: null, motivo: "redução de 20,0% no preço mensal", pedido_por: "Karine",
+        pedido_em: "2026-10-02T12:00:00+00:00", situacao: "Aguardando", decidido_por: null, decidido_em: null, motivo_da_recusa: null,
+      },
+    }));
+    render(
+      <ProvedorDeAcesso eu={KARINE}>
+        <EventosDeContrato contrato={contrato()} aoRegistrar={vi.fn()} />
+      </ProvedorDeAcesso>,
+    );
+    await userEvent.selectOptions(screen.getByLabelText("Registrar evento"), "Contração");
+    await userEvent.type(screen.getByLabelText("Novo preço mensal"), "800");
+    await userEvent.click(screen.getByRole("button", { name: /registrar contração/i }));
+    expect(screen.getByRole("note")).toHaveTextContent("Precisa de aprovação: redução de 20,0% no preço mensal");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar para aprovação" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Pedido de contração enviado para aprovação");
+  });
+
+  it("com pedido aguardando, mostra o pedido e não oferece outro evento", () => {
+    const pendente = {
+      id: 1, contrato_id: 7, grupo_nome: "Alfa", tipo: "Aditivo" as const, data_do_evento: "2026-10-02", descricao: "inclui BPO Financeiro",
+      preco_mensal_anterior: "1000.00", preco_mensal_novo: null, preco_anual_anterior: null, preco_anual_novo: null,
+      escopo_anterior: "BPO Contábil", escopo_novo: "BPO Full", motivo: "aditivo que muda o escopo", pedido_por: "Karine",
+      pedido_em: "2026-10-02T12:00:00+00:00", situacao: "Aguardando" as const, decidido_por: null, decidido_em: null, motivo_da_recusa: null,
+    };
+    render(
+      <ProvedorDeAcesso eu={KARINE}>
+        <EventosDeContrato contrato={contrato({ aprovacao_pendente: pendente })} aoRegistrar={vi.fn()} />
+      </ProvedorDeAcesso>,
+    );
+    const nota = screen.getByRole("note");
+    expect(nota).toHaveTextContent("Aditivo aguardando aprovação");
+    expect(nota).toHaveTextContent("Escopo “BPO Contábil” → “BPO Full”");
+    expect(screen.queryByLabelText("Registrar evento")).toBeNull();
+  });
+
+  it("sem login não há alçada: confirma como sempre", async () => {
+    render(<EventosDeContrato contrato={contrato()} aoRegistrar={vi.fn()} />);
+    await userEvent.selectOptions(screen.getByLabelText("Registrar evento"), "Contração");
+    await userEvent.type(screen.getByLabelText("Novo preço mensal"), "100");
+    await userEvent.click(screen.getByRole("button", { name: /registrar contração/i }));
+    expect(screen.getByRole("button", { name: "Confirmar contração" })).toBeInTheDocument();
   });
 });

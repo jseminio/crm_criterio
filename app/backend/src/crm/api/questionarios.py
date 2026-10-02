@@ -6,8 +6,10 @@ from __future__ import annotations
 import base64
 import binascii
 from collections.abc import Callable, Iterator
-from datetime import datetime
+from datetime import date, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -15,8 +17,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from crm.db.base import agora
-from crm.db.modelos import GrupoEconomico, Oportunidade, QuestionarioRecebido
-from crm.domain.listas import SituacaoDoQuestionario
+from crm.db.modelos import GrupoEconomico, Oportunidade, Proposta, QuestionarioRecebido
+from crm.domain.listas import Situacao, SituacaoDoQuestionario
+from crm.proposta import ficha as regras_da_ficha
 from crm.questionario import importacao
 from crm.questionario.endereco import BuscaDeEndereco
 from crm.questionario.fonte import (
@@ -92,6 +95,59 @@ class QuestionarioDaOportunidade(BaseModel):
     tem_pdf: bool
 
 
+_FUSO = ZoneInfo("America/Sao_Paulo")
+SITUACOES_DO_PAINEL = ("precisa_de_voce", "aguardando_proposta", "proposta_enviada", "em_espera", "aceita", "perdida")
+DIAS_UTEIS_DE_ESPERA = 5
+"""Aguardando proposta há mais que isto aparece destacado no painel."""
+
+
+class LinhaDoPainel(QuestionarioResumo):
+    servicos: list[str]
+    situacao_do_painel: str
+    """Uma de `SITUACOES_DO_PAINEL`, tirada da oportunidade: nada se digita duas vezes."""
+    proposta_numero: str | None
+    proposta_enviada_em: date | None
+    """A primeira proposta enviada desta oportunidade."""
+    motivo_da_perda: str | None
+    dias_uteis_aguardando: int | None
+
+
+class NumerosDoPainel(BaseModel):
+    recebidos: int
+    recebidos_antes: int | None
+    """O mesmo número de dias logo antes do período; sem período, não há com o que comparar."""
+    aguardando: int
+    aguardando_atrasados: int
+    enviados: int
+    media_de_dias_ate_a_proposta: Decimal | None
+    precisam_de_voce: int
+
+
+class PainelDeQuestionarios(BaseModel):
+    numeros: NumerosDoPainel
+    itens: list[LinhaDoPainel]
+
+
+class RespostaDaSecao(BaseModel):
+    rotulo: str
+    valor: str
+
+
+class SecaoDeRespostas(BaseModel):
+    numero: int
+    titulo: str
+    respostas: list[RespostaDaSecao]
+
+
+def _dia(momento: datetime) -> date:
+    return (momento if momento.tzinfo else momento.replace(tzinfo=ZoneInfo("UTC"))).astimezone(_FUSO).date()
+
+
+def dias_uteis_entre(inicio: date, fim: date) -> int:
+    """Dias de segunda a sexta depois de `inicio`, até `fim` inclusive (feriado conta como útil)."""
+    return sum(1 for n in range(1, (fim - inicio).days + 1) if (inicio + timedelta(days=n)).weekday() < 5)
+
+
 def roteador_de_questionarios(
     obter_sessao: Callable[[], Iterator[Session]],
     fonte: Callable[[], FonteDeQuestionarios | None] = fonte_real,
@@ -163,6 +219,96 @@ def roteador_de_questionarios(
         if q is None:
             raise HTTPException(404, "questionário não encontrado")
         return q
+
+    def _linha_do_painel(sessao: Session, q: QuestionarioRecebido, hoje: date) -> LinhaDoPainel:
+        base = _resumo(sessao, q).model_dump()
+        servicos = importacao.leitura_de(q).servicos
+        o = sessao.get(Oportunidade, q.oportunidade_id) if q.oportunidade_id else None
+        propostas = sessao.scalars(
+            sa.select(Proposta).where(Proposta.oportunidade_id == o.id).order_by(Proposta.gerada_em.desc())
+        ).all() if o else []
+        enviadas = [x.enviada_em for x in propostas if x.enviada_em is not None]
+        ultima = propostas[0] if propostas else None
+        motivo = None
+        dias = None
+        if q.situacao is SituacaoDoQuestionario.PRECISA_DE_VOCE:
+            situacao = "precisa_de_voce"
+        elif o is None or o.situacao is Situacao.ENVIAR_PROPOSTA and not enviadas:
+            situacao = "aguardando_proposta"
+            dias = dias_uteis_entre(_dia(q.recebido_em), hoje)
+        elif o.situacao is Situacao.ACEITA:
+            situacao = "aceita"
+        elif o.situacao in (Situacao.RECUSADA, Situacao.PERDIDO):
+            situacao = "perdida"
+            motivo = o.motivo_recusa.value if o.motivo_recusa else None
+        elif o.situacao is Situacao.ON_HOLD:
+            situacao = "em_espera"
+        else:
+            situacao = "proposta_enviada"
+        return LinhaDoPainel(
+            **base, servicos=servicos, situacao_do_painel=situacao,
+            proposta_numero=f"{ultima.numero}.{ultima.ano}" if ultima else None,
+            proposta_enviada_em=min(enviadas) if enviadas else None,
+            motivo_da_perda=motivo, dias_uteis_aguardando=dias,
+        )
+
+    @r.get("/api/questionarios/painel", response_model=PainelDeQuestionarios)
+    def painel(
+        sessao: Session = Depends(obter_sessao),
+        dias: int = Query(default=30, ge=0, le=3660),
+        servico: str | None = None,
+        porte: str | None = None,
+        situacao: str | None = None,
+    ) -> PainelDeQuestionarios:
+        """Todos os questionários dos últimos `dias` (0 = desde o primeiro), com a situação tirada da
+        oportunidade e os números do topo, que seguem os mesmos filtros (amostra aprovada em 02/10/2026)."""
+        if situacao is not None and situacao not in SITUACOES_DO_PAINEL:
+            raise HTTPException(422, f"situação desconhecida: use uma de {', '.join(SITUACOES_DO_PAINEL)}")
+        hoje = datetime.now(_FUSO).date()
+        inicio = hoje - timedelta(days=dias - 1) if dias else None
+
+        def no_filtro(linha: LinhaDoPainel) -> bool:
+            return (servico is None or servico in linha.servicos) and (porte is None or linha.porte_crm == porte)
+
+        todos = sessao.scalars(sa.select(QuestionarioRecebido).order_by(
+            QuestionarioRecebido.recebido_em.desc(), QuestionarioRecebido.id.desc())).all()
+        linhas = [(_dia(q.recebido_em), q) for q in todos]
+        periodo = [_linha_do_painel(sessao, q, hoje) for d, q in linhas if inicio is None or d >= inicio]
+        periodo = [x for x in periodo if no_filtro(x)]
+        antes = None
+        if inicio is not None:
+            anterior = inicio - timedelta(days=dias)
+            antes = sum(1 for d, q in linhas if anterior <= d < inicio and no_filtro(_linha_do_painel(sessao, q, hoje)))
+
+        enviados = [x for x in periodo if x.proposta_enviada_em is not None or x.situacao_do_painel in ("proposta_enviada", "aceita")]
+        prazos = [(x.proposta_enviada_em - _dia(x.recebido_em)).days for x in enviados if x.proposta_enviada_em is not None]
+        media = (Decimal(sum(prazos)) / len(prazos)).quantize(Decimal("0.1"), ROUND_HALF_UP) if prazos else None
+        aguardando = [x for x in periodo if x.situacao_do_painel == "aguardando_proposta"]
+        numeros = NumerosDoPainel(
+            recebidos=len(periodo), recebidos_antes=antes, aguardando=len(aguardando),
+            aguardando_atrasados=sum(1 for x in aguardando if (x.dias_uteis_aguardando or 0) > DIAS_UTEIS_DE_ESPERA),
+            enviados=len(enviados), media_de_dias_ate_a_proposta=media,
+            precisam_de_voce=sum(1 for x in periodo if x.situacao_do_painel == "precisa_de_voce"),
+        )
+        itens = [x for x in periodo if situacao is None or x.situacao_do_painel == situacao]
+        return PainelDeQuestionarios(numeros=numeros, itens=itens)
+
+    @r.get("/api/questionarios/{questionario_id}/respostas", response_model=list[SecaoDeRespostas])
+    def respostas(questionario_id: int, sessao: Session = Depends(obter_sessao)) -> list[SecaoDeRespostas]:
+        """O que o cliente respondeu, por seção, só as perguntas respondidas e as seções do escopo pedido.
+        É a resposta original: as correções da entrevista ficam na ficha da oportunidade."""
+        q = _questionario(sessao, questionario_id)
+        secoes = []
+        for s in regras_da_ficha.montar(q.respostas, None, q.recebido_em).secoes:
+            if not s.no_escopo:
+                continue
+            itens = [
+                RespostaDaSecao(rotulo=c.campo.rotulo, valor=", ".join(map(str, c.valor)) if isinstance(c.valor, list) else str(c.valor))
+                for c in s.campos if c.respondida
+            ]
+            if itens:
+                secoes.append(SecaoDeRespostas(numero=s.numero, titulo=s.titulo, respostas=itens))
+        return secoes
 
     @r.post("/api/questionarios/{questionario_id}/resolver", response_model=QuestionarioResumo)
     def resolver(questionario_id: int, corpo: Resolucao, sessao: Session = Depends(obter_sessao)) -> QuestionarioResumo:

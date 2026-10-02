@@ -53,6 +53,7 @@ from crm.domain.listas import (
     MotivoDeEncerramento,
     TipoDeEventoDeContrato,
     TipoDeOcorrencia,
+    SituacaoDaAprovacao,
 )
 
 __all__ = [
@@ -1437,3 +1438,41 @@ class RegistroDeAlteracao(Base):
     antes: Mapped[str | None] = mapped_column(sa.Text)
     depois: Mapped[str | None] = mapped_column(sa.Text)
     rota: Mapped[str | None] = mapped_column(sa.String(200))
+
+
+class PedidoDeAprovacao(Base):
+    """Evento de contrato acima da alçada esperando quem aprova (decisões de Eduardo, 02/10/2026).
+
+    Contração e reajuste que reduzem o preço em mais de 10%, e aditivo que muda o escopo (ou reduz o
+    preço em mais de 10%), registrados por quem não tem "aprovar eventos de contrato". O contrato só
+    muda quando alguém aprova: aí nasce o `EventoDeContrato`, com a data pedida. Regras em
+    `crm.domain.alcada`. Não se apaga: recusado fica com o porquê.
+    """
+
+    __tablename__ = "pedido_de_aprovacao"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contrato_id: Mapped[int] = mapped_column(sa.ForeignKey("contrato.id"), nullable=False, index=True)
+    tipo: Mapped[TipoDeEventoDeContrato] = mapped_column(coluna_lista(TipoDeEventoDeContrato), nullable=False)
+    data_do_evento: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    descricao: Mapped[str | None] = mapped_column(sa.String(500))
+    preco_mensal_anterior: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_mensal_novo: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_anual_anterior: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    preco_anual_novo: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    escopo_anterior: Mapped[str | None] = mapped_column(sa.String(200))
+    escopo_novo: Mapped[str | None] = mapped_column(sa.String(200))
+    motivo: Mapped[str] = mapped_column(sa.String(300), nullable=False)
+    """Por que pediu aprovação, como a tela mostra ("redução de 18,8% no preço mensal")."""
+    pedido_por: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    pedido_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+    situacao: Mapped[SituacaoDaAprovacao] = mapped_column(
+        coluna_lista(SituacaoDaAprovacao, 20), nullable=False, default=SituacaoDaAprovacao.AGUARDANDO, index=True
+    )
+    decidido_por: Mapped[str | None] = mapped_column(sa.String(200))
+    decidido_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    motivo_da_recusa: Mapped[str | None] = mapped_column(sa.String(500))
+    evento_id: Mapped[int | None] = mapped_column(sa.ForeignKey("evento_de_contrato.id"))
+    """O evento que nasceu da aprovação."""
+
+    contrato: Mapped[Contrato] = relationship()

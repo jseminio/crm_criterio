@@ -14,6 +14,7 @@ const TABELAS: Record<string, string> = {
   oportunidade: "Oportunidade", lead: "Lead", proposta: "Proposta", pendencia_da_proposta: "O que falta",
   pessoa_contato: "Contato", empresa: "Empresa", vinculo_de_contato: "Vínculo de contato",
   grupo_economico: "Grupo", contrato: "Contrato", evento_de_contrato: "Evento de contrato",
+  pedido_de_aprovacao: "Aprovação de evento",
   perfil: "Perfil", usuario: "Acesso", matriz_de_proposta: "Matriz de proposta", configuracao_de_proposta: "Configuração de proposta",
   abordagem: "Abordagem", classificacao_do_grupo: "Avaliação da carteira", conversa_do_sdr: "Conversa do SDR",
 };

@@ -16,6 +16,37 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Menu Questionários e alçada nos eventos de contrato (02/10/2026)
+
+Amostra e decisões aprovadas por Eduardo em 02/10/2026.
+
+**Questionários** (menu novo, depois do Funil; funcionalidade "Questionários: ver", que o perfil
+Comercial ganhou na migração): tudo o que chegou pelo questionário do site num lugar só.
+- Cinco números no topo, que seguem os filtros de período, serviço e porte: recebidos (com o mesmo
+  número de dias logo antes), aguardando proposta (destacando os que esperam há mais de 5 dias
+  úteis), quantos viraram proposta enviada, a média de dias do questionário à primeira proposta
+  enviada e os que precisam de você. O filtro de situação muda só a tabela.
+- A **situação vem da oportunidade**, nunca digitada de novo: precisa de você, aguardando proposta,
+  proposta enviada (com o número), em espera, aceita, perdida (com o motivo). Ícone e texto, nunca só cor.
+- Clicar na linha abre **as respostas do cliente por seção** (`GET /api/questionarios/{id}/respostas`),
+  só o que foi respondido e só as seções do escopo pedido. É a resposta original; as correções da
+  entrevista ficam na ficha da oportunidade.
+- Rota: `GET /api/questionarios/painel?dias=30` (`dias=0` = desde o primeiro).
+
+**Alçada nos eventos de contrato** (`crm/domain/alcada.py`). Para quem não tem a funcionalidade nova
+**"Contratos: aprovar eventos acima da alçada"** (só o Administrador tem; outro perfil recebe pela tela):
+- **Contração** e **reajuste para baixo** que reduzam o preço mensal ou anual em **mais de 10%**, e
+  **aditivo que mude o escopo** (ou reduza o preço em mais de 10%), viram **pedido de aprovação**
+  (`202`): o contrato não muda e não recebe outro evento até a decisão.
+- Expansão, reajuste para cima, renovação, correção e **encerramento** entram direto, como antes.
+- Quem aprova vê os pedidos no topo da **Agenda** (`GET /api/aprovacoes`). **Aprovar** aplica o evento
+  com a data pedida, revalidando contra o contrato de agora; **recusar** exige o porquê e o contrato
+  fica como estava. Pedido, decisão e evento vão para o histórico de alterações.
+- Sem login não há alçada: tudo entra direto, como antes do E1.
+- A absorção de horas fora da política fica para a Etapa 2, com o saldo de horas de conforto.
+- Migração `e3a9c6b4d2f1`, só aditiva (tabela `pedido_de_aprovacao` e "Questionários: ver" no
+  Comercial). **Rode `alembic upgrade head`**, com o backup antes.
+
 ## Entrada pela conta Microsoft, perfis e histórico de alterações (E1, 02/10/2026)
 
 Amostra aprovada por Eduardo em 02/10/2026.
@@ -134,10 +165,10 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.069** no backend e **441** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
-| Banco | PostgreSQL 18 local, 34 tabelas, migrações até `d8b2f5a1c3e7` (perfis, pessoas e histórico de alterações, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
-| API | 117 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
-| Telas | Agenda, Contatos, Funil (kanban e grade, exportar para Excel), Grupos, Contratos, Carteira, Abordagens, SDR da IA, Conferência e Configurações. React com TypeScript, em `../frontend` |
+| Testes | **1.087** no backend e **455** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Banco | PostgreSQL 18 local, 35 tabelas, migrações até `e3a9c6b4d2f1` (pedidos de aprovação e menu Questionários, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
+| API | 122 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
+| Telas | Agenda, Contatos, Funil (kanban e grade, exportar para Excel), Questionários, Grupos, Contratos, Carteira, Abordagens, SDR da IA, Conferência e Configurações. React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3 e E4 prontos. E5 quase todo: falta o MRR da carteira inteira, que depende de carregar os contratos de antes do CRM |
 | Fora do ar | **E1:** nuvem em região brasileira (custo a estimar antes de contratar) e backup fora da máquina com restauração testada. Login, perfis e histórico já estão no código, à espera do registro no Microsoft Entra. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto, implantação |
 

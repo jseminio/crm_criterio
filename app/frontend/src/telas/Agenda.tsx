@@ -17,6 +17,8 @@ import { data, dinheiroCurto } from "../formato";
 import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 import { CampoDeData } from "../componentes/CampoDeData";
+import { AprovacoesPendentes } from "../componentes/AprovacoesPendentes";
+import { usarAcesso } from "../entrada";
 
 const BALDES: { chave: BaldeDaAgenda; rotulo: string; explicacao: string }[] = [
   { chave: "atrasada", rotulo: "Atrasadas", explicacao: "A data da próxima ação já passou." },
@@ -129,6 +131,7 @@ export function Agenda({
   aoAbrirLeads: () => void;
   aoAbrirContratos?: () => void;
 }) {
+  const { pode } = usarAcesso();
   const [balde, definirBalde] = useState<BaldeDaAgenda | null>(null);
   const [aberta, definirAberta] = useState<number | null>(null);
   const { dados, carregando, erro, recarregar } = usarDados<DadosDaAgenda>(() => api.agenda(), []);
@@ -144,6 +147,7 @@ export function Agenda({
 
   return (
     <>
+      {pode("contratos.aprovar") && <AprovacoesPendentes />}
       <div className="abas" role="tablist" aria-label="Baldes da agenda">
         {BALDES.map((b) => (
           <button

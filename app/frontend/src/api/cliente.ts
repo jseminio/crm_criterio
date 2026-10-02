@@ -71,6 +71,10 @@ import type {
   MatrizResumo,
   PropostaResumo,
   TipoDeMatriz,
+  Aprovacao,
+  PainelDeQuestionarios,
+  SecaoDeRespostas,
+  SituacaoDoPainel,
 } from "./tipos";
 
 export class ErroDaApi extends Error {
@@ -440,6 +444,9 @@ export const api = {
     pedir<QuestionarioDaOportunidade | null>(`/api/oportunidades/${id}/questionario`),
   buscarQuestionarios: () => pedir<ResultadoDaBusca>("/api/questionarios/buscar", { method: "POST" }),
   questionarios: () => pedir<QuestionarioResumo[]>("/api/questionarios"),
+  painelDeQuestionarios: (filtros: { dias?: number | null; servico?: string; porte?: string; situacao?: SituacaoDoPainel | "" }) =>
+    pedir<PainelDeQuestionarios>(comParametros("/api/questionarios/painel", { ...filtros })),
+  respostasDoQuestionario: (id: number) => pedir<SecaoDeRespostas[]>(`/api/questionarios/${id}/respostas`),
   resolverQuestionario: (id: number, acao: "anexar" | "criar") =>
     pedir<QuestionarioResumo>(`/api/questionarios/${id}/resolver`, { method: "POST", body: JSON.stringify({ acao }) }),
 
@@ -545,6 +552,11 @@ export const api = {
     pedir<Pagina<ContratoResumo>>(comParametros("/api/contratos", { ...filtros, limite: 500 })),
 
   contrato: (id: number) => pedir<ContratoDetalhe>(`/api/contratos/${id}`),
+
+  aprovacoes: () => pedir<Aprovacao[]>("/api/aprovacoes"),
+  aprovar: (id: number) => pedir<Aprovacao>(`/api/aprovacoes/${id}/aprovar`, { method: "POST" }),
+  recusar: (id: number, motivo: string) =>
+    pedir<Aprovacao>(`/api/aprovacoes/${id}/recusar`, { method: "POST", body: JSON.stringify({ motivo }) }),
 
   registrarEventoDeContrato: (id: number, evento: Record<string, unknown>) =>
     pedir<ContratoDetalhe>(`/api/contratos/${id}/eventos`, {

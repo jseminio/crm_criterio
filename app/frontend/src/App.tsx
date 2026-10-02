@@ -15,6 +15,7 @@ import { Configuracoes } from "./telas/Configuracoes";
 import { Contratos } from "./telas/Contratos";
 import { Funil } from "./telas/Funil";
 import { Grupos } from "./telas/Grupos";
+import { Questionarios } from "./telas/Questionarios";
 import { Sdr } from "./telas/Sdr";
 import { usarDados } from "./usarDados";
 import { VERSAO } from "./versao";
@@ -23,6 +24,7 @@ type Tela =
   | "agenda"
   | "contatos"
   | "funil"
+  | "questionarios"
   | "grupos"
   | "contratos"
   | "carteira"
@@ -49,6 +51,12 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     rotulo: "Funil",
     titulo: "Funil comercial",
     descricao: "Kanban ou grade — arraste um cartão ou abra a linha para mover a oportunidade.",
+  },
+  {
+    chave: "questionarios",
+    rotulo: "Questionários",
+    titulo: "Questionários",
+    descricao: "Tudo o que chegou pelo questionário do site, do recebimento à proposta.",
   },
   {
     chave: "grupos",
@@ -165,6 +173,7 @@ export default function App() {
             />}
           {visiveis.length > 0 && tela === "contatos" && <Contatos listas={listas} />}
           {visiveis.length > 0 && tela === "funil" && <Funil listas={listas} />}
+          {visiveis.length > 0 && tela === "questionarios" && <Questionarios listas={listas} />}
           {visiveis.length > 0 && tela === "grupos" && <Grupos listas={listas} />}
           {visiveis.length > 0 && tela === "contratos" && <Contratos listas={listas} />}
           {visiveis.length > 0 && tela === "carteira" && <Carteira listas={listas} />}

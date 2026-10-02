@@ -318,6 +318,31 @@ export interface ContratoDetalhe extends ContratoResumo {
   observacao: string | null;
   /** Mais recente primeiro. */
   eventos: EventoDeContrato[];
+  /** Evento acima da alçada esperando quem aprova (02/10/2026): o contrato não recebe outro até a decisão. */
+  aprovacao_pendente?: Aprovacao | null;
+}
+
+export interface Aprovacao {
+  id: number;
+  contrato_id: number;
+  grupo_nome: string | null;
+  tipo: EventoDeContrato["tipo"];
+  data_do_evento: string;
+  descricao: string | null;
+  preco_mensal_anterior: string | null;
+  preco_mensal_novo: string | null;
+  preco_anual_anterior: string | null;
+  preco_anual_novo: string | null;
+  escopo_anterior: string | null;
+  escopo_novo: string | null;
+  /** Por que pediu aprovação ("redução de 18,8% no preço mensal"). */
+  motivo: string;
+  pedido_por: string;
+  pedido_em: string;
+  situacao: "Aguardando" | "Aprovado" | "Recusado";
+  decidido_por: string | null;
+  decidido_em: string | null;
+  motivo_da_recusa: string | null;
 }
 
 export interface Ocorrencia {
@@ -1159,6 +1184,38 @@ export interface QuestionarioResumo {
   porte_crm: string | null;
   porte_site: string | null;
   tem_pdf: boolean;
+}
+
+export type SituacaoDoPainel =
+  | "precisa_de_voce" | "aguardando_proposta" | "proposta_enviada" | "em_espera" | "aceita" | "perdida";
+
+export interface LinhaDoPainel extends QuestionarioResumo {
+  servicos: string[];
+  situacao_do_painel: SituacaoDoPainel;
+  proposta_numero: string | null;
+  proposta_enviada_em: string | null;
+  motivo_da_perda: string | null;
+  dias_uteis_aguardando: number | null;
+}
+
+export interface PainelDeQuestionarios {
+  numeros: {
+    recebidos: number;
+    /** O mesmo número de dias logo antes do período; sem período, null. */
+    recebidos_antes: number | null;
+    aguardando: number;
+    aguardando_atrasados: number;
+    enviados: number;
+    media_de_dias_ate_a_proposta: string | null;
+    precisam_de_voce: number;
+  };
+  itens: LinhaDoPainel[];
+}
+
+export interface SecaoDeRespostas {
+  numero: number;
+  titulo: string;
+  respostas: { rotulo: string; valor: string }[];
 }
 
 export interface ResultadoDaBusca {

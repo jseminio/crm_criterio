@@ -2,13 +2,16 @@
  * de cor ou espaçamento solto aqui. */
 
 /* ---------------------------------------------------------------- estrutura */
-.aplicacao { display: grid; grid-template-columns: 232px 1fr; height: 100%; }
+.aplicacao { display: grid; grid-template-columns: 232px 1fr; grid-template-rows: minmax(0, 1fr); height: 100%; }
+/* Menu lateral e faixa do título sempre à vista; só a .area rola (02/10/2026, pedido de Eduardo).
+   Sem o min-height: 0, a coluna crescia com o conteúdo e a página inteira rolava, levando o menu. */
 
 .lateral {
   background: var(--surface-brand);
   color: var(--texto-sobre-marca);
   padding: var(--e6) var(--e4);
   display: flex; flex-direction: column; gap: var(--e6);
+  min-height: 0; overflow-y: auto; /* janela baixa: o menu rola sozinho, sem levar a tela */
 }
 /* Regra 8 do PAD-002: a logomarca aparece sozinha, nada ao lado dela.
    Sem o arquivo oficial, o nome é composto em display. */
@@ -35,7 +38,7 @@
   border-top: 1px solid rgba(255,255,255,.16); padding-top: var(--e3);
 }
 
-.conteudo { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+.conteudo { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; }
 
 .topo {
   background: var(--surface-brand); color: var(--texto-sobre-marca);
@@ -45,7 +48,7 @@
 .topo h1 { font-size: 22px; }
 .topo-detalhe { color: var(--texto-sobre-marca-fraco); font-size: 13px; }
 
-.area { padding: var(--e5) var(--e6); overflow: auto; flex: 1; }
+.area { padding: var(--e5) var(--e6); overflow: auto; flex: 1; min-height: 0; }
 
 /* ------------------------------------------------------------------ filtros */
 .filtros {

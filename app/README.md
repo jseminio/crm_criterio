@@ -16,6 +16,11 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Menu e título sempre à vista (02/10/2026)
+
+O menu lateral e a faixa do título da tela ficam parados; só o conteúdo rola. Antes a página
+inteira rolava e levava o menu junto. Em janela baixa, o próprio menu ganha rolagem.
+
 ## Ordenação nas tabelas (27/09/2026)
 
 Todo título de coluna clicável ordena a lista: primeiro clique crescente, segundo decrescente, terceiro

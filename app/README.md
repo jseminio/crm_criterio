@@ -18,8 +18,16 @@ resultado (ver "SDR de IA", abaixo).
 
 ## Menu reorganizado e Configurações em abas (02/10/2026)
 
-Aprovado por Eduardo em 02/10/2026. O menu ficou: **Agenda · Contatos · Funil · Questionários ·
-Contratos · Saúde da Carteira · SDR - Abordagens e conhecimento · Configurações**.
+Aprovado por Eduardo em 02/10/2026. O menu ficou: **Agenda · Contatos · Funil comercial · Sucesso do Cliente ·
+SDR - Abordagens e conhecimento · Configurações**.
+
+- **Funil comercial** (era "Funil") em abas: **Oportunidades** (o funil de sempre) · **Questionários**.
+- **Sucesso do Cliente** (era "Saúde da Carteira", antes "Carteira") em abas: **Saúde da carteira** ·
+  **Gestão de contratos** (era o menu Contratos). O **Funil do Sucesso do Cliente** (comercial,
+  onboarding e as reuniões mensais, trimestrais e anuais pelo Score) entra como terceira aba numa
+  entrega própria. O atalho da Agenda para contratos abre direto em Gestão de contratos.
+- As permissões não mudaram: cada aba segue a sua (`funil.ver`, `questionarios.ver`, `carteira.ver`,
+  `contratos.ver`). O perfil Comercial vê Sucesso do Cliente só com Gestão de contratos.
 
 - **Configurações** em abas, nesta ordem: **Perfis e acesso · Metas · Propostas · Grupos ·
   Conferência · Histórico · Backup · Serviços pedidos**. **Grupos** e **Conferência** saíram do menu
@@ -202,7 +210,7 @@ Atualizado em 02/10/2026.
 | Testes | **1.101** no backend e **460** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
 | Banco | PostgreSQL 18 local, 36 tabelas, migrações até `f6c2d8a4b1e9` (metas dos indicadores, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 124 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
-| Telas | Agenda, Contatos, Funil (kanban e grade, exportar para Excel), Questionários, Contratos, Saúde da Carteira, SDR - Abordagens e conhecimento (Abordagens e SDR da IA) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
+| Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira e Gestão de contratos), SDR - Abordagens e conhecimento (Abordagens e SDR da IA) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos; faltam a nuvem e o backup fora da máquina |
 | Fora do ar | **E1:** nuvem em região brasileira (custo a estimar antes de contratar) e backup fora da máquina com restauração testada. Login, perfis e histórico já estão no código, à espera do registro no Microsoft Entra. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto, implantação |
 

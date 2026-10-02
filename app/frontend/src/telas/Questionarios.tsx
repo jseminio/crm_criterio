@@ -5,6 +5,7 @@
 import { Fragment, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { LinhaDoPainel, Listas, PainelDeQuestionarios, SecaoDeRespostas, SituacaoDoPainel } from "../api/tipos";
+import { EstadoDaBuscaDeQuestionarios } from "../componentes/EstadoDaBuscaDeQuestionarios";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { usarAcesso } from "../entrada";
@@ -133,6 +134,7 @@ export function Questionarios({ listas }: { listas: Listas | null }) {
 
   return (
     <div className="questionarios">
+      <EstadoDaBuscaDeQuestionarios aoChegar={recarregar} />
       <div className="questionarios-numeros">
         <div className="numero">
           <div className="numero-rotulo">Recebidos · {periodo.rotulo.toLowerCase()}</div>
@@ -189,7 +191,7 @@ export function Questionarios({ listas }: { listas: Listas | null }) {
         ) : (
           <VazioSemDados
             titulo="Nenhum questionário no período"
-            explicacao="Os questionários entram pelo botão “Buscar questionários”, no Funil. Escolha um período maior para ver os anteriores."
+            explicacao="O CRM busca os questionários do site sozinho, a cada 10 minutos. Escolha um período maior para ver os anteriores."
           />
         )
       ) : (

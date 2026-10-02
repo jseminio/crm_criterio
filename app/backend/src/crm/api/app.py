@@ -13,6 +13,8 @@ nenhuma sem a entrada configurada.**
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from datetime import date
@@ -48,6 +50,7 @@ from crm.api.contatos import roteador_de_empresas
 from crm.api.sdr import roteador as roteador_do_sdr
 from crm.api.ficha import pendencias_de, roteador_da_ficha
 from crm.api.propostas import roteador_de_propostas
+from crm.api.busca_automatica import laco_da_busca
 from crm.api.questionarios import fonte_real, roteador_de_questionarios
 from crm.questionario.endereco import BuscaDeEndereco, endereco_pelo_cnpj
 from crm.questionario.fonte import FonteDeQuestionarios
@@ -135,6 +138,7 @@ def criar_app(
     entrada: ConfiguracaoDeEntrada | None = None,
     validar_token: Callable[[str], dict] | None = None,
     servicos_da_ata: Callable[[], ServicosDaAta] | None = None,
+    busca_automatica: bool | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede."""
@@ -143,7 +147,18 @@ def criar_app(
     async def ciclo_de_vida(_: FastAPI):
         global _fabrica
         _fabrica = fabrica or criar_fabrica_de_sessao(criar_engine(url_do_banco()))
-        yield
+        # Busca automática dos questionários (02/10/2026): ligada no uso real; no teste, só se pedir.
+        ligada = busca_automatica if busca_automatica is not None else fabrica is None
+        tarefa = asyncio.create_task(
+            laco_da_busca(_fabrica, fonte_de_questionarios or fonte_real, endereco)
+        ) if ligada else None
+        try:
+            yield
+        finally:
+            if tarefa is not None:
+                tarefa.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await tarefa
 
     api = FastAPI(
         title="Critério CRM",

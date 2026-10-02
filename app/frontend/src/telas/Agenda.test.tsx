@@ -7,7 +7,7 @@ import { Agenda } from "./Agenda";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { agenda: vi.fn(), editarOportunidade: vi.fn(), oportunidade: vi.fn(), aprovacoes: vi.fn().mockResolvedValue([]) } };
+  return { ...real, api: { agenda: vi.fn(), editarOportunidade: vi.fn(), oportunidade: vi.fn(), aprovacoes: vi.fn().mockResolvedValue([]), questionarios: vi.fn().mockResolvedValue([]) } };
 });
 
 const item = (o: Partial<ItemDaAgenda>): ItemDaAgenda => ({

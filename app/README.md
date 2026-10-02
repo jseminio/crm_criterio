@@ -16,6 +16,25 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Busca automática dos questionários (02/10/2026)
+
+Aprovado por Eduardo em 02/10/2026, depois de o questionário da Smarthis ficar esperando no site até
+alguém apertar o botão. **Enquanto o CRM estiver ligado, ele busca sozinho**: logo ao iniciar e
+depois a cada **10 minutos**. O questionário novo vira oportunidade em "Enviar proposta" (ou fica
+"Precisa de você"), exatamente como no botão.
+
+- **Painel Questionários** (Funil comercial › Questionários): no topo, a linha da busca diz a última
+  (automática ou na hora), o que trouxe, a próxima e, se falhou, **⚠ o motivo** (chave errada,
+  Supabase fora do ar, `.env` sem configuração). **"Buscar agora"** faz a mesma busca na hora. A linha
+  se atualiza a cada minuto e o painel recarrega sozinho quando chega questionário.
+- **"Precisa de você"** se resolve no próprio painel ("Anexar à existente" ou "Criar nova") e
+  aparece também na **Agenda**, até alguém resolver.
+- O botão "Buscar questionários" da aba Oportunidades continua; botão e busca automática nunca
+  importam o mesmo questionário juntos.
+- **Com o CRM desligado, ninguém busca:** o questionário espera no site e entra assim que o CRM volta.
+  Resolver isso de vez é o CRM na nuvem (E1).
+- Rota nova `GET /api/questionarios/busca`. Sem migração.
+
 ## Contrato bruto ou líquido, e o MRR em bruto (02/10/2026)
 
 Aprovado por Eduardo em 02/10/2026, no lugar de uma "data do valor líquido": cada contrato diz se o
@@ -305,7 +324,7 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.143** no backend e **492** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Testes | **1.148** no backend e **499** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
 | Banco | PostgreSQL 18 local, 40 tabelas, migrações até `c9f2a7d4e1b8` (contrato bruto ou líquido, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 136 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens e SDR da IA) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |

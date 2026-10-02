@@ -18,6 +18,7 @@ import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 import { CampoDeData } from "../componentes/CampoDeData";
 import { AprovacoesPendentes } from "../componentes/AprovacoesPendentes";
+import { QuestionariosQuePrecisam } from "../componentes/QuestionariosQuePrecisam";
 import { usarAcesso } from "../entrada";
 
 const BALDES: { chave: BaldeDaAgenda; rotulo: string; explicacao: string }[] = [
@@ -148,6 +149,7 @@ export function Agenda({
   return (
     <>
       {pode("contratos.aprovar") && <AprovacoesPendentes />}
+      {pode("funil.questionarios") && <QuestionariosQuePrecisam />}
       <div className="abas" role="tablist" aria-label="Baldes da agenda">
         {BALDES.map((b) => (
           <button

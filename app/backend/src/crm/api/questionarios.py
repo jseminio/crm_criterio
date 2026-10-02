@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import threading
 from collections.abc import Callable, Iterator
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -27,7 +28,9 @@ from crm.questionario.fonte import (
 )
 from crm.questionario.leitura import ROTULOS_COMPLEXIDADE, ROTULOS_RISCO, inteiro_ou_nada
 
-__all__ = ["roteador_de_questionarios", "fonte_real"]
+__all__ = [
+    "ESTADO_DA_BUSCA", "INTERVALO_DA_BUSCA", "BuscaNaoConfigurada", "executar_busca", "fonte_real", "roteador_de_questionarios",
+]
 
 
 def fonte_real() -> FonteDeQuestionarios | None:
@@ -139,6 +142,113 @@ class SecaoDeRespostas(BaseModel):
     respostas: list[RespostaDaSecao]
 
 
+class BuscaNaoConfigurada(RuntimeError):
+    """Sem URL e chave do questionário no .env."""
+
+
+def executar_busca(
+    sessao: Session, origem: FonteDeQuestionarios | None, buscar_endereco: BuscaDeEndereco | None,
+) -> tuple[list[QuestionarioRecebido], list[str]]:
+    """Traz do site o que ainda não foi importado e faz cada um virar oportunidade (ou "precisa de
+    você"). Cada questionário é gravado aqui **antes** de ser marcado lá: se a marca falhar, ele volta
+    na próxima busca e só a marca é refeita. Usada pelo botão e pela busca automática."""
+    if origem is None:
+        raise BuscaNaoConfigurada(
+            f"Falta configurar a busca: preencha {VARIAVEIS['url']} e {VARIAVEIS['chave']} no backend/.env "
+            "e reinicie o CRM."
+        )
+    with _UMA_BUSCA_POR_VEZ:  # o botão e a busca automática nunca importam o mesmo questionário juntos
+        return _buscar(sessao, origem, buscar_endereco)
+
+
+_UMA_BUSCA_POR_VEZ = threading.Lock()
+
+
+def _buscar(
+    sessao: Session, origem: FonteDeQuestionarios, buscar_endereco: BuscaDeEndereco | None,
+) -> tuple[list[QuestionarioRecebido], list[str]]:
+    linhas = origem.novos()
+    novos: list[QuestionarioRecebido] = []
+    avisos: list[str] = []
+    for linha in linhas:
+        externo = str(linha.get("id", ""))
+        q = sessao.scalar(sa.select(QuestionarioRecebido).where(QuestionarioRecebido.externo_id == externo))
+        if q is None:
+            try:
+                q = importacao.importar(sessao, linha, buscar_endereco)
+            except (importacao.LinhaInvalida, KeyError, ValueError) as falha:
+                sessao.rollback()  # só esta linha: as anteriores já foram gravadas
+                avisos.append(f"Questionário {externo or 'sem id'} ficou de fora: {falha}. Ele continua no site.")
+                continue
+            sessao.commit()
+            novos.append(q)
+        try:
+            origem.marcar_importado(externo, agora())
+            q.marcado_na_origem_em = agora()
+            sessao.commit()
+        except BuscaFalhou as falha:
+            avisos.append(f"{q.razao_social}: entrou no CRM, mas {falha} Na próxima busca o CRM só tenta marcar de novo.")
+    return novos, avisos
+
+
+INTERVALO_DA_BUSCA = timedelta(minutes=10)
+"""De quanto em quanto tempo o CRM busca sozinho (aprovado por Eduardo em 02/10/2026)."""
+
+
+class EstadoDaBusca:
+    """A última busca e a próxima, em memória: some ao reiniciar o CRM, que busca logo ao subir."""
+
+    def __init__(self) -> None:
+        self._trava = threading.Lock()
+        self._ultima_em: datetime | None = None
+        self._manual = False
+        self._novos = 0
+        self._erro: str | None = None
+        self._avisos: list[str] = []
+        self._proxima_em: datetime | None = None
+        self._automatica = False
+
+    def ligar(self, proxima_em: datetime) -> None:
+        with self._trava:
+            self._automatica, self._proxima_em = True, proxima_em
+
+    def desligar(self) -> None:
+        with self._trava:
+            self._automatica, self._proxima_em = False, None
+
+    def agendar(self, proxima_em: datetime) -> None:
+        with self._trava:
+            self._proxima_em = proxima_em
+
+    def registrar(self, *, manual: bool, novos: int, erro: str | None, avisos: list[str] | None = None) -> None:
+        with self._trava:
+            self._ultima_em, self._manual, self._novos, self._erro = agora(), manual, novos, erro
+            self._avisos = list(avisos or [])
+
+    def retrato(self) -> dict:
+        with self._trava:
+            return {
+                "automatica": self._automatica, "intervalo_minutos": int(INTERVALO_DA_BUSCA.total_seconds() // 60),
+                "ultima_em": self._ultima_em, "ultima_manual": self._manual, "novos": self._novos,
+                "erro": self._erro, "avisos": self._avisos, "proxima_em": self._proxima_em,
+            }
+
+
+ESTADO_DA_BUSCA = EstadoDaBusca()
+
+
+class EstadoDaBuscaResposta(BaseModel):
+    automatica: bool
+    """Falso quando o CRM roda sem a busca automática (no teste, ou sem configuração)."""
+    intervalo_minutos: int
+    ultima_em: datetime | None
+    ultima_manual: bool
+    novos: int
+    erro: str | None
+    avisos: list[str]
+    proxima_em: datetime | None
+
+
 def _dia(momento: datetime) -> date:
     return (momento if momento.tzinfo else momento.replace(tzinfo=ZoneInfo("UTC"))).astimezone(_FUSO).date()
 
@@ -169,39 +279,22 @@ def roteador_de_questionarios(
 
     @r.post("/api/questionarios/buscar", response_model=ResultadoDaBusca)
     def buscar(sessao: Session = Depends(obter_sessao)) -> ResultadoDaBusca:
-        """Traz do site o que ainda não foi importado. Cada questionário é gravado aqui **antes** de ser
-        marcado lá: se a marca falhar, ele volta na próxima busca e só a marca é refeita."""
-        origem = fonte()
-        if origem is None:
-            raise HTTPException(
-                409, f"Falta configurar a busca: preencha {VARIAVEIS['url']} e {VARIAVEIS['chave']} no backend/.env "
-                     "e reinicie o CRM.",
-            )
+        """A busca na hora ("Buscar agora"). A mesma que o CRM faz sozinho a cada 10 minutos."""
         try:
-            linhas = origem.novos()
+            novos, avisos = executar_busca(sessao, fonte(), buscar_endereco)
+        except BuscaNaoConfigurada as falha:
+            ESTADO_DA_BUSCA.registrar(manual=True, novos=0, erro=str(falha))
+            raise HTTPException(409, str(falha)) from falha
         except BuscaFalhou as falha:
+            ESTADO_DA_BUSCA.registrar(manual=True, novos=0, erro=str(falha))
             raise HTTPException(502, str(falha)) from falha
-        novos: list[QuestionarioRecebido] = []
-        avisos: list[str] = []
-        for linha in linhas:
-            externo = str(linha.get("id", ""))
-            q = sessao.scalar(sa.select(QuestionarioRecebido).where(QuestionarioRecebido.externo_id == externo))
-            if q is None:
-                try:
-                    q = importacao.importar(sessao, linha, buscar_endereco)
-                except (importacao.LinhaInvalida, KeyError, ValueError) as falha:
-                    sessao.rollback()  # só esta linha: as anteriores já foram gravadas
-                    avisos.append(f"Questionário {externo or 'sem id'} ficou de fora: {falha}. Ele continua no site.")
-                    continue
-                sessao.commit()
-                novos.append(q)
-            try:
-                origem.marcar_importado(externo, agora())
-                q.marcado_na_origem_em = agora()
-                sessao.commit()
-            except BuscaFalhou as falha:
-                avisos.append(f"{q.razao_social}: entrou no CRM, mas {falha} Na próxima busca o CRM só tenta marcar de novo.")
+        ESTADO_DA_BUSCA.registrar(manual=True, novos=len(novos), erro=None, avisos=avisos)
         return ResultadoDaBusca(buscado_em=agora(), novos=[_resumo(sessao, q) for q in novos], avisos=avisos)
+
+    @r.get("/api/questionarios/busca", response_model=EstadoDaBuscaResposta)
+    def estado_da_busca() -> EstadoDaBuscaResposta:
+        """Quando foi a última busca (automática ou na hora), quantos vieram, se deu erro e quando é a próxima."""
+        return EstadoDaBuscaResposta(**ESTADO_DA_BUSCA.retrato())
 
     @r.get("/api/questionarios", response_model=list[QuestionarioResumo])
     def listar(sessao: Session = Depends(obter_sessao), limite: int = Query(default=30, le=200)) -> list[QuestionarioResumo]:

@@ -5,7 +5,11 @@
  * CRM — o servidor recusa pedidos que chegam por túnel.
  */
 
+import { HistoricoDeAlteracoes } from "../componentes/HistoricoDeAlteracoes";
+import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
 import { MatrizesDeProposta } from "../componentes/MatrizesDeProposta";
+import { PerfisEAcesso } from "../componentes/PerfisEAcesso";
+import { usarAcesso } from "../entrada";
 import { useState } from "react";
 import { ErroDaApi, api } from "../api/cliente";
 import type { ResumoDeBackup } from "../api/cliente";
@@ -99,6 +103,7 @@ function Tabelas({ resumo }: { resumo: ResumoDeBackup }) {
 }
 
 export function Configuracoes() {
+  const { pode } = usarAcesso();
   const [arquivo, definirArquivo] = useState<File | null>(null);
   const [resumo, definirResumo] = useState<ResumoDeBackup | null>(null);
   const [substituir, definirSubstituir] = useState(false);
@@ -141,7 +146,11 @@ export function Configuracoes() {
   const podeImportar = !!resumo && !ocupado && (!substituir || confirmacao === "SUBSTITUIR");
 
   return (
-    <div className="configuracoes" style={{ display: "grid", gap: "var(--e4)", maxWidth: 720 }}>
+    <div className="configuracoes" style={{ display: "grid", gap: "var(--e4)", maxWidth: 960 }}>
+      {pode("configuracoes.perfis") && <PerfisEAcesso />}
+      {pode("configuracoes.historico") && <HistoricoDeAlteracoes />}
+      {pode("configuracoes.backup") && (
+      <>
       <section className="numero">
         <h3 className="numero-rotulo">Exportar</h3>
         <p>
@@ -149,9 +158,9 @@ export function Configuracoes() {
           detectar corrupção. Não é um banco de dados: é o conteúdo, no mesmo padrão para
           exportar e importar.
         </p>
-        <a className="botao botao-primario" href="/api/backup/exportar" download>
+        <LinkDeArquivo className="botao botao-primario" href="/api/backup/exportar">
           Baixar backup completo
-        </a>
+        </LinkDeArquivo>
         <p className="numero-detalhe">
           O arquivo tem todos os dados de cliente, sem criptografia. Guarde fora de pastas
           compartilhadas.
@@ -213,7 +222,9 @@ export function Configuracoes() {
         )}
         {feito && <p role="status">{feito}</p>}
       </section>
-      <MatrizesDeProposta />
+      </>
+      )}
+      {pode("configuracoes.propostas") && <MatrizesDeProposta />}
       <PedidosDeServicoNovo />
     </div>
   );

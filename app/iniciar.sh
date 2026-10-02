@@ -5,8 +5,8 @@
 #
 # Ctrl+C derruba as duas. Abra http://localhost:5173 no navegador.
 #
-# A API escuta só em 127.0.0.1 e NÃO tem login (o E1 foi adiado). Não exponha
-# esta porta na rede.
+# A API escuta só em 127.0.0.1. Sem CRM_ENTRA_* no backend/.env ela NÃO tem
+# login (ver "Entrada pela conta Microsoft" no README). Não exponha esta porta na rede.
 
 set -euo pipefail
 

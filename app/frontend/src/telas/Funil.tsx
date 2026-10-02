@@ -27,6 +27,8 @@ import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/
 import { data, dinheiro, dinheiroCurto, prazo } from "../formato";
 import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
+import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
+import { usarAcesso } from "../entrada";
 
 type Visao = "kanban" | "grade";
 
@@ -83,6 +85,7 @@ function Cartao({
 }
 
 export function Funil({ listas }: { listas: Listas | null }) {
+  const { pode } = usarAcesso();
   const [visao, definirVisao] = useState<Visao>("kanban");
   const [filtros, definirFiltros] = useState<EstadoDosFiltros>(FILTROS_VAZIOS);
   const [situacao, definirSituacao] = useState("");
@@ -247,9 +250,9 @@ export function Funil({ listas }: { listas: Listas | null }) {
                 ☰ Grade
               </button>
             </div>
-            <BotaoBuscarQuestionarios estado={questionarios} />
-            {visao === "grade" && (
-              <a
+            {pode("funil.questionarios") && <BotaoBuscarQuestionarios estado={questionarios} />}
+            {visao === "grade" && pode("funil.exportar") && (
+              <LinkDeArquivo
                 className="botao botao-secundario"
                 href={api.enderecoDaExportacaoDoFunil({
                   ...paraConsulta(filtros),
@@ -258,11 +261,13 @@ export function Funil({ listas }: { listas: Listas | null }) {
                 title="Baixa em Excel as oportunidades da Grade, com os filtros aplicados"
               >
                 Exportar para Excel
-              </a>
+              </LinkDeArquivo>
             )}
-            <button type="button" className="botao botao-primario" onClick={() => definirCriando(true)}>
-              Nova oportunidade
-            </button>
+            {pode("funil.editar") && (
+              <button type="button" className="botao botao-primario" onClick={() => definirCriando(true)}>
+                Nova oportunidade
+              </button>
+            )}
           </>
         }
       />

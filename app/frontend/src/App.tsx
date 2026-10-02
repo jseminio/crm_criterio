@@ -4,6 +4,7 @@ import { useState } from "react";
 import "./tokens.css";
 import "./app.css";
 import { api } from "./api/cliente";
+import { usarAcesso } from "./entrada";
 import type { Listas } from "./api/tipos";
 import { Abordagens } from "./telas/Abordagens";
 import { Agenda } from "./telas/Agenda";
@@ -89,12 +90,20 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     chave: "configuracoes",
     rotulo: "Configurações",
     titulo: "Configurações",
-    descricao: "Backup lógico dos dados e os pedidos de serviço fora do catálogo.",
+    descricao: "Perfis e acesso, histórico de alterações, propostas, backup e pedidos de serviço fora do catálogo.",
   },
 ];
 
 export default function App() {
-  const [tela, definirTela] = useState<Tela>("funil");
+  const { eu, pode, sair } = usarAcesso();
+  // Menu sem nenhuma funcionalidade liberada no perfil não aparece (E1, 02/10/2026).
+  const visiveis = TELAS.filter((t) =>
+    t.chave === "configuracoes"
+      ? pode("configuracoes.propostas", "configuracoes.backup", "configuracoes.perfis", "configuracoes.historico")
+      : pode(`${t.chave}.ver`),
+  );
+  const [escolhida, definirTela] = useState<Tela>("funil");
+  const tela = visiveis.some((t) => t.chave === escolhida) ? escolhida : (visiveis[0]?.chave ?? escolhida);
   const { dados: listas } = usarDados<Listas>(() => api.listas(), []);
   const atual = TELAS.find((t) => t.chave === tela)!;
 
@@ -110,7 +119,7 @@ export default function App() {
         </div>
 
         <div className="menu">
-          {TELAS.map((t) => (
+          {visiveis.map((t) => (
             <button
               key={t.chave}
               type="button"
@@ -123,10 +132,18 @@ export default function App() {
           ))}
         </div>
 
-        <p className="aviso-sem-login">
-          Ambiente local, sem login. Não abra esta porta na rede antes da conta corporativa
-          existir.
-        </p>
+        {eu.modo === "microsoft" ? (
+          <div className="quem-entrou">
+            <strong>{eu.nome ?? eu.email}</strong>
+            <span>Perfil: {eu.perfil}</span>
+            <button type="button" className="quem-entrou-sair" onClick={sair}>Sair</button>
+          </div>
+        ) : (
+          <p className="aviso-sem-login">
+            Ambiente local, sem login. Não abra esta porta na rede antes da conta corporativa
+            existir.
+          </p>
+        )}
       </nav>
 
       <div className="conteudo">
@@ -136,20 +153,25 @@ export default function App() {
         </header>
 
         <main className="area">
-          {tela === "agenda" && <Agenda
+          {visiveis.length === 0 && (
+            <p className="estado estado-texto" role="status">
+              O seu perfil ({eu.perfil}) ainda não libera nenhum menu. Peça a quem administra em Configurações › Perfis e acesso.
+            </p>
+          )}
+          {visiveis.length > 0 && tela === "agenda" && <Agenda
               listas={listas}
               aoAbrirLeads={() => definirTela("funil")}
               aoAbrirContratos={() => definirTela("contratos")}
             />}
-          {tela === "contatos" && <Contatos listas={listas} />}
-          {tela === "funil" && <Funil listas={listas} />}
-          {tela === "grupos" && <Grupos listas={listas} />}
-          {tela === "contratos" && <Contratos listas={listas} />}
-          {tela === "carteira" && <Carteira listas={listas} />}
-          {tela === "abordagens" && <Abordagens />}
-          {tela === "sdr" && <Sdr listas={listas} />}
-          {tela === "conferencia" && <Conferencia listas={listas} />}
-          {tela === "configuracoes" && <Configuracoes />}
+          {visiveis.length > 0 && tela === "contatos" && <Contatos listas={listas} />}
+          {visiveis.length > 0 && tela === "funil" && <Funil listas={listas} />}
+          {visiveis.length > 0 && tela === "grupos" && <Grupos listas={listas} />}
+          {visiveis.length > 0 && tela === "contratos" && <Contratos listas={listas} />}
+          {visiveis.length > 0 && tela === "carteira" && <Carteira listas={listas} />}
+          {visiveis.length > 0 && tela === "abordagens" && <Abordagens />}
+          {visiveis.length > 0 && tela === "sdr" && <Sdr listas={listas} />}
+          {visiveis.length > 0 && tela === "conferencia" && <Conferencia listas={listas} />}
+          {visiveis.length > 0 && tela === "configuracoes" && <Configuracoes />}
         </main>
       </div>
     </div>

@@ -8,6 +8,8 @@ import type { ConfiguracaoDeProposta, MatrizesDeProposta as Matrizes, TipoDeMatr
 import { data, fracaoEmPercentual } from "../formato";
 import { Recolhivel } from "./Recolhivel";
 import { Carregando, Erro } from "./estados";
+import { LinkDeArquivo } from "./LinkDeArquivo";
+import { usarAcesso } from "../entrada";
 
 const TIPOS: TipoDeMatriz[] = ["Contábil", "Financeiro"];
 const chave = (n: string) => `{{${n}}}`;
@@ -26,6 +28,7 @@ export function MatrizesDeProposta() {
   const [config, definirConfig] = useState<ConfiguracaoDeProposta | null>(null);
   const [rascunho, definirRascunho] = useState<Rascunho | null>(null);
   const [quem, definirQuem] = useState("");
+  const comLogin = usarAcesso().eu.modo === "microsoft";
   const [erroAoAbrir, definirErroAoAbrir] = useState<string | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
   const [feito, definirFeito] = useState<string | null>(null);
@@ -100,12 +103,14 @@ export function MatrizesDeProposta() {
       {erro && <p role="alert" className="estado-texto">{erro}</p>}
       {feito && <p role="status">{feito}</p>}
 
-      <label className="campo" style={{ maxWidth: 240 }}>
-        <span className="campo-rotulo">Quem está subindo a matriz</span>
-        <select className="entrada" value={quem} onChange={(e) => definirQuem(e.target.value)}>
-          {config.revisores.map((r) => <option key={r} value={r}>{r}</option>)}
-        </select>
-      </label>
+      {!comLogin && (
+        <label className="campo" style={{ maxWidth: 240 }}>
+          <span className="campo-rotulo">Quem está subindo a matriz</span>
+          <select className="entrada" value={quem} onChange={(e) => definirQuem(e.target.value)}>
+            {config.revisores.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </label>
+      )}
 
       <table className="tabela" aria-label="Matrizes de proposta">
         <thead>
@@ -148,7 +153,7 @@ export function MatrizesDeProposta() {
                   <label className="link-de-tabela">
                     {m ? "Trocar matriz" : "Subir matriz"}
                     <input
-                      type="file" accept=".pptx" hidden disabled={ocupado || !quem}
+                      type="file" accept=".pptx" hidden disabled={ocupado || (!quem && !comLogin)}
                       aria-label={`${m ? "Trocar" : "Subir"} a matriz ${tipo}`}
                       onChange={(e) => { void subir(tipo, e.target.files?.[0] ?? null); e.target.value = ""; }}
                     />
@@ -156,7 +161,7 @@ export function MatrizesDeProposta() {
                   {m && (
                     <>
                       {" · "}
-                      <a className="link-de-tabela" href={`/api/propostas/matrizes/${m.id}/pptx`} download={m.nome_arquivo}>Baixar</a>
+                      <LinkDeArquivo className="link-de-tabela" href={`/api/propostas/matrizes/${m.id}/pptx`} nome={m.nome_arquivo}>Baixar</LinkDeArquivo>
                     </>
                   )}
                 </td>

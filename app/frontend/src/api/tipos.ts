@@ -1352,3 +1352,61 @@ export interface MudancaDePendencia {
   feita?: boolean;
   por: string;
 }
+
+/* ------------------------------------------------------ acesso (E1, 02/10/2026) */
+
+export interface ConfiguracaoDeEntrada {
+  /** "microsoft": entra pela conta Microsoft; "local": sem login, só na máquina do CRM. */
+  modo: "microsoft" | "local";
+  tenant_id: string | null;
+  client_id: string | null;
+  escopo: string | null;
+}
+
+export interface Eu {
+  modo: "microsoft" | "local";
+  email: string | null;
+  nome: string | null;
+  perfil: string;
+  administrador: boolean;
+  permissoes: string[];
+}
+
+export interface MenuDoCatalogo {
+  chave: string;
+  rotulo: string;
+  funcionalidades: { chave: string; rotulo: string }[];
+}
+
+export interface PerfilDeAcesso {
+  id: number;
+  nome: string;
+  administrador: boolean;
+  permissoes: string[];
+  pessoas: number;
+}
+
+export interface UsuarioDoCrm {
+  id: number;
+  email: string;
+  nome: string | null;
+  perfil_id: number;
+  perfil: string;
+  ativo: boolean;
+  liberado_por: string | null;
+  criado_em: string;
+}
+
+export interface Alteracao {
+  id: number;
+  quando: string;
+  usuario_email: string;
+  usuario_nome: string | null;
+  acao: "criou" | "alterou" | "excluiu";
+  tabela: string;
+  registro_id: number | null;
+  descricao: string | null;
+  campo: string | null;
+  antes: string | null;
+  depois: string | null;
+}

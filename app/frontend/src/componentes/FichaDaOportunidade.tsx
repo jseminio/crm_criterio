@@ -12,6 +12,7 @@ import { data } from "../formato";
 import { usarQuemPreenche } from "../quemPreenche";
 import { CampoDeData } from "./CampoDeData";
 import { Carregando, Erro } from "./estados";
+import { usarAcesso } from "../entrada";
 
 function situacaoDaSecao(s: SecaoDaFicha): { texto: string; tom: string } {
   if (!s.no_escopo) return { texto: "fora do escopo", tom: "neutra" };
@@ -155,6 +156,7 @@ export function FichaDaOportunidade({ oportunidadeId, aoMudar }: { oportunidadeI
   const [ficha, definirFicha] = useState<Ficha | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
   const [quem, definirQuem] = usarQuemPreenche(ficha?.revisores ?? []);
+  const comLogin = usarAcesso().eu.modo === "microsoft";
 
   const carregar = () => {
     definirErro(null);
@@ -193,14 +195,18 @@ export function FichaDaOportunidade({ oportunidadeId, aoMudar }: { oportunidadeI
         </span>
       </div>
       <div className="ficha-quem">
-        <label className="campo-rotulo" htmlFor="ficha-quem">Quem preenche</label>
-        <select id="ficha-quem" className="selecao" value={quem} onChange={(e) => definirQuem(e.target.value)}>
-          {ficha.revisores.map((r) => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
+        {!comLogin && (
+          <>
+            <label className="campo-rotulo" htmlFor="ficha-quem">Quem preenche</label>
+            <select id="ficha-quem" className="selecao" value={quem} onChange={(e) => definirQuem(e.target.value)}>
+              {ficha.revisores.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </>
+        )}
         <span className="campo-ajuda">
-          Corrigir aqui grava como <strong>Entrevista</strong>, com quem e quando; a resposta original do cliente fica guardada.
+          Corrigir aqui grava como <strong>Entrevista</strong>, com {comLogin ? "o seu nome" : "quem"} e quando; a resposta original do cliente fica guardada.
         </span>
       </div>
 

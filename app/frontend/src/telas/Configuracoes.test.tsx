@@ -6,7 +6,8 @@ import { Configuracoes } from "./Configuracoes";
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
   return { ...real, api: { verificarBackup: vi.fn(), importarBackup: vi.fn(), pedidosDeServicoNovo: vi.fn().mockResolvedValue([]),
-    matrizesDeProposta: vi.fn(), configuracaoDeProposta: vi.fn() } };
+    matrizesDeProposta: vi.fn(), configuracaoDeProposta: vi.fn(), catalogoDeAcesso: vi.fn(), perfis: vi.fn(), usuarios: vi.fn(),
+    historico: vi.fn() } };
 });
 
 const RESUMO = {
@@ -19,6 +20,10 @@ const arquivo = () => new File(["x"], "crm.zip", { type: "application/zip" });
 
 /** A seção de propostas abre junto; aqui ela só precisa existir. */
 function semMatrizes() {
+  vi.mocked(api.catalogoDeAcesso).mockResolvedValue([]);
+  vi.mocked(api.perfis).mockResolvedValue([]);
+  vi.mocked(api.usuarios).mockResolvedValue([]);
+  vi.mocked(api.historico).mockResolvedValue([]);
   vi.mocked(api.matrizesDeProposta).mockResolvedValue({ em_uso: { "Contábil": null, Financeiro: null }, marcadores: [] });
   vi.mocked(api.configuracaoDeProposta).mockResolvedValue({
     proximo_numero: 154, revisores: ["Eduardo", "Karine"], plano_bpo: "5000.00", plano_plus: "7000.00",

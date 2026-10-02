@@ -9,6 +9,7 @@ import type { MudancaDePendencia, PendenciaDaProposta, PendenciasDaProposta } fr
 import { data } from "../formato";
 import { usarQuemPreenche } from "../quemPreenche";
 import { CampoDeData } from "./CampoDeData";
+import { usarAcesso } from "../entrada";
 
 function Estado({ item }: { item: PendenciaDaProposta }) {
   if (!item.aberta)
@@ -36,6 +37,7 @@ export function ListaDoQueFalta({
   aoMudar: (novos: PendenciasDaProposta) => void;
 }) {
   const [quem, definirQuem] = usarQuemPreenche(dados.revisores);
+  const comLogin = usarAcesso().eu.modo === "microsoft";
   const [nova, definirNova] = useState("");
   const [erro, definirErro] = useState<string | null>(null);
   const [mostrarFeitas, definirMostrarFeitas] = useState(false);
@@ -118,14 +120,16 @@ export function ListaDoQueFalta({
           {dados.atrasadas > 0 && ` · ${dados.atrasadas} atrasada${dados.atrasadas === 1 ? "" : "s"}`} · {dados.feitas} feita
           {dados.feitas === 1 ? "" : "s"}
         </span>
-        <label>
-          Quem está mexendo{" "}
-          <select className="selecao" value={quem} onChange={(e) => definirQuem(e.target.value)} aria-label="Quem está mexendo">
-            {dados.revisores.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-        </label>
+        {!comLogin && (
+          <label>
+            Quem está mexendo{" "}
+            <select className="selecao" value={quem} onChange={(e) => definirQuem(e.target.value)} aria-label="Quem está mexendo">
+              {dados.revisores.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
       <p className="campo-ajuda">
         Os itens com caixa pontilhada o CRM confere sozinho e fecha quando o dado chega. Os que têm prazo entram na Agenda.

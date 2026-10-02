@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from crm.acesso.auditoria import usuario_atual
 from crm.db.base import agora
 from crm.db.modelos import (
     ConfiguracaoDeProposta, Empresa, MatrizDeProposta, Oportunidade, PendenciaDaProposta, PessoaContato,
@@ -255,10 +256,20 @@ def roteador_da_ficha(obter_sessao: Callable[[], Iterator[Session]]) -> APIRoute
         return o
 
     def _quem(sessao: Session, por: str) -> str:
+        """Com login, quem fez é quem entrou; sem login, um dos que revisam as propostas."""
+        entrou = usuario_atual.get()
+        if entrou is not None:
+            return entrou.nome or entrou.email
         revisores = _revisores(sessao)
         if por not in revisores:
             raise HTTPException(422, f"quem preenche é {', '.join(revisores)}")
         return por
+
+    def _responsavel(sessao: Session, nome: str) -> str:
+        revisores = _revisores(sessao)
+        if nome not in revisores:
+            raise HTTPException(422, f"o responsável é um de {', '.join(revisores)}")
+        return nome
 
     @r.get("/api/oportunidades/{oportunidade_id}/ficha", response_model=FichaResposta)
     def ver_ficha(oportunidade_id: int, sessao: Session = Depends(obter_sessao)) -> FichaResposta:
@@ -287,7 +298,7 @@ def roteador_da_ficha(obter_sessao: Callable[[], Iterator[Session]]) -> APIRoute
         o = _oportunidade(sessao, oportunidade_id)
         por = _quem(sessao, corpo.por)
         if corpo.responsavel is not None:
-            _quem(sessao, corpo.responsavel)
+            _responsavel(sessao, corpo.responsavel)
         sessao.add(PendenciaDaProposta(
             oportunidade_id=o.id, descricao=corpo.descricao.strip(), responsavel=corpo.responsavel,
             prazo=corpo.prazo, criada_por=por,
@@ -303,7 +314,7 @@ def roteador_da_ficha(obter_sessao: Callable[[], Iterator[Session]]) -> APIRoute
         por = _quem(sessao, corpo.por)
         campos = corpo.model_fields_set
         if "responsavel" in campos and corpo.responsavel is not None:
-            _quem(sessao, corpo.responsavel)
+            _responsavel(sessao, corpo.responsavel)
         if chave.startswith("manual-"):
             p = sessao.get(PendenciaDaProposta, int(chave[7:])) if chave[7:].isdigit() else None
             if p is None or p.oportunidade_id != o.id or p.chave is not None:

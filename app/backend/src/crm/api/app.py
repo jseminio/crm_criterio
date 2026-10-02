@@ -4,14 +4,11 @@ Serve o funil: grupos, oportunidades, leads e, a partir do início da Etapa 2
 (23/09/2026), o contrato que nasce de uma oportunidade aceita. Implantação e
 carteira classificada continuam de fora — ainda não passam por aqui.
 
-⚠️ **Esta API não tem autenticação.** O E1, que traz o login pela conta
-corporativa Microsoft, foi adiado por decisão de Eduardo em 20/09/2026 para que
-o CRM ficasse de pé até sexta. Enquanto isso ela roda **só na máquina dele, com
-um único usuário**, e escuta apenas em `localhost`.
-
-Isso está declarado na proposta aprovada, seção 2, com o alcance: a Karine não
-usa o CRM até o E1. **Não publique esta API em rede nenhuma antes do login
-existir.**
+**Entrada (E1, 02/10/2026).** Com `CRM_ENTRA_TENANT_ID` e `CRM_ENTRA_CLIENT_ID` no `.env`, toda
+rota exige a entrada pela conta Microsoft e a permissão do perfil (`crm.acesso`), e cada gravação vai
+para o histórico de alterações com quem fez. **Sem essas duas variáveis, a API segue sem login**,
+como antes do E1: só na máquina do CRM, escutando em `localhost`. **Não publique a API em rede
+nenhuma sem a entrada configurada.**
 """
 
 from __future__ import annotations
@@ -26,7 +23,18 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, object_session, sessionmaker
 
+from dataclasses import replace
+
+from starlette.concurrency import run_in_threadpool
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+from crm.acesso import auditoria
+from crm.acesso.auditoria import usuario_atual
+from crm.acesso.catalogo import PUBLICAS, permissoes_da_rota
+from crm.acesso.entrada import ConfiguracaoDeEntrada, EntradaRecusada, ler_configuracao, pessoa_do_token, validador_da_microsoft
 from crm.api import esquemas as e
+from crm.api.acesso import roteador_do_acesso
 from crm.api.abordagens import Servicos, roteador_de_abordagens, servicos_reais
 from crm.api.backup import roteador as roteador_de_backup
 from crm.api.classificacao import ServicosDeAnalise, roteador as roteador_de_carteira, servicos_de_analise_reais
@@ -116,6 +124,8 @@ def criar_app(
     servicos_de_analise: Callable[[], ServicosDeAnalise] | None = None,
     fonte_de_questionarios: Callable[[], FonteDeQuestionarios | None] | None = None,
     busca_de_endereco: BuscaDeEndereco | None = None,
+    entrada: ConfiguracaoDeEntrada | None = None,
+    validar_token: Callable[[str], dict] | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede."""
@@ -132,6 +142,49 @@ def criar_app(
         summary="Funil comercial. Sem autenticação — ver o aviso no módulo.",
         lifespan=ciclo_de_vida,
     )
+    # Entrada: no uso real, lida do `.env`; no teste (que passa a própria `fabrica`), só se o teste mandar.
+    config_de_entrada = entrada if (entrada is not None or fabrica is not None) else ler_configuracao()
+    validador: list[Callable[[str], dict]] = [validar_token] if validar_token else []
+
+    def _validar(token: str) -> dict:
+        if not validador:
+            validador.append(validador_da_microsoft(config_de_entrada))
+        return validador[0](token)
+
+    auditoria.ligar()
+
+    @api.middleware("http")
+    async def exigir_entrada(request: Request, call_next):
+        caminho, metodo = request.url.path, request.method
+        if config_de_entrada is None or not caminho.startswith("/api") or metodo == "OPTIONS" or caminho in PUBLICAS:
+            return await call_next(request)
+        autorizacao = request.headers.get("authorization", "")
+        if not autorizacao.lower().startswith("bearer "):
+            return JSONResponse({"detail": "Entre com a conta Microsoft para usar o CRM."}, status_code=401)
+
+        def identificar():
+            claims = _validar(autorizacao[7:].strip())
+            sessao = _fabrica()
+            try:
+                return pessoa_do_token(sessao, claims, config_de_entrada)
+            finally:
+                sessao.close()
+
+        try:
+            quem = await run_in_threadpool(identificar)
+        except EntradaRecusada as recusa:
+            return JSONResponse({"detail": recusa.mensagem}, status_code=recusa.status)
+        exigidas = permissoes_da_rota(metodo, caminho)
+        if exigidas is None:
+            return JSONResponse({"detail": "Esta ação não tem permissão definida: fale com quem administra o CRM."}, status_code=403)
+        if not quem.pode(*exigidas):
+            return JSONResponse({"detail": "O seu perfil não libera esta ação."}, status_code=403)
+        marca = usuario_atual.set(replace(quem, rota=f"{metodo} {caminho}"[:200]))
+        try:
+            return await call_next(request)
+        finally:
+            usuario_atual.reset(marca)
+
     api.add_middleware(
         CORSMiddleware,
         allow_origins=ORIGENS_PERMITIDAS,
@@ -154,6 +207,7 @@ def criar_app(
     api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real, endereco))
     api.include_router(roteador_de_propostas(obter_sessao))
     api.include_router(roteador_da_ficha(obter_sessao))
+    api.include_router(roteador_do_acesso(obter_sessao, lambda: config_de_entrada))
     return api
 
 

@@ -15,6 +15,8 @@ import { Carregando, Erro } from "../componentes/estados";
 import { dataHora, dinheiro } from "../formato";
 import { CampoDeData } from "../componentes/CampoDeData";
 import { BuscaDeEmpresa } from "../componentes/BuscaDeEmpresa";
+import { usarAcesso } from "../entrada";
+import { HistoricoDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 
 function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
@@ -278,6 +280,7 @@ export function DetalheDaOportunidade({
   aoFechar: () => void;
   aoSalvar: () => void;
 }) {
+  const { pode } = usarAcesso();
   const [detalhe, definirDetalhe] = useState<OportunidadeDetalhe | null>(null);
   const [empresaEscolhida, definirEmpresaEscolhida] = useState<EmpresaEncontrada | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
@@ -426,7 +429,8 @@ export function DetalheDaOportunidade({
             <button type="button" className="botao botao-secundario" onClick={aoFechar}>
               Cancelar
             </button>
-            {detalhe.situacao === "Aceita" && (
+            {!pode("funil.editar") && <span className="campo-ajuda">Só leitura: o seu perfil não libera editar.</span>}
+            {detalhe.situacao === "Aceita" && pode("funil.converter") && (
               <button
                 type="button"
                 className="botao botao-secundario"
@@ -436,13 +440,16 @@ export function DetalheDaOportunidade({
                 {convertendoEmContrato ? "Convertendo…" : "Converter em contrato"}
               </button>
             )}
+            {detalhe.situacao === "Aceita" && !pode("funil.converter") && (
+              <span className="campo-ajuda">Converter em contrato: o seu perfil não libera.</span>
+            )}
             {/* Uma ação primária por painel — regra 2 do PAD-002. Na aba Proposta a primária é
                 "Gerar PowerPoint", e salvar a oportunidade fica secundário. */}
             <button
               type="button"
               className={`botao ${aba === "proposta" ? "botao-secundario" : "botao-primario"}`}
               onClick={salvar}
-              disabled={salvando || exigeDataDeAceite}
+              disabled={salvando || exigeDataDeAceite || !pode("funil.editar")}
             >
               {salvando ? "Salvando…" : "Salvar alterações"}
             </button>
@@ -516,7 +523,7 @@ export function DetalheDaOportunidade({
               aria-selected={aba === "historico"}
               onClick={() => definirAba("historico")}
             >
-              Histórico de preço
+              Histórico
               {(detalhe.historico_de_preco?.length ?? 0) > 0 && (
                 <span className="aba-contagem"> ({detalhe.historico_de_preco!.length})</span>
               )}
@@ -809,7 +816,14 @@ export function DetalheDaOportunidade({
             />
           )}
 
-          {aba === "historico" && <HistoricoDePreco mudancas={detalhe.historico_de_preco ?? []} />}
+          {aba === "historico" && (
+            <>
+              <h3 className="numero-rotulo">Preço</h3>
+              <HistoricoDePreco mudancas={detalhe.historico_de_preco ?? []} />
+              <h3 className="numero-rotulo">Alterações</h3>
+              <HistoricoDoRegistro tabela="oportunidade" id={id} />
+            </>
+          )}
         </>
       )}
     </PainelLateral>

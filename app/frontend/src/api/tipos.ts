@@ -218,6 +218,22 @@ export interface TaxaDeConversao {
   calculavel: boolean;
   abaixo_do_alerta: boolean | null;
   atingiu_a_meta: boolean | null;
+  /** Em %, de Configurações › Metas. */
+  meta?: string;
+  alerta?: string;
+}
+
+export interface MetaDeIndicador {
+  meta: string;
+  alerta: string;
+  alterado_por: string | null;
+  alterado_em: string | null;
+}
+
+/** Configurações › Metas (02/10/2026): MRR em reais por mês, conversão em %. */
+export interface Metas {
+  mrr: MetaDeIndicador;
+  conversao: MetaDeIndicador;
 }
 
 /** Ticket das propostas aceitas com preço mensal > 0, com a mediana ao lado.

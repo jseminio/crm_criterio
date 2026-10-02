@@ -75,6 +75,7 @@ import type {
   PainelDeQuestionarios,
   SecaoDeRespostas,
   SituacaoDoPainel,
+  Metas,
 } from "./tipos";
 
 export class ErroDaApi extends Error {
@@ -553,6 +554,9 @@ export const api = {
 
   contrato: (id: number) => pedir<ContratoDetalhe>(`/api/contratos/${id}`),
 
+  metas: () => pedir<Metas>("/api/metas"),
+  mudarMetas: (metas: { mrr?: { meta: string; alerta: string }; conversao?: { meta: string; alerta: string } }) =>
+    pedir<Metas>("/api/metas", { method: "PUT", body: JSON.stringify(metas) }),
   aprovacoes: () => pedir<Aprovacao[]>("/api/aprovacoes"),
   aprovar: (id: number) => pedir<Aprovacao>(`/api/aprovacoes/${id}/aprovar`, { method: "POST" }),
   recusar: (id: number, motivo: string) =>

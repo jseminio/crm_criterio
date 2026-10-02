@@ -40,17 +40,18 @@ from crm.domain.listas import IniciativaDoEncerramento, SituacaoContrato, TipoDe
 __all__ = ["ALERTA_DE_MRR", "META_DE_MRR", "MrrAtual", "Movimento", "contra_a_meta", "mrr_atual", "movimento", "mrr_em"]
 
 META_DE_MRR = Decimal("400000")
-"""KPI oficial "MRR" (planilha "KPI de Head de Novos Negócios"): meta R$ 400 mil."""
+"""KPI oficial "MRR" (planilha "KPI de Head de Novos Negócios"): meta R$ 400 mil. É o padrão: o
+valor que vale fica em Configurações › Metas (02/10/2026)."""
 ALERTA_DE_MRR = Decimal("200000")
-"""Abaixo disto, alerta."""
+"""Abaixo disto, alerta (padrão)."""
 
 
-def contra_a_meta(valor: Decimal) -> str:
+def contra_a_meta(valor: Decimal, meta: Decimal = META_DE_MRR, alerta: Decimal = ALERTA_DE_MRR) -> str:
     """"abaixo_do_alerta" (< R$ 200 mil), "entre" ou "na_meta" (>= R$ 400 mil). Só vale com a
     carteira inteira no CRM: com o MRR parcial, quem chama não compara."""
-    if valor >= META_DE_MRR:
+    if valor >= meta:
         return "na_meta"
-    return "abaixo_do_alerta" if valor < ALERTA_DE_MRR else "entre"
+    return "abaixo_do_alerta" if valor < alerta else "entre"
 
 ZERO = Decimal("0.00")
 CENTAVOS = Decimal("0.01")

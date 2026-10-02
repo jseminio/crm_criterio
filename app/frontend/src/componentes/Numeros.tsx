@@ -17,7 +17,7 @@ import { paraConsulta, type EstadoDosFiltros } from "./Filtros";
 import { dias, dinheiro, dinheiroCurto, percentual } from "../formato";
 import { usarDados } from "../usarDados";
 
-/** O tom da conversão contra os limiares oficiais (meta 50%, alerta <30%).
+/** O tom da conversão contra a meta e o alerta de Configurações › Metas (padrão: 50% e 30%).
  *
  * Mesma regra do PAD-002 que `Etiqueta` aplica às situações: a palavra vem
  * sempre junto da cor, nunca só a cor sozinha.
@@ -208,7 +208,8 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
           <>
             <p>
               {dados.taxa_de_conversao.aceitas} de {dados.taxa_de_conversao.decididas}{" "}
-              decididas. Meta 50%, alerta abaixo de 30%.
+              decididas. Meta {Number(dados.taxa_de_conversao.meta ?? 50).toLocaleString("pt-BR")}%, alerta abaixo de{" "}
+              {Number(dados.taxa_de_conversao.alerta ?? 30).toLocaleString("pt-BR")}%.
             </p>
             <p className="numero-nota">
               Só o que já tem desfecho entra na conta — aceita, recusada ou

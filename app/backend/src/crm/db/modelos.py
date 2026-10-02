@@ -1476,3 +1476,17 @@ class PedidoDeAprovacao(Base):
     """O evento que nasceu da aprovação."""
 
     contrato: Mapped[Contrato] = relationship()
+
+
+class MetaDeIndicador(Base):
+    """A meta e o alerta de um indicador, editáveis em Configurações › Metas (02/10/2026, aprovado
+    por Eduardo). `chave`: "mrr" (em reais) ou "conversao" (em %). Sem a linha, valem os padrões
+    do KPI oficial (`crm.domain.mrr`, `crm.domain.indicadores`). Quem muda fica no histórico."""
+
+    __tablename__ = "meta_de_indicador"
+
+    chave: Mapped[str] = mapped_column(sa.String(30), primary_key=True)
+    meta: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    alerta: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
+    alterado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))

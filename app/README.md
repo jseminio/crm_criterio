@@ -16,6 +16,20 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Metas dos indicadores editáveis (02/10/2026)
+
+Aprovado por Eduardo em 02/10/2026: a meta e o alerta deixaram de ser fixos no código.
+**Configurações › Metas** (funcionalidade "Configurações: metas", só do Administrador; outro perfil
+recebe pela tela) altera:
+- **MRR da carteira**: meta e alerta em R$/mês (KPI oficial de hoje: R$ 400 mil e R$ 200 mil);
+- **Taxa de conversão**: meta e alerta em % (KPI oficial de hoje: 50% e 30%).
+
+O alerta precisa ficar abaixo da meta, e a meta da conversão vai até 100% (o servidor recusa com o
+motivo). Muda na hora o painel de MRR em Contratos e a etiqueta da conversão no Funil. Cada mudança
+vai para o histórico de alterações, com quem mudou e o antes e depois. Rotas `GET`/`PUT /api/metas`.
+Migração `f6c2d8a4b1e9`, só aditiva (tabela `meta_de_indicador`, já com os valores oficiais de hoje).
+**Rode `alembic upgrade head`**, com o backup antes.
+
 ## Menu Questionários e alçada nos eventos de contrato (02/10/2026)
 
 Amostra e decisões aprovadas por Eduardo em 02/10/2026.
@@ -165,9 +179,9 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.087** no backend e **455** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
-| Banco | PostgreSQL 18 local, 35 tabelas, migrações até `e3a9c6b4d2f1` (pedidos de aprovação e menu Questionários, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
-| API | 122 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
+| Testes | **1.101** no backend e **460** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Banco | PostgreSQL 18 local, 36 tabelas, migrações até `f6c2d8a4b1e9` (metas dos indicadores, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
+| API | 124 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Telas | Agenda, Contatos, Funil (kanban e grade, exportar para Excel), Questionários, Grupos, Contratos, Carteira, Abordagens, SDR da IA, Conferência e Configurações. React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos; faltam a nuvem e o backup fora da máquina |
 | Fora do ar | **E1:** nuvem em região brasileira (custo a estimar antes de contratar) e backup fora da máquina com restauração testada. Login, perfis e histórico já estão no código, à espera do registro no Microsoft Entra. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto, implantação |
@@ -864,7 +878,7 @@ mês corrente até hoje; `de`/`ate` mudam o período (não passa de hoje).
 (`importar_carteira.py`, ver acima), só entram os contratos registrados no CRM: o painel diz
 "MRR parcial" e **não compara com a meta** (seria um "atingimento" enganoso). Com ela
 carregada (`cobertura_completa: true`), o painel vira **"MRR da carteira"** e compara com o KPI
-oficial (aprovado por Eduardo em 02/10/2026): **meta R$ 400 mil, alerta abaixo de R$ 200 mil**,
+oficial (aprovado por Eduardo em 02/10/2026): **meta e alerta de Configurações › Metas** (hoje R$ 400 mil e R$ 200 mil),
 com etiqueta de ícone e texto (⚠ abaixo do alerta · entre o alerta e a meta · ✓ na meta) e
 quanto falta para a meta. A API devolve `meta`, `alerta`, `contra_a_meta` e `falta_para_a_meta`.
 

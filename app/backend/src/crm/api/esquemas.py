@@ -673,6 +673,9 @@ class TaxaDeConversaoResposta(Base):
     calculavel: bool
     abaixo_do_alerta: bool | None
     atingiu_a_meta: bool | None
+    meta: Decimal
+    alerta: Decimal
+    """Em %, de Configurações › Metas (padrão: meta 50, alerta 30)."""
 
 
 class TicketRecorrenteResposta(Base):

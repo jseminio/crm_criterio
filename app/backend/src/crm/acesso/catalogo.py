@@ -40,7 +40,7 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     ("conferencia", "Conferência", (("ver", "ver"),)),
     ("configuracoes", "Configurações", (
         ("propostas", "matrizes e numeração das propostas"), ("backup", "backup"),
-        ("perfis", "perfis e acesso"), ("historico", "histórico de alterações"),
+        ("perfis", "perfis e acesso"), ("historico", "histórico de alterações"), ("metas", "metas dos indicadores"),
     )),
 )
 PERMISSOES: frozenset[str] = frozenset(f"{m}.{f}" for m, _, fs in MENUS for f, _ in fs)
@@ -135,6 +135,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("POST", r"/api/sdr/conversas(/\d+/(encerrar|mensagens|nota))?", ("sdr.editar",)),
     # conferência da carga
     ("GET", r"/api/cargas(/\d+(/ocorrencias)?)?", ("conferencia.ver",)),
+    # metas dos indicadores
+    ("GET|PUT", r"/api/metas", ("configuracoes.metas",)),
     # backup
     ("GET|POST", r"/api/backup/(exportar|importar|verificar)", ("configuracoes.backup",)),
 )

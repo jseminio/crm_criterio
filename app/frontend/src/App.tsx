@@ -98,7 +98,7 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     chave: "configuracoes",
     rotulo: "Configurações",
     titulo: "Configurações",
-    descricao: "Perfis e acesso, histórico de alterações, propostas, backup e pedidos de serviço fora do catálogo.",
+    descricao: "Perfis e acesso, metas, histórico de alterações, propostas, backup e pedidos de serviço fora do catálogo.",
   },
 ];
 
@@ -107,7 +107,7 @@ export default function App() {
   // Menu sem nenhuma funcionalidade liberada no perfil não aparece (E1, 02/10/2026).
   const visiveis = TELAS.filter((t) =>
     t.chave === "configuracoes"
-      ? pode("configuracoes.propostas", "configuracoes.backup", "configuracoes.perfis", "configuracoes.historico")
+      ? pode("configuracoes.propostas", "configuracoes.backup", "configuracoes.perfis", "configuracoes.historico", "configuracoes.metas")
       : pode(`${t.chave}.ver`),
   );
   const [escolhida, definirTela] = useState<Tela>("funil");

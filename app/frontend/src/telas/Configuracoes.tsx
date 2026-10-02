@@ -7,6 +7,7 @@
 
 import { HistoricoDeAlteracoes } from "../componentes/HistoricoDeAlteracoes";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
+import { MetasDosIndicadores } from "../componentes/MetasDosIndicadores";
 import { MatrizesDeProposta } from "../componentes/MatrizesDeProposta";
 import { PerfisEAcesso } from "../componentes/PerfisEAcesso";
 import { usarAcesso } from "../entrada";
@@ -148,6 +149,7 @@ export function Configuracoes() {
   return (
     <div className="configuracoes" style={{ display: "grid", gap: "var(--e4)", maxWidth: 960 }}>
       {pode("configuracoes.perfis") && <PerfisEAcesso />}
+      {pode("configuracoes.metas") && <MetasDosIndicadores />}
       {pode("configuracoes.historico") && <HistoricoDeAlteracoes />}
       {pode("configuracoes.backup") && (
       <>

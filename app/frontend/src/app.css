@@ -916,6 +916,14 @@
 
 .receita-meta { margin: var(--e1) 0 var(--e2); font-size: 13px; color: var(--texto-medio); display: flex; flex-wrap: wrap; gap: var(--e1) var(--e2); align-items: center; }
 
+/* Configurações › Metas (02/10/2026) */
+.metas { display: grid; gap: var(--e3); margin: var(--e3) 0; }
+.metas-linha { display: grid; grid-template-columns: 170px repeat(2, minmax(150px, 200px)) 1fr; gap: var(--e2) var(--e3); align-items: end; }
+.metas-linha > strong { align-self: center; font-size: 14px; }
+.metas-linha > .campo-ajuda { align-self: center; }
+.metas-campo { display: grid; gap: var(--e1); font-size: 12.5px; color: var(--texto-medio); }
+@media (max-width: 760px) { .metas-linha { grid-template-columns: 1fr 1fr; } .metas-linha > strong, .metas-linha > .campo-ajuda { grid-column: 1 / -1; } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

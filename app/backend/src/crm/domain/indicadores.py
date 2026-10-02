@@ -46,7 +46,8 @@ __all__ = [
 
 ZERO = Decimal("0.00")
 
-#: Do KPI oficial "KPI de Head de Novos Negócios": meta 50%, alerta abaixo de 30%.
+#: Do KPI oficial "KPI de Head de Novos Negócios": meta 50%, alerta abaixo de 30%. São o padrão:
+#: os valores que valem ficam em Configurações › Metas (02/10/2026) e chegam por `calcular`.
 META_DE_CONVERSAO = Decimal("50")
 ALERTA_DE_CONVERSAO = Decimal("30")
 
@@ -130,18 +131,21 @@ class TaxaDeConversao:
     def calculavel(self) -> bool:
         return self.percentual is not None
 
+    meta: Decimal = META_DE_CONVERSAO
+    alerta: Decimal = ALERTA_DE_CONVERSAO
+
     @property
     def abaixo_do_alerta(self) -> bool | None:
         """``None`` quando não calculável — não há o que alertar sobre o vazio."""
         if self.percentual is None:
             return None
-        return self.percentual < ALERTA_DE_CONVERSAO
+        return self.percentual < self.alerta
 
     @property
     def atingiu_a_meta(self) -> bool | None:
         if self.percentual is None:
             return None
-        return self.percentual >= META_DE_CONVERSAO
+        return self.percentual >= self.meta
 
 
 @dataclass(frozen=True)
@@ -263,7 +267,11 @@ def _somar(oportunidades: list[_Oportunidade]) -> Recorte:
     )
 
 
-def calcular(oportunidades: Iterable[_Oportunidade]) -> Indicadores:
+def calcular(
+    oportunidades: Iterable[_Oportunidade],
+    meta_de_conversao: Decimal = META_DE_CONVERSAO,
+    alerta_de_conversao: Decimal = ALERTA_DE_CONVERSAO,
+) -> Indicadores:
     """Soma o funil e diz o que ainda não dá para medir.
 
     **Em aberto** é tudo que ainda não foi decidido — o inverso de
@@ -300,7 +308,8 @@ def calcular(oportunidades: Iterable[_Oportunidade]) -> Indicadores:
     else:
         percentual = None
     conversao = TaxaDeConversao(
-        aceitas=len(aceitas), decididas=len(decididas), percentual=percentual
+        aceitas=len(aceitas), decididas=len(decididas), percentual=percentual,
+        meta=meta_de_conversao, alerta=alerta_de_conversao,
     )
 
     com_proxima_acao = sum(

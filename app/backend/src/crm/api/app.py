@@ -36,6 +36,7 @@ from crm.acesso.catalogo import PUBLICAS, permissoes_da_rota
 from crm.acesso.entrada import ConfiguracaoDeEntrada, EntradaRecusada, ler_configuracao, pessoa_do_token, validador_da_microsoft
 from crm.api import esquemas as e
 from crm.api.acesso import quem_fez, roteador_do_acesso
+from crm.api.metas import metas_vigentes, roteador_de_metas
 from crm.domain.alcada import motivo_da_alcada
 from crm.api.abordagens import Servicos, roteador_de_abordagens, servicos_reais
 from crm.api.backup import roteador as roteador_de_backup
@@ -211,6 +212,7 @@ def criar_app(
     api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real, endereco))
     api.include_router(roteador_de_propostas(obter_sessao))
     api.include_router(roteador_da_ficha(obter_sessao))
+    api.include_router(roteador_de_metas(obter_sessao))
     api.include_router(roteador_do_acesso(obter_sessao, lambda: config_de_entrada))
     return api
 
@@ -846,7 +848,8 @@ def _registrar(api: FastAPI) -> None:
             data_tipo, data_de, data_ate, servico,
         )
         oportunidades = [linha[0] for linha in sessao.execute(consulta).all()]
-        resultado = regras_de_indicadores.calcular(oportunidades)
+        meta_conv, alerta_conv = metas_vigentes(sessao)["conversao"]
+        resultado = regras_de_indicadores.calcular(oportunidades, meta_conv, alerta_conv)
 
         def recorte(r: regras_de_indicadores.Recorte) -> e.RecorteResposta:
             return e.RecorteResposta(
@@ -895,7 +898,7 @@ def _registrar(api: FastAPI) -> None:
 
         Sem `de`/`ate`, vale o mês corrente até hoje. `hoje` existe para teste.
         **Parcial** enquanto a carteira anterior ao CRM não for carregada; com ela, vem
-        a comparação com a meta (R$ 400 mil) e o alerta (R$ 200 mil). Ver `crm.domain.mrr`.
+        a comparação com a meta e o alerta de Configurações › Metas. Ver `crm.domain.mrr`.
         """
         dia = hoje or date.today()
         fim = ate or dia
@@ -909,11 +912,12 @@ def _registrar(api: FastAPI) -> None:
         mov = regras_de_mrr.movimento(contratos, inicio, fim, dia)
         atual = regras_de_mrr.mrr_atual(contratos)
         completa = da_carteira > 0
+        meta, alerta = metas_vigentes(sessao)["mrr"]
         return e.MrrResposta(
-            meta=regras_de_mrr.META_DE_MRR,
-            alerta=regras_de_mrr.ALERTA_DE_MRR,
-            contra_a_meta=regras_de_mrr.contra_a_meta(atual.valor) if completa else None,
-            falta_para_a_meta=max(regras_de_mrr.META_DE_MRR - atual.valor, Decimal("0")) if completa else None,
+            meta=meta,
+            alerta=alerta,
+            contra_a_meta=regras_de_mrr.contra_a_meta(atual.valor, meta, alerta) if completa else None,
+            falta_para_a_meta=max(meta - atual.valor, Decimal("0")) if completa else None,
             atual=e.MrrAtualResposta.model_validate(atual),
             movimento=e.MovimentoDeMrrResposta(
                 de=mov.de, ate=mov.ate, mrr_inicio=mov.mrr_inicio, novo=mov.novo,

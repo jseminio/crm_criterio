@@ -1185,6 +1185,44 @@ class TestEventosDeContrato:
         # encerrado não recebe mais nada
         assert cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Aditivo", "descricao": "x y z"}).status_code == 409
 
+    def _encerrar(self, cliente, cid):
+        r = cliente.post(f"/api/contratos/{cid}/eventos", json={
+            "tipo": "Encerramento", "iniciativa": "Cliente", "motivo_categoria": "Preço", "data_do_evento": "2026-09-20"})
+        assert r.status_code == 201
+        return r.json()
+
+    def test_encerrado_nao_reabre_nem_muda_por_patch(self, cliente, carteira):
+        """Regressão: um salvar voltava o encerrado para Ativo, trocava o preço e
+        apagava o fim gravado pelo Encerramento — sem evento nenhum."""
+        cid = self._contrato_ativo(cliente, carteira)
+        self._encerrar(cliente, cid)
+        for corpo in ({"situacao": "Ativo"}, {"preco_mensal": "1.00"}, {"data_fim": None}, {"escopo": "outro"}):
+            r = cliente.patch(f"/api/contratos/{cid}", json=corpo)
+            assert r.status_code == 422 and "encerrado" in r.json()["detail"], corpo
+        c = cliente.get(f"/api/contratos/{cid}").json()
+        assert (c["situacao"], c["preco_mensal"], c["data_fim"]) == ("Encerrado", "8000.00", "2026-09-20")
+
+    def test_encerrado_aceita_o_rascunho_sem_mudanca(self, cliente, carteira):
+        # a tela manda o rascunho inteiro; igual ao que está gravado não é mudança
+        cid = self._contrato_ativo(cliente, carteira)
+        self._encerrar(cliente, cid)
+        r = cliente.patch(f"/api/contratos/{cid}", json={"situacao": "Encerrado", "preco_mensal": "8000.00", "data_fim": "2026-09-20"})
+        assert r.status_code == 200
+
+    def test_assinado_nao_volta_para_aguardando_assinatura(self, cliente, carteira):
+        """Regressão: Ativo -> Aguardando destravava o preço, e a volta para Ativo
+        o deixava trocado sem Reajuste, Expansão ou Contração."""
+        cid = self._contrato_ativo(cliente, carteira)
+        r = cliente.patch(f"/api/contratos/{cid}", json={"situacao": "Aguardando assinatura"})
+        assert r.status_code == 422 and "Ativo e Suspenso" in r.json()["detail"]
+        assert cliente.get(f"/api/contratos/{cid}").json()["situacao"] == "Ativo"
+
+    def test_assinado_alterna_entre_ativo_e_suspenso(self, cliente, carteira):
+        cid = self._contrato_ativo(cliente, carteira)
+        assert cliente.patch(f"/api/contratos/{cid}", json={"situacao": "Suspenso"}).json()["situacao"] == "Suspenso"
+        assert cliente.patch(f"/api/contratos/{cid}", json={"situacao": "Aguardando assinatura"}).status_code == 422
+        assert cliente.patch(f"/api/contratos/{cid}", json={"situacao": "Ativo"}).json()["situacao"] == "Ativo"
+
     def test_categoria_de_motivo_fora_da_lista_e_recusada(self, cliente, carteira):
         cid = self._contrato_ativo(cliente, carteira)
         r = cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento", "iniciativa": "Cliente", "motivo_categoria": "Palpite"})

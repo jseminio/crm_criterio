@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
@@ -77,5 +77,46 @@ describe("Contratos — vigência na assinatura (25/09/2026)", () => {
   it("antes de assinar, o preço continua editável", async () => {
     await abrir();
     expect(screen.getByLabelText("Preço mensal")).toBeEnabled();
+  });
+});
+
+describe("Contratos — mudanças de situação permitidas (01/10/2026)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const opcoes = () =>
+    Array.from(screen.getByLabelText("Situação", { selector: "#c-situacao" }).querySelectorAll("option")).map((o) => o.textContent);
+
+  it("antes da assinatura: tudo menos Encerrado", async () => {
+    await abrir();
+    expect(opcoes()).toEqual(["Aguardando assinatura", "Ativo", "Suspenso"]);
+  });
+
+  it("assinado só alterna entre Ativo e Suspenso, sem voltar para Aguardando assinatura", async () => {
+    await abrir({ situacao: "Ativo", data_inicio: "2026-03-01" });
+    expect(opcoes()).toEqual(["Ativo", "Suspenso"]);
+  });
+
+  it("encerrado não se mexe: tudo travado, sem salvar", async () => {
+    await abrir({ situacao: "Encerrado", data_inicio: "2026-03-01", data_fim: "2026-09-20" });
+    const situacao = screen.getByLabelText("Situação", { selector: "#c-situacao" });
+    await waitFor(() => expect(situacao).toBeDisabled());
+    expect(opcoes()).toEqual(["Encerrado"]);
+    for (const rotulo of ["Escopo", "Preço mensal", "Preço anual", /data da assinatura/i, "Fim da vigência", "Signatário"]) {
+      expect(screen.getByLabelText(rotulo)).toBeDisabled();
+    }
+    expect(screen.getByRole("button", { name: /salvar alterações/i })).toBeDisabled();
+    expect(screen.getByText(/contrato encerrado: nada mais muda/i)).toBeInTheDocument();
+    expect(screen.queryByText(/só mudam por um evento/i)).toBeNull();
+  });
+
+  it("o fim trava pelo que está gravado, não pelo que veio da lista (Renovação)", async () => {
+    // A lista ainda mostra o contrato sem fim; o detalhe, depois da Renovação, já tem.
+    vi.mocked(api.contratos).mockResolvedValue({
+      total: 1, itens: [resumo({ situacao: "Ativo", data_inicio: "2026-03-01", data_fim: null })],
+    } as never);
+    vi.mocked(api.contrato).mockResolvedValue(detalhe({ situacao: "Ativo", data_inicio: "2026-03-01", data_fim: "2028-03-01" }));
+    render(<Contratos listas={null} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Abrir" }));
+    await waitFor(() => expect(screen.getByLabelText("Fim da vigência")).toBeDisabled());
   });
 });

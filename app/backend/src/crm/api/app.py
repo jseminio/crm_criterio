@@ -1161,20 +1161,30 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(404, "contrato não encontrado")
 
         mudancas = corpo.model_dump(exclude_unset=True)
+        # A tela manda o rascunho inteiro: só conta o que difere do valor atual.
+        reais = {campo: valor for campo, valor in mudancas.items() if valor != getattr(contrato, campo)}
+
+        # Encerrado não se mexe mais — nem por evento, nem por edição. Sem isto, um
+        # salvar voltava a situação para Ativo e destravava preço e data de fim.
+        if contrato.situacao is SituacaoContrato.ENCERRADO and reais:
+            raise HTTPException(422, "contrato encerrado não se mexe mais")
+        if mudancas.get("situacao") is SituacaoContrato.ENCERRADO and contrato.situacao is not SituacaoContrato.ENCERRADO:
+            raise HTTPException(422, "para encerrar, registre um evento de Encerramento com o motivo")
 
         # Depois de assinado, preço, fim e encerramento só mudam por evento: é o
-        # que deixa o antes e o depois registrados. A tela manda o rascunho inteiro,
-        # então só conta como mudança o que de fato difere do valor atual.
+        # que deixa o antes e o depois registrados.
         assinado = contrato.situacao in (SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO)
         if assinado:
+            # Assinado não volta para antes da assinatura: "Aguardando assinatura"
+            # destravaria o preço, e a volta para Ativo o mudaria sem evento.
+            if "situacao" in reais and reais["situacao"] not in (SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO):
+                raise HTTPException(422, "contrato assinado só alterna entre Ativo e Suspenso; para encerrar, registre um Encerramento")
             for campo, evento in (("preco_mensal", "Reajuste, Expansão ou Contração"),
                                   ("preco_anual", "Reajuste, Expansão ou Contração")):
                 if campo in mudancas and mudancas[campo] != getattr(contrato, campo):
                     raise HTTPException(422, f"contrato assinado: para mudar o preço, registre um evento ({evento})")
             if "data_fim" in mudancas and contrato.data_fim is not None and mudancas["data_fim"] != contrato.data_fim:
                 raise HTTPException(422, "contrato assinado: para mudar a data de fim, registre uma Renovação")
-        if mudancas.get("situacao") is SituacaoContrato.ENCERRADO and contrato.situacao is not SituacaoContrato.ENCERRADO:
-            raise HTTPException(422, "para encerrar, registre um evento de Encerramento com o motivo")
 
         for campo, valor in mudancas.items():
             setattr(contrato, campo, valor)

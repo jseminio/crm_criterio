@@ -26,8 +26,12 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         ("exportar", "exportar para Excel"),
         ("questionarios", "buscar e resolver questionários do site"),
     )),
+    ("questionarios", "Questionários", (("ver", "ver"),)),
     ("grupos", "Grupos", (("ver", "ver"), ("editar", "editar"), ("fundir", "fundir e desfazer fusão"))),
-    ("contratos", "Contratos", (("ver", "ver"), ("editar", "editar"), ("eventos", "registrar evento"))),
+    ("contratos", "Contratos", (
+        ("ver", "ver"), ("editar", "editar"), ("eventos", "registrar evento"),
+        ("aprovar", "aprovar eventos acima da alçada"),
+    )),
     ("carteira", "Carteira", (
         ("ver", "ver"), ("avaliar", "avaliar e calcular"), ("parametros", "parâmetros"), ("exportar", "exportar"),
     )),
@@ -44,11 +48,12 @@ PERMISSOES: frozenset[str] = frozenset(f"{m}.{f}" for m, _, fs in MENUS for f, _
 
 def permissoes_do_comercial() -> list[str]:
     """O perfil inicial da Karine (decisão de Eduardo, 02/10/2026): o comercial inteiro, sem converter
-    em contrato, sem Carteira e sem Configurações; contratos e grupos só para ver."""
+    em contrato, sem Carteira e sem Configurações; contratos e grupos só para ver. O menu Questionários
+    entrou em 02/10/2026, também para ver."""
     return sorted(
-        {"agenda.ver", "contatos.ver", "contatos.editar", "contatos.excluir", "grupos.ver", "contratos.ver",
+        {"agenda.ver", "questionarios.ver", "contatos.ver", "contatos.editar", "contatos.excluir", "grupos.ver", "contratos.ver",
          "abordagens.ver", "abordagens.editar", "sdr.ver", "sdr.editar", "conferencia.ver"}
-        | {f"funil.{f}" for f, _ in MENUS[2][2] if f != "converter"}
+        | {f"funil.{f}" for m, _, fs in MENUS if m == "funil" for f, _ in fs if f != "converter"}
     )
 
 
@@ -100,7 +105,9 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/leads", ("funil.ver",)),
     ("POST", r"/api/leads(/\d+/converter)?", ("funil.editar",)),
     ("PATCH", r"/api/leads/\d+", ("funil.editar",)),
-    ("GET", r"/api/questionarios(/\d+/pdf)?", ("funil.ver",)),
+    ("GET", r"/api/questionarios/painel", ("questionarios.ver",)),
+    ("GET", r"/api/questionarios/\d+/respostas", ("questionarios.ver", "funil.ver")),
+    ("GET", r"/api/questionarios(/\d+/pdf)?", ("funil.ver", "questionarios.ver")),
     ("POST", r"/api/questionarios/(buscar|\d+/resolver)", ("funil.questionarios",)),
     # grupos
     ("GET", r"/api/grupos(/sugestoes-de-fusao|/fusoes)?", ("grupos.ver", "funil.ver")),
@@ -111,6 +118,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/contratos(/\d+)?", ("contratos.ver",)),
     ("PATCH", r"/api/contratos/\d+", ("contratos.editar",)),
     ("POST", r"/api/contratos/\d+/eventos", ("contratos.eventos",)),
+    ("GET", r"/api/aprovacoes", ("contratos.aprovar",)),
+    ("POST", r"/api/aprovacoes/\d+/(aprovar|recusar)", ("contratos.aprovar",)),
     # carteira
     ("GET", r"/api/carteira/exportar", ("carteira.exportar",)),
     ("GET", r"/api/carteira/.+", ("carteira.ver",)),

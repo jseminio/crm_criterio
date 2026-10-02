@@ -117,7 +117,7 @@ _FUSO = ZoneInfo("America/Sao_Paulo")
 _MENU_DA_TABELA = {
     "oportunidade": "funil.ver", "lead": "funil.ver", "proposta": "funil.ver", "pendencia_da_proposta": "funil.ver",
     "pessoa_contato": "contatos.ver", "empresa": "contatos.ver", "vinculo_de_contato": "contatos.ver",
-    "contrato": "contratos.ver", "evento_de_contrato": "contratos.ver", "grupo_economico": "grupos.ver",
+    "contrato": "contratos.ver", "evento_de_contrato": "contratos.ver", "pedido_de_aprovacao": "contratos.ver", "grupo_economico": "grupos.ver",
 }
 
 

@@ -34,7 +34,8 @@ from crm.acesso.auditoria import usuario_atual
 from crm.acesso.catalogo import PUBLICAS, permissoes_da_rota
 from crm.acesso.entrada import ConfiguracaoDeEntrada, EntradaRecusada, ler_configuracao, pessoa_do_token, validador_da_microsoft
 from crm.api import esquemas as e
-from crm.api.acesso import roteador_do_acesso
+from crm.api.acesso import quem_fez, roteador_do_acesso
+from crm.domain.alcada import motivo_da_alcada
 from crm.api.abordagens import Servicos, roteador_de_abordagens, servicos_reais
 from crm.api.backup import roteador as roteador_de_backup
 from crm.api.classificacao import ServicosDeAnalise, roteador as roteador_de_carteira, servicos_de_analise_reais
@@ -51,6 +52,7 @@ from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, desfazer_fusao, fundir_grupos
 from crm.db import leads as regras_do_lead
 from crm.db.modelos import (
+    PedidoDeAprovacao,
     Contrato,
     Empresa,
     EventoDeContrato,
@@ -76,6 +78,7 @@ from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
 from crm.domain.servicos import CATALOGO as CATALOGO_DE_SERVICOS, OUTRO, linha_do_servico, problema_na_descricao, problema_no_tema
 from crm.domain.listas import (
+    SituacaoDaAprovacao,
     ORIGEM_DA_MUDANCA_NO_CRM,
     IndiceDeReajuste,
     IniciativaDoEncerramento,
@@ -270,10 +273,56 @@ def _resumo_de_contrato(contrato: Contrato, nome_do_grupo: str | None) -> e.Cont
     return resumo
 
 
+def _pendente(sessao: Session, contrato_id: int) -> PedidoDeAprovacao | None:
+    return sessao.scalar(
+        sa.select(PedidoDeAprovacao).where(
+            PedidoDeAprovacao.contrato_id == contrato_id,
+            PedidoDeAprovacao.situacao == SituacaoDaAprovacao.AGUARDANDO,
+        )
+    )
+
+
 def _detalhe_de_contrato(contrato: Contrato, nome_do_grupo: str | None) -> e.ContratoDetalhe:
     detalhe = e.ContratoDetalhe.model_validate(contrato)
     detalhe.grupo_nome = nome_do_grupo
+    sessao = Session.object_session(contrato)
+    pendente = _pendente(sessao, contrato.id) if sessao is not None else None
+    if pendente is not None:
+        detalhe.aprovacao_pendente = _resposta_da_aprovacao(pendente)
     return detalhe
+
+
+def _resposta_da_aprovacao(p: PedidoDeAprovacao) -> e.AprovacaoResposta:
+    r = e.AprovacaoResposta.model_validate(p)
+    r.grupo_nome = p.contrato.grupo.nome
+    return r
+
+
+def _gravar_evento(
+    sessao: Session, contrato: Contrato, pedido: regras_de_eventos.Pedido, efeito: dict[str, object]
+) -> EventoDeContrato:
+    """Grava o evento com o antes e o depois e aplica o efeito no contrato."""
+    evento = EventoDeContrato(
+        contrato_id=contrato.id,
+        tipo=pedido.tipo,
+        data_do_evento=pedido.data_do_evento,
+        descricao=pedido.descricao,
+        motivo_categoria=pedido.motivo_categoria,
+        iniciativa=pedido.iniciativa,
+        preco_mensal_anterior=contrato.preco_mensal,
+        preco_mensal_novo=efeito.get("preco_mensal"),
+        preco_anual_anterior=contrato.preco_anual,
+        preco_anual_novo=efeito.get("preco_anual"),
+        escopo_anterior=contrato.escopo,
+        escopo_novo=efeito.get("escopo"),
+        data_fim_anterior=contrato.data_fim,
+        data_fim_nova=efeito.get("data_fim") if pedido.tipo is not TipoDeEventoDeContrato.ENCERRAMENTO else pedido.data_do_evento,
+    )
+    sessao.add(evento)
+    for campo, valor in efeito.items():
+        setattr(contrato, campo, valor)
+    sessao.flush()
+    return evento
 
 
 def _registrar(api: FastAPI) -> None:
@@ -1280,15 +1329,21 @@ def _registrar(api: FastAPI) -> None:
     def registrar_evento_de_contrato(
         contrato_id: int,
         corpo: e.EventoDeContratoNovo,
+        resposta: Response,
         sessao: Session = Depends(obter_sessao),
     ) -> e.ContratoDetalhe:
         """Registra um aditivo, reajuste, expansão, contração, renovação ou
         encerramento. Valida, grava o evento com o antes e o depois e aplica o
         efeito no contrato — tudo na mesma transação. Não há rota para editar
-        nem apagar um evento: errou, registra outro."""
+        nem apagar um evento: errou, registra outro.
+
+        **Alçada (02/10/2026):** acima dela, e para quem não aprova, o evento vira
+        pedido de aprovação (202) e o contrato só muda quando alguém aprovar."""
         contrato = sessao.get(Contrato, contrato_id)
         if contrato is None:
             raise HTTPException(404, "contrato não encontrado")
+        if _pendente(sessao, contrato.id) is not None:
+            raise HTTPException(409, "este contrato tem um evento aguardando aprovação: espere a decisão antes de registrar outro")
         pedido = regras_de_eventos.Pedido(
             tipo=corpo.tipo,
             data_do_evento=corpo.data_do_evento or date.today(),
@@ -1307,29 +1362,80 @@ def _registrar(api: FastAPI) -> None:
         except regras_de_eventos.ErroDeEvento as erro:
             raise HTTPException(erro.status, str(erro)) from erro
 
-        sessao.add(
-            EventoDeContrato(
-                contrato_id=contrato.id,
-                tipo=pedido.tipo,
-                data_do_evento=pedido.data_do_evento,
+        quem = usuario_atual.get()
+        motivo = motivo_da_alcada(contrato, pedido.tipo, efeito)
+        if motivo and quem is not None and not quem.pode("contratos.aprovar"):
+            sessao.add(PedidoDeAprovacao(
+                contrato_id=contrato.id, tipo=pedido.tipo, data_do_evento=pedido.data_do_evento,
                 descricao=pedido.descricao,
-                motivo_categoria=pedido.motivo_categoria,
-                iniciativa=pedido.iniciativa,
-                preco_mensal_anterior=contrato.preco_mensal,
-                preco_mensal_novo=efeito.get("preco_mensal"),
-                preco_anual_anterior=contrato.preco_anual,
-                preco_anual_novo=efeito.get("preco_anual"),
-                escopo_anterior=contrato.escopo,
-                escopo_novo=efeito.get("escopo"),
-                data_fim_anterior=contrato.data_fim,
-                data_fim_nova=efeito.get("data_fim") if pedido.tipo is not TipoDeEventoDeContrato.ENCERRAMENTO else pedido.data_do_evento,
-            )
-        )
-        for campo, valor in efeito.items():
-            setattr(contrato, campo, valor)
-        sessao.flush()
+                preco_mensal_anterior=contrato.preco_mensal, preco_mensal_novo=efeito.get("preco_mensal"),
+                preco_anual_anterior=contrato.preco_anual, preco_anual_novo=efeito.get("preco_anual"),
+                escopo_anterior=contrato.escopo, escopo_novo=efeito.get("escopo"),
+                motivo=motivo[:300], pedido_por=quem_fez("")[:200],
+            ))
+            sessao.flush()
+            resposta.status_code = 202
+            return _detalhe_de_contrato(contrato, contrato.grupo.nome)
+
+        _gravar_evento(sessao, contrato, pedido, efeito)
         sessao.refresh(contrato)
         return _detalhe_de_contrato(contrato, contrato.grupo.nome)
+
+    # ------------------------------------------------------------- aprovações
+    @api.get("/api/aprovacoes", response_model=list[e.AprovacaoResposta], tags=["contratos"])
+    def listar_aprovacoes(
+        sessao: Session = Depends(obter_sessao),
+        situacao: SituacaoDaAprovacao = SituacaoDaAprovacao.AGUARDANDO,
+        limite: int = Query(default=100, le=500),
+    ) -> list[e.AprovacaoResposta]:
+        """Os pedidos de evento acima da alçada; por padrão, os que esperam decisão (mais antigos primeiro)."""
+        ordem = PedidoDeAprovacao.pedido_em.asc() if situacao is SituacaoDaAprovacao.AGUARDANDO else PedidoDeAprovacao.decidido_em.desc()
+        pedidos = sessao.scalars(
+            sa.select(PedidoDeAprovacao).where(PedidoDeAprovacao.situacao == situacao).order_by(ordem, PedidoDeAprovacao.id).limit(limite)
+        ).all()
+        return [_resposta_da_aprovacao(p) for p in pedidos]
+
+    def _aguardando(sessao: Session, aprovacao_id: int) -> PedidoDeAprovacao:
+        p = sessao.get(PedidoDeAprovacao, aprovacao_id)
+        if p is None:
+            raise HTTPException(404, "pedido de aprovação não encontrado")
+        if p.situacao is not SituacaoDaAprovacao.AGUARDANDO:
+            quem = f" por {p.decidido_por}" if p.decidido_por else ""
+            raise HTTPException(409, f"este pedido já foi decidido ({p.situacao.value.lower()}{quem})")
+        return p
+
+    @api.post("/api/aprovacoes/{aprovacao_id}/aprovar", response_model=e.AprovacaoResposta, tags=["contratos"])
+    def aprovar(aprovacao_id: int, sessao: Session = Depends(obter_sessao)) -> e.AprovacaoResposta:
+        """Aplica o evento com a data pedida. Revalida contra o contrato de agora: se ele mudou (por
+        exemplo, foi encerrado), recusa com o motivo e o pedido continua esperando."""
+        p = _aguardando(sessao, aprovacao_id)
+        contrato = p.contrato
+        pedido = regras_de_eventos.Pedido(
+            tipo=p.tipo, data_do_evento=p.data_do_evento, descricao=p.descricao, escopo_novo=p.escopo_novo,
+            preco_mensal_novo=p.preco_mensal_novo, preco_anual_novo=p.preco_anual_novo,
+        )
+        try:
+            efeito = regras_de_eventos.efeito_do_evento(contrato, pedido)
+        except regras_de_eventos.ErroDeEvento as erro:
+            raise HTTPException(409, f"não dá para aprovar: {erro}") from erro
+        evento = _gravar_evento(sessao, contrato, pedido, efeito)
+        p.situacao = SituacaoDaAprovacao.APROVADO
+        p.decidido_por = quem_fez("")[:200] or None
+        p.decidido_em = agora()
+        p.evento_id = evento.id
+        sessao.flush()
+        return _resposta_da_aprovacao(p)
+
+    @api.post("/api/aprovacoes/{aprovacao_id}/recusar", response_model=e.AprovacaoResposta, tags=["contratos"])
+    def recusar(aprovacao_id: int, corpo: e.Recusa, sessao: Session = Depends(obter_sessao)) -> e.AprovacaoResposta:
+        """O contrato não muda; o pedido fica guardado com o porquê."""
+        p = _aguardando(sessao, aprovacao_id)
+        p.situacao = SituacaoDaAprovacao.RECUSADO
+        p.decidido_por = quem_fez("")[:200] or None
+        p.decidido_em = agora()
+        p.motivo_da_recusa = corpo.motivo.strip()
+        sessao.flush()
+        return _resposta_da_aprovacao(p)
 
     # ------------------------------------------------------------- conferência
     def _contagens(sessao: Session, ids: list[int]) -> dict[int, dict[TipoDeOcorrencia, int]]:

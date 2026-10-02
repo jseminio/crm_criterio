@@ -11,6 +11,8 @@ import { api, ErroDaApi } from "../api/cliente";
 import type { ContratoDetalhe, EventoDeContrato } from "../api/tipos";
 import { data, dataHora, dinheiro } from "../formato";
 import { CampoDeData } from "../componentes/CampoDeData";
+import { motivoDaAlcada } from "../alcada";
+import { usarAcesso } from "../entrada";
 
 type Tipo = EventoDeContrato["tipo"];
 const TIPOS: { valor: Tipo; ajuda: string }[] = [
@@ -56,6 +58,9 @@ export function EventosDeContrato({
   const [confirmando, definirConfirmando] = useState(false);
   const [salvando, definirSalvando] = useState(false);
   const [erro, definirErro] = useState<string | null>(null);
+  const [enviado, definirEnviado] = useState<string | null>(null);
+  const { eu, pode } = usarAcesso();
+  const pendente = contrato.aprovacao_pendente ?? null;
 
   const mudar = (campo: string, valor: string) => {
     definirCampos((c) => ({ ...c, [campo]: valor }));
@@ -67,6 +72,8 @@ export function EventosDeContrato({
   // Aditivo sempre descreve; no encerramento o texto só é obrigatório quando a
   // categoria é "Outro" — nas demais, a categoria já diz o porquê.
   const pedeDescricao = tipo === "Aditivo" || tipo === "Correção" || categoriaOutro;
+  // Alçada (02/10/2026): sem login não há alçada; quem aprova registra direto.
+  const alcada = eu.modo === "microsoft" && !pode("contratos.aprovar") ? motivoDaAlcada(contrato, tipo, campos) : null;
   const faltaDado =
     (pedeMotivo && (!campos.iniciativa || !campos.motivo_categoria)) ||
     (pedeDescricao && (campos.descricao ?? "").trim().length < 3) ||
@@ -84,6 +91,7 @@ export function EventosDeContrato({
       const atualizado = await api.registrarEventoDeContrato(contrato.id, corpo);
       definirCampos({});
       definirConfirmando(false);
+      definirEnviado(atualizado.aprovacao_pendente ? `Pedido de ${tipo.toLowerCase()} enviado para aprovação: o contrato muda quando alguém aprovar.` : null);
       aoRegistrar(atualizado);
     } catch (falha) {
       definirErro(falha instanceof ErroDaApi ? falha.message : "Falha ao registrar.");
@@ -116,7 +124,19 @@ export function EventosDeContrato({
         </ul>
       )}
 
-      {!assinado ? (
+      {enviado && <p className="recado" role="status">✓ {enviado}</p>}
+
+      {pendente ? (
+        <div className="recado recado-alcada" role="note">
+          <strong>⏳ {pendente.tipo} aguardando aprovação</strong>, pedida por {pendente.pedido_por} em {dataHora(pendente.pedido_em)}
+          {" "}({pendente.motivo}).
+          {pendente.preco_mensal_novo !== null && ` Mensal ${dinheiro(pendente.preco_mensal_anterior)} → ${dinheiro(pendente.preco_mensal_novo)}.`}
+          {pendente.preco_anual_novo !== null && ` Anual ${dinheiro(pendente.preco_anual_anterior)} → ${dinheiro(pendente.preco_anual_novo)}.`}
+          {pendente.escopo_novo !== null && ` Escopo “${pendente.escopo_anterior ?? "—"}” → “${pendente.escopo_novo}”.`}
+          {" "}Até a decisão, o contrato não recebe outro evento.
+          {pode("contratos.aprovar") && " Aprove ou recuse na Agenda › Aprovações."}
+        </div>
+      ) : !assinado ? (
         <div className="recado">
           {contrato.situacao === "Encerrado"
             ? "Contrato encerrado: não recebe mais eventos."
@@ -198,12 +218,19 @@ export function EventosDeContrato({
 
           {confirmando ? (
             <>
-              <div className="recado">
-                <strong>Isto não se edita nem se apaga depois.</strong> Se errar, registre outro evento.
-                {tipo === "Encerramento" && " O contrato passa a Encerrado e não recebe mais eventos."}
-              </div>
+              {alcada ? (
+                <div className="recado recado-alcada" role="note">
+                  <strong>⚠ Precisa de aprovação:</strong> {alcada}, acima da alçada do seu perfil (reduções de até 10% entram
+                  direto). O evento fica <strong>aguardando aprovação</strong> e o contrato só muda quando um Administrador aprovar.
+                </div>
+              ) : (
+                <div className="recado">
+                  <strong>Isto não se edita nem se apaga depois.</strong> Se errar, registre outro evento.
+                  {tipo === "Encerramento" && " O contrato passa a Encerrado e não recebe mais eventos."}
+                </div>
+              )}
               <button type="button" className="botao botao-primario" disabled={salvando} onClick={registrar}>
-                {salvando ? "Registrando…" : `Confirmar ${tipo.toLowerCase()}`}
+                {salvando ? "Registrando…" : alcada ? "Enviar para aprovação" : `Confirmar ${tipo.toLowerCase()}`}
               </button>
             </>
           ) : (

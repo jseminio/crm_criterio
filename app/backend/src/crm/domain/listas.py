@@ -236,6 +236,14 @@ class TipoDeEventoDeContrato(Enum):
     nem reajuste no MRR do período."""
 
 
+class SituacaoDaAprovacao(Enum):
+    """Pedido de evento de contrato acima da alçada (02/10/2026): espera quem aprova."""
+
+    AGUARDANDO = "Aguardando"
+    APROVADO = "Aprovado"
+    RECUSADO = "Recusado"
+
+
 class IniciativaDoEncerramento(Enum):
     """Quem decidiu encerrar o contrato — separa saída do cliente de saída da Critério.
 

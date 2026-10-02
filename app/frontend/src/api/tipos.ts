@@ -31,6 +31,10 @@ export interface OportunidadeResumo {
   nome: string;
   grupo_id: number;
   grupo_nome: string | null;
+  /** A empresa (CNPJ) da oportunidade; o grupo vem dela (01/10/2026). */
+  empresa_id?: number | null;
+  empresa_razao_social?: string | null;
+  empresa_cnpj?: string | null;
   situacao: Situacao;
   temperatura: Temperatura | null;
   servico: string | null;
@@ -68,6 +72,8 @@ export interface MudancaDePreco {
 }
 
 export interface OportunidadeDetalhe extends OportunidadeResumo {
+  /** Já virou contrato: a empresa não troca mais pelo detalhe. */
+  tem_contrato?: boolean;
   canal: string | null;
   linha_servico: string | null;
   servico_descricao?: string | null;
@@ -486,6 +492,17 @@ export interface Mrr {
 export type TipoDeContato = "cliente" | "prospect";
 
 /** Uma empresa em que a pessoa está — a pessoa pode estar em várias (30/09/2026). */
+/** Uma empresa da base, para escolher a da oportunidade (01/10/2026). */
+export interface EmpresaEncontrada {
+  id: number;
+  razao_social: string;
+  nome_fantasia: string | null;
+  cnpj: string | null;
+  grupo_id: number;
+  grupo_nome: string;
+  tipo: TipoDeContato;
+}
+
 export interface EmpresaDaPessoa {
   empresa_id: number;
   razao_social: string;

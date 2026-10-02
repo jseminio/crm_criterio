@@ -801,6 +801,16 @@
 .campo-data-hoje { font-weight: 700; text-decoration: underline; }
 .campo-data-escolhido { background: var(--surface-brand); color: var(--texto-sobre-marca); }
 
+/* ------------------------------------------- busca de empresa da oportunidade */
+.busca-empresa { position: relative; }
+.busca-empresa-lista { position: absolute; z-index: 30; top: 100%; left: 0; right: 0; margin: var(--e1) 0 0; padding: var(--e1);
+  list-style: none; max-height: 280px; overflow-y: auto; background: var(--surface-card);
+  border: 1px solid var(--borda); border-radius: var(--raio-sm); box-shadow: var(--sombra-painel); }
+.busca-empresa-item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: var(--e2);
+  border-radius: var(--raio-sm); cursor: pointer; font-size: 13px; color: var(--texto-forte); }
+.busca-empresa-item:hover, .busca-empresa-item:focus { background: var(--surface-sunken); }
+.busca-empresa-vazio { padding: var(--e2); margin: 0; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

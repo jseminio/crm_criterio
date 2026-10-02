@@ -24,7 +24,7 @@ from typing import Callable, Iterator, Literal
 import sqlalchemy as sa
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, object_session, sessionmaker
 
 from crm.api import esquemas as e
 from crm.api.abordagens import Servicos, roteador_de_abordagens, servicos_reais
@@ -35,6 +35,7 @@ from crm.api.contatos import roteador_de_empresas
 from crm.api.sdr import roteador as roteador_do_sdr
 from crm.api.propostas import roteador_de_propostas
 from crm.api.questionarios import fonte_real, roteador_de_questionarios
+from crm.questionario.endereco import BuscaDeEndereco, endereco_pelo_cnpj
 from crm.questionario.fonte import FonteDeQuestionarios
 from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
 from crm.db.base import agora
@@ -112,6 +113,7 @@ def criar_app(
     servicos: Callable[[], Servicos] | None = None,
     servicos_de_analise: Callable[[], ServicosDeAnalise] | None = None,
     fonte_de_questionarios: Callable[[], FonteDeQuestionarios | None] | None = None,
+    busca_de_endereco: BuscaDeEndereco | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede."""
@@ -144,7 +146,10 @@ def criar_app(
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
     api.include_router(roteador_do_sdr(obter_sessao))
-    api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real))
+    # Endereço pelo CNPJ na importação do questionário: a BrasilAPI no uso real; no teste (que passa a
+    # própria `fabrica`), só se o teste mandar uma busca — teste não sai para a rede.
+    endereco = busca_de_endereco or (None if fabrica is not None else endereco_pelo_cnpj)
+    api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real, endereco))
     api.include_router(roteador_de_propostas(obter_sessao))
     return api
 
@@ -155,8 +160,16 @@ def _valores(enum) -> list[str]:
 
 def _resumo_de(oportunidade: Oportunidade, nome_do_grupo: str | None) -> e.OportunidadeResumo:
     resumo = e.OportunidadeResumo.model_validate(oportunidade)
+    _empresa_no_resumo(resumo, oportunidade)
     resumo.grupo_nome = nome_do_grupo
     return resumo
+
+
+def _empresa_no_resumo(saida: e.OportunidadeResumo, oportunidade: Oportunidade) -> None:
+    """Razão social e CNPJ da empresa da oportunidade, para a tela mostrar sem outra consulta."""
+    if oportunidade.empresa is not None:
+        saida.empresa_razao_social = oportunidade.empresa.razao_social
+        saida.empresa_cnpj = oportunidade.empresa.cnpj
 
 
 def _detalhe_de(oportunidade: Oportunidade, nome_do_grupo: str | None) -> e.OportunidadeDetalhe:
@@ -164,6 +177,11 @@ def _detalhe_de(oportunidade: Oportunidade, nome_do_grupo: str | None) -> e.Opor
     nunca é gravada, então recalcula a cada leitura (ver `crm.domain.porte`)."""
     detalhe = e.OportunidadeDetalhe.model_validate(oportunidade)
     detalhe.grupo_nome = nome_do_grupo
+    _empresa_no_resumo(detalhe, oportunidade)
+    sessao = object_session(oportunidade)
+    detalhe.tem_contrato = sessao is not None and oportunidade.id is not None and sessao.scalar(
+        sa.select(Contrato.id).where(Contrato.oportunidade_id == oportunidade.id).limit(1)
+    ) is not None
     volumetria = regras_de_porte.Volumetria(
         documentos_fiscais_mes=oportunidade.documentos_fiscais_mes,
         lancamentos_contabeis_mes=oportunidade.lancamentos_contabeis_mes,
@@ -593,7 +611,14 @@ def _registrar(api: FastAPI) -> None:
         )
         if problema:
             raise HTTPException(422, problema)
-        if corpo.grupo_id is not None:
+        empresa = None
+        if corpo.empresa_id is not None:
+            # A empresa vem da base de empresas e manda no grupo (Karine, 01/10/2026).
+            empresa = sessao.get(Empresa, corpo.empresa_id)
+            if empresa is None:
+                raise HTTPException(404, "empresa não encontrada")
+            grupo = empresa.grupo
+        elif corpo.grupo_id is not None:
             grupo = sessao.get(GrupoEconomico, corpo.grupo_id)
             if grupo is None:
                 raise HTTPException(404, "grupo não encontrado")
@@ -625,6 +650,7 @@ def _registrar(api: FastAPI) -> None:
 
         oportunidade = Oportunidade(
             grupo_id=grupo.id,
+            empresa_id=empresa.id if empresa else None,
             nome=corpo.nome,
             servico=corpo.servico,
             tipo_servico=corpo.tipo_servico,
@@ -910,6 +936,24 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(404, "oportunidade não encontrada")
 
         mudancas = corpo.model_dump(exclude_unset=True)
+        if mudancas.get("nome") is None:
+            mudancas.pop("nome", None)
+        else:
+            mudancas["nome"] = " ".join(mudancas["nome"].split())
+        # Trocar a empresa leva o grupo junto; quem já virou contrato não troca
+        # (o contrato ficaria noutra empresa). Karine, 01/10/2026.
+        if "empresa_id" in mudancas:
+            nova = mudancas.pop("empresa_id")
+            if nova != oportunidade.empresa_id:
+                if nova is None:
+                    raise HTTPException(422, "escolha a empresa da oportunidade")
+                empresa = sessao.get(Empresa, nova)
+                if empresa is None:
+                    raise HTTPException(404, "empresa não encontrada")
+                if sessao.scalar(sa.select(Contrato.id).where(Contrato.oportunidade_id == oportunidade.id).limit(1)):
+                    raise HTTPException(409, "esta oportunidade já virou contrato e não troca de empresa")
+                oportunidade.empresa = empresa
+                oportunidade.grupo = empresa.grupo
         # Estes dois não são colunas da oportunidade que se copiam por `setattr`:
         # o motivo vai para a linha do histórico, e a origem tem validação própria.
         motivo_do_preco = mudancas.pop("motivo_do_preco", None)
@@ -1050,6 +1094,7 @@ def _registrar(api: FastAPI) -> None:
 
         contrato = Contrato(
             grupo_id=oportunidade.grupo_id,
+            empresa_id=oportunidade.empresa_id,
             oportunidade_id=oportunidade.id,
             escopo=corpo.escopo or oportunidade.servico,
             preco_mensal=corpo.preco_mensal or oportunidade.preco_mensal,

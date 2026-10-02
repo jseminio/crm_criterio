@@ -373,6 +373,9 @@ class Oportunidade(CarimboMixin, Base):
     grupo_id: Mapped[int] = mapped_column(
         sa.ForeignKey("grupo_economico.id"), nullable=False, index=True
     )
+    empresa_id: Mapped[int | None] = mapped_column(sa.ForeignKey("empresa.id"), index=True)
+    """A empresa (o CNPJ) da oportunidade, escolhida na base de empresas; o grupo vem dela.
+    Pedido de Karine em 01/10/2026. Nulo nas antigas cujo grupo tem mais de uma empresa."""
     nome: Mapped[str] = mapped_column(sa.String(200), nullable=False, index=True)
 
     servico: Mapped[str | None] = mapped_column(sa.String(120))
@@ -513,6 +516,7 @@ class Oportunidade(CarimboMixin, Base):
     """
 
     grupo: Mapped[GrupoEconomico] = relationship(back_populates="oportunidades")
+    empresa: Mapped[Empresa | None] = relationship()
     lead: Mapped[Lead | None] = relationship(back_populates="convertido_em")
 
     __table_args__ = (

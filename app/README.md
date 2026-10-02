@@ -551,6 +551,42 @@ pontual). Antes, só a carteira recorrente era "Cliente". Agora:
 - A sugestão "prospect que já é cliente" passou a comparar os grupos **sem empresa** (prospects e clientes
   não recorrentes) com os clientes da carteira, para não perder as duplicatas depois da promoção.
 
+## Questionário preenche pessoa, empresa e oportunidade (01/10/2026)
+
+Pedido de Karine: continua pelo botão **"Buscar questionários"** no Funil, e cada questionário novo já
+preenche tudo sozinho.
+
+- **Oportunidade** nasce ligada à **empresa** do CNPJ (`oportunidade.empresa_id`), também em "criar
+  nova"; "anexar" só preenche a empresa se a oportunidade ainda não tiver.
+- **Pessoa:** se o e-mail do contato já está na base (em qualquer empresa), a pessoa é reaproveitada —
+  ganha o vínculo com esta empresa e só os campos vazios (cargo, telefone) são preenchidos. Sem isso,
+  nasce a pessoa nova, como antes.
+- **Endereço:** o questionário não pergunta o endereço; ele vem do **cadastro público do CNPJ**
+  (BrasilAPI, `crm/questionario/endereco.py`), só nos campos vazios. Sai do CRM apenas o CNPJ. Falha de
+  rede ou CNPJ não achado não impede a importação: o "o que fez" avisa "Endereço não encontrado pelo
+  CNPJ". A BrasilAPI recusa o agente padrão do Python (403); o CRM se identifica como `CRM-Criterio/1.0`.
+- Nos testes não há rede: `criar_app(fabrica=...)` não busca endereço, a menos que o teste passe
+  `busca_de_endereco`.
+
+## Oportunidade ligada a uma empresa da base (01/10/2026)
+
+Pedido de Karine, amostra aprovada. Em **Funil > Nova oportunidade** a empresa é escolhida na base
+de empresas — ao clicar no campo a lista aparece, e a busca acha por **nome fantasia, razão social ou
+CNPJ** (com ou sem pontuação). O **grupo vem da empresa**; o campo "Grupo (cliente)" saiu. O Funil
+**não cadastra empresa**: quem não está na base aparece como "Empresa não encontrada — cadastre em
+Contatos > Nova empresa", e o botão "Criar oportunidade" só libera com empresa escolhida. Ao escolher,
+o nome da oportunidade é preenchido com a razão social e continua editável.
+
+- **Editar depois:** no detalhe da oportunidade, **nome** e **empresa** são editáveis (busca e
+  "Trocar"); trocar a empresa leva o grupo junto. A oportunidade que **já virou contrato não troca de
+  empresa** (409). O contrato passa a nascer com a empresa da oportunidade.
+- **Banco:** `oportunidade.empresa_id` (migração `b7d2e9f4a1c8`). As oportunidades antigas cujo grupo
+  tem **uma única empresa** receberam essa empresa (decisão de Karine); as demais ficam em branco
+  para escolher no detalhe. Excluir uma empresa deixa as oportunidades dela sem empresa (o grupo fica).
+- **API:** `GET /api/empresas/busca`; `POST /api/oportunidades` aceita `empresa_id` (quando vem, o
+  grupo é o da empresa e `grupo_id`/`nome_do_grupo` são ignorados — o caminho antigo continua para
+  integrações); `PATCH /api/oportunidades/{id}` aceita `nome` e `empresa_id`.
+
 ## Datas no padrão brasileiro (01/10/2026)
 
 Pedido de Karine: os campos de data apareciam como mm/dd/aaaa. Motivo: o `<input type="date">` do

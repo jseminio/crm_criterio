@@ -490,6 +490,30 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
         sessao.flush()
         return {"id": e.id, "razao_social": e.razao_social, "cnpj": e.cnpj, "grupo_id": grupo.id, "grupo_nome": grupo.nome}
 
+    @r.get("/api/empresas/busca")
+    def buscar_empresas(busca: str = "", limite: int = Query(default=30, ge=1, le=100),
+                        sessao: Session = Depends(obter_sessao)) -> list[dict]:
+        """A base de empresas, para escolher a da oportunidade no Funil: por nome fantasia, razão
+        social ou CNPJ (com ou sem pontuação). Em branco, as primeiras em ordem alfabética.
+        Pedido de Karine em 01/10/2026."""
+        digitos = re.sub(r"\D", "", busca)
+        saida = []
+        for e, g in sessao.execute(
+            sa.select(Empresa, GrupoEconomico).join(GrupoEconomico, GrupoEconomico.id == Empresa.grupo_id)
+            .where(GrupoEconomico.fundido_em_id.is_(None)).order_by(Empresa.razao_social)
+        ).all():
+            if busca.strip() and not (casa(busca, e.razao_social, e.nome_fantasia, g.nome)
+                                      or (len(digitos) >= 3 and digitos in (e.cnpj or ""))):
+                continue
+            saida.append({
+                "id": e.id, "razao_social": e.razao_social, "nome_fantasia": e.nome_fantasia, "cnpj": e.cnpj,
+                "grupo_id": g.id, "grupo_nome": g.nome,
+                "tipo": "cliente" if g.situacao is SituacaoGrupo.CLIENTE else "prospect",
+            })
+            if len(saida) == limite:
+                break
+        return saida
+
     @r.delete("/api/empresas/{empresa_id}", status_code=204)
     def excluir_empresa(empresa_id: int, sessao: Session = Depends(obter_sessao)) -> None:
         """Apaga a empresa. Os contatos continuam na base (só o vínculo some) e o grupo fica.
@@ -501,6 +525,8 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
         if sessao.scalar(sa.select(Contrato.id).where(Contrato.empresa_id == empresa_id).limit(1)) is not None:
             raise HTTPException(409, "esta empresa tem contrato; encerre ou mova o contrato antes de excluir")
         sessao.execute(sa.delete(VinculoDeContato).where(VinculoDeContato.empresa_id == empresa_id))
+        # As oportunidades dela continuam no grupo, só sem empresa escolhida.
+        sessao.execute(sa.update(Oportunidade).where(Oportunidade.empresa_id == empresa_id).values(empresa_id=None))
         sessao.delete(e)
         sessao.flush()
 

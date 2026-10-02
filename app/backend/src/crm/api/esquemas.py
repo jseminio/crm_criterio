@@ -170,6 +170,7 @@ class ItemDaAgendaResposta(Base):
     balde: str
     dias_de_atraso: int
     dias_desde_o_envio: int | None = None
+    oportunidade_id: int | None = None
 
 
 class AgendaResposta(Base):

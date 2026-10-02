@@ -17,7 +17,8 @@ Baldes, na ordem em que pedem atenção:
 
 Só entra o que está **em aberto**: oportunidade não decidida, lead ainda no funil e
 **contrato em vigor com data de fim** — o vencimento é a hora de decidir a renovação
-(a data usada é a do fim, sem prazo de aviso inventado).
+(a data usada é a do fim, sem prazo de aviso inventado) — e, desde 02/10/2026, **pendência da
+proposta com prazo** ainda aberta (E4), com o responsável no lugar do captador.
 Lembrete aqui é **tela**, não notificação: a API do WhatsApp segue pendente.
 """
 
@@ -46,7 +47,7 @@ class _Aberto(Protocol):
 
 @dataclass(frozen=True)
 class ItemDaAgenda:
-    tipo: str  # "oportunidade" | "lead" | "contrato"
+    tipo: str  # "oportunidade" | "lead" | "contrato" | "pendencia"
     id: int
     titulo: str
     subtitulo: str | None
@@ -61,6 +62,8 @@ class ItemDaAgenda:
     """Positivo quando a data passou; zero nos demais casos."""
     dias_desde_o_envio: int | None
     """Idade da proposta (hoje − data de colocação). `None` para lead e para proposta sem data."""
+    oportunidade_id: int | None = None
+    """Na pendência, a oportunidade a abrir (o `id` é o da pendência)."""
 
 
 def _balde(acao: str | None, quando: date | None, hoje: date) -> str:
@@ -80,6 +83,7 @@ def montar(
     leads: Iterable[object],
     hoje: date,
     contratos: Iterable[tuple[object, str | None]] = (),
+    pendencias: Iterable[tuple[int, object, object, str | None]] = (),
 ) -> list[ItemDaAgenda]:
     """`oportunidades` é uma lista de (oportunidade em aberto, nome do grupo).
 
@@ -144,6 +148,30 @@ def montar(
                 balde=balde,
                 dias_de_atraso=(hoje - c.data_fim).days if balde == "atrasada" else 0,
                 dias_desde_o_envio=None,
+            )
+        )
+
+    # (número da linha, pendência aberta com prazo, oportunidade, nome do grupo)
+    for n, p, o, grupo in pendencias:
+        if p.prazo is None or not p.aberta:
+            continue
+        balde = _balde(p.descricao, p.prazo, hoje)
+        itens.append(
+            ItemDaAgenda(
+                tipo="pendencia",
+                id=n,
+                titulo=grupo or o.nome,
+                subtitulo=o.nome if grupo and o.nome != grupo else None,
+                situacao=o.situacao.value,
+                temperatura=o.temperatura.value if o.temperatura else None,
+                captador=p.responsavel,
+                valor_anual=o.preco_anual,
+                proxima_acao=f"Pendência da proposta: {p.descricao}",
+                proxima_acao_em=p.prazo,
+                balde=balde,
+                dias_de_atraso=(hoje - p.prazo).days if balde == "atrasada" else 0,
+                dias_desde_o_envio=None,
+                oportunidade_id=o.id,
             )
         )
 

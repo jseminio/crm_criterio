@@ -505,6 +505,16 @@ class Oportunidade(CarimboMixin, Base):
     entrevista ou do questionário.
     """
 
+    ficha: Mapped[dict[str, dict]] = mapped_column(
+        sa.JSON().with_variant(JSONB(), "postgresql"),
+        nullable=False,
+        default=dict,
+        server_default=sa.text("'{}'"),
+    )
+    """O que se corrigiu da ficha na entrevista (E4, 02/10/2026): `{chave: {"valor", "por", "em"}}`,
+    com a chave do questionário do site (`crm.proposta.ficha`). Vale sobre a resposta do
+    questionário, que continua guardada em `QuestionarioRecebido.respostas`."""
+
     historico_de_preco: Mapped[list["HistoricoDePreco"]] = relationship(
         back_populates="oportunidade",
         order_by="HistoricoDePreco.id.desc()",
@@ -1347,3 +1357,27 @@ class Proposta(CarimboMixin, Base):
     enviada_em: Mapped[date | None] = mapped_column(sa.Date)
     enviada_por: Mapped[str | None] = mapped_column(sa.String(60))
 
+
+
+class PendenciaDaProposta(CarimboMixin, Base):
+    """Um item de "o que falta para a proposta" (E4, 02/10/2026).
+
+    Item **manual**: `descricao` escrita por alguém, fechado com `feita_em`. Item **automático**: o
+    CRM confere sozinho (`crm.proposta.pendencias`) e fecha quando o dado chega; a linha só existe
+    para guardar o responsável e o prazo que alguém lhe deu, pela `chave` da regra."""
+
+    __tablename__ = "pendencia_da_proposta"
+    __table_args__ = (sa.UniqueConstraint("oportunidade_id", "chave", name="uq_pendencia_oportunidade_chave"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    oportunidade_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("oportunidade.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    chave: Mapped[str | None] = mapped_column(sa.String(40))
+    """A regra automática (ex. "volumes", "porte"); vazio no item manual."""
+    descricao: Mapped[str | None] = mapped_column(sa.String(300))
+    responsavel: Mapped[str | None] = mapped_column(sa.String(60))
+    prazo: Mapped[date | None] = mapped_column(sa.Date)
+    criada_por: Mapped[str] = mapped_column(sa.String(60), nullable=False)
+    feita_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    feita_por: Mapped[str | None] = mapped_column(sa.String(60))

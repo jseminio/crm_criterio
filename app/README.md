@@ -16,6 +16,32 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Ficha e "o que falta para a proposta" (E4, 02/10/2026)
+
+Amostra aprovada por Eduardo em 02/10/2026. Fecha os dois itens do E4 que faltavam no
+`planejamento.md`: a ficha com as nove seções do questionário, cada campo sabendo de onde veio,
+e a lista do que falta para a proposta, com responsável e prazo.
+
+- **Aba Ficha** (entre "Volumetria e porte" e "Proposta"): as nove seções do questionário do site
+  (`crm.proposta.ficha`, espelho do `SECOES` de `app/site/questionario/index.html`). Cada seção diz
+  "✓ 14 de 14", "◐ 3 de 5", "✗ 0 de 7", "fora do escopo" (Folha sem DP, Financeiro sem
+  Financeiro) ou "para a implantação" (seção 9). Cada resposta mostra a origem: **Questionário** e a
+  data do envio, ou **Entrevista**, quem e quando. Corrigir na Ficha grava como Entrevista em
+  `oportunidade.ficha`; a resposta do cliente continua em `questionario_recebido.respostas`. Só
+  conta a pergunta visível para as respostas atuais, como no formulário.
+- **O que falta para a proposta**, no alto da aba Proposta, com a contagem no rótulo da aba
+  ("Proposta · 3 pendentes"). Itens **automáticos** (`crm.proposta.pendencias`) que fecham
+  sozinhos: volumes sem resposta, seção do escopo inteira sem resposta, porte não confirmado,
+  matriz não subida ou com marcador faltando, nenhum contato com e-mail nas empresas do grupo,
+  proposta ainda não gerada. Itens **manuais**, que se marcam como feitos. Todos podem ter
+  responsável (quem revisa as propostas) e prazo.
+- **Decisões de Eduardo (02/10/2026):** a lista **não bloqueia** o "Gerar PowerPoint"; pendência
+  aberta **com prazo entra na Agenda**, no balde do prazo, com o responsável; a **seção 9** aparece na
+  ficha mas **não conta** como pendência (é levantada no kick-off).
+- **Quem preenche:** sem login (E1), a pessoa escolhe o nome uma vez (o navegador lembra).
+- Migração `c4e1a7d2f9b3`, só aditiva (coluna `oportunidade.ficha` e tabela
+  `pendencia_da_proposta`): **rode `alembic upgrade head`**, com o backup antes.
+
 ## Menu e título sempre à vista (02/10/2026)
 
 O menu lateral e a faixa do título da tela ficam parados; só o conteúdo rola. Antes a página

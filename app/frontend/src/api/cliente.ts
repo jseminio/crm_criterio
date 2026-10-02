@@ -58,6 +58,9 @@ import type {
   AbaDaProposta,
   ConfiguracaoDeProposta,
   EntradaDaProposta,
+  Ficha,
+  MudancaDePendencia,
+  PendenciasDaProposta,
   MatrizesDeProposta,
   MatrizResumo,
   PropostaResumo,
@@ -350,6 +353,20 @@ export const api = {
   resolverQuestionario: (id: number, acao: "anexar" | "criar") =>
     pedir<QuestionarioResumo>(`/api/questionarios/${id}/resolver`, { method: "POST", body: JSON.stringify({ acao }) }),
 
+  ficha: (oportunidadeId: number) => pedir<Ficha>(`/api/oportunidades/${oportunidadeId}/ficha`),
+  corrigirFicha: (oportunidadeId: number, chave: string, valor: string | string[] | null, por: string) =>
+    pedir<Ficha>(`/api/oportunidades/${oportunidadeId}/ficha/${encodeURIComponent(chave)}`, {
+      method: "PUT",
+      body: JSON.stringify({ valor, por }),
+    }),
+  pendencias: (oportunidadeId: number) => pedir<PendenciasDaProposta>(`/api/oportunidades/${oportunidadeId}/pendencias`),
+  novaPendencia: (oportunidadeId: number, corpo: { descricao: string; responsavel?: string | null; prazo?: string | null; por: string }) =>
+    pedir<PendenciasDaProposta>(`/api/oportunidades/${oportunidadeId}/pendencias`, { method: "POST", body: JSON.stringify(corpo) }),
+  mudarPendencia: (oportunidadeId: number, chave: string, mudanca: MudancaDePendencia) =>
+    pedir<PendenciasDaProposta>(`/api/oportunidades/${oportunidadeId}/pendencias/${encodeURIComponent(chave)}`, {
+      method: "PATCH",
+      body: JSON.stringify(mudanca),
+    }),
   abaDaProposta: (oportunidadeId: number) => pedir<AbaDaProposta>(`/api/oportunidades/${oportunidadeId}/proposta`),
   gerarProposta: (oportunidadeId: number, entrada: EntradaDaProposta) =>
     pedir<PropostaResumo>(`/api/oportunidades/${oportunidadeId}/proposta`, { method: "POST", body: JSON.stringify(entrada) }),

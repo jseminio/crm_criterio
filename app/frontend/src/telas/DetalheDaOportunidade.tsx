@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { EmpresaEncontrada, Listas, MudancaDePreco, OportunidadeDetalhe } from "../api/tipos";
+import type { EmpresaEncontrada, Listas, MudancaDePreco, OportunidadeDetalhe, PendenciasDaProposta } from "../api/tipos";
 import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { DIRECIONADORES_DE_PORTE } from "../componentes/direcionadoresDePorte";
 import { Etiqueta } from "../componentes/Etiqueta";
+import { FichaDaOportunidade } from "../componentes/FichaDaOportunidade";
+import { ListaDoQueFalta } from "../componentes/ListaDoQueFalta";
 import { PropostaDaOportunidade } from "../componentes/PropostaDaOportunidade";
 import { QuestionarioDaOportunidade } from "../componentes/QuestionarioDaOportunidade";
 import { PainelLateral } from "../componentes/PainelLateral";
@@ -283,7 +285,16 @@ export function DetalheDaOportunidade({
   const [rascunho, definirRascunho] = useState<Record<string, string>>({});
   const [convertendoEmContrato, definirConvertendoEmContrato] = useState(false);
   const [avisoDeContrato, definirAvisoDeContrato] = useState<string | null>(null);
-  const [aba, definirAba] = useState<"cadastro" | "volumetria" | "proposta" | "historico">("cadastro");
+  const [aba, definirAba] = useState<"cadastro" | "volumetria" | "ficha" | "proposta" | "historico">("cadastro");
+  // O que falta para a proposta (E4): a contagem fica no rótulo da aba; falhar aqui não impede o painel.
+  const [pendencias, definirPendencias] = useState<PendenciasDaProposta | null>(null);
+  const carregarPendencias = () => {
+    Promise.resolve()
+      .then(() => api.pendencias(id))
+      .then((d) => definirPendencias(d ?? null))
+      .catch(() => definirPendencias(null));
+  };
+  useEffect(carregarPendencias, [id]);
 
   const carregar = () => {
     definirErro(null);
@@ -478,10 +489,25 @@ export function DetalheDaOportunidade({
               type="button"
               role="tab"
               className="aba"
+              aria-selected={aba === "ficha"}
+              onClick={() => definirAba("ficha")}
+            >
+              Ficha
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className="aba"
               aria-selected={aba === "proposta"}
               onClick={() => definirAba("proposta")}
             >
               Proposta
+              {pendencias && pendencias.abertas > 0 && (
+                <span className="aba-contagem aba-pendentes">
+                  {" "}
+                  · {pendencias.abertas} pendente{pendencias.abertas === 1 ? "" : "s"}
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -766,11 +792,18 @@ export function DetalheDaOportunidade({
             />
           )}
 
+          {aba === "ficha" && <FichaDaOportunidade oportunidadeId={id} aoMudar={carregarPendencias} />}
+
+          {aba === "proposta" && pendencias && (
+            <ListaDoQueFalta oportunidadeId={id} dados={pendencias} aoMudar={definirPendencias} />
+          )}
           {aba === "proposta" && (
             <PropostaDaOportunidade
               oportunidadeId={id}
+              aoGerar={carregarPendencias}
               aoEnviar={() => {
                 carregar();
+                carregarPendencias();
                 aoSalvar();
               }}
             />

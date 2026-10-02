@@ -76,7 +76,16 @@ function apagarRascunho(id: number) {
   }
 }
 
-export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunidadeId: number; aoEnviar: () => void }) {
+export function PropostaDaOportunidade({
+  oportunidadeId,
+  aoEnviar,
+  aoGerar,
+}: {
+  oportunidadeId: number;
+  aoEnviar: () => void;
+  /** Gerar fecha o item "Proposta ainda não gerada" do que falta (E4). */
+  aoGerar?: () => void;
+}) {
   const [aba, definirAba] = useState<AbaDaProposta | null>(null);
   const [entrada, definirEntrada] = useState<EntradaDaProposta | null>(null);
   const [erroAoAbrir, definirErroAoAbrir] = useState<string | null>(null);
@@ -148,6 +157,7 @@ export function PropostaDaOportunidade({ oportunidadeId, aoEnviar }: { oportunid
           `Se não apareceu, use "Baixar de novo", logo abaixo. Revise, salve como PDF e envie.`,
       );
       carregar();
+      aoGerar?.();
     } catch (falha) {
       definirErro(falha instanceof ErroDaApi ? falha.message : "Falha ao gerar a proposta.");
     } finally {

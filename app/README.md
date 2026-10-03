@@ -65,10 +65,12 @@ como lá).
 
 Para quando alguém trabalhou num **outro** CRM (outro computador, outra cópia do banco) e mandou o
 backup. `scripts/comparar_backup.py <arquivo>` **só lê**: mostra, tabela por tabela, o que está
-só no arquivo (incluído lá), o que foi alterado lá depois da versão daqui (e quais campos), e
-quantos registros estão só no banco daqui. Reconhece o mesmo registro nas duas cópias pela data de
-criação mais o nome, com o grupo, empresa ou pessoa a que ele pertence (o número não serve: cada
-cópia numerou por conta própria). A saída tem nomes de clientes: fica na tela.
+só no arquivo (incluído lá), o que tem diferença entre as duas cópias (e quais campos), e quantos
+registros estão só no banco daqui. Reconhece o mesmo registro nas duas cópias pelo que o identifica de verdade, e não pela hora em que nasceu (revisto em 03/10/2026): empresa
+pelo CNPJ, contato pelo e-mail ou nome, oportunidade pela chave da planilha ou grupo e nome, contrato
+pela oportunidade ou grupo, empresa e escopo. Cada diferença diz se é para **preencher** (vazio aqui),
+um **conflito** (preenchido nos dois) ou **vazio lá**, e qual cópia mexeu por último. A saída tem nomes
+de clientes: fica na tela.
 
 ```
 cd app/backend && ~/.venvs/criterio-crm/bin/python scripts/comparar_backup.py ~/Downloads/<arquivo>.zip

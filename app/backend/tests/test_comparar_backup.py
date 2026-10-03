@@ -69,15 +69,43 @@ def resultado(tmp_path):
 def test_acha_o_novo_e_o_alterado_la_e_conta_o_novo_daqui(resultado):
     g = resultado["grupo_economico"]
     assert [l["nome"] for l in g["so_no_arquivo"]] == ["Novo da Karine"]
-    assert [(l["nome"], campos) for l, campos in g["alterados_no_arquivo"]] == [("Alterar", ["observacao"])]
+    assert [(l["nome"], campos) for l, _, campos, _ in g["diferencas"]] == [
+        ("Alterar", [("observacao", "", "nova observação", "preencher")])]
+    assert g["diferencas"][0][3] is True  # lá mexeu por último
     assert g["so_no_banco"] == 1
     assert [l["razao_social"] for l in resultado["empresa"]["so_no_arquivo"]] == ["Empresa K"]
 
 
-def test_registros_iguais_no_mesmo_segundo_contam_um_a_um(resultado):
+def test_registros_iguais_contam_um_a_um(resultado):
     c = resultado["contrato"]
     assert len(c["so_no_arquivo"]) == 1  # o contrato que saiu daqui continua no arquivo
     assert cb._rotulo("contrato", c["so_no_arquivo"][0], c["nomes"]) == "Alterar / 8000"
+
+
+def test_o_mesmo_registro_criado_em_outra_hora_e_reconhecido(tmp_path):
+    """A atualização do CRM rodou em horas diferentes nas duas cópias: a empresa é a mesma pelo CNPJ,
+    o contato pelo e-mail, mesmo com a hora, o acento e o zero da frente diferentes."""
+    from crm.db.modelos import PessoaContato
+
+    daqui, dela = _motor(), _motor()
+    for m, hora, cnpj, razao in ((daqui, T0, "05519711000190", "MP Linhares"), (dela, T0 + timedelta(hours=5), "5519711000190", "MP LINHARES")):
+        with Session(m) as s:
+            s.add(GrupoEconomico(nome="Grupo Queimado", criado_em=T0, atualizado_em=T0))
+            s.flush()
+            s.add(Empresa(grupo_id=1, razao_social=razao, cnpj=cnpj, criado_em=hora, atualizado_em=hora))
+            s.add(PessoaContato(nome="Raquel", email="Raquel@x.com" if m is dela else "raquel@x.com",
+                                telefone="21 9999-0000" if m is dela else None, criado_em=hora, atualizado_em=hora))
+            s.commit()
+    arquivo = tmp_path / "dela.zip"
+    buf = io.BytesIO()
+    exportar(dela, buf)
+    arquivo.write_bytes(buf.getvalue())
+    r = cb.comparar(cb._do_arquivo(arquivo), daqui)
+    assert (r["empresa"]["so_no_arquivo"], r["empresa"]["so_no_banco"]) == ([], 0)
+    (_, _, campos, _), = r["empresa"]["diferencas"]
+    assert campos == [("razao_social", "MP Linhares", "MP LINHARES", "conflito")]  # o CNPJ é o mesmo
+    (_, _, campos, _), = r["pessoa_contato"]["diferencas"]
+    assert ("telefone", "", "21 9999-0000", "preencher") in campos
 
 
 @pytest.mark.parametrize("a, b", [

@@ -34,6 +34,7 @@ def validar(token: str) -> dict:
     (date(2028, 1, 31), 1, date(2028, 2, 29)),
     (date(2026, 11, 15), 3, date(2027, 2, 15)),
     (date(2026, 10, 2), 12, date(2027, 10, 2)),
+    (date(2026, 8, 31), 6, date(2027, 2, 28)),
 ])
 def test_mais_meses_cai_no_ultimo_dia_do_mes_curto(dia, meses, esperado):
     assert regra.mais_meses(dia, meses) == esperado
@@ -41,15 +42,17 @@ def test_mais_meses_cai_no_ultimo_dia_do_mes_curto(dia, meses, esperado):
 
 def test_devida_conta_da_ultima_e_sem_nenhuma_conta_da_entrada_em_curso():
     hoje = date(2026, 10, 2)
-    linhas = regra.devidas(["mensal", "anual"], {"mensal": date(2026, 8, 20)}, date(2026, 6, 1), hoje)
-    mensal, anual = linhas
+    linhas = regra.devidas(["mensal", "semestral"], {"mensal": date(2026, 8, 20)}, date(2026, 6, 1), hoje)
+    mensal, semestral = linhas
     assert (mensal.proxima, mensal.atrasada, mensal.dias_de_atraso) == (date(2026, 9, 20), True, 12)
-    assert (anual.ultima, anual.proxima, anual.atrasada, anual.dias_de_atraso) == (None, date(2027, 6, 1), False, None)
+    # semestral sem nenhuma: 6 meses da entrada em curso (01/06 → 01/12)
+    assert (semestral.ultima, semestral.proxima, semestral.atrasada, semestral.dias_de_atraso) == (
+        None, date(2026, 12, 1), False, None)
 
 
 def test_sem_nenhuma_registrada_e_sem_data_de_entrada_conta_como_atrasada():
-    (anual,) = regra.devidas(["anual"], {}, None, date(2026, 10, 2))
-    assert (anual.proxima, anual.atrasada, anual.dias_de_atraso) == (None, True, None)
+    (semestral,) = regra.devidas(["semestral"], {}, None, date(2026, 10, 2))
+    assert (semestral.proxima, semestral.atrasada, semestral.dias_de_atraso) == (None, True, None)
 
 
 def test_vence_no_dia_ainda_esta_em_dia():
@@ -58,13 +61,52 @@ def test_vence_no_dia_ainda_esta_em_dia():
 
 
 def test_ordem_segue_o_fluxograma_e_nao_a_da_cadencia():
-    assert [d.tipo for d in regra.devidas(["anual", "mensal"], {}, HOJE, HOJE)] == ["mensal", "anual"]
+    assert [d.tipo for d in regra.devidas(["semestral", "mensal"], {}, HOJE, HOJE)] == ["mensal", "semestral"]
 
 
-def test_cadencia_padrao_e_a_recomendacao_aceita():
-    assert regra.CADENCIA_PADRAO == {
-        "A": ("mensal", "bimestral", "trimestral", "anual"), "B": ("trimestral", "anual"), "C": ("anual",),
-    }
+def test_um_tipo_antigo_nao_e_cobrado():
+    assert regra.devidas(["anual", "bimestral"], {}, HOJE, HOJE) == []
+    assert regra.tipo("anual") is None and regra.nome_do_tipo("anual") == "Anual"
+    assert regra.nome_do_tipo("semestral") == "Semestral"
+
+
+def test_cadencia_padrao_e_uma_reuniao_por_classe():
+    # Eduardo, 03/10/2026: A mensal, B trimestral, C semestral; sem anual
+    assert regra.CADENCIA_PADRAO == {"A": ("mensal",), "B": ("trimestral",), "C": ("semestral",)}
+    assert [(t.chave, t.meses) for t in regra.TIPOS_DE_REUNIAO] == [("mensal", 1), ("trimestral", 3), ("semestral", 6)]
+    # toda pauta leva as lacunas e o que vender; a semestral começa pela estratégia e os desafios
+    assert all("Lacunas técnicas" in t.pauta[-1] for t in regra.TIPOS_DE_REUNIAO)
+    assert regra.tipo("semestral").pauta[0] == "Entender a estratégia e os desafios da empresa"
+    assert "análise vertical e horizontal" in regra.tipo("mensal").pauta[0]
+
+
+@pytest.mark.parametrize("ultima, hoje, proxima, atrasada, dias", [
+    (None, date(2026, 12, 2), date(2026, 12, 2), False, None),  # sem nenhuma: do início do funil
+    (None, date(2026, 12, 5), date(2026, 12, 2), True, 3),
+    (date(2026, 11, 30), date(2027, 1, 30), date(2027, 1, 30), False, None),
+])
+def test_bimestral_da_carteira_vence_a_cada_2_meses(ultima, hoje, proxima, atrasada, dias):
+    d = regra.devida_da_carteira(ultima, hoje)
+    assert (d.proxima, d.atrasada, d.dias_de_atraso) == (proxima, atrasada, dias)
+
+
+PESSOAS = [("jefferson@x.com", "Jefferson Souza"), ("bruno@x.com", "Bruno Soares"), ("bruna@x.com", "Bruna Lima"),
+           ("ana@x.com", "Ana Paula Reis"), ("ana.c@x.com", "Ana Costa"), ("jose@x.com", None)]
+
+
+@pytest.mark.parametrize("citado, email", [
+    ("Jefferson", "jefferson@x.com"),
+    ("jefferson souza", "jefferson@x.com"),
+    ("Bruno", "bruno@x.com"),  # "Bruno" não é "Bruna"
+    ("Ana Paula", "ana@x.com"),
+    ("Ana", None),  # duas Anas: a pessoa escolhe
+    ("Carla", None),  # não cadastrada
+    ("Souza", None),  # só o sobrenome não basta
+    ("José", "jose@x.com"),  # sem nome, pelo e-mail; sem acento
+    ("", None), (None, None),
+])
+def test_responsavel_citado_vira_quem_recebe_ajuste(citado, email):
+    assert regra.achar_responsavel(citado, PESSOAS) == email
 
 
 # ------------------------------------------------------------------ API
@@ -129,11 +171,15 @@ def test_entram_os_grupos_com_contrato_valendo_na_etapa_certa(cliente, ids):
     assert (antigo["etapa"], antigo["classe"], antigo["situacao"]) == ("em_curso", "A", "em_dia")
     # Anterior ao CRM sem reunião registrada: conta do início do funil, 02/10/2026 (opção A).
     assert antigo["em_curso_desde"] == "2026-10-02"
-    assert [(r["tipo"], r["proxima"], r["atrasada"]) for r in antigo["reunioes"]] == [
-        ("mensal", "2026-11-02", False), ("bimestral", "2026-12-02", False),
-        ("trimestral", "2027-01-02", False), ("anual", "2027-10-02", False)]
+    assert [(r["tipo"], r["proxima"], r["atrasada"]) for r in antigo["reunioes"]] == [("mensal", "2026-11-02", False)]
+    assert antigo["mrr_bruto"] == "6000.00"  # os dois contratos ativos
     assert (por_nome["Sem classe"]["situacao"], por_nome["Sem classe"]["reunioes"]) == ("sem_classe", [])
-    assert len(f["checklist"]["kickoff"]) == 5 and f["cadencia"]["C"] == ["anual"]
+    assert len(f["checklist"]["kickoff"]) == 5 and f["cadencia"] == {"A": ["mensal"], "B": ["trimestral"], "C": ["semestral"]}
+    assert [t["chave"] for t in f["tipos"]] == ["mensal", "trimestral", "semestral"]
+    assert f["tipos_antigos"] == {"bimestral": "Bimestral", "anual": "Anual"}
+    assert f["intencao"]["C"].startswith("Entender a estratégia e os desafios")
+    assert (f["carteira"]["nome"], f["carteira"]["proxima"], f["carteira"]["atrasada"]) == (
+        "Bimestral da carteira", "2026-12-02", False)
 
 
 def test_checklist_e_concluir_etapa_ate_entrar_em_curso(cliente, ids):
@@ -185,21 +231,22 @@ def test_registrar_reuniao_tira_o_atraso_daquele_tipo(cliente, ids, engine):
     assert (lista[0]["decisoes"], lista[0]["proximos_passos"], lista[0]["registrada_por"]) == (
         "Renegociar a dívida bancária", None, "Eduardo Luiz")
     with Session(engine) as s:
+        # reuniões de tipos antigos ficam no histórico, mas não contam pela mensal
         for tipo in ("bimestral", "trimestral", "anual"):
-            s.add(ReuniaoDeResultado(grupo_id=g, tipo=tipo, data=ontem))
+            s.add(ReuniaoDeResultado(grupo_id=g, tipo=tipo, data=date(2027, 5, 31)))
         s.commit()
     # Bem depois do início do funil: só não vence o que foi registrado.
     depois = date(2027, 6, 1)
     assert _grupo(cliente, g, depois)["situacao"] == "atrasada"
     with Session(engine) as s:
-        for tipo in ("mensal", "bimestral", "trimestral", "anual"):
-            s.add(ReuniaoDeResultado(grupo_id=g, tipo=tipo, data=date(2027, 5, 31)))
+        s.add(ReuniaoDeResultado(grupo_id=g, tipo="mensal", data=date(2027, 5, 31)))
         s.commit()
     assert _grupo(cliente, g, depois)["situacao"] == "em_dia"
 
 
 @pytest.mark.parametrize("grupo, corpo, trecho", [
     ("antigo", {"tipo": "semanal", "data": HOJE.isoformat()}, "Tipo de reunião desconhecido"),
+    ("antigo", {"tipo": "anual", "data": HOJE.isoformat()}, "Tipo de reunião desconhecido"),  # saiu em 03/10/2026
     ("antigo", {"tipo": "mensal", "data": (HOJE + timedelta(days=1)).isoformat()}, "não pode ser futura"),
     ("novo", {"tipo": "mensal", "data": HOJE.isoformat()}, "depois do kickoff"),
 ])
@@ -214,16 +261,50 @@ def test_grupo_fora_do_funil_da_404(cliente, ids):
 
 
 def test_mudar_a_cadencia_muda_as_reunioes_cobradas(cliente, ids):
-    r = cliente.put("/api/sucesso/cadencia", headers=ADMIN, json={"cadencia": {"A": ["anual", "trimestral"]}})
+    r = cliente.put("/api/sucesso/cadencia", headers=ADMIN, json={"cadencia": {"A": ["semestral", "trimestral"]}})
     assert r.status_code == 200, r.text
-    assert r.json()["cadencia"]["A"] == ["trimestral", "anual"] and r.json()["alterado_por"] == "Eduardo Luiz"
-    assert r.json()["cadencia"]["B"] == ["trimestral", "anual"]
-    assert [x["tipo"] for x in _grupo(cliente, ids["antigo"])["reunioes"]] == ["trimestral", "anual"]
+    assert r.json()["cadencia"]["A"] == ["trimestral", "semestral"] and r.json()["alterado_por"] == "Eduardo Luiz"
+    assert r.json()["cadencia"]["B"] == ["trimestral"]
+    assert [x["tipo"] for x in _grupo(cliente, ids["antigo"])["reunioes"]] == ["trimestral", "semestral"]
+
+
+def test_intencao_da_classe_editavel_e_vazia_volta_ao_padrao(cliente, ids):
+    r = cliente.put("/api/sucesso/cadencia", headers=ADMIN, json={"intencao": {"B": "  Subir para A  "}})
+    assert r.status_code == 200, r.text
+    assert r.json()["intencao"]["B"] == "Subir para A" and r.json()["cadencia"]["B"] == ["trimestral"]
+    assert cliente.get("/api/sucesso/funil", headers=ADMIN).json()["intencao"]["B"] == "Subir para A"
+    r = cliente.put("/api/sucesso/cadencia", headers=ADMIN, json={"intencao": {"B": " "}})
+    assert r.json()["intencao"]["B"] == regra.INTENCAO_PADRAO["B"]
+
+
+def test_tipo_antigo_gravado_na_cadencia_nao_e_cobrado(cliente, ids, engine):
+    from crm.db.modelos import CadenciaDeReuniao
+
+    with Session(engine) as s:
+        s.add(CadenciaDeReuniao(classe="A", tipos=["bimestral", "anual"]))
+        s.commit()
+    assert [x["tipo"] for x in _grupo(cliente, ids["antigo"])["reunioes"]] == ["mensal"]  # volta ao padrão
+
+
+def test_bimestral_da_carteira_registra_e_vence_de_novo(cliente, ids):
+    ontem = HOJE - timedelta(days=1)
+    r = cliente.post("/api/sucesso/carteira/reunioes", headers=ADMIN, json={
+        "data": ontem.isoformat(), "resumo": "Carteira estável", "correcoes_de_rota": "Revisar PRA da classe B"})
+    assert r.status_code == 201, r.text
+    c = r.json()
+    assert (c["devida"]["ultima"], c["devida"]["proxima"]) == (ontem.isoformat(), regra.mais_meses(ontem, 2).isoformat())
+    (x,) = c["reunioes"]
+    assert (x["participantes"], x["correcoes_de_rota"], x["registrada_por"]) == (
+        "Head do BPO & CEO da Critério", "Revisar PRA da classe B", "Eduardo Luiz")
+    r = cliente.post("/api/sucesso/carteira/reunioes", headers=ADMIN, json={"data": (HOJE + timedelta(days=1)).isoformat()})
+    assert r.status_code == 422
 
 
 @pytest.mark.parametrize("corpo, trecho", [
     ({"cadencia": {"A": []}}, "ao menos uma"),
-    ({"cadencia": {"D": ["anual"]}}, "Classe desconhecida"),
+    ({"cadencia": {"D": ["mensal"]}}, "Classe desconhecida"),
+    ({"intencao": {"D": "x"}}, "Classe desconhecida"),
+    ({"cadencia": {"A": ["anual"]}}, "tipo de reunião desconhecido"),
     ({"cadencia": {"B": ["semanal"]}}, "tipo de reunião desconhecido"),
 ])
 def test_cadencia_validada(cliente, corpo, trecho):
@@ -235,4 +316,6 @@ def test_sem_permissao_nao_ve_nem_mexe(cliente, ids):
     assert cliente.get("/api/sucesso/funil", headers=KARINE).status_code == 403
     assert cliente.post(f"/api/sucesso/grupos/{ids['antigo']}/reunioes", headers=KARINE,
                         json={"tipo": "mensal", "data": HOJE.isoformat()}).status_code == 403
-    assert cliente.put("/api/sucesso/cadencia", headers=KARINE, json={"cadencia": {"A": ["anual"]}}).status_code == 403
+    assert cliente.put("/api/sucesso/cadencia", headers=KARINE, json={"cadencia": {"A": ["mensal"]}}).status_code == 403
+    assert cliente.get("/api/sucesso/carteira", headers=KARINE).status_code == 403
+    assert cliente.post("/api/sucesso/carteira/reunioes", headers=KARINE, json={"data": HOJE.isoformat()}).status_code == 403

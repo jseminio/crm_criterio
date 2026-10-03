@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
@@ -10,32 +10,37 @@ vi.mock("../api/cliente", async () => {
 });
 
 const CADENCIA = {
-  cadencia: { A: ["mensal", "bimestral", "trimestral", "anual"], B: ["trimestral", "anual"], C: ["anual"] },
+  cadencia: { A: ["mensal"], B: ["trimestral"], C: ["semestral"] },
+  intencao: { A: "Reter e expandir", B: "Subir para A", C: "Entender a estratégia" },
   alterado_por: null, alterado_em: null,
 };
 
-describe("Configurações › Metas: reuniões por classe", () => {
+describe("Configurações › Metas: uma reunião e uma intenção por classe (03/10/2026)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(api.cadenciaDeReunioes).mockResolvedValue(CADENCIA);
   });
 
-  it("mostra a cadência aceita e salva a mudança na ordem do fluxograma", async () => {
+  it("mostra a reunião e a intenção de cada classe e salva só o que mudou", async () => {
     vi.mocked(api.mudarCadenciaDeReunioes).mockResolvedValue(CADENCIA);
     render(<CadenciaDeReunioes />);
-    expect(await screen.findByLabelText("Classe B: Trimestral")).toBeChecked();
-    expect(screen.getByLabelText("Classe C: Mensal")).not.toBeChecked();
-    expect(screen.getByRole("button", { name: "Salvar cadência" })).toBeDisabled();
-    await userEvent.click(screen.getByLabelText("Classe C: Trimestral"));
-    await userEvent.click(screen.getByRole("button", { name: "Salvar cadência" }));
-    expect(api.mudarCadenciaDeReunioes).toHaveBeenCalledWith({ ...CADENCIA.cadencia, C: ["trimestral", "anual"] });
-    expect(await screen.findByRole("status")).toHaveTextContent("Cadência salva");
+    expect(await screen.findByLabelText("Classe C: reunião")).toHaveValue("semestral");
+    expect(screen.getByLabelText("Classe A: intenção")).toHaveValue("Reter e expandir");
+    expect(screen.queryByRole("option", { name: "Anual" })).not.toBeInTheDocument();
+    const salvar = screen.getByRole("button", { name: "Salvar" });
+    expect(salvar).toBeDisabled();
+    await userEvent.selectOptions(screen.getByLabelText("Classe B: reunião"), "semestral");
+    fireEvent.change(screen.getByLabelText("Classe C: intenção"), { target: { value: "Vender valuation" } });
+    expect(screen.getByText("· alterações ainda não salvas")).toBeInTheDocument();
+    await userEvent.click(salvar);
+    expect(api.mudarCadenciaDeReunioes).toHaveBeenCalledWith({
+      cadencia: { B: ["semestral"] }, intencao: { C: "Vender valuation" },
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent("Salvo");
   });
 
-  it("classe sem nenhuma reunião não salva", async () => {
+  it("a bimestral da carteira fica fora das classes", async () => {
     render(<CadenciaDeReunioes />);
-    await userEvent.click(await screen.findByLabelText("Classe C: Anual"));
-    expect(screen.getByRole("button", { name: "Salvar cadência" })).toBeDisabled();
-    expect(screen.getByText("· a classe C precisa de ao menos uma reunião")).toBeInTheDocument();
+    expect(await screen.findByText(/bimestral da carteira \(interna, Head do BPO e CEO da Critério\)/)).toBeInTheDocument();
   });
 });

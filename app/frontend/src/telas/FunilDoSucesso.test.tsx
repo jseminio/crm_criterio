@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ErroDaApi } from "../api/cliente";
 import type { FunilDoSucesso as Funil, GrupoNoFunilDoSucesso } from "../api/tipos";
 import { ProvedorDeAcesso } from "../entrada";
-import { FunilDoSucesso } from "./FunilDoSucesso";
+import { FunilDoSucesso, textoDasVendas } from "./FunilDoSucesso";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
@@ -13,13 +13,15 @@ vi.mock("../api/cliente", async () => {
     api: {
       funilDoSucesso: vi.fn(), marcarItemDoSucesso: vi.fn(), concluirEtapaDoSucesso: vi.fn(),
       reunioesDoGrupo: vi.fn(), registrarReuniao: vi.fn(), montarAta: vi.fn(), responsaveisPorAjuste: vi.fn(),
+      servicos: vi.fn(), reunioesDaCarteira: vi.fn(), registrarReuniaoDaCarteira: vi.fn(),
     },
   };
 });
 
 const grupo = (g: Partial<GrupoNoFunilDoSucesso> & { grupo_id: number; nome: string }): GrupoNoFunilDoSucesso => ({
   etapa: "em_curso", classe: null, itens_feitos: [], etapa_desde: null, em_curso_desde: null, situacao: null, reunioes: [],
-  ajustes_pendentes: 0, ajustes_atrasados: 0, ajustes_feitos: 0, ...g,
+  ajustes_pendentes: 0, ajustes_atrasados: 0, ajustes_feitos: 0,
+  mrr_bruto: "0", vendas_abertas: 0, vendas_por_mes: "0", vendas_em_projeto: "0", ...g,
 });
 
 const FUNIL: Funil = {
@@ -39,23 +41,31 @@ const FUNIL: Funil = {
     kickoff: [{ chave: "kyc", rotulo: "Preencher o KYC" }],
   },
   tipos: [
-    { chave: "mensal", nome: "Mensal", meses: 1, participantes: "Gestor & Cliente", pauta: ["Demonstrações do mês"] },
+    { chave: "mensal", nome: "Mensal", meses: 1, participantes: "Gestor & Cliente", pauta: ["Dashboard do mês"] },
     { chave: "trimestral", nome: "Trimestral", meses: 3, participantes: "Gestor & Cliente", pauta: ["PRA e KPIs"] },
-    { chave: "anual", nome: "Anual", meses: 12, participantes: "Gestor & Cliente", pauta: ["Renovação"] },
+    { chave: "semestral", nome: "Semestral", meses: 6, participantes: "Gestor & Cliente", pauta: ["Estratégia e desafios"] },
   ],
-  cadencia: { A: ["mensal", "trimestral", "anual"], B: ["trimestral", "anual"], C: ["anual"] },
+  tipos_antigos: { bimestral: "Bimestral", anual: "Anual" },
+  cadencia: { A: ["mensal"], B: ["trimestral"], C: ["semestral"] },
+  intencao: { A: "Reter e expandir", B: "Subir para A", C: "Entender a estratégia e vender o que falta" },
+  carteira: {
+    nome: "Bimestral da carteira", participantes: "Head do BPO & CEO da Critério", pauta: ["Overview da carteira"],
+    ultima: "2026-08-01", proxima: "2026-10-01", atrasada: true, dias_de_atraso: 2,
+  },
   grupos: [
     grupo({ grupo_id: 1, nome: "Grupo Novo", etapa: "contrato", itens_feitos: ["proposta", "contrato"] }),
     grupo({
-      grupo_id: 2, nome: "Grupo Em Dia", classe: "C", situacao: "em_dia", em_curso_desde: "2026-01-10",
-      reunioes: [{ tipo: "anual", ultima: "2026-05-01", proxima: "2027-05-01", atrasada: false, dias_de_atraso: null }],
+      grupo_id: 2, nome: "Grupo Em Dia", classe: "C", situacao: "em_dia", em_curso_desde: "2026-01-10", mrr_bruto: "3000.00",
+      reunioes: [{ tipo: "semestral", ultima: "2026-05-01", proxima: "2026-11-01", atrasada: false, dias_de_atraso: null }],
     }),
     grupo({
-      grupo_id: 3, nome: "Grupo Atrasado", classe: "B", situacao: "atrasada",
-      reunioes: [
-        { tipo: "trimestral", ultima: "2026-05-01", proxima: "2026-08-01", atrasada: true, dias_de_atraso: 62 },
-        { tipo: "anual", ultima: null, proxima: null, atrasada: true, dias_de_atraso: null },
-      ],
+      grupo_id: 3, nome: "Grupo Atrasado", classe: "B", situacao: "atrasada", mrr_bruto: "10000.00",
+      ajustes_pendentes: 2, ajustes_atrasados: 1, vendas_abertas: 2, vendas_por_mes: "4500.00", vendas_em_projeto: "14000.00",
+      reunioes: [{ tipo: "trimestral", ultima: "2026-05-01", proxima: "2026-08-01", atrasada: true, dias_de_atraso: 62 }],
+    }),
+    grupo({
+      grupo_id: 5, nome: "Grupo B Novo", classe: "B", situacao: "atrasada", mrr_bruto: "2000.00",
+      reunioes: [{ tipo: "trimestral", ultima: null, proxima: null, atrasada: true, dias_de_atraso: null }],
     }),
     grupo({ grupo_id: 4, nome: "Grupo Sem Classe", situacao: "sem_classe" }),
   ],
@@ -66,58 +76,124 @@ const eu = (permissoes: string[]) => ({
 });
 
 const coluna = (nome: string) => screen.getByRole("region", { name: nome });
+const classe = (rotulo: RegExp) => screen.getByRole("button", { name: rotulo });
 
-describe("Funil do Sucesso do Cliente (02/10/2026)", () => {
+describe("Funil do Sucesso do Cliente por classe (03/10/2026)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
     vi.mocked(api.funilDoSucesso).mockResolvedValue(FUNIL);
     vi.mocked(api.reunioesDoGrupo).mockResolvedValue([]);
+    vi.mocked(api.servicos).mockResolvedValue([]);
     vi.mocked(api.responsaveisPorAjuste).mockResolvedValue([
       { email: "bruno@grupocriterio.com.br", nome: "Bruno Soares", perfil: "Área técnica" },
     ]);
   });
 
-  it("uma coluna por etapa do fluxograma, com quem participa e o que se faz", async () => {
+  it("consolidado: uma coluna por etapa, a contagem de cada classe e o quadro que compara", async () => {
     render(<FunilDoSucesso />);
     await screen.findByText("Grupo Novo");
-    expect(screen.getAllByRole("region").map((r) => r.getAttribute("aria-label")))
-      .toEqual(["Contrato", "Handover", "Kickoff", "Mensal", "Trimestral", "Anual"]);
-    const contrato = coluna("Contrato");
-    expect(within(contrato).getByText("Comercial & Cliente")).toBeInTheDocument();
-    expect(within(contrato).getByText("Emitir a proposta comercial")).toBeInTheDocument();
-    expect(within(contrato).getByText("2 de 3 itens feitos")).toBeInTheDocument();
-    expect(within(coluna("Anual")).getByText("Renovação")).toBeInTheDocument();
-    expect(within(coluna("Handover")).getByText("Nenhum grupo nesta etapa.")).toBeInTheDocument();
-    expect(screen.getByText(/A: Mensal, Trimestral, Anual · B: Trimestral, Anual · C: Anual/)).toBeInTheDocument();
+    expect(screen.getAllByRole("region").filter((r) => r.classList.contains("coluna")).map((r) => r.getAttribute("aria-label")))
+      .toEqual(["Contrato", "Handover", "Kickoff", "Mensal", "Trimestral", "Semestral"]);
+    expect(classe(/^Consolidado/)).toHaveAttribute("aria-pressed", "true");
+    expect(classe(/^Consolidado/)).toHaveTextContent("Consolidado5");
+    expect(classe(/^Classe B/)).toHaveTextContent("Classe B2");
+    expect(classe(/^Sem classe/)).toHaveTextContent("Sem classe1");
+    const quadro = screen.getByRole("region", { name: "Comparativo das classes" });
+    const linhaB = within(quadro).getByRole("button", { name: /B · trimestral/ }).closest("tr")!;
+    // 2 clientes, MRR somado, nenhum em dia, 2 vencidas; mensal e projeto separados
+    expect(Array.from(linhaB.querySelectorAll("td")).map((td) => td.textContent?.replace(/\s/g, " "))).toEqual([
+      "B · trimestral", "2", "R$ 12.000,00", "0%", "⚠ 2", "2 · ⚠ 1 atrasado", "2R$ 4.500,00/mês+ R$ 14.000,00 em projeto",
+    ]);
+    const linhaA = within(quadro).getByRole("button", { name: /A · mensal/ }).closest("tr")!;
+    expect(linhaA.querySelectorAll("td")[3]).toHaveTextContent("—"); // sem cliente em curso, sem %
+    expect(screen.getByText(/Sem classe, sem reunião cobrada/)).toBeInTheDocument();
   });
 
-  it("em curso, o grupo aparece em cada reunião da classe, vencidas no topo", async () => {
+  it("o que se faz em cada etapa aparece no ⓘ, não dentro da coluna", async () => {
+    render(<FunilDoSucesso />);
+    await screen.findByText("Grupo Novo");
+    expect(screen.queryByText("Emitir a proposta comercial")).not.toBeInTheDocument();
+    const info = within(coluna("Contrato")).getByRole("button", { name: "O que se faz em Contrato" });
+    fireEvent.mouseEnter(info);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Contrato · Comercial & Cliente");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Emitir a proposta comercial");
+    fireEvent.mouseLeave(info);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    // no clique (celular), fica aberta até clicar de novo
+    await userEvent.click(within(coluna("Semestral")).getByRole("button", { name: "O que se faz em Semestral" }));
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Estratégia e desafios");
+  });
+
+  it("em curso, vencidas no topo com ⚠ e texto", async () => {
     render(<FunilDoSucesso />);
     await screen.findByText("Grupo Novo");
     const trimestral = coluna("Trimestral");
+    expect(within(trimestral).getByText("⚠ 2 vencidas")).toBeInTheDocument();
+    expect(within(trimestral).getAllByRole("button").filter((b) => b.classList.contains("cartao"))
+      .map((b) => b.querySelector(".cartao-grupo")?.textContent)).toEqual(["Grupo Atrasado", "Grupo B Novo"]);
     expect(within(trimestral).getByText("⚠ venceu em 01/08/2026 (62 d)")).toBeInTheDocument();
-    const anual = coluna("Anual");
-    expect(within(anual).getByText("2 grupos")).toBeInTheDocument();
-    expect(within(anual).getByText("· ⚠ 1 vencida")).toBeInTheDocument();
-    expect(within(anual).getAllByRole("button").map((b) => b.querySelector(".cartao-grupo")?.textContent))
-      .toEqual(["Grupo Atrasado", "Grupo Em Dia"]);
-    expect(within(anual).getByText("⚠ nenhuma registrada ainda")).toBeInTheDocument();
-    expect(within(anual).getByText("até 01/05/2027")).toBeInTheDocument();
+    expect(within(trimestral).getByText("⚠ nenhuma registrada ainda")).toBeInTheDocument();
+    expect(within(trimestral).getByText("2 vendas abertas")).toBeInTheDocument();
     expect(within(coluna("Mensal")).getByText("Nenhum grupo nesta etapa.")).toBeInTheDocument();
-    // sem classe não entra em coluna de reunião: fica no aviso, clicável
-    expect(screen.getByText(/Sem classe, sem reunião cobrada/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Grupo Sem Classe" })).toBeInTheDocument();
   });
 
-  it("recolhe e mostra o que se faz em cada etapa, e lembra a escolha", async () => {
+  it("a classe mostra a intenção, os números dela e só a reunião dela; e é lembrada", async () => {
     const { unmount } = render(<FunilDoSucesso />);
     await screen.findByText("Grupo Novo");
-    await userEvent.click(screen.getByRole("button", { name: "Recolher o que se faz em cada etapa" }));
-    expect(screen.queryByText("Emitir a proposta comercial")).not.toBeInTheDocument();
+    await userEvent.click(classe(/^Classe B/));
+    const intencao = screen.getByRole("region", { name: "Intenção da classe B" });
+    expect(intencao).toHaveTextContent("Classe B · reunião trimestral · intenção");
+    expect(intencao).toHaveTextContent("Subir para A");
+    expect(intencao).toHaveTextContent("2 clientes · R$ 12.000,00 bruto · 0% das reuniões em dia · ⚠ 2 vencidas");
+    expect(screen.getAllByRole("region").filter((r) => r.classList.contains("coluna")).map((r) => r.getAttribute("aria-label")))
+      .toEqual(["Contrato", "Handover", "Kickoff", "Trimestral"]);
+    expect(screen.queryByText("Grupo Novo")).not.toBeInTheDocument(); // sem classe ainda, fica no consolidado
+    expect(screen.queryByRole("region", { name: "Comparativo das classes" })).not.toBeInTheDocument();
     unmount();
     render(<FunilDoSucesso />);
-    expect(await screen.findByRole("button", { name: "Mostrar o que se faz em cada etapa" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Intenção da classe B" })).toBeInTheDocument();
+  });
+
+  it("sem classe: uma coluna só, com o porquê no ⓘ", async () => {
+    render(<FunilDoSucesso />);
+    await screen.findByText("Grupo Novo");
+    await userEvent.click(classe(/^Sem classe/));
+    expect(within(coluna("Sem classe")).getByText("Grupo Sem Classe")).toBeInTheDocument();
+    expect(within(coluna("Sem classe")).getByText("⚠ sem classe")).toBeInTheDocument();
+  });
+
+  it("grade: uma linha por cliente, as mais atrasadas primeiro, e ordena pelo título", async () => {
+    render(<FunilDoSucesso />);
+    await screen.findByText("Grupo Novo");
+    await userEvent.click(screen.getByRole("button", { name: "☰ Grade" }));
+    const grade = () => within(document.querySelector<HTMLElement>(".sucesso-grade")!);
+    const nomes = () => grade().getAllByRole("row").slice(1).map((r) => r.querySelector("td")?.textContent);
+    expect(nomes()).toEqual(["Grupo Atrasado", "Grupo B Novo", "Grupo Em Dia", "Grupo Novo", "Grupo Sem Classe"]);
+    const atrasado = grade().getAllByRole("row")[1];
+    expect(atrasado).toHaveTextContent("⚠ venceu em 01/08/2026 (62 d)");
+    expect(atrasado).toHaveTextContent("2 pendentes · ⚠ 1 atrasado");
+    expect(grade().getAllByRole("row")[4]).toHaveTextContent("2 de 3 itens do checklist feitos");
+    await userEvent.click(grade().getByRole("button", { name: "Grupo" }));
+    expect(nomes()).toEqual(["Grupo Atrasado", "Grupo B Novo", "Grupo Em Dia", "Grupo Novo", "Grupo Sem Classe"].sort((a, b) => a.localeCompare(b, "pt-BR")));
+    expect(localStorage.getItem("crm.sucesso.visao")).toBe("grade");
+  });
+
+  it("vendas: mensal e projeto nunca se somam", () => {
+    expect(textoDasVendas(0, 0, 0)).toBe("0");
+    expect(textoDasVendas(1, 0, 45000)).toMatch(/^1 · R\$\s45\.000,00 em projeto$/);
+    expect(textoDasVendas(1, 0, 0)).toBe("1");
+  });
+
+  it("a bimestral da carteira mostra o vencimento e abre o painel", async () => {
+    vi.mocked(api.reunioesDaCarteira).mockResolvedValue({ devida: FUNIL.carteira, reunioes: [] });
+    render(<FunilDoSucesso />);
+    await screen.findByText("Grupo Novo");
+    const cartao = screen.getByRole("region", { name: "Reunião bimestral da carteira" });
+    expect(cartao).toHaveTextContent("Última 01/08/2026 · ⚠ venceu em 01/10/2026 (2 d)");
+    await userEvent.click(within(cartao).getByRole("button", { name: "Registrar a bimestral" }));
+    expect(await screen.findByText("Bimestrais registradas")).toBeInTheDocument();
+    expect(screen.getByLabelText("Correções de rota")).toBeInTheDocument();
   });
 
   it("a busca filtra e, sem resultado, oferece limpar", async () => {
@@ -145,28 +221,21 @@ describe("Funil do Sucesso do Cliente (02/10/2026)", () => {
     expect(api.marcarItemDoSucesso).toHaveBeenCalledWith(1, "assinatura", true);
   });
 
-  it("em curso: registra a reunião com a pauta do tipo já preenchida", async () => {
+  it("em curso: aberto pela coluna, registra a reunião com a pauta do tipo já preenchida", async () => {
     vi.mocked(api.registrarReuniao).mockResolvedValue(FUNIL.grupos[2]);
     render(<FunilDoSucesso />);
     await screen.findByText("Grupo Novo");
     await userEvent.click(within(coluna("Trimestral")).getByText("Grupo Atrasado"));
-    expect(screen.getByLabelText("Tipo")).toHaveValue("trimestral"); // aberto pela coluna da Trimestral
+    expect(screen.getByText("Em curso · classe B · reunião trimestral")).toBeInTheDocument();
+    expect(screen.getByLabelText("Tipo")).toHaveValue("trimestral");
     expect(screen.getByLabelText("Pauta")).toHaveValue("• PRA e KPIs");
-    expect(screen.getByText("⚠ registre a primeira")).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Anual" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Decisões do cliente"), { target: { value: "Abrir filial em 2027" } });
     await userEvent.click(screen.getByRole("button", { name: "Registrar reunião" }));
     expect(api.registrarReuniao).toHaveBeenCalledWith(3, expect.objectContaining({
-      tipo: "trimestral", participantes: "Gestor & Cliente", decisoes: "Abrir filial em 2027", dashboard: "", ajustes: [],
+      tipo: "trimestral", participantes: "Gestor & Cliente", decisoes: "Abrir filial em 2027", dashboard: "", ajustes: [], oportunidades: [],
     }));
     expect(await screen.findByRole("status")).toHaveTextContent("Reunião trimestral");
-  });
-
-  it("aberto pela coluna da Anual, o painel já vem na Anual", async () => {
-    render(<FunilDoSucesso />);
-    await screen.findByText("Grupo Novo");
-    await userEvent.click(within(coluna("Anual")).getByText("Grupo Atrasado"));
-    expect(screen.getByLabelText("Tipo")).toHaveValue("anual");
-    expect(screen.getByLabelText("Pauta")).toHaveValue("• Renovação");
   });
 
   it("o motivo da recusa do servidor aparece", async () => {

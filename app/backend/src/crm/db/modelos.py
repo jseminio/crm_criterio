@@ -1525,7 +1525,7 @@ class ReuniaoDeResultado(CarimboMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     grupo_id: Mapped[int] = mapped_column(sa.ForeignKey("grupo_economico.id"), nullable=False, index=True)
     tipo: Mapped[str] = mapped_column(sa.String(20), nullable=False)
-    """mensal · bimestral · trimestral · anual"""
+    """mensal · trimestral · semestral (bimestral e anual, só antes de 03/10/2026)"""
     data: Mapped[date] = mapped_column(sa.Date, nullable=False)
     participantes: Mapped[str | None] = mapped_column(sa.String(300))
     pauta: Mapped[str | None] = mapped_column(sa.Text)
@@ -1538,9 +1538,49 @@ class ReuniaoDeResultado(CarimboMixin, Base):
     pontos_sensiveis: Mapped[str | None] = mapped_column(sa.Text)
     transcricao: Mapped[str | None] = mapped_column(sa.Text)
     """A transcrição do Granola colada para montar a ata (02/10/2026). Dado de cliente: só no banco."""
+    estrategia_e_desafios: Mapped[str | None] = mapped_column(sa.Text)
+    """O que o cliente contou da estratégia e dos desafios dele (03/10/2026): de onde saem as vendas."""
 
     grupo: Mapped[GrupoEconomico] = relationship()
     ajustes: Mapped[list["AjusteTecnico"]] = relationship(back_populates="reuniao", order_by="AjusteTecnico.id")
+    oportunidades: Mapped[list["OportunidadeDaReuniao"]] = relationship(
+        back_populates="reuniao", order_by="OportunidadeDaReuniao.id")
+
+
+class OportunidadeDaReuniao(CarimboMixin, Base):
+    """Um novo negócio que a reunião de resultado achou (aprovado por Eduardo em 03/10/2026): a lacuna
+    técnica do cliente e o serviço da Critério que a cobre. Marcada na ata, vira uma oportunidade no
+    Funil comercial (`oportunidade_id`); sem marcar, fica só anotada."""
+
+    __tablename__ = "oportunidade_da_reuniao"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reuniao_id: Mapped[int] = mapped_column(sa.ForeignKey("reuniao_de_resultado.id"), nullable=False, index=True)
+    grupo_id: Mapped[int] = mapped_column(sa.ForeignKey("grupo_economico.id"), nullable=False, index=True)
+    lacuna: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    servico: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    servico_tema: Mapped[str | None] = mapped_column(sa.String(80))
+    valor: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    recorrente: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
+    """Recorrente (C1): o valor é por mês. Projeto (C2): o valor é o total."""
+    oportunidade_id: Mapped[int | None] = mapped_column(sa.ForeignKey("oportunidade.id"), index=True)
+
+    reuniao: Mapped[ReuniaoDeResultado] = relationship(back_populates="oportunidades")
+    oportunidade: Mapped["Oportunidade | None"] = relationship()
+
+
+class ReuniaoDaCarteira(CarimboMixin, Base):
+    """A bimestral interna, entre o Head do BPO e o CEO da Critério (Eduardo, 03/10/2026): overview da
+    carteira para corrigir rotas de análise. Não é de um cliente."""
+
+    __tablename__ = "reuniao_da_carteira"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    data: Mapped[date] = mapped_column(sa.Date, nullable=False, index=True)
+    participantes: Mapped[str | None] = mapped_column(sa.String(300))
+    resumo: Mapped[str | None] = mapped_column(sa.Text)
+    correcoes_de_rota: Mapped[str | None] = mapped_column(sa.Text)
+    registrada_por: Mapped[str | None] = mapped_column(sa.String(200))
 
 
 class AjusteTecnico(CarimboMixin, Base):
@@ -1573,5 +1613,7 @@ class CadenciaDeReuniao(Base):
 
     classe: Mapped[str] = mapped_column(sa.String(1), primary_key=True)
     tipos: Mapped[list] = mapped_column(_JSON, nullable=False, default=list)
+    intencao: Mapped[str | None] = mapped_column(sa.Text)
+    """O que a Critério quer com a classe (03/10/2026). Vazia: vale `INTENCAO_PADRAO`."""
     alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
     alterado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))

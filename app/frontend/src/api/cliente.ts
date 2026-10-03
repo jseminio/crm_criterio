@@ -36,6 +36,7 @@ import type {
   ParametrosDoSdr,
   PedidoDeServicoNovo,
   ServicoDoCatalogo,
+  CarteiraComReunioes,
   DimensaoDeRecorte,
   LinhaDeRecorte,
   ContratoDetalhe,
@@ -584,8 +585,11 @@ export const api = {
     pedir<AjusteTecnico>(`/api/ajustes/${id}/feito`, { method: "POST", body: JSON.stringify({ observacao }) }),
   reabrirAjuste: (id: number) => pedir<AjusteTecnico>(`/api/ajustes/${id}/reabrir`, { method: "POST" }),
   cadenciaDeReunioes: () => pedir<CadenciaDeReunioes>("/api/sucesso/cadencia"),
-  mudarCadenciaDeReunioes: (cadencia: Record<string, string[]>) =>
-    pedir<CadenciaDeReunioes>("/api/sucesso/cadencia", { method: "PUT", body: JSON.stringify({ cadencia }) }),
+  mudarCadenciaDeReunioes: (mudanca: { cadencia?: Record<string, string[]>; intencao?: Record<string, string> }) =>
+    pedir<CadenciaDeReunioes>("/api/sucesso/cadencia", { method: "PUT", body: JSON.stringify(mudanca) }),
+  reunioesDaCarteira: () => pedir<CarteiraComReunioes>("/api/sucesso/carteira"),
+  registrarReuniaoDaCarteira: (reuniao: { data: string; participantes?: string; resumo?: string; correcoes_de_rota?: string }) =>
+    pedir<CarteiraComReunioes>("/api/sucesso/carteira/reunioes", { method: "POST", body: JSON.stringify(reuniao) }),
   aprovacoes: () => pedir<Aprovacao[]>("/api/aprovacoes"),
   aprovar: (id: number) => pedir<Aprovacao>(`/api/aprovacoes/${id}/aprovar`, { method: "POST" }),
   recusar: (id: number, motivo: string) =>

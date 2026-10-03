@@ -29,8 +29,10 @@ como lá).
   os serviços da Critério que as cobrem**. A semestral começa por "entender a estratégia e os desafios
   da empresa". Reuniões bimestrais e anuais já registradas ficam no histórico, sem cobrança.
 - **Visões:** Consolidado · Classe A · Classe B · Classe C · Sem classe (lembrada no navegador), em
-  **Kanban** ou **Grade**, como o Funil comercial. O que se faz em cada etapa saiu de dentro da coluna:
-  aparece no **ⓘ** do cabeçalho (mouse, foco ou clique). A Grade tem uma linha por cliente, as mais
+  **Kanban** ou **Grade**, como o Funil comercial: **as mesmas colunas e os mesmos cartões** (pedido
+  de Eduardo em 03/10/2026). Embaixo do nome da coluna, a fase e o MRR somado; no cartão, o MRR bruto
+  do cliente por mês, a classe e a reunião. O que se faz em cada etapa, e quem participa, só aparece
+  no **ⓘ** do cabeçalho (mouse, foco ou clique). A Grade tem uma linha por cliente, as mais
   atrasadas primeiro, e ordena por qualquer coluna.
 - **Consolidado:** um quadro compara as classes (clientes, **MRR bruto** dos contratos ativos, % de
   reuniões em dia, vencidas, ajustes pendentes e **vendas abertas**, com o valor por mês e o de projeto

@@ -78,6 +78,12 @@ cd app/backend && ~/.venvs/criterio-crm/bin/python scripts/comparar_backup.py ~/
 
 **Não importe o backup de outra cópia pela tela:** a importação substitui o banco inteiro.
 
+**Apagar um grupo de teste** (03/10/2026, para o "Karine ON"): `scripts/apagar_grupo.py --cnpj <CNPJ>`
+(ou `--grupo <nome>`) mostra tudo o que sairia: grupo, empresas, oportunidades com proposta e
+questionário, vínculos, os contatos que só existem nele, leitura do Score, jornada e reuniões. Com
+`--apagar`, apaga numa transação só, sem backup antes (para guardar, rode `backup.py exportar` antes).
+Recusa grupo com contrato ou em fusão. O histórico de alterações fica.
+
 ## Busca automática dos questionários (02/10/2026)
 
 Aprovado por Eduardo em 02/10/2026, depois de o questionário da Smarthis ficar esperando no site até

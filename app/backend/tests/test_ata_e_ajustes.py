@@ -31,12 +31,22 @@ ATA = {
     "resumo": "Reunião trimestral. O cliente quer abrir loja.",
     "decisoes_do_cliente": ["Abrir a segunda loja em 2027", "  "],
     "ajustes": [
-        {"descricao": "Reclassificar o frete de custo para despesa na DRE", "prazo": "2026-10-10"},
-        {"descricao": "Conciliar o cartão de setembro", "prazo": "até sexta"},
-        {"descricao": " ", "prazo": ""},
+        {"descricao": "Reclassificar o frete de custo para despesa na DRE", "prazo": "2026-10-10",
+         "responsavel": "Jefferson", "trecho": "Jefferson fica com o frete até dia 10"},
+        {"descricao": "Conciliar o cartão de setembro", "prazo": "até sexta", "responsavel": "Carla", "trecho": ""},
+        {"descricao": " ", "prazo": "", "responsavel": "", "trecho": ""},
     ],
     "pendencias_do_cliente": ["Enviar extratos de setembro"],
     "pontos_sensiveis": [],
+    "estrategia_e_desafios": " Abrir a segunda loja; a equipe financeira é uma pessoa só. ",
+    "oportunidades": [
+        {"lacuna": "Ninguém faz projeção de caixa", "servico": "bpo financeiro", "tema": "", "valor": "4.500,00",
+         "trecho": "a equipe financeira é só uma pessoa"},
+        {"lacuna": "Avaliar a empresa antes do sócio", "servico": "Consultoria", "tema": "Valuation, PPA e laudos",
+         "valor": "", "trecho": ""},
+        {"lacuna": "Algo", "servico": "Serviço inventado", "tema": "Tema inventado", "valor": "muito", "trecho": ""},
+        {"lacuna": " ", "servico": "Consultoria", "tema": "", "valor": "", "trecho": ""},
+    ],
 }
 
 
@@ -110,14 +120,32 @@ def test_ata_limpa_o_rascunho_e_nao_grava_nada(cliente, ids, falso):
     a = r.json()
     assert a["decisoes_do_cliente"] == ["Abrir a segunda loja em 2027"]
     assert a["ajustes"] == [  # prazo que não é data vira vazio; ajuste em branco some
-        {"descricao": "Reclassificar o frete de custo para despesa na DRE", "prazo": "2026-10-10"},
-        {"descricao": "Conciliar o cartão de setembro", "prazo": None},
+        {"descricao": "Reclassificar o frete de custo para despesa na DRE", "prazo": "2026-10-10",
+         # o nome citado vira o e-mail de quem recebe ajustes
+         "responsavel_citado": "Jefferson", "responsavel_email": "jefferson@grupocriterio.com.br",
+         "trecho": "Jefferson fica com o frete até dia 10"},
+        # citada mas não cadastrada: fica sem e-mail, a pessoa escolhe
+        {"descricao": "Conciliar o cartão de setembro", "prazo": None, "responsavel_citado": "Carla",
+         "responsavel_email": None, "trecho": None},
+    ]
+    assert a["estrategia_e_desafios"] == "Abrir a segunda loja; a equipe financeira é uma pessoa só."
+    assert a["oportunidades"] == [
+        {"lacuna": "Ninguém faz projeção de caixa", "servico": "BPO Financeiro", "servico_tema": None,
+         "valor": "4500.00", "recorrente": True, "trecho": "a equipe financeira é só uma pessoa"},
+        {"lacuna": "Avaliar a empresa antes do sócio", "servico": "Consultoria", "servico_tema": "Valuation, PPA e laudos",
+         "valor": None, "recorrente": False, "trecho": None},
+        # serviço fora do catálogo fica vazio, para a pessoa escolher; tema e valor inválidos também
+        {"lacuna": "Algo", "servico": None, "servico_tema": None, "valor": None, "recorrente": False, "trecho": None},
     ]
     assert a["custo_usd"] == "0.0080"  # 1000 × US$ 4/M + 200 × US$ 20/M
     pedido = falso.pedidos[0]
     assert pedido["model"] == "claude-opus-5-5" and pedido["fallbacks"] == "default"
     assert pedido["output_config"]["format"]["type"] == "json_schema"
-    assert "Rede Farma" in pedido["messages"][0]["content"] and "Trimestral, em 02/10/2026" in pedido["messages"][0]["content"]
+    conteudo = pedido["messages"][0]["content"]
+    assert "Rede Farma" in conteudo and "Trimestral, em 02/10/2026" in conteudo
+    # a IA recebe quem pode receber ajuste e o catálogo, para citar só o que existe
+    assert "Bruno Soares, Eduardo Luiz, Jefferson Souza" in conteudo
+    assert "Consultoria (temas: Tributária e fiscal" in conteudo and "BPO Financeiro" in conteudo
     assert cliente.get(f"/api/sucesso/grupos/{ids['grupo']}/reunioes", headers=ADMIN).json() == []
 
 
@@ -223,3 +251,65 @@ def test_area_tecnica_nao_ve_o_funil_e_o_comercial_nao_ve_ajustes(cliente, ids):
     assert cliente.get("/api/ajustes", headers=KARINE).status_code == 403
     assert cliente.post(f"/api/sucesso/grupos/{ids['grupo']}/ata", headers=BRUNO,
                         json={"tipo": "mensal", "data": "2026-10-02", "transcricao": TRANSCRICAO}).status_code == 403
+
+
+# ------------------------------------------------------------------ oportunidades de novos negócios (03/10/2026)
+
+
+VENDAS = [
+    {"lacuna": "Ninguém faz projeção de caixa", "servico": "BPO Financeiro", "valor": "4500", "abrir_no_funil": True},
+    {"lacuna": "Avaliar a empresa antes do sócio", "servico": "Consultoria", "servico_tema": "Valuation, PPA e laudos",
+     "valor": "14000", "abrir_no_funil": True},
+    {"lacuna": "Balanço sem auditoria para o banco", "servico": "Auditoria"},
+]
+
+
+def test_oportunidades_marcadas_viram_venda_no_funil_comercial(cliente, ids, engine):
+    from crm.db.modelos import Oportunidade
+    from crm.domain.listas import Situacao, TipoCanal
+
+    g = ids["grupo"]
+    r = _registrar(cliente, g, [], oportunidades=VENDAS, estrategia_e_desafios=" Abrir a segunda loja ")
+    assert r.status_code == 201, r.text
+    funil = r.json()
+    # mensal e projeto ficam separados: um é por mês, o outro é o total
+    assert (funil["vendas_abertas"], funil["vendas_por_mes"], funil["vendas_em_projeto"]) == (2, "4500.00", "14000.00")
+    (reuniao,) = cliente.get(f"/api/sucesso/grupos/{g}/reunioes", headers=ADMIN).json()
+    assert reuniao["estrategia_e_desafios"] == "Abrir a segunda loja"
+    anotadas = reuniao["oportunidades"]
+    assert [(o["servico"], o["recorrente"], o["situacao"]) for o in anotadas] == [
+        ("BPO Financeiro", True, "Enviar proposta"), ("Consultoria", False, "Enviar proposta"), ("Auditoria", False, None)]
+    assert anotadas[2]["oportunidade_id"] is None  # sem marcar, só anotada
+    with Session(engine) as s:
+        bpo = s.get(Oportunidade, anotadas[0]["oportunidade_id"])
+        assert (bpo.grupo_id, bpo.nome, bpo.situacao, bpo.tipo_canal, bpo.captador) == (
+            g, "Rede Farma", Situacao.ENVIAR_PROPOSTA, TipoCanal.CARTEIRA, "EL")  # Eduardo Luiz → EL
+        assert (bpo.preco_mensal, bpo.preco_anual) == (D("4500.00"), None)
+        assert bpo.observacao.startswith("Aberta na reunião trimestral de") and "projeção de caixa" in bpo.observacao
+        valuation = s.get(Oportunidade, anotadas[1]["oportunidade_id"])
+        assert (valuation.servico_tema, valuation.preco_mensal, valuation.preco_anual) == (
+            "Valuation, PPA e laudos", None, D("14000.00"))
+        valuation.situacao = Situacao.ACEITA  # decidida: sai das abertas
+        s.commit()
+    f = cliente.get("/api/sucesso/funil", headers=ADMIN).json()
+    (grupo,) = f["grupos"]
+    assert (grupo["vendas_abertas"], grupo["vendas_por_mes"], grupo["vendas_em_projeto"]) == (1, "4500.00", "0")
+    assert cliente.get(f"/api/sucesso/grupos/{g}/reunioes", headers=ADMIN).json()[0]["oportunidades"][1]["situacao"] == "Aceita"
+
+
+@pytest.mark.parametrize("venda, trecho", [
+    ({"lacuna": "Avaliar a empresa", "servico": "Consultoria"}, "escolha o tema"),
+    ({"lacuna": "Avaliar a empresa", "servico": "Serviço inventado"}, "fora do catálogo"),
+    ({"lacuna": "Algo novo", "servico": "Outro"}, "ao menos 10"),
+    ({"lacuna": "Fluxo de caixa", "servico": "BPO Financeiro", "servico_tema": "Valuation, PPA e laudos"}, "tema só vale"),
+])
+def test_oportunidade_invalida_nao_grava_nada(cliente, ids, venda, trecho):
+    r = _registrar(cliente, ids["grupo"], [], oportunidades=[VENDAS[0], venda])
+    assert r.status_code == 422 and "Oportunidade 2" in r.json()["detail"] and trecho in r.json()["detail"]
+    assert cliente.get(f"/api/sucesso/grupos/{ids['grupo']}/reunioes", headers=ADMIN).json() == []
+
+
+def test_captador_so_quando_as_iniciais_sao_uma_sigla_conhecida():
+    from crm.api.sucesso import _captador
+
+    assert (_captador("Eduardo Luiz"), _captador("Karine N"), _captador("Eduardo"), _captador(None)) == ("EL", None, None, None)

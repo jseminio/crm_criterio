@@ -45,6 +45,8 @@ ROTULOS: dict[str, tuple[str, ...]] = {
     "classificacao_do_grupo": ("referencia", "classe"),
     "reuniao_de_resultado": ("tipo", "data"),
     "ajuste_tecnico": ("descricao",),
+    "oportunidade_da_reuniao": ("servico", "lacuna"),
+    "reuniao_da_carteira": ("data",),
 }
 _IGNORAR_NA_DIFERENCA = {"id", "criado_em", "atualizado_em"}
 

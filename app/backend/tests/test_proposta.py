@@ -181,7 +181,9 @@ class TestAbaDaProposta:
         assert rascunho["cliente"] == "Exemplo Alfa"
         assert rascunho["tratamento"] == "Prezado(a) Sr(a). Ana Souza"  # nunca adivinha o gênero
         assert rascunho["contextualizacao"].startswith("A Exemplo Alfa busca um novo parceiro para os serviços contábeis e fiscais.\n")
-        assert D(rascunho["valor_contabil"]) == D("2350")  # sem DP no escopo: o sugerido arredondado
+        assert D(rascunho["valor_contabil"]) == D("2350") == D(a["contabil_apurado"])  # o sugerido arredondado
+        assert rascunho["valor_dp"] is None and a["colaboradores"] is None  # sem DP no escopo
+        assert (rascunho["horas_contabil"], rascunho["horas_dp"]) == (3, None)  # 50% de 2.350 ÷ 350 = 3,4
         assert a["perfil"]["cnpj"] == "12.345.678/0001-90" and a["perfil"]["regime"] == "Lucro Presumido"
         assert a["perfil"]["funcionarios"] == "18" and a["perfil"]["sistema"] == "N/D"
         assert a["proximo_numero"] == f"154.{ANO}" and a["revisores"] == ["Eduardo", "Karine"]
@@ -201,6 +203,20 @@ class TestAbaDaProposta:
         assert a["rascunho"]["contextualizacao"].startswith(
             "A Exemplo Alfa atua no segmento de comércio atacadista, com operação em Niterói/RJ, e busca um novo "
             "parceiro para os serviços financeiros.")
+
+    def test_com_dp_o_honorario_e_50_por_colaborador(self, fonte, cliente):
+        """Eduardo, 03/10/2026: DP = R$ 50 × (CLT + PJs/estagiários); Contábil = o apurado, mesmo com DP."""
+        respostas = {**RESPOSTAS_ALFA, "servicos": ["Contábil", "Fiscal", "Folha / DP"],
+                     "vol": {**RESPOSTAS_ALFA["vol"], "empregados_clt": "80", "pjs_estagiarios": "32"}}
+        fonte.linhas = [linha(respostas=respostas)]
+        oid = _oportunidade_do_questionario(cliente)
+        a = cliente.get(f"/api/oportunidades/{oid}/proposta").json()
+        c = a["colaboradores"]
+        assert (c["clt"], c["pjs_estagiarios"], c["total"], D(c["valor_dp"])) == (80, 32, 112, D(5600))
+        r = a["rascunho"]
+        assert D(r["valor_dp"]) == D(5600) and D(r["valor_contabil"]) == D(a["contabil_apurado"])
+        total = round((D(r["valor_contabil"]) + 5600) / 2 / 350)
+        assert r["horas_contabil"] + r["horas_dp"] == total and D(a["valor_da_hora_de_consulta"]) == D(350)
 
     def test_sem_volumetria_nao_ha_preco_sugerido(self, cliente, fabrica):
         with fabrica() as s:
@@ -256,16 +272,19 @@ class TestGerarEEnviar:
         assert baixado.headers["content-disposition"] == f'attachment; filename="Exemplo Alfa_Proposta BPO Contabil_154.{ANO}.pptx"'
         assert texto_do_pptx(baixado.content) == [
             f"PROP CCE RJ 154.{ANO}", "Exemplo Alfa", "Prezada Sra. Ana Souza,", "A Exemplo Alfa atua no comércio.",
-            "Contábil R$ 4.500 mês · 6 horas", "DP R$ 2.400 mês · 3 horas",
-            "Total 9 horas · Valor Líquido: R$ 6.900,00 · Valor Bruto: R$ 7.750,00",
+            # 50% de 6.900 ÷ 350 = 9,86 → 10 h: 7 de Contábil (70%) e 3 de DP; as 6 e 3 digitadas não valem.
+            "Contábil R$ 4.500 mês · 7 horas", "DP R$ 2.400 mês · 3 horas",
+            "Total 10 horas · Valor Líquido: R$ 6.900,00 · Valor Bruto: R$ 7.750,00",
             "CNPJ: 12.345.678/0001-90 · Lucro Presumido · N/D/ano · 18 CLT + PJs · N/D",
         ]
 
         # Gerar de novo antes de enviar: mesmo número, valores novos.
         p2 = cliente.post(f"/api/oportunidades/{oid}/proposta", json=_entrada(valor_dp=None, horas_dp=None)).json()
         assert (p2["id"], p2["numero"], D(p2["valor_liquido"])) == (p["id"], f"154.{ANO}", D(4500))
-        assert "DP R$ — mês · — horas" in texto_do_pptx(cliente.get(f"/api/propostas/{p['id']}/pptx").content)
-        assert cliente.get(f"/api/oportunidades/{oid}/proposta").json()["rascunho"]["valor_dp"] is None
+        texto = texto_do_pptx(cliente.get(f"/api/propostas/{p['id']}/pptx").content)
+        assert "DP R$ — mês · — horas" in texto and "Contábil R$ 4.500 mês · 6 horas" in texto  # sem DP, tudo é Contábil
+        rascunho = cliente.get(f"/api/oportunidades/{oid}/proposta").json()["rascunho"]
+        assert rascunho["valor_dp"] is None and (rascunho["horas_contabil"], rascunho["horas_dp"]) == (6, None)
 
         enviada = cliente.post(f"/api/propostas/{p['id']}/enviada", json={"por": "Karine", "em": str(date.today())})
         assert enviada.status_code == 200, enviada.text
@@ -273,9 +292,10 @@ class TestGerarEEnviar:
         with fabrica() as s:
             o = s.get(Oportunidade, oid)
             assert o.situacao is Situacao.EM_AVALIACAO and o.preco_mensal == D("4500.00")
-            assert {"situacao", "preco_mensal"} <= set(o.campos_do_crm)
+            assert o.preco_anual == D("58500.00")  # contábil: × 13
+            assert {"situacao", "preco_mensal", "preco_anual"} <= set(o.campos_do_crm)
             h = s.scalars(sa.select(HistoricoDePreco).where(HistoricoDePreco.oportunidade_id == oid)).one()
-            assert h.preco_mensal_novo == D("4500.00") and h.motivo == f"Proposta 154.{ANO} enviada (valor líquido)"
+            assert (h.preco_mensal_novo, h.preco_anual_novo) == (D("4500.00"), D("58500.00")) and h.motivo == f"Proposta 154.{ANO} enviada (valor líquido)"
         assert cliente.post(f"/api/propostas/{p['id']}/enviada", json={"por": "Karine", "em": str(date.today())}).status_code == 409
 
         # Depois de enviada, gerar abre número novo.
@@ -311,8 +331,6 @@ class TestGerarEEnviar:
 
     @pytest.mark.parametrize("extra, erro", [
         ({"valor_contabil": None}, "honorário de Contábil"),
-        ({"horas_contabil": None}, "horas de consulta por ano de Contábil"),
-        ({"horas_dp": None}, "horas de consulta por ano de DP"),
         ({"matriz": "Financeiro", "plano_cfo": None}, None),
     ])
     def test_campos_que_faltam(self, cliente, extra, erro):
@@ -406,3 +424,24 @@ class TestMatrizesEConfiguracao:
         r = cliente.put("/api/propostas/configuracao", json=corpo)
         assert r.status_code == 422 and f"154.{ANO} já foi usado" in r.json()["detail"]
         assert cliente.get("/api/propostas/configuracao").json()["ultimo_usado"] == f"154.{ANO}"
+
+
+class TestHorasEHonorarioDeDp:
+    """Eduardo, 03/10/2026: 50% do 13º honorário ÷ R$ 350/h; 70% Contábil, 30% DP."""
+
+    def test_exemplo_da_amostra(self):
+        from crm.proposta.conta import honorario_de_dp, horas_de_consulta
+        assert honorario_de_dp(112) == D("5600.00")
+        assert horas_de_consulta(D(8650), D(5600)) == (14, 6)  # 7.125 ÷ 350 = 20,4 → 20
+
+    def test_contabil_e_dp_sempre_somam_o_total(self):
+        from crm.proposta.conta import horas_de_consulta
+        for c, dp in ((D(4500), D(2400)), (D(10000), D(1000)), (D(350), D(350)), (D(100), D(50))):
+            hc, hd = horas_de_consulta(c, dp)
+            assert hc + hd == int(((c + dp) / 2 / 350).quantize(D(1), rounding="ROUND_HALF_UP"))
+
+    def test_sem_dp_tudo_e_contabil(self):
+        from crm.proposta.conta import horas_de_consulta
+        assert horas_de_consulta(D(4500), None) == (6, None)
+        assert horas_de_consulta(D(4500), D(0)) == (6, None)
+        assert horas_de_consulta(None, None) == (0, None)

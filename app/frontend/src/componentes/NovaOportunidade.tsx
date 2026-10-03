@@ -9,6 +9,9 @@
  * passa a ser mensal × parcelas, travado. Pedido de Karine em 30/09/2026; o
  * servidor refaz a conta e ignora qualquer anual digitado.
  *
+ * Desde 03/10/2026 (Eduardo), contábil e DP têm 13 mensalidades no ano e
+ * financeiro 12: nesses serviços as parcelas saem do serviço e não se pedem.
+ *
  * Reajuste: o índice do contrato (IPCA, IGP-M ou sem reajuste), para
  * qualquer serviço. Só registra o índice; não calcula. Pedido de Karine em
  * 30/09/2026.
@@ -67,9 +70,11 @@ export function NovaOportunidade({
     definirEmpresa(e);
   };
   const { dados: catalogo } = usarDados<ServicoDoCatalogo[]>(() => api.servicos(), []);
-  const recorrente =
-    catalogo?.find((s) => s.nome === campos.servico)?.recorrente ?? false;
-  const anualCalculado = precoPelasParcelas(campos.preco_mensal, campos.quantidade_parcelas);
+  const doCatalogo = catalogo?.find((s) => s.nome === campos.servico);
+  const recorrente = doCatalogo?.recorrente ?? false;
+  const meses = doCatalogo?.meses_no_ano ?? null;
+  const parcelas = meses ? String(meses) : campos.quantidade_parcelas;
+  const anualCalculado = precoPelasParcelas(campos.preco_mensal, parcelas);
 
   const mudar = (campo: string, valor: string) =>
     definirCampos((atual) => ({ ...atual, [campo]: valor }));
@@ -79,7 +84,7 @@ export function NovaOportunidade({
     definirErro(null);
     try {
       const valores = recorrente
-        ? { ...campos, preco_anual: anualCalculado }
+        ? { ...campos, quantidade_parcelas: parcelas, preco_anual: anualCalculado }
         : { ...campos, quantidade_parcelas: "" };
       const corpo = Object.fromEntries(
         Object.entries(valores).filter(([, v]) => v !== ""),
@@ -187,13 +192,14 @@ export function NovaOportunidade({
           <>
             <div className="formulario-duplo">
               {campo("preco_mensal", "Preço mensal", { type: "number", step: "0.01", min: "0" })}
-              {campo("quantidade_parcelas", "Quantidade de parcelas", {
-                type: "number",
-                step: "1",
-                min: "1",
-                max: "120",
-                placeholder: "12",
-              })}
+              {!meses &&
+                campo("quantidade_parcelas", "Quantidade de parcelas", {
+                  type: "number",
+                  step: "1",
+                  min: "1",
+                  max: "120",
+                  placeholder: "12",
+                })}
             </div>
             <div className="campo-bloco">
               <label className="campo-rotulo" htmlFor="n-preco_anual">
@@ -208,8 +214,9 @@ export function NovaOportunidade({
                 aria-describedby="n-preco_anual-ajuda"
               />
               <p id="n-preco_anual-ajuda" className="campo-ajuda">
-                Serviço recorrente: calculado como preço mensal × quantidade de parcelas. Não se
-                ajusta à mão.
+                {meses
+                  ? `${campos.servico}: preço mensal × ${meses}. Não se ajusta à mão.`
+                  : "Serviço recorrente: calculado como preço mensal × quantidade de parcelas. Não se ajusta à mão."}
               </p>
             </div>
           </>

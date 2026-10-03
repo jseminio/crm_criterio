@@ -22,7 +22,7 @@ from crm.domain.listas import DestinoDoTransbordo, LinhaServico
 __all__ = [
     "Pergunta", "Tema", "Servico", "CATALOGO", "OUTRO", "DESCRICAO_MINIMA", "CONSULTORIA_SERVICO",
     "linha_do_servico", "servico_do_catalogo", "problema_na_descricao", "problema_no_tema",
-    "reclassificar_pelo_tipo",
+    "reclassificar_pelo_tipo", "meses_no_ano",
 ]
 
 #: O serviço fora do catálogo (27/09/2026). A pessoa descreve o que o lead pediu,
@@ -65,6 +65,9 @@ class Servico:
     rascunho: bool = True
     temas: tuple[Tema, ...] = field(default=())
     """Quando o serviço tem temas, o tema é **obrigatório** (decisão de 27/09/2026)."""
+    meses_no_ano: int | None = None
+    """Quantas mensalidades o ano tem (Eduardo, 03/10/2026): contábil e DP cobram 13 (o 13º
+    honorário), financeiro cobra 12. O preço anual é mensal × isso e não se digita."""
 
 
 _DOCS = Pergunta("Documentos fiscais por mês (emitidas + recebidas)", "documentos_fiscais_mes")
@@ -87,6 +90,7 @@ CATALOGO: tuple[Servico, ...] = (
         ("MEI", "Porte abaixo do mínimo", "Quer só a folha: é Dep. Pessoal"),
         BPO,
         nomes_antigos=("BPO Contábil",),
+        meses_no_ano=13,
     ),
     Servico(
         "BPO Contábil e Fiscal", C1,
@@ -94,6 +98,7 @@ CATALOGO: tuple[Servico, ...] = (
         (_DOCS, _LANC, _CNPJ, _TOMADORES, _REGIME),
         ("MEI", "Porte abaixo do mínimo"),
         BPO,
+        meses_no_ano=13,
     ),
     Servico(
         "Dep. Pessoal", C1,
@@ -101,6 +106,7 @@ CATALOGO: tuple[Servico, ...] = (
         (_CLT, _ADM, _CNPJ, Pergunta("Sindicato ou convenção da categoria")),
         ("Nenhum empregado CLT",),
         BPO,
+        meses_no_ano=13,
     ),
     Servico(
         "BPO Financeiro", C1,
@@ -112,6 +118,7 @@ CATALOGO: tuple[Servico, ...] = (
         ),
         ("Movimento tão pequeno que não justifica rotina mensal",),
         BPO,
+        meses_no_ano=12,
     ),
     Servico(
         "Endereço Fiscal", C1,
@@ -262,6 +269,12 @@ def linha_do_servico(nome: str | None) -> LinhaServico | None:
     quem chama decide o que fazer (a carga mantém a coluna da planilha)."""
     servico = servico_do_catalogo(nome)
     return servico.linha if servico else None
+
+
+def meses_no_ano(nome: str | None) -> int | None:
+    """13 (contábil, DP) ou 12 (financeiro); `None` nos outros serviços, que seguem as parcelas."""
+    servico = servico_do_catalogo(nome)
+    return servico.meses_no_ano if servico else None
 
 
 def problema_na_descricao(servico: str | None, descricao: str | None) -> str | None:

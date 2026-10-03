@@ -17,9 +17,12 @@ vi.mock("../api/cliente", async () => {
         grupo_id: 3, grupo_nome: "Grupo Delta", tipo: "prospect" },
     ]),
     servicos: vi.fn().mockResolvedValue([
-        { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
+        { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true, meses_no_ano: 13,
           para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],
           fora_do_perfil: ["MEI"], transbordo: "Comercial · BPO (C1)", nomes_antigos: ["BPO Contábil"], rascunho: true, temas: [] },
+        { nome: "Endereço Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true, meses_no_ano: null,
+          para_quem: "Empresa que precisa de endereço fiscal.", perguntas: [{ texto: "Cidade e UF", direcionador: null }],
+          fora_do_perfil: [], transbordo: "Comercial · BPO (C1)", nomes_antigos: [], rascunho: true, temas: [] },
         { nome: "Auditoria", nome_por_extenso: null, linha: "C2", recorrente: false,
           para_quem: "Auditoria das demonstrações.", perguntas: [{ texto: "Exercício a auditar", direcionador: null }],
           fora_do_perfil: [], transbordo: "Consultoria (C2)", nomes_antigos: [], rascunho: true, temas: [] },
@@ -111,7 +114,7 @@ describe("NovaOportunidade", () => {
     expect(screen.queryByLabelText("Quantidade de parcelas")).not.toBeInTheDocument();
     await escolherEmpresaEDarNome("Delta");
     await userEvent.click(screen.getByRole("button", { name: /^Serviço/ }));
-    await userEvent.click(await screen.findByRole("option", { name: "BPO Contábil e Fiscal" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Endereço Fiscal" }));
     await userEvent.click(screen.getByRole("button", { name: "Usar este serviço" }));
 
     await userEvent.type(screen.getByLabelText("Preço mensal"), "5000");
@@ -126,6 +129,31 @@ describe("NovaOportunidade", () => {
       preco_mensal: "5000",
       quantidade_parcelas: "12",
       preco_anual: "60000.00",
+    });
+  });
+
+  it("contábil não pede parcelas: o anual é mensal × 13, travado", async () => {
+    vi.mocked(api.criarOportunidade).mockResolvedValue({} as OportunidadeDetalhe);
+    render(<NovaOportunidade listas={LISTAS} aoFechar={() => {}} aoCriar={() => {}} />);
+
+    await escolherEmpresaEDarNome("Delta");
+    await userEvent.click(screen.getByRole("button", { name: /^Serviço/ }));
+    await userEvent.click(await screen.findByRole("option", { name: "BPO Contábil e Fiscal" }));
+    await userEvent.click(screen.getByRole("button", { name: "Usar este serviço" }));
+
+    expect(screen.queryByLabelText("Quantidade de parcelas")).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Preço mensal"), "14250");
+    const anual = screen.getByLabelText("Preço anual");
+    expect(anual).toHaveAttribute("readonly");
+    expect(anual).toHaveValue(185250);
+    expect(screen.getByText(/preço mensal × 13/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /criar oportunidade/i }));
+    await waitFor(() => expect(api.criarOportunidade).toHaveBeenCalledOnce());
+    expect(vi.mocked(api.criarOportunidade).mock.calls[0][0]).toMatchObject({
+      preco_mensal: "14250",
+      quantidade_parcelas: "13",
+      preco_anual: "185250.00",
     });
   });
 

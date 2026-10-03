@@ -3,13 +3,16 @@
  *
  * A proposta sai em PowerPoint: Eduardo ou Karine revisam, ajustam à mão se preciso, salvam como PDF
  * e enviam. "Marcar como enviada" registra quem enviou e quando. Amostra aprovada em 01/10/2026.
+ *
+ * Desde 03/10/2026 (Eduardo, amostra aprovada): Contábil/Fiscal vem do apurado pelo questionário e DP
+ * de R$ 50 por colaborador, os dois editáveis; as horas de consulta são calculadas e não se digitam.
  */
 
 import { useEffect, useState } from "react";
 import { api, baixarArquivo, entradaLigada, ErroDaApi } from "../api/cliente";
 import type { AbaDaProposta, EntradaDaProposta, PropostaResumo, TipoDeMatriz } from "../api/tipos";
 import { data, dataHora, dinheiro, fracaoEmPercentual } from "../formato";
-import { brutoPrevio } from "../proposta";
+import { brutoPrevio, horasDeConsulta } from "../proposta";
 import { CampoDeValor } from "./CampoDeValor";
 import { Etiqueta } from "./Etiqueta";
 import { Carregando, Erro } from "./estados";
@@ -141,8 +144,6 @@ export function PropostaDaOportunidade({
     : !aba.matrizes[entrada.matriz]!.utilizavel
       ? `A matriz ${entrada.matriz} em uso tem marcador faltando ou errado: corrija em Configurações › Propostas.`
       : null;
-  const inteiro = (campo: "horas_contabil" | "horas_dp") => (e: { target: { value: string } }) =>
-    mudar(campo, e.target.value === "" ? null : Number(e.target.value));
 
   const matriz = entrada.matriz;
   const outra: TipoDeMatriz = matriz === "Contábil" ? "Financeiro" : "Contábil";
@@ -150,6 +151,9 @@ export function PropostaDaOportunidade({
   const s = aba.sugestao;
   const imposto = Number(aba.imposto);
   const liquido = (numero(entrada.valor_contabil) ?? 0) + (numero(entrada.valor_dp) ?? 0);
+  const horas = horasDeConsulta(numero(entrada.valor_contabil) ?? 0, numero(entrada.valor_dp) ?? 0, Number(aba.valor_da_hora_de_consulta));
+  const col = aba.colaboradores;
+  const apurado = numero(aba.contabil_apurado);
   const aberta = aba.propostas.find((p) => p.enviada_em === null);
 
   const gerar = async () => {
@@ -157,7 +161,8 @@ export function PropostaDaOportunidade({
     definirErro(null);
     definirAviso(null);
     try {
-      const p = await api.gerarProposta(oportunidadeId, entrada);
+      // O servidor refaz as horas; mandar as calculadas só deixa o rascunho guardado coerente.
+      const p = await api.gerarProposta(oportunidadeId, { ...entrada, horas_contabil: horas.contabil, horas_dp: horas.dp });
       apagarRascunho(oportunidadeId);
       definirEditado(false);
       definirRestaurado(null);
@@ -238,22 +243,60 @@ export function PropostaDaOportunidade({
 
           <h3 className="proposta-titulo">Honorários que vão na proposta (líquidos, como no contrato)</h3>
           <div className="proposta-grade proposta-grade-fixa">
-            <label className="campo">
-              <span className="campo-rotulo">Contábil / Fiscal (R$/mês)</span>
-              <CampoDeValor value={entrada.valor_contabil} aoMudar={(v) => mudar("valor_contabil", v)} />
-            </label>
-            <label className="campo">
-              <span className="campo-rotulo">Departamento Pessoal (R$/mês)</span>
-              <CampoDeValor value={entrada.valor_dp} aoMudar={(v) => mudar("valor_dp", v)} />
-            </label>
-            <label className="campo">
-              <span className="campo-rotulo">Horas de consulta/ano: Contábil</span>
-              <input className="entrada" type="number" min="0" step="1" value={entrada.horas_contabil ?? ""} onChange={inteiro("horas_contabil")} />
-            </label>
-            <label className="campo">
-              <span className="campo-rotulo">Horas de consulta/ano: DP</span>
-              <input className="entrada" type="number" min="0" step="1" value={entrada.horas_dp ?? ""} onChange={inteiro("horas_dp")} />
-            </label>
+            <div className="campo">
+              <label className="campo">
+                <span className="campo-rotulo">Contábil / Fiscal (R$/mês)</span>
+                <CampoDeValor value={entrada.valor_contabil} aoMudar={(v) => mudar("valor_contabil", v)} />
+              </label>
+              <span className="campo-ajuda">
+                {apurado === null ? (
+                  "Sem valor apurado: o questionário ainda não deu porte."
+                ) : (
+                  <>
+                    apurado pelo questionário: {dinheiro(aba.contabil_apurado)}
+                    {numero(entrada.valor_contabil) !== apurado && (
+                      <>
+                        {" · "}
+                        <button type="button" className="link-de-tabela" onClick={() => mudar("valor_contabil", aba.contabil_apurado)}>
+                          voltar ao apurado
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
+              </span>
+            </div>
+            <div className="campo">
+              <label className="campo">
+                <span className="campo-rotulo">Departamento Pessoal (R$/mês)</span>
+                <CampoDeValor value={entrada.valor_dp} aoMudar={(v) => mudar("valor_dp", v)} />
+              </label>
+              <span className="campo-ajuda">
+                {col ? (
+                  <>
+                    {col.total} colaboradores × {dinheiro(col.valor_por_colaborador)} ({col.clt ?? 0} CLT + {col.pjs_estagiarios ?? 0} PJs/estagiários)
+                    {numero(entrada.valor_dp) !== Number(col.valor_dp) && (
+                      <>
+                        {" · "}
+                        <button type="button" className="link-de-tabela" onClick={() => mudar("valor_dp", col.valor_dp)}>
+                          voltar ao calculado
+                        </button>
+                      </>
+                    )}
+                  </>
+                ) : aba.tem_dp ? (
+                  "Sem colaboradores informados: R$ 50 por colaborador, preencha à mão."
+                ) : null}
+              </span>
+            </div>
+            <div className="proposta-caixa">
+              Horas de consulta/ano: Contábil{horas.dp !== null ? " · 70%" : ""}
+              <strong className="proposta-valor">{horas.contabil} h</strong>
+            </div>
+            <div className="proposta-caixa">
+              Horas de consulta/ano: DP · 30%
+              <strong className="proposta-valor">{horas.dp !== null ? `${horas.dp} h` : "—"}</strong>
+            </div>
             <div className="proposta-caixa">
               Total líquido
               <strong className="proposta-valor">{dinheiro(liquido)}</strong>
@@ -270,6 +313,11 @@ export function PropostaDaOportunidade({
               <span className="campo-ajuda">= líquido ÷ {virgula((1 - imposto).toFixed(2))}, ao múltiplo de R$ 50 mais próximo</span>
             </div>
           </div>
+          <p className="campo-ajuda">
+            Horas de consulta (calculadas, não se digitam): 50% do 13º honorário ({dinheiro(liquido)}) = {dinheiro(horas.base)} ÷{" "}
+            {dinheiro(aba.valor_da_hora_de_consulta)}/h = {virgula((horas.base / Number(aba.valor_da_hora_de_consulta)).toFixed(1))} h →{" "}
+            {horas.total} h{horas.dp === null ? ", todas de Contábil (sem DP)" : ""}.{aba.tem_dp && " O questionário ainda não separa jovem aprendiz: some à mão no DP."}
+          </p>
           {!aba.tem_dp && <p className="campo-ajuda">O questionário não pediu DP: sem valor de DP, a proposta sai com "—" nessa caixa.</p>}
         </>
       ) : (

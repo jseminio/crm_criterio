@@ -1173,6 +1173,8 @@ export interface ServicoDoCatalogo {
   nome_por_extenso: string | null;
   linha: "C1" | "C2";
   recorrente: boolean;
+  /** 13 (contábil, DP) ou 12 (financeiro): o preço anual é mensal × isso. Os outros seguem as parcelas. */
+  meses_no_ano?: number | null;
   para_quem: string;
   perguntas: { texto: string; direcionador: string | null }[];
   fora_do_perfil: string[];
@@ -1357,6 +1359,17 @@ export interface AbaDaProposta {
   tem_dp: boolean;
   sugestao: SugestaoDePreco | null;
   sem_sugestao: string | null;
+  /** O preço sugerido (apurado pelo questionário) ao múltiplo de R$ 50. */
+  contabil_apurado: string | null;
+  /** A base do DP (R$ 50 por colaborador); null sem DP ou sem colaboradores informados. */
+  colaboradores: {
+    clt: number | null;
+    pjs_estagiarios: number | null;
+    total: number;
+    valor_por_colaborador: string;
+    valor_dp: string;
+  } | null;
+  valor_da_hora_de_consulta: string;
   rascunho: EntradaDaProposta;
   perfil: Record<string, string>;
   imposto: string;

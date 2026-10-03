@@ -13,6 +13,12 @@ Cliente novo ainda não tem nota de **disciplina**: entra 3, neutra (a mesma pre
 líquido (o que vai no contrato) e o bruto com a alíquota estimada, para o cliente não se surpreender.
 O bruto é líquido ÷ (1 − alíquota), **arredondado ao múltiplo de R$ 50 mais próximo** (aprovado por
 Eduardo: a NRH, 6.900 líquido, saiu com 7.750 bruto; 6.900 ÷ 0,89 = 7.752,81).
+
+**Honorário de DP e horas de consulta** (Eduardo, 03/10/2026):
+
+    DP     = R$ 50 × colaboradores (CLT, PJ, estagiário e jovem aprendiz); a pessoa pode mudar
+    horas  = 50% do 13º honorário (Contábil + DP, líquidos) ÷ R$ 350 por hora, ao inteiro mais próximo
+    Contábil fica com 70% das horas (ao inteiro mais próximo) e DP com o resto; sem DP, tudo é Contábil
 """
 
 from __future__ import annotations
@@ -26,12 +32,17 @@ from crm.domain.rentabilidade import ParametrosDeRentabilidade
 __all__ = [
     "DISCIPLINA_DO_NOVO", "PrecoSugerido", "preco_sugerido", "bruto_de", "arredondar_50",
     "reais", "reais_sem_centavos_se_inteiro", "faturamento_por_extenso",
+    "VALOR_POR_COLABORADOR", "VALOR_DA_HORA_DE_CONSULTA", "honorario_de_dp", "horas_de_consulta",
 ]
 
 D = Decimal
 DISCIPLINA_DO_NOVO = 3
 NOTA_SEM_INFORMACAO = 3
 _CENTAVO = D("0.01")
+VALOR_POR_COLABORADOR = D(50)
+VALOR_DA_HORA_DE_CONSULTA = D(350)
+_PARTE_DO_13_EM_CONSULTA = D("0.5")
+_PARTE_CONTABIL = D("0.7")
 
 
 @dataclass(frozen=True)
@@ -61,6 +72,25 @@ def bruto_de(liquido: Decimal, imposto: Decimal) -> Decimal:
     if not D(0) <= imposto < 1:
         raise ValueError("a alíquota precisa ficar entre 0% e 100%")
     return arredondar_50(D(liquido) / (1 - imposto)).quantize(_CENTAVO)
+
+
+def honorario_de_dp(colaboradores: int) -> Decimal:
+    return (VALOR_POR_COLABORADOR * colaboradores).quantize(_CENTAVO)
+
+
+def _inteiro(v: Decimal) -> int:
+    return int(v.quantize(D(1), rounding=ROUND_HALF_UP))
+
+
+def horas_de_consulta(valor_contabil: Decimal | None, valor_dp: Decimal | None) -> tuple[int, int | None]:
+    """(horas Contábil, horas DP) por ano. DP sai `None` quando a proposta não tem DP."""
+    tem_dp = bool(valor_dp)
+    decimo_terceiro = D(valor_contabil or 0) + (D(valor_dp) if tem_dp else 0)
+    total = _inteiro(decimo_terceiro * _PARTE_DO_13_EM_CONSULTA / VALOR_DA_HORA_DE_CONSULTA)
+    if not tem_dp:
+        return total, None
+    contabil = _inteiro(total * _PARTE_CONTABIL)
+    return contabil, total - contabil
 
 
 def preco_sugerido(

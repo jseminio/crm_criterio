@@ -32,6 +32,9 @@ const ABA: AbaDaProposta = {
     imposto: "0.11", margem_alvo: "0.7000", origem_da_margem: "padrão", bruto: "2523.19", liquido: "2245.64",
   },
   sem_sugestao: null,
+  contabil_apurado: "2250.00",
+  colaboradores: { clt: 80, pjs_estagiarios: 32, total: 112, valor_por_colaborador: "50.00", valor_dp: "5600.00" },
+  valor_da_hora_de_consulta: "350.00",
   rascunho: {
     matriz: "Contábil", cliente: "Exemplo Alfa", tratamento: "Prezado(a) Sr(a). Ana Souza",
     contextualizacao: "A Exemplo Alfa busca um novo parceiro.", valor_contabil: null, valor_dp: null, horas_contabil: null,
@@ -80,15 +83,42 @@ describe("aba Proposta", () => {
     expect(screen.getByText(/Valor bruto/).closest("div")).toHaveTextContent("R$ 2.550,00"); // 2.528,09 → 2.550
   });
 
+  it("horas de consulta saem dos honorários: 50% do 13º ÷ R$ 350, 70% Contábil e 30% DP", async () => {
+    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText("Contábil / Fiscal (R$/mês)"), { target: { value: "8650" } });
+    fireEvent.change(screen.getByLabelText("Departamento Pessoal (R$/mês)"), { target: { value: "5600" } });
+    expect(screen.queryByRole("spinbutton")).toBeNull(); // horas não se digitam
+    expect(screen.getByText(/Horas de consulta\/ano: Contábil/).closest("div")).toHaveTextContent("14 h");
+    expect(screen.getByText(/Horas de consulta\/ano: DP/).closest("div")).toHaveTextContent("6 h");
+    expect(screen.getByText(/calculadas, não se digitam/)).toHaveTextContent("R$ 7.125,00 ÷ R$ 350,00/h = 20,4 h → 20 h");
+  });
+
+  it("sem DP, todas as horas são de Contábil", async () => {
+    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText("Contábil / Fiscal (R$/mês)"), { target: { value: "4500" } });
+    expect(screen.getByText(/Horas de consulta\/ano: Contábil/).closest("div")).toHaveTextContent("6 h");
+    expect(screen.getByText(/Horas de consulta\/ano: DP/).closest("div")).toHaveTextContent("—");
+  });
+
+  it("DP a R$ 50 por colaborador e Contábil do apurado, com volta ao valor calculado", async () => {
+    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
+    expect(await screen.findByText(/112 colaboradores/)).toHaveTextContent("112 colaboradores × R$ 50,00 (80 CLT + 32 PJs/estagiários)");
+    expect(screen.getByText(/apurado pelo questionário/)).toHaveTextContent("R$ 2.250,00");
+    await userEvent.click(screen.getByRole("button", { name: "voltar ao calculado" }));
+    expect(screen.getByLabelText("Departamento Pessoal (R$/mês)")).toHaveValue("5.600,00");
+    expect(screen.queryByRole("button", { name: "voltar ao calculado" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "voltar ao apurado" }));
+    expect(screen.getByLabelText("Contábil / Fiscal (R$/mês)")).toHaveValue("2.250,00");
+  });
+
   it("gera, baixa e mostra a proposta gerada", async () => {
     vi.mocked(api.gerarProposta).mockResolvedValue(GERADA);
     const clique = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
     fireEvent.change(await screen.findByLabelText("Contábil / Fiscal (R$/mês)"), { target: { value: "1600" } });
-    fireEvent.change(screen.getByLabelText("Horas de consulta/ano: Contábil"), { target: { value: "6" } });
     vi.mocked(api.abaDaProposta).mockResolvedValue({ ...ABA, propostas: [GERADA] });
     await userEvent.click(screen.getByRole("button", { name: "Gerar PowerPoint" }));
-    expect(api.gerarProposta).toHaveBeenCalledWith(10, expect.objectContaining({ valor_contabil: "1600", horas_contabil: 6, matriz: "Contábil" }));
+    expect(api.gerarProposta).toHaveBeenCalledWith(10, expect.objectContaining({ valor_contabil: "1600", horas_contabil: 2, horas_dp: null, matriz: "Contábil" }));
     expect(clique).toHaveBeenCalled();
     expect(await screen.findByRole("status")).toHaveTextContent("Proposta 154.2026 gerada");
     const linha = (await screen.findByRole("table", { name: "Propostas geradas" })).querySelector("tbody tr")!;
@@ -106,7 +136,6 @@ describe("aba Proposta", () => {
     fireEvent.blur(campo);
     expect(campo).toHaveValue("3.287,38");
     expect(screen.getByText("Total líquido").closest("div")).toHaveTextContent("R$ 3.287,38");
-    fireEvent.change(screen.getByLabelText("Horas de consulta/ano: Contábil"), { target: { value: "10" } });
     await userEvent.click(screen.getByRole("button", { name: "Gerar PowerPoint" }));
     expect(api.gerarProposta).toHaveBeenCalledWith(10, expect.objectContaining({ valor_contabil: "3287.38" }));
     clique.mockRestore();
@@ -128,7 +157,6 @@ describe("aba Proposta", () => {
     const clique = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
     fireEvent.change(await screen.findByLabelText("Contábil / Fiscal (R$/mês)"), { target: { value: "1600" } });
-    fireEvent.change(screen.getByLabelText("Horas de consulta/ano: Contábil"), { target: { value: "6" } });
     const botao = screen.getByRole("button", { name: "Gerar PowerPoint" });
     await userEvent.click(botao);
     const recado = await screen.findByRole("status");
@@ -175,12 +203,11 @@ describe("aba Proposta", () => {
   it("o que foi digitado sobrevive a trocar de aba e fechar o painel, e some ao gerar", async () => {
     const primeiro = render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
     fireEvent.change(await screen.findByLabelText("Contábil / Fiscal (R$/mês)"), { target: { value: "4500" } });
-    fireEvent.change(screen.getByLabelText("Horas de consulta/ano: Contábil"), { target: { value: "6" } });
     primeiro.unmount(); // trocar de aba ou salvar a oportunidade desmonta a aba
 
     render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
     expect(await screen.findByLabelText("Contábil / Fiscal (R$/mês)")).toHaveValue("4.500");
-    expect(screen.getByLabelText("Horas de consulta/ano: Contábil")).toHaveValue(6);
+    expect(screen.getByText(/Horas de consulta\/ano: Contábil/).closest("div")).toHaveTextContent("6 h");
     expect(screen.getByText(/Rascunho ainda não gerado/)).toBeInTheDocument();
 
     vi.mocked(api.gerarProposta).mockResolvedValue(GERADA);

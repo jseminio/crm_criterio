@@ -28,8 +28,9 @@ from crm.db.modelos import (
     ConfiguracaoDeProposta, HistoricoDePreco, MatrizDeProposta, Oportunidade, Proposta,
 )
 from crm.domain.listas import ORIGEM_DA_MUDANCA_NO_CRM, Situacao, TipoDeMatriz
+from crm.domain.servicos import meses_no_ano
 from crm.proposta import conta, marcadores
-from crm.proposta.rascunho import base_da_proposta, porte_da_oportunidade
+from crm.proposta.rascunho import Base, base_da_proposta, porte_da_oportunidade
 
 __all__ = ["roteador_de_propostas", "PADRAO_DA_CONFIGURACAO"]
 
@@ -74,9 +75,20 @@ class EntradaDaProposta(BaseModel):
     valor_dp: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     horas_contabil: int | None = Field(default=None, ge=0, le=10000)
     horas_dp: int | None = Field(default=None, ge=0, le=10000)
+    """As horas de consulta saem dos honorários (`conta.horas_de_consulta`): o que vier digitado é
+    ignorado e o servidor grava as calculadas."""
     plano_bpo: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
     plano_plus: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
     plano_cfo: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
+
+
+class Colaboradores(BaseModel):
+    """A base do honorário de DP: R$ 50 por colaborador (Eduardo, 03/10/2026)."""
+    clt: int | None
+    pjs_estagiarios: int | None
+    total: int
+    valor_por_colaborador: Decimal
+    valor_dp: Decimal
 
 
 class PropostaResumo(BaseModel):
@@ -110,6 +122,11 @@ class AbaDaProposta(BaseModel):
     tem_dp: bool
     sugestao: Sugestao | None
     sem_sugestao: str | None
+    contabil_apurado: Decimal | None
+    """O preço sugerido (apurado pelo questionário) ao múltiplo de R$ 50: o Contábil/Fiscal sugerido."""
+    colaboradores: Colaboradores | None
+    """`None` quando não há DP ou ninguém informou colaboradores."""
+    valor_da_hora_de_consulta: Decimal
     rascunho: EntradaDaProposta
     perfil: dict[str, str]
     imposto: Decimal
@@ -246,6 +263,19 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
             return None, f"O porte {porte} não está na matriz de horas dos Parâmetros."
         return Sugestao(**{**s.__dict__, "porte_confirmado": confirmado, "origem_da_margem": janela.origem}), None
 
+    def _colaboradores(o: Oportunidade, base: Base) -> Colaboradores | None:
+        """CLT da oportunidade (a volumetria, que a pessoa pode corrigir) + PJs e estagiários do
+        questionário. O questionário ainda não separa jovem aprendiz: quem tiver entra à mão."""
+        if not base.tem_dp:
+            return None
+        total = (o.empregados_clt or 0) + (base.pjs_estagiarios or 0)
+        if total == 0:
+            return None
+        return Colaboradores(
+            clt=o.empregados_clt, pjs_estagiarios=base.pjs_estagiarios, total=total,
+            valor_por_colaborador=conta.VALOR_POR_COLABORADOR, valor_dp=conta.honorario_de_dp(total),
+        )
+
     @r.get("/api/oportunidades/{oportunidade_id}/proposta", response_model=AbaDaProposta)
     def aba(oportunidade_id: int, sessao: Session = Depends(obter_sessao)) -> AbaDaProposta:
         o = _oportunidade(sessao, oportunidade_id)
@@ -253,22 +283,26 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         sugestao, sem = _sugestao(sessao, o)
         config = _configuracao(sessao)
         propostas = _propostas(sessao, o.id)
+        apurado = conta.arredondar_50(sugestao.liquido) if sugestao else None
+        colaboradores = _colaboradores(o, base)
         if propostas:  # reabrir a aba traz o que foi usado na última, para ajustar e gerar de novo
             rascunho = EntradaDaProposta(**propostas[0].valores["entrada"])
         else:
             rascunho = EntradaDaProposta(
                 matriz=base.matriz.value, cliente=base.cliente, tratamento=base.tratamento,
                 contextualizacao=base.contextualizacao,
-                valor_contabil=conta.arredondar_50(sugestao.liquido) if sugestao and not base.tem_dp else None,
+                valor_contabil=apurado, valor_dp=colaboradores.valor_dp if colaboradores else None,
                 plano_bpo=config.plano_bpo, plano_plus=config.plano_plus, plano_cfo=config.plano_cfo,
             )
+            rascunho.horas_contabil, rascunho.horas_dp = conta.horas_de_consulta(rascunho.valor_contabil, rascunho.valor_dp)
         aberta = propostas[0] if propostas and propostas[0].enviada_em is None else None
         proximo = (_texto_do_numero(aberta.numero, aberta.ano) if aberta
                    else _texto_do_numero(config.proximo_numero, _ano_de_hoje()))
         sessao.commit()  # a configuração pode ter nascido agora
         return AbaDaProposta(
             matriz_sugerida=base.matriz.value, servicos=base.servicos, tem_dp=base.tem_dp,
-            sugestao=sugestao, sem_sugestao=sem, rascunho=rascunho, perfil=base.perfil, imposto=_imposto(sessao),
+            sugestao=sugestao, sem_sugestao=sem, contabil_apurado=apurado, colaboradores=colaboradores,
+            valor_da_hora_de_consulta=conta.VALOR_DA_HORA_DE_CONSULTA, rascunho=rascunho, perfil=base.perfil, imposto=_imposto(sessao),
             matrizes=_em_uso(sessao), revisores=list(config.revisores), proximo_numero=proximo,
             propostas=[_resumo(sessao, p) for p in propostas],
         )
@@ -286,10 +320,7 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
             return v, None, None
         if not entrada.valor_contabil:
             raise HTTPException(422, "preencha o honorário de Contábil/Fiscal")
-        if entrada.horas_contabil is None:
-            raise HTTPException(422, "preencha as horas de consulta por ano de Contábil/Fiscal")
-        if entrada.valor_dp and entrada.horas_dp is None:
-            raise HTTPException(422, "preencha as horas de consulta por ano de DP")
+        entrada.horas_contabil, entrada.horas_dp = conta.horas_de_consulta(entrada.valor_contabil, entrada.valor_dp)
         liquido = entrada.valor_contabil + (entrada.valor_dp or 0)
         bruto = conta.bruto_de(liquido, imposto)
         v.update({
@@ -362,7 +393,8 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
     @r.post("/api/propostas/{proposta_id}/enviada", response_model=PropostaResumo)
     def marcar_enviada(proposta_id: int, envio: Envio, sessao: Session = Depends(obter_sessao)) -> PropostaResumo:
         """Quem enviou e quando. A oportunidade em "Enviar proposta" passa a "Em avaliação pela empresa";
-        na matriz Contábil, o total líquido vira o preço mensal da oportunidade, com histórico."""
+        na matriz Contábil, o total líquido vira o preço mensal da oportunidade, e o anual o acompanha
+        (× 13 ou × 12, pelo serviço), com histórico."""
         p = _proposta(sessao, proposta_id)
         config = _configuracao(sessao)
         if envio.por not in config.revisores:
@@ -377,15 +409,20 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         if o.situacao is Situacao.ENVIAR_PROPOSTA:
             o.situacao = Situacao.EM_AVALIACAO
             editados.add("situacao")
-        if p.valor_liquido is not None and o.preco_mensal != p.valor_liquido:
+        # O anual acompanha: × 13 em contábil e DP, × 12 em financeiro (03/10/2026). A proposta da
+        # matriz Contábil sem serviço do catálogo na oportunidade conta como contábil.
+        meses = meses_no_ano(o.servico) or 13
+        anual = p.valor_liquido * meses if p.valor_liquido is not None else None
+        if p.valor_liquido is not None and (o.preco_mensal != p.valor_liquido or o.preco_anual != anual):
             sessao.add(HistoricoDePreco(
                 oportunidade_id=o.id, origem=ORIGEM_DA_MUDANCA_NO_CRM,
                 motivo=f"Proposta {_texto_do_numero(p.numero, p.ano)} enviada (valor líquido)",
                 preco_mensal_anterior=o.preco_mensal, preco_mensal_novo=p.valor_liquido,
-                preco_anual_anterior=o.preco_anual, preco_anual_novo=o.preco_anual,
+                preco_anual_anterior=o.preco_anual, preco_anual_novo=anual,
             ))
-            o.preco_mensal = p.valor_liquido
-            editados.add("preco_mensal")
+            o.preco_mensal, o.preco_anual = p.valor_liquido, anual
+            o.quantidade_parcelas = meses
+            editados |= {"preco_mensal", "preco_anual"}
         if editados:
             o.campos_do_crm = sorted(set(o.campos_do_crm or []) | editados)
         sessao.commit()

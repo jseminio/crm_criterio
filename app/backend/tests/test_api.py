@@ -319,7 +319,7 @@ class TestParcelasDaOportunidadeNova:
     def test_recorrente_ignora_o_anual_digitado(self, cliente: TestClient):
         corpo = cliente.post(
             "/api/oportunidades",
-            json={"nome": "Delta", "servico": "Dep. Pessoal", "preco_mensal": "1000",
+            json={"nome": "Delta", "servico": "Endereço Fiscal", "preco_mensal": "1000",
                   "quantidade_parcelas": 6, "preco_anual": "99999"},
         ).json()
 
@@ -328,7 +328,7 @@ class TestParcelasDaOportunidadeNova:
     def test_parcelas_sem_mensal_da_422(self, cliente: TestClient):
         resposta = cliente.post(
             "/api/oportunidades",
-            json={"nome": "Delta", "servico": "BPO Financeiro", "quantidade_parcelas": 12},
+            json={"nome": "Delta", "servico": "Endereço Fiscal", "quantidade_parcelas": 12},
         )
 
         assert resposta.status_code == 422
@@ -351,6 +351,60 @@ class TestParcelasDaOportunidadeNova:
                       "quantidade_parcelas": parcelas},
             )
             assert resposta.status_code == 422
+
+
+class TestAnualPeloServico:
+    """Contábil e DP: anual = mensal × 13; financeiro: × 12. Eduardo, 03/10/2026."""
+
+    def test_contabil_e_dp_cobram_13_e_financeiro_12(self, cliente: TestClient):
+        for servico, meses in (("BPO Contábil, Fiscal e Dep. Pessoal", 13), ("BPO Contábil e Fiscal", 13),
+                               ("Dep. Pessoal", 13), ("BPO Financeiro", 12)):
+            corpo = cliente.post(
+                "/api/oportunidades",
+                json={"nome": "Delta", "servico": servico, "preco_mensal": "14250",
+                      "quantidade_parcelas": 6, "preco_anual": "1"},
+            ).json()
+            assert corpo["quantidade_parcelas"] == meses, servico
+            assert Decimal(corpo["preco_anual"]) == Decimal("14250") * meses, servico
+
+    def test_sem_mensal_fica_sem_anual(self, cliente: TestClient):
+        corpo = cliente.post(
+            "/api/oportunidades", json={"nome": "Delta", "servico": "BPO Financeiro", "preco_anual": "5"}
+        ).json()
+
+        assert corpo["preco_anual"] is None
+
+    def test_catalogo_informa_os_meses(self, cliente: TestClient):
+        meses = {s["nome"]: s["meses_no_ano"] for s in cliente.get("/api/servicos").json()}
+
+        assert meses["BPO Contábil e Fiscal"] == 13
+        assert meses["BPO Financeiro"] == 12
+        assert meses["Endereço Fiscal"] is None
+
+    def test_editar_o_mensal_recalcula_o_anual_e_ignora_o_digitado(self, cliente: TestClient):
+        o = cliente.post(
+            "/api/oportunidades", json={"nome": "Delta", "servico": "BPO Contábil e Fiscal", "preco_mensal": "1000"}
+        ).json()
+
+        corpo = cliente.patch(f"/api/oportunidades/{o['id']}", json={"preco_mensal": "2000", "preco_anual": "5"}).json()
+        assert Decimal(corpo["preco_anual"]) == Decimal("26000")
+
+        corpo = cliente.patch(f"/api/oportunidades/{o['id']}", json={"preco_anual": "5"}).json()
+        assert Decimal(corpo["preco_anual"]) == Decimal("26000")
+
+        corpo = cliente.patch(f"/api/oportunidades/{o['id']}", json={"servico": "BPO Financeiro"}).json()
+        assert Decimal(corpo["preco_anual"]) == Decimal("24000")
+
+    def test_salvar_outro_campo_nao_mexe_no_anual_antigo(self, cliente: TestClient, engine: sa.Engine):
+        o = cliente.post(
+            "/api/oportunidades", json={"nome": "Delta", "servico": "BPO Contábil e Fiscal", "preco_mensal": "1000"}
+        ).json()
+        with engine.begin() as c:  # um anual de antes da regra, como os que já estão no banco
+            c.execute(sa.text("update oportunidade set preco_anual = 12000 where id = :id"), {"id": o["id"]})
+
+        corpo = cliente.patch(f"/api/oportunidades/{o['id']}", json={"observacao": "ligar segunda", "preco_mensal": "1000",
+                                                                      "preco_anual": "12000"}).json()
+        assert Decimal(corpo["preco_anual"]) == Decimal("12000")
 
 
 class TestReajusteDaOportunidadeNova:

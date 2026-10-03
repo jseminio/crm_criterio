@@ -80,6 +80,10 @@ def _texto(v) -> str:
     return " ".join(t.split())
 
 
+def _digitos(v) -> str:
+    return "".join(c for c in str(v or "") if c.isdigit())
+
+
 def _cnpj(v) -> str | None:
     """Só os dígitos, com os zeros da frente (a planilha às vezes perde o primeiro zero)."""
     d = "".join(c for c in str(v or "") if c.isdigit())
@@ -114,7 +118,7 @@ CHAVES: dict[str, Callable[[Linha, _Chaves], Chave]] = {
     "vinculo_de_contato": lambda l, k: ("vinculo", _ref(k, l, "pessoa_id"), _ref(k, l, "empresa_id")),
     "lead": lambda l, k: (("email", _texto(l.get("email"))) if l.get("email") else ("lead", _texto(l.get("nome")))),
     "contrato": lambda l, k: (("da oportunidade", _ref(k, l, "oportunidade_id")) if l.get("oportunidade_id")
-                              else ("contrato", _ref(k, l, "grupo_id"), _ref(k, l, "empresa_id"), _texto(l.get("escopo")))),
+                              else ("contrato", _ref(k, l, "grupo_id"), _texto(l.get("escopo")))),
     "evento_de_contrato": lambda l, k: ("evento", _ref(k, l, "contrato_id"), l.get("tipo"), _valor(l.get("data_do_evento"))),
     "proposta": lambda l, k: ("proposta", _valor(l.get("ano")), _valor(l.get("numero"))),
     "pendencia_da_proposta": lambda l, k: ("pendencia", _ref(k, l, "oportunidade_id"), l.get("chave")),
@@ -201,21 +205,55 @@ def _valor(v) -> str:
     return texto
 
 
-def _chaves_da_copia(tabelas: dict[str, list[Linha]]) -> tuple[_Chaves, dict[str, dict[Chave, list[Linha]]]]:
-    """Calcula a chave natural de todos os registros de uma cópia e agrupa por chave (dois registros
-    com a mesma chave contam como dois)."""
-    k = _Chaves()
-    grupos: dict[str, dict[Chave, list[Linha]]] = {}
-    for tabela, chave_de in CHAVES.items():
-        linhas = sorted(tabelas.get(tabela) or [], key=lambda l: (_instante(l.get("criado_em")), str(l.get("id"))))
-        k.por_id[tabela] = {}
-        por_chave: dict[Chave, list[Linha]] = {}
-        for l in linhas:
-            chave = chave_de(l, k)
-            k.por_id[tabela][l.get("id")] = chave
-            por_chave.setdefault(chave, []).append(l)
-        grupos[tabela] = por_chave
-    return k, grupos
+def _agrupar(tabela: str, linhas: list[Linha], k: _Chaves) -> dict[Chave, list[Linha]]:
+    """A chave natural de cada registro, guardada para as referências, e os registros por chave
+    (dois com a mesma chave contam como dois)."""
+    chave_de = CHAVES[tabela]
+    k.por_id[tabela] = {}
+    por_chave: dict[Chave, list[Linha]] = {}
+    for l in sorted(linhas, key=lambda l: (_instante(l.get("criado_em")), str(l.get("id")))):
+        chave = chave_de(l, k)
+        k.por_id[tabela][l.get("id")] = chave
+        por_chave.setdefault(chave, []).append(l)
+    return por_chave
+
+
+def _casar_empresa_sem_cnpj(la: dict[Chave, list[Linha]], aqui: dict[Chave, list[Linha]], k_la: _Chaves,
+                            k_aqui: _Chaves) -> None:
+    """A empresa com CNPJ de um lado e sem CNPJ do outro, com a mesma razão social no mesmo grupo, é a
+    mesma: a daqui passa a ter a chave da de lá (e as referências a ela também)."""
+    for chave, ls in la.items():
+        if chave[0] != "cnpj" or chave in aqui:
+            continue
+        l = ls[0]
+        candidata = ("empresa", _texto(l.get("razao_social")), _ref(k_la, l, "grupo_id"))
+        if len(ls) == 1 and len(aqui.get(candidata, [])) == 1:
+            d = aqui.pop(candidata)[0]
+            aqui[chave] = [d]
+            k_aqui.por_id["empresa"][d.get("id")] = chave
+
+
+def casar(arquivo: dict[str, list[Linha]], banco: dict[str, list[Linha]]) -> tuple[dict, _Chaves, _Chaves]:
+    """Tabela por tabela, na ordem das referências: os pares (lá, aqui), o que só está lá e quantos só
+    aqui. Cada tabela se casa antes de a seguinte calcular as chaves, para a referência a um registro
+    casado de outro jeito (empresa sem CNPJ) apontar para a mesma chave nos dois lados."""
+    k_la, k_aqui = _Chaves(), _Chaves()
+    saida: dict[str, dict] = {}
+    for tabela in CHAVES:
+        la = _agrupar(tabela, arquivo.get(tabela) or [], k_la)
+        aqui = _agrupar(tabela, banco.get(tabela) or [], k_aqui)
+        if tabela == "empresa":  # os grupos já casaram pelo nome: a chave do grupo é a mesma nos dois lados
+            _casar_empresa_sem_cnpj(la, aqui, k_la, k_aqui)
+        pares, so_la = [], []
+        for chave, ls in la.items():
+            daqui = aqui.get(chave, [])
+            so_la += ls[len(daqui):]
+            pares += list(zip(ls, daqui))
+        saida[tabela] = {
+            "pares": pares, "so_la": so_la,
+            "so_aqui": sum(max(0, len(d) - len(la.get(c, []))) for c, d in aqui.items()),
+        }
+    return saida, k_la, k_aqui
 
 
 def _diferencas(tabela: str, la: Linha, aqui: Linha, k_la: _Chaves, k_aqui: _Chaves, nomes_la: Nomes,
@@ -236,8 +274,8 @@ def _diferencas(tabela: str, la: Linha, aqui: Linha, k_la: _Chaves, k_aqui: _Cha
             continue  # aponta para tabela técnica (matriz, fusão…): o número não diz nada
         else:
             v_la, v_aqui = _valor(la[campo]), _valor(aqui[campo])
-            if v_la == v_aqui:
-                continue
+            if v_la == v_aqui or (campo == "telefone" and _digitos(v_la) == _digitos(v_aqui)):
+                continue  # "+351 963…" e "351 963…" são o mesmo telefone
         tipo = "preencher" if not v_aqui else ("vazio lá" if not v_la else "conflito")
         saida.append((campo, v_aqui, v_la, tipo))
     return saida
@@ -264,13 +302,12 @@ def _do_banco(engine: sa.Engine, tabela: str) -> list[dict] | None:
 
 def comparar(arquivo: dict[str, list[dict]], engine: sa.Engine) -> dict[str, dict]:
     """Por tabela: `so_no_arquivo` (linhas), `diferencas` [(linha lá, linha aqui, [(campo, aqui, lá,
-    tipo)])], `so_no_banco` (contagem), `la_mexeu_depois` (por diferença) e `nomes` do arquivo.
-    Tabelas que o banco daqui não tem vêm com `banco=None`; as técnicas (fora de `CHAVES`), de fora."""
+    tipo)], lá mexeu por último)], `so_no_banco` (contagem) e `nomes` do arquivo. Tabelas que o banco
+    daqui não tem vêm com `banco=None`; as técnicas (fora de `CHAVES`), de fora."""
     do_banco = {t: _do_banco(engine, t) for t in set(arquivo) | set(CHAVES)}
     banco = {t: v for t, v in do_banco.items() if v is not None}
     nomes_la, nomes_aqui = _nomes(arquivo), _nomes(banco)
-    k_la, grupos_la = _chaves_da_copia(arquivo)
-    k_aqui, grupos_aqui = _chaves_da_copia(banco)
+    casados, k_la, k_aqui = casar(arquivo, banco)
     resultado: dict[str, dict] = {}
     for tabela in sorted(arquivo):
         if do_banco.get(tabela) is None:
@@ -278,21 +315,15 @@ def comparar(arquivo: dict[str, list[dict]], engine: sa.Engine) -> dict[str, dic
             continue
         if tabela not in CHAVES:
             continue  # tabelas técnicas (parâmetros, carga, perfis…): não são inclusões de tela
-        la, aqui = grupos_la[tabela], grupos_aqui.get(tabela, {})
-        so_no_arquivo, diferencas = [], []
-        for chave, ls in la.items():
-            daqui = aqui.get(chave, [])
-            so_no_arquivo += ls[len(daqui):]
-            for l, d in zip(ls, daqui):
-                campos = _diferencas(tabela, l, d, k_la, k_aqui, nomes_la, nomes_aqui)
-                if campos:
-                    depois = _instante(l.get("atualizado_em")) > _instante(d.get("atualizado_em"))
-                    diferencas.append((l, d, campos, depois))
+        c = casados[tabela]
+        diferencas = []
+        for l, d in c["pares"]:
+            campos = _diferencas(tabela, l, d, k_la, k_aqui, nomes_la, nomes_aqui)
+            if campos:
+                diferencas.append((l, d, campos, _instante(l.get("atualizado_em")) > _instante(d.get("atualizado_em"))))
         resultado[tabela] = {
             "banco": len(banco[tabela]), "arquivo": len(arquivo[tabela]),
-            "so_no_arquivo": so_no_arquivo, "diferencas": diferencas,
-            "so_no_banco": sum(max(0, len(d) - len(la.get(c, []))) for c, d in aqui.items()),
-            "nomes": nomes_la,
+            "so_no_arquivo": c["so_la"], "diferencas": diferencas, "so_no_banco": c["so_aqui"], "nomes": nomes_la,
         }
     return resultado
 

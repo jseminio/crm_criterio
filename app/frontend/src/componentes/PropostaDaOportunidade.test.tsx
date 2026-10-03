@@ -33,7 +33,7 @@ const ABA: AbaDaProposta = {
   },
   sem_sugestao: null,
   contabil_apurado: "2250.00",
-  colaboradores: { clt: 80, pjs_estagiarios: 32, total: 112, valor_por_colaborador: "50.00", valor_dp: "5600.00" },
+  colaboradores: { clt: 80, pjs_estagiarios: 32, jovens_aprendizes: 6, total: 118, valor_por_colaborador: "50.00", valor_dp: "5900.00" },
   valor_da_hora_de_consulta: "350.00",
   rascunho: {
     matriz: "Contábil", cliente: "Exemplo Alfa", tratamento: "Prezado(a) Sr(a). Ana Souza",
@@ -102,10 +102,12 @@ describe("aba Proposta", () => {
 
   it("DP a R$ 50 por colaborador e Contábil do apurado, com volta ao valor calculado", async () => {
     render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
-    expect(await screen.findByText(/112 colaboradores/)).toHaveTextContent("112 colaboradores × R$ 50,00 (80 CLT + 32 PJs/estagiários)");
+    expect(await screen.findByText(/118 colaboradores/)).toHaveTextContent(
+      "118 colaboradores × R$ 50,00 (80 CLT + 32 PJs/estagiários + 6 jovens aprendizes)",
+    );
     expect(screen.getByText(/apurado pelo questionário/)).toHaveTextContent("R$ 2.250,00");
     await userEvent.click(screen.getByRole("button", { name: "voltar ao calculado" }));
-    expect(screen.getByLabelText("Departamento Pessoal (R$/mês)")).toHaveValue("5.600,00");
+    expect(screen.getByLabelText("Departamento Pessoal (R$/mês)")).toHaveValue("5.900,00");
     expect(screen.queryByRole("button", { name: "voltar ao calculado" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "voltar ao apurado" }));
     expect(screen.getByLabelText("Contábil / Fiscal (R$/mês)")).toHaveValue("2.250,00");

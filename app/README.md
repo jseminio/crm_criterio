@@ -417,8 +417,9 @@ enviam. A proposta fica em PowerPoint justamente para isso: dá para mudar um de
   complexidade ou risco sem nota também entram 3, e a tela diz isso. Sem porte, não há sugestão.
 - **Honorários e horas de consulta** (03/10/2026, Eduardo): **Contábil/Fiscal** vem do valor
   apurado pelo questionário (o preço sugerido, ao múltiplo de R$ 50), mesmo quando há DP; **DP** vem
-  de **R$ 50 por colaborador** (CLT da volumetria + PJs/estagiários do questionário; o questionário
-  ainda não separa jovem aprendiz, que se soma à mão). Os dois se editam, com "voltar ao apurado" e
+  de **R$ 50 por colaborador** (CLT da volumetria + PJs/estagiários e jovens aprendizes do
+  questionário; o item "Jovens aprendizes" entrou no questionário em 03/10/2026, e o que chegou antes
+  conta zero). Os dois se editam, com "voltar ao apurado" e
   "voltar ao calculado". As **horas de consulta por ano** não se digitam: 50% do 13º honorário
   (Contábil + DP, líquidos) ÷ **R$ 350/h**, ao inteiro mais próximo; Contábil fica com 70% e DP com
   o resto (sem DP, todas são de Contábil). O servidor refaz a conta ao gerar (`crm.proposta.conta`).

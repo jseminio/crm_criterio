@@ -86,6 +86,7 @@ class Colaboradores(BaseModel):
     """A base do honorário de DP: R$ 50 por colaborador (Eduardo, 03/10/2026)."""
     clt: int | None
     pjs_estagiarios: int | None
+    jovens_aprendizes: int | None
     total: int
     valor_por_colaborador: Decimal
     valor_dp: Decimal
@@ -264,15 +265,16 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         return Sugestao(**{**s.__dict__, "porte_confirmado": confirmado, "origem_da_margem": janela.origem}), None
 
     def _colaboradores(o: Oportunidade, base: Base) -> Colaboradores | None:
-        """CLT da oportunidade (a volumetria, que a pessoa pode corrigir) + PJs e estagiários do
-        questionário. O questionário ainda não separa jovem aprendiz: quem tiver entra à mão."""
+        """CLT da oportunidade (a volumetria, que a pessoa pode corrigir) + PJs, estagiários e jovens
+        aprendizes do questionário."""
         if not base.tem_dp:
             return None
-        total = (o.empregados_clt or 0) + (base.pjs_estagiarios or 0)
+        total = (o.empregados_clt or 0) + (base.pjs_estagiarios or 0) + (base.jovens_aprendizes or 0)
         if total == 0:
             return None
         return Colaboradores(
-            clt=o.empregados_clt, pjs_estagiarios=base.pjs_estagiarios, total=total,
+            clt=o.empregados_clt, pjs_estagiarios=base.pjs_estagiarios, jovens_aprendizes=base.jovens_aprendizes,
+            total=total,
             valor_por_colaborador=conta.VALOR_POR_COLABORADOR, valor_dp=conta.honorario_de_dp(total),
         )
 

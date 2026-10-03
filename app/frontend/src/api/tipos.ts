@@ -1365,6 +1365,7 @@ export interface AbaDaProposta {
   colaboradores: {
     clt: number | null;
     pjs_estagiarios: number | null;
+    jovens_aprendizes: number | null;
     total: number;
     valor_por_colaborador: string;
     valor_dp: string;

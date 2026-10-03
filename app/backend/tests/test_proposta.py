@@ -207,15 +207,15 @@ class TestAbaDaProposta:
     def test_com_dp_o_honorario_e_50_por_colaborador(self, fonte, cliente):
         """Eduardo, 03/10/2026: DP = R$ 50 × (CLT + PJs/estagiários); Contábil = o apurado, mesmo com DP."""
         respostas = {**RESPOSTAS_ALFA, "servicos": ["Contábil", "Fiscal", "Folha / DP"],
-                     "vol": {**RESPOSTAS_ALFA["vol"], "empregados_clt": "80", "pjs_estagiarios": "32"}}
+                     "vol": {**RESPOSTAS_ALFA["vol"], "empregados_clt": "80", "pjs_estagiarios": "32", "jovens_aprendizes": "6"}}
         fonte.linhas = [linha(respostas=respostas)]
         oid = _oportunidade_do_questionario(cliente)
         a = cliente.get(f"/api/oportunidades/{oid}/proposta").json()
         c = a["colaboradores"]
-        assert (c["clt"], c["pjs_estagiarios"], c["total"], D(c["valor_dp"])) == (80, 32, 112, D(5600))
+        assert (c["clt"], c["pjs_estagiarios"], c["jovens_aprendizes"], c["total"], D(c["valor_dp"])) == (80, 32, 6, 118, D(5900))
         r = a["rascunho"]
-        assert D(r["valor_dp"]) == D(5600) and D(r["valor_contabil"]) == D(a["contabil_apurado"])
-        total = round((D(r["valor_contabil"]) + 5600) / 2 / 350)
+        assert D(r["valor_dp"]) == D(5900) and D(r["valor_contabil"]) == D(a["contabil_apurado"])
+        total = round((D(r["valor_contabil"]) + 5900) / 2 / 350)
         assert r["horas_contabil"] + r["horas_dp"] == total and D(a["valor_da_hora_de_consulta"]) == D(350)
 
     def test_sem_volumetria_nao_ha_preco_sugerido(self, cliente, fabrica):

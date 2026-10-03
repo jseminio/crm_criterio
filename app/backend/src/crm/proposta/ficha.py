@@ -62,7 +62,8 @@ _VOLUMES = (
     ("notas_emitidas", "Notas fiscais emitidas (serviço / produto)"), ("notas_recebidas", "Notas fiscais recebidas"),
     ("lancamentos", "Lançamentos contábeis"), ("pagamentos", "Pagamentos efetuados"),
     ("contas_bancarias", "Contas bancárias"), ("conciliacoes_cartao", "Conciliações de cartão"),
-    ("empregados_clt", "Empregados CLT"), ("pjs_estagiarios", "PJs / estagiários"), ("admissoes", "Admissões"),
+    ("empregados_clt", "Empregados CLT"), ("pjs_estagiarios", "PJs / estagiários"),
+    ("jovens_aprendizes", "Jovens aprendizes"), ("admissoes", "Admissões"),
     ("desligamentos", "Desligamentos"), ("cnpjs", "CNPJs (empresas do grupo que a Critério atenderá)"),
     ("tomadores", "Tomadores de serviço (clientes atendidos)"), ("filiais_estabelecimentos", "Filiais / estabelecimentos"),
 )

@@ -274,7 +274,7 @@ export function PropostaDaOportunidade({
               <span className="campo-ajuda">
                 {col ? (
                   <>
-                    {col.total} colaboradores × {dinheiro(col.valor_por_colaborador)} ({col.clt ?? 0} CLT + {col.pjs_estagiarios ?? 0} PJs/estagiários)
+                    {col.total} colaboradores × {dinheiro(col.valor_por_colaborador)} ({col.clt ?? 0} CLT + {col.pjs_estagiarios ?? 0} PJs/estagiários + {col.jovens_aprendizes ?? 0} jovens aprendizes)
                     {numero(entrada.valor_dp) !== Number(col.valor_dp) && (
                       <>
                         {" · "}
@@ -316,7 +316,7 @@ export function PropostaDaOportunidade({
           <p className="campo-ajuda">
             Horas de consulta (calculadas, não se digitam): 50% do 13º honorário ({dinheiro(liquido)}) = {dinheiro(horas.base)} ÷{" "}
             {dinheiro(aba.valor_da_hora_de_consulta)}/h = {virgula((horas.base / Number(aba.valor_da_hora_de_consulta)).toFixed(1))} h →{" "}
-            {horas.total} h{horas.dp === null ? ", todas de Contábil (sem DP)" : ""}.{aba.tem_dp && " O questionário ainda não separa jovem aprendiz: some à mão no DP."}
+            {horas.total} h{horas.dp === null ? ", todas de Contábil (sem DP)" : ""}.
           </p>
           {!aba.tem_dp && <p className="campo-ajuda">O questionário não pediu DP: sem valor de DP, a proposta sai com "—" nessa caixa.</p>}
         </>

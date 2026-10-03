@@ -436,7 +436,9 @@ enviam. A proposta fica em PowerPoint justamente para isso: dá para mudar um de
   Fiscal e Dep. Pessoal · BPO Contábil e Fiscal · Dep. Pessoal) o anual é **mensal × 13**; no BPO
   Financeiro, **mensal × 12**. Na Nova oportunidade e no detalhe o campo fica travado e as parcelas
   não se pedem; os outros serviços C1 seguem mensal × parcelas. O anual só se recalcula quando o
-  mensal ou o serviço muda: os anuais já gravados ficam como estão até alguém mexer no mensal.
+  mensal ou o serviço muda. Os anuais gravados antes da regra foram recalculados em 03/10/2026
+  (autorizado por Eduardo) com `scripts/recalcular_anual_por_servico.py` (ensaio por padrão;
+  `--aplicar` grava com backup antes e deixa linha no Histórico de preço). Contratos não mudam.
 - **Baixar de novo** sai igual, com a matriz e os valores da época, mesmo depois de trocar a matriz.
 - **Valores no padrão brasileiro** (02/10/2026): os honorários e os planos aceitam `3.287,38`,
   `3287,38` ou `3287`; valor que não dá para ler avisa no campo e fica em branco, em vez de valer o

@@ -16,6 +16,21 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Comparar um backup de outro CRM (03/10/2026)
+
+Para quando alguém trabalhou num **outro** CRM (outro computador, outra cópia do banco) e mandou o
+backup. `scripts/comparar_backup.py <arquivo>` **só lê**: mostra, tabela por tabela, o que está
+só no arquivo (incluído lá), o que foi alterado lá depois da versão daqui (e quais campos), e
+quantos registros estão só no banco daqui. Reconhece o mesmo registro nas duas cópias pela data de
+criação mais o nome, com o grupo, empresa ou pessoa a que ele pertence (o número não serve: cada
+cópia numerou por conta própria). A saída tem nomes de clientes: fica na tela.
+
+```
+cd app/backend && ~/.venvs/criterio-crm/bin/python scripts/comparar_backup.py ~/Downloads/<arquivo>.zip
+```
+
+**Não importe o backup de outra cópia pela tela:** a importação substitui o banco inteiro.
+
 ## Busca automática dos questionários (02/10/2026)
 
 Aprovado por Eduardo em 02/10/2026, depois de o questionário da Smarthis ficar esperando no site até
@@ -324,7 +339,7 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.148** no backend e **499** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Testes | **1.158** no backend e **499** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
 | Banco | PostgreSQL 18 local, 40 tabelas, migrações até `c9f2a7d4e1b8` (contrato bruto ou líquido, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 136 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens e SDR da IA) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |

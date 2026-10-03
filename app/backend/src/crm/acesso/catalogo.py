@@ -131,7 +131,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     # funil do sucesso do cliente
     ("GET", r"/api/sucesso/cadencia", ("sucesso.ver", "configuracoes.metas")),
     ("PUT", r"/api/sucesso/cadencia", ("configuracoes.metas",)),
-    ("GET", r"/api/sucesso/(funil|grupos/\d+/reunioes)", ("sucesso.ver",)),
+    ("GET", r"/api/sucesso/(funil|grupos/\d+/reunioes|carteira)", ("sucesso.ver",)),
+    ("POST", r"/api/sucesso/carteira/reunioes", ("sucesso.editar",)),
     ("PATCH|POST", r"/api/sucesso/grupos/\d+/(itens|concluir-etapa|reunioes|ata)", ("sucesso.editar",)),
     # ajustes da área técnica (a rota confere: quem só marca feito vê os seus)
     ("GET", r"/api/ajustes/responsaveis", ("sucesso.editar",)),

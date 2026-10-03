@@ -16,6 +16,49 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Funil do Sucesso do Cliente por classe, com vendas na ata (03/10/2026)
+
+Aprovado por Eduardo em 03/10/2026, a partir das amostras. **Substitui a cadência e as colunas** das
+duas seções do Funil do Sucesso do Cliente de 02/10/2026, mais abaixo (a implantação e a ata seguem
+como lá).
+
+- **Uma reunião por classe:** **A mensal, B trimestral, C semestral** (6 meses, nova). A **anual
+  saiu** ("com a semestral não há necessidade da anual") e a **bimestral virou interna**, da carteira.
+  As pautas começam pelo dashboard (análise vertical e horizontal e indicadores de performance
+  financeira; o dashboard em si é outro projeto) e todas terminam em **lacunas técnicas do cliente e
+  os serviços da Critério que as cobrem**. A semestral começa por "entender a estratégia e os desafios
+  da empresa". Reuniões bimestrais e anuais já registradas ficam no histórico, sem cobrança.
+- **Visões:** Consolidado · Classe A · Classe B · Classe C · Sem classe (lembrada no navegador), em
+  **Kanban** ou **Grade**, como o Funil comercial. O que se faz em cada etapa saiu de dentro da coluna:
+  aparece no **ⓘ** do cabeçalho (mouse, foco ou clique). A Grade tem uma linha por cliente, as mais
+  atrasadas primeiro, e ordena por qualquer coluna.
+- **Consolidado:** um quadro compara as classes (clientes, **MRR bruto** dos contratos ativos, % de
+  reuniões em dia, vencidas, ajustes pendentes e **vendas abertas**, com o valor por mês e o de projeto
+  **separados**, nunca somados). Ao lado, a **bimestral da carteira**.
+- **Cada classe** mostra no topo a **intenção** dela e os números só dela. A intenção e a reunião de
+  cada classe mudam em **Configurações › Metas**; a intenção apagada volta ao texto padrão.
+- **Bimestral da carteira:** interna, entre o Head do BPO e o CEO da Critério, para um overview da
+  carteira e correção de rotas de análise. Vence 2 meses depois da última (sem nenhuma, conta de
+  02/10/2026). Registra data, participantes, overview e correções de rota.
+- **A ata lê o responsável:** a IA devolve o nome de quem ficou com cada ajuste e o prazo combinado; o
+  CRM acha a pessoa entre quem recebe ajustes (sem acento e sem caixa; só o primeiro nome basta se for
+  único). Citado e não cadastrado, ou dois possíveis, fica em branco com ⚠ para escolher. A frase de
+  onde saiu aparece embaixo.
+- **Oportunidades de novos negócios na ata:** a IA também anota a **estratégia e os desafios** do
+  cliente e uma oportunidade por lacuna (serviço do catálogo, tema da Consultoria, valor só se foi
+  dito). O **"+"** abre outra, para quantas forem. O serviço vem em dois grupos: **recorrente** (valor
+  por mês) e **projeto** (valor total). Uma oportunidade sem serviço trava o registro. Cada uma
+  marcada em **"Abrir no Funil comercial"** vira, ao registrar, uma oportunidade em **Enviar proposta**,
+  no grupo do cliente, canal **Carteira**, com o captador pelas iniciais de quem registrou (se for uma
+  das siglas; senão em branco) e a lacuna na observação; recorrente leva o valor no preço mensal,
+  projeto no preço anual (o total). A não marcada fica só anotada na ata. O painel do cliente mostra as
+  **vendas abertas nas reuniões**, com a situação de cada uma no Funil comercial.
+- Rotas novas: `GET /api/sucesso/carteira` e `POST /api/sucesso/carteira/reunioes`. `PUT
+  /api/sucesso/cadencia` aceita `intencao`. **Migração `d1e5b8c3f7a2`:** a intenção por classe, a
+  estratégia e os desafios na reunião, as tabelas `oportunidade_da_reuniao` e `reuniao_da_carteira`, e
+  **apaga a cadência gravada em Configurações** para valer a nova (autorizado por Eduardo em
+  03/10/2026). **Rode `alembic upgrade head`**, com o backup antes.
+
 ## Comparar um backup de outro CRM (03/10/2026)
 
 Para quando alguém trabalhou num **outro** CRM (outro computador, outra cópia do banco) e mandou o
@@ -339,8 +382,8 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.158** no backend e **499** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
-| Banco | PostgreSQL 18 local, 40 tabelas, migrações até `c9f2a7d4e1b8` (contrato bruto ou líquido, 02/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
+| Testes | **1.185** no backend e **504** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Banco | PostgreSQL 18 local, 42 tabelas, migrações até `d1e5b8c3f7a2` (funil do sucesso por classe, 03/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 136 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens e SDR da IA) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos; faltam a nuvem e o backup fora da máquina |

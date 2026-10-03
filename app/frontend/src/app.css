@@ -929,7 +929,6 @@
 
 /* ------------------------------------------------- funil do sucesso do cliente (02/10/2026) */
 .sucesso { display: grid; gap: var(--e3); }
-.sucesso-topo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e3); }
 .sucesso-kanban { gap: var(--e3); }
 /* Sete colunas cabem na largura: a implantação ocupa 3 partes, em curso 4 (uma por coluna); abaixo
    de 140px por coluna, rola na horizontal como o funil comercial. */
@@ -941,14 +940,12 @@
 .sucesso-fase-colunas { display: flex; gap: var(--e2); align-items: flex-start; }
 .sucesso-kanban .coluna { min-width: 140px; max-width: none; flex: 1 1 0; max-height: none; }
 /* A seta do fluxograma (Macroprocesso Comercial & Sucesso do Cliente). */
-.sucesso-seta { background: var(--surface-brand); color: var(--texto-sobre-marca); text-align: center;
+.sucesso-seta { background: var(--surface-brand); color: var(--texto-sobre-marca); text-align: left;
   padding: var(--e2) var(--e5); border-radius: var(--raio-md) var(--raio-md) 0 0;
   clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%); }
 .sucesso-fase-colunas > .coluna:first-child .sucesso-seta { clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%); }
-.sucesso-seta-nome { margin: 0; font-size: 14px; font-weight: 600; }
+.sucesso-seta-nome { margin: 0; font: 600 14px var(--fonte-ui); }
 .sucesso-seta-quem { margin: 2px 0 0; font-size: 11.5px; font-style: italic; opacity: .9; }
-.sucesso-itens { margin: 0; padding: var(--e2) var(--e3) var(--e2) var(--e5); font-size: 12px; line-height: 1.35;
-  color: var(--texto-forte); display: grid; gap: var(--e1); border-bottom: 1px solid var(--borda); }
 .sucesso-contagem { margin: 0; padding: var(--e2) var(--e3) 0; font-size: 12px; color: var(--texto-medio); font-variant-numeric: tabular-nums; }
 .sucesso-sem-classe { margin: 0; }
 .cartao-clicavel { cursor: pointer; font: inherit; color: inherit; }
@@ -962,6 +959,8 @@
 .sucesso-historico p { margin: 0; font-size: 13px; white-space: pre-wrap; }
 .cadencia td, .cadencia th { text-align: center; }
 .cadencia td:first-child, .cadencia th:first-child { text-align: left; }
+.cadencia .cadencia-intencao, .cadencia td:last-child { text-align: left; width: 60%; }
+.cadencia textarea { width: 100%; font: 13px var(--fonte-ui); }
 
 /* ------------------------------------------------- ata e ajustes da área técnica (02/10/2026) */
 .ata-transcricao { padding: var(--e3); border: 1px dashed var(--borda-forte); border-radius: var(--raio-sm); background: var(--surface-sunken); }
@@ -994,6 +993,54 @@ td > .celula-fonte { display: block; }
 .busca-automatica { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3);
   padding: var(--e2) var(--e3); border: 1px solid var(--borda); border-radius: var(--raio-sm); background: var(--surface-card); }
 .busca-automatica-erro { flex-basis: 100%; max-width: none; margin: 0; text-align: left; }
+
+/* ------------------------------------------------- funil do sucesso por classe (03/10/2026) */
+.sucesso-barra { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--e3); }
+.sucesso-barra-direita { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); }
+.sucesso-classes { display: flex; flex-wrap: wrap; gap: var(--e2); }
+.sucesso-classe { border: 1px solid var(--borda-forte); background: var(--surface-card); color: var(--texto-forte); border-radius: 999px;
+  padding: 6px 14px; font: 600 13px var(--fonte-ui); cursor: pointer; }
+.sucesso-classe:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.sucesso-classe[aria-pressed="true"] { background: var(--surface-brand); color: var(--texto-sobre-marca); border-color: var(--surface-brand); }
+.sucesso-classe-quantas { font-weight: 400; margin-left: 6px; opacity: .8; font-variant-numeric: tabular-nums; }
+.sucesso-resumo { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 2fr); gap: var(--e3); align-items: start; }
+@media (max-width: 1100px) { .sucesso-resumo { grid-template-columns: 1fr; } }
+.sucesso-quadro, .sucesso-carteira { display: grid; gap: var(--e2); align-content: start; }
+.sucesso-carteira p { font-size: 13px; }
+.quadro { width: 100%; border-collapse: collapse; font-size: 13px; }
+.quadro th, .quadro td { padding: 6px 10px; border-bottom: 1px solid var(--borda); text-align: right; white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+.quadro th:first-child, .quadro td:first-child { text-align: left; }
+.quadro-vendas span { display: block; font-size: 12px; color: var(--texto-medio); }
+.quadro th { font-size: 12px; color: var(--texto-medio); font-weight: 500; }
+.sucesso-intencao { display: grid; gap: var(--e1); border-left: 4px solid var(--surface-brand); background: var(--surface-card);
+  padding: var(--e3) var(--e4); border-radius: var(--raio-sm); font-size: 13px; }
+.sucesso-seta-nome { display: flex; justify-content: space-between; align-items: center; gap: var(--e2); text-align: left; }
+.sucesso-seta-quantas { font-weight: 400; font-size: 12px; opacity: .85; margin-left: 4px; }
+.sucesso-info { display: inline-grid; place-items: center; width: 18px; height: 18px; flex: none; border-radius: 50%; padding: 0;
+  border: 1px solid currentColor; background: transparent; color: inherit; font: italic 600 11px var(--fonte-ui); cursor: help; opacity: .9; }
+.sucesso-info:focus-visible { outline: 2px solid var(--texto-sobre-marca); outline-offset: 2px; }
+.sucesso-dica { position: fixed; z-index: 30; width: 300px; max-width: calc(100vw - 16px); background: var(--surface-card);
+  color: var(--texto-forte); border: 1px solid var(--borda-forte); border-radius: var(--raio-md); box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+  padding: var(--e3) var(--e4); font-size: 12.5px; line-height: 1.4; }
+.sucesso-dica strong { display: block; margin-bottom: var(--e1); }
+.sucesso-dica ul { margin: var(--e1) 0 0; padding-left: var(--e5); display: grid; gap: 3px; }
+.sucesso-grade .linha-clicavel { cursor: pointer; }
+.sucesso-grade .linha-clicavel:hover { background: var(--surface-sunken); }
+.sucesso-vendas { margin-bottom: var(--e3); }
+.sucesso-vendas h3, #re-historico, #ca-historico { font-family: var(--fonte-ui); }
+/* a ata: responsável lido da transcrição e as oportunidades de novos negócios */
+.ata-citado { font-size: 12px; color: var(--texto-medio); }
+.ata-citado-aviso { color: var(--espera); }
+.ata-vendas { display: grid; gap: var(--e3); padding: var(--e3); border: 1px solid var(--borda-forte); border-radius: var(--raio-md); }
+.ata-vendas-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--e3); }
+.ata-vendas-titulo { margin: 0; font: 600 14px var(--fonte-ui); }
+.ata-mais { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--surface-brand); background: var(--surface-brand);
+  color: var(--texto-sobre-marca); font: 600 20px/1 var(--fonte-ui); cursor: pointer; }
+.ata-mais:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.ata-venda-nova { border: 2px solid var(--surface-brand) !important; }
+.ata-venda-num { font-size: 12px; font-weight: 600; color: var(--texto-medio); }
+.ata-venda-abrir { display: flex; gap: var(--e2); align-items: center; font-size: 13px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

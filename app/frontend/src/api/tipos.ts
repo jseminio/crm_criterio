@@ -1561,14 +1561,65 @@ export interface GrupoNoFunilDoSucesso {
   /** Pendentes com prazo vencido. */
   ajustes_atrasados: number;
   ajustes_feitos: number;
+  /** Contratos ativos, em bruto, como o MRR. */
+  mrr_bruto: string;
+  /** Oportunidades abertas no Funil comercial a partir das reuniões, ainda não decididas (03/10/2026). */
+  vendas_abertas: number;
+  /** Das abertas, as recorrentes: valor por mês. */
+  vendas_por_mes: string;
+  /** Das abertas, as de projeto: valor total. Não se soma com o mensal. */
+  vendas_em_projeto: string;
+}
+
+/** A bimestral interna da carteira (Head do BPO e CEO da Critério), 03/10/2026. */
+export interface ReuniaoDaCarteiraDevida {
+  nome: string;
+  participantes: string;
+  pauta: string[];
+  ultima: string | null;
+  proxima: string;
+  atrasada: boolean;
+  dias_de_atraso: number | null;
+}
+
+export interface ReuniaoDaCarteira {
+  id: number;
+  data: string;
+  participantes: string | null;
+  resumo: string | null;
+  correcoes_de_rota: string | null;
+  registrada_por: string | null;
+}
+
+export interface CarteiraComReunioes {
+  devida: ReuniaoDaCarteiraDevida;
+  reunioes: ReuniaoDaCarteira[];
 }
 
 export interface FunilDoSucesso {
   etapas: EtapaDoSucesso[];
   checklist: Record<string, { chave: string; rotulo: string }[]>;
   tipos: TipoDeReuniao[];
+  /** Nome dos tipos que só aparecem no histórico (bimestral e anual, antes de 03/10/2026). */
+  tipos_antigos: Record<string, string>;
   cadencia: Record<string, string[]>;
+  /** O que a Critério quer com cada classe. */
+  intencao: Record<string, string>;
+  carteira: ReuniaoDaCarteiraDevida;
   grupos: GrupoNoFunilDoSucesso[];
+}
+
+/** Um novo negócio anotado na ata; com `oportunidade_id`, aberto no Funil comercial. */
+export interface OportunidadeDaReuniao {
+  id: number;
+  lacuna: string;
+  servico: string;
+  servico_tema: string | null;
+  valor: string | null;
+  recorrente: boolean;
+  oportunidade_id: number | null;
+  /** A situação dela no Funil comercial, agora. */
+  situacao: string | null;
 }
 
 export interface ReuniaoDeResultado {
@@ -1583,10 +1634,12 @@ export interface ReuniaoDeResultado {
   pendencias_do_cliente: string | null;
   pontos_sensiveis: string | null;
   proximos_passos: string | null;
+  estrategia_e_desafios: string | null;
   tem_transcricao: boolean;
   registrada_por: string | null;
   criado_em: string;
   ajustes: AjusteTecnico[];
+  oportunidades: OportunidadeDaReuniao[];
 }
 
 /** Um ajuste que a reunião identificou e a área técnica faz (02/10/2026). */
@@ -1616,9 +1669,27 @@ export interface ResponsavelPorAjuste {
 export interface RascunhoDaAta {
   resumo: string;
   decisoes_do_cliente: string[];
-  ajustes: { descricao: string; prazo: string | null }[];
+  ajustes: {
+    descricao: string;
+    prazo: string | null;
+    /** O nome como a ata citou. */
+    responsavel_citado: string | null;
+    /** Quem é, entre os que recebem ajustes; vazio se não deu para saber. */
+    responsavel_email: string | null;
+    trecho: string | null;
+  }[];
   pendencias_do_cliente: string[];
   pontos_sensiveis: string[];
+  estrategia_e_desafios: string;
+  oportunidades: {
+    lacuna: string;
+    /** Do catálogo; vazio se a IA citou um serviço que não existe. */
+    servico: string | null;
+    servico_tema: string | null;
+    valor: string | null;
+    recorrente: boolean;
+    trecho: string | null;
+  }[];
   custo_usd: string | null;
 }
 
@@ -1634,11 +1705,20 @@ export interface NovaReuniaoDeResultado {
   pontos_sensiveis?: string;
   proximos_passos?: string;
   transcricao?: string;
+  estrategia_e_desafios?: string;
   ajustes?: { descricao: string; responsavel_email: string; prazo: string | null }[];
+  oportunidades?: {
+    lacuna: string;
+    servico: string;
+    servico_tema: string | null;
+    valor: string | null;
+    abrir_no_funil: boolean;
+  }[];
 }
 
 export interface CadenciaDeReunioes {
   cadencia: Record<string, string[]>;
+  intencao: Record<string, string>;
   alterado_por: string | null;
   alterado_em: string | null;
 }

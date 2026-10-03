@@ -9,7 +9,8 @@ aprovou em 03/10/2026. Reconhece "o mesmo registro" do mesmo jeito que a compara
 **Acrescenta** (o que só existe lá):
 - empresas (no grupo de mesmo nome daqui; grupo novo não entra), contatos e vínculos de contato. O
   contato sem e-mail cujo nome está contido no de outro contato da mesma empresa ("Rafael" e "Rafael
-  Monteiro Machado") é o mesmo: não se duplica, e o vínculo vai para o que já existe.
+  Monteiro Machado") é o mesmo: não se duplica, e o vínculo vai para o que já existe. Contato cujas
+  empresas não entram (a de um grupo de teste apagado aqui) também não entra.
 
 **Preenche** (vazio aqui, preenchido lá) em empresas, contatos e oportunidades: CNPJ, telefone,
 cargo, papel, observação, data de aceite, data de colocação…
@@ -122,7 +123,8 @@ def montar(arquivo: dict[str, list[dict]], engine: sa.Engine) -> Plano:
         mapa["pessoa_contato"][l["id"]] = -i
         plano.inserir.setdefault("pessoa_contato", []).append({**_novo("pessoa_contato", l, {}), "_id": -i, "_rotulo": rotulo})
 
-    # ---- vínculos novos (sem repetir pessoa e empresa)
+    # ---- vínculos novos (sem repetir pessoa e empresa); contato novo sem vínculo que entre fica de fora
+    com_vinculo: set[int] = set()
     ja = {(v["pessoa_id"], v["empresa_id"]) for v in banco.get("vinculo_de_contato", [])}
     for l in casados["vinculo_de_contato"]["so_la"]:
         pessoa, empresa = mapa["pessoa_contato"].get(l["pessoa_id"]), mapa["empresa"].get(l["empresa_id"])
@@ -130,11 +132,23 @@ def montar(arquivo: dict[str, list[dict]], engine: sa.Engine) -> Plano:
         if pessoa is None or empresa is None:
             plano.avisos.append(f"vínculo {rotulo}: a pessoa ou a empresa não entrou; não entra")
             continue
+        com_vinculo.add(pessoa)
         if (pessoa, empresa) in ja:
             continue
         ja.add((pessoa, empresa))
         plano.inserir.setdefault("vinculo_de_contato", []).append(
             {**_novo("vinculo_de_contato", l, {"pessoa_id": pessoa, "empresa_id": empresa}), "_rotulo": rotulo})
+
+    tinham_vinculo = {v["pessoa_id"] for v in arquivo.get("vinculo_de_contato", [])}
+    novos = []
+    for r in plano.inserir.get("pessoa_contato", []):
+        la_id = next(i for i, m in mapa["pessoa_contato"].items() if m == r["_id"])
+        if la_id in tinham_vinculo and r["_id"] not in com_vinculo:
+            plano.avisos.append(f"contato {r['_rotulo']}: nenhuma empresa dele entra; não entra")
+            continue
+        novos.append(r)
+    if "pessoa_contato" in plano.inserir:
+        plano.inserir["pessoa_contato"] = novos
 
     # ---- preencher e trocar
     for tabela in TABELAS_QUE_MUDAM:
@@ -155,7 +169,7 @@ def montar(arquivo: dict[str, list[dict]], engine: sa.Engine) -> Plano:
                     if campo == "observacao" and troca:  # a observação nunca perde o texto daqui
                         valor = f"{l[campo]}\n{d[campo]}"
                     valores[campo] = valor
-                    mostrar.append((campo, v_aqui, cb._valor(valor)))
+                    mostrar.append((campo, v_aqui, cb._valor(valor) if isinstance(valor, str) else v_la))
                 elif tipo == "conflito":
                     plano.pendentes.append((tabela, rotulo, campo, v_aqui, v_la))
             if valores:

@@ -54,6 +54,15 @@ def _comum(s: Session, dela: bool) -> None:
         s.flush()
         s.add(VinculoDeContato(pessoa_id=sem_email.id, empresa_id=e.id))
         s.add(Empresa(grupo_id=g.id, razao_social="Nova Ltda", cnpj="11222333000144", criado_em=DEPOIS, atualizado_em=DEPOIS))
+        # um grupo de teste, apagado aqui: a empresa e o contato dele não voltam
+        teste = GrupoEconomico(nome="Teste", criado_em=T0, atualizado_em=T0)
+        s.add(teste)
+        s.flush()
+        e_teste = Empresa(grupo_id=teste.id, razao_social="Teste", criado_em=T0, atualizado_em=T0)
+        p_teste = PessoaContato(nome="Pessoal", email="pessoal@x.com", criado_em=T0, atualizado_em=T0)
+        s.add_all([e_teste, p_teste])
+        s.flush()
+        s.add(VinculoDeContato(pessoa_id=p_teste.id, empresa_id=e_teste.id))
     s.commit()
 
 
@@ -73,6 +82,10 @@ def test_acrescenta_preenche_e_troca_so_o_aprovado(tmp_path):
         _comum(s, dela=True)
     plano = imp.montar(_arquivo(dela, tmp_path), daqui)
     assert any("não duplica" in a for a in plano.avisos)  # "Rafael" é o Rafael Monteiro Machado
+    assert not plano.inserir.get("pessoa_contato")  # o contato do grupo de teste não volta
+    assert any("pessoal@x.com" in a and "nenhuma empresa" in a for a in plano.avisos)
+    navvik = next(m for m in plano.mudar if m[0] == "oportunidade")
+    assert ("temperatura", "Morno", "Frio") in navvik[4]  # a prévia mostra o texto, não o nome interno
     assert [r["_rotulo"] for r in plano.inserir["empresa"]] == ["Salus / 11222333000144 · Nova Ltda"]
     assert len(plano.inserir["vinculo_de_contato"]) == 1  # Rafael Monteiro Machado ↔ Salus, uma vez só
     assert ("oportunidade", "Salus / Salus", "preco_mensal", "1000", "900") in plano.pendentes  # preço: decide à mão

@@ -3,12 +3,23 @@
     comparar_backup.py <arquivo>
 
 Para quando alguém trabalhou num **outro** CRM (outro computador, outra cópia do banco) e mandou o
-backup: mostra, tabela por tabela, o que está **só no arquivo** (incluído lá), o que foi **alterado
-lá depois** da versão daqui, e quantos registros estão só no banco daqui. Não importa nada.
+backup: mostra, tabela por tabela, o que está **só no arquivo** (incluído lá), o que tem **diferença**
+entre as duas cópias e quantos registros estão só no banco daqui. Não importa nada.
 
-Como reconhece "o mesmo registro" nas duas cópias: pela data de criação (ao segundo) mais o nome
-(ou razão social, CNPJ, e-mail…). O número (id) não serve: as duas cópias deram números novos
-cada uma por conta própria depois de se separarem.
+Como reconhece "o mesmo registro" nas duas cópias (revisto em 03/10/2026, a pedido de Eduardo): pelo
+que identifica o registro de verdade, e não pela hora em que nasceu (a mesma empresa pode ter nascido
+em horas diferentes em cada cópia, quando a atualização do CRM rodou em momentos diferentes):
+
+- grupo pelo nome; empresa pelo CNPJ (ou razão social e grupo, sem CNPJ); contato pelo e-mail (ou
+  nome); vínculo pelo contato e pela empresa; oportunidade pela chave da planilha (ou grupo e nome);
+  contrato pela oportunidade (ou grupo, empresa e escopo); proposta pelo número e ano; e assim por
+  diante (`CHAVES`). Nome sem acento, sem caixa e sem espaço sobrando; CNPJ só com os dígitos.
+- O número (id) não serve: cada cópia numerou por conta própria. As colunas que apontam para outro
+  registro (`grupo_id`, `empresa_id`…) se comparam pelo registro apontado.
+
+Cada diferença diz se é para **preencher** (vazio aqui, preenchido lá), um **conflito** (preenchido
+nos dois, diferente) ou **vazio lá** (preenchido aqui, vazio lá), e qual cópia mexeu no registro por
+último. `campos_do_crm` (controle interno) fica de fora.
 
 ⚠️ A saída tem nomes de clientes: fica na tela, não vai para o repositório nem para nota.
 """
@@ -18,8 +29,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import unicodedata
 import zipfile
-from datetime import date, datetime, timezone
+from collections.abc import Callable
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -29,7 +42,7 @@ import sqlalchemy as sa  # noqa: E402
 
 from crm.db.sessao import criar_engine  # noqa: E402
 
-#: Tabelas que alguém inclui ou altera na tela, e o campo que diz quem é o registro.
+#: Como cada registro aparece na tela.
 ROTULOS: dict[str, tuple[str, ...]] = {
     "grupo_economico": ("nome",),
     "empresa": ("cnpj", "razao_social"),
@@ -48,14 +61,70 @@ ROTULOS: dict[str, tuple[str, ...]] = {
     "oportunidade_da_reuniao": ("servico", "lacuna"),
     "reuniao_da_carteira": ("data",),
 }
-_IGNORAR_NA_DIFERENCA = {"id", "criado_em", "atualizado_em"}
 
-
-#: Coluna que aponta para outro registro → a tabela dele. O rótulo leva o nome do apontado (o número
-#: não serve: cada cópia numerou por conta própria).
+#: Coluna que aponta para outro registro → a tabela dele.
 REFERENCIAS = {
     "grupo_id": "grupo_economico", "empresa_id": "empresa", "pessoa_id": "pessoa_contato",
     "oportunidade_id": "oportunidade", "contrato_id": "contrato", "reuniao_id": "reuniao_de_resultado",
+}
+
+_IGNORAR = {"id", "criado_em", "atualizado_em", "campos_do_crm"}
+
+Linha = dict
+Chave = tuple
+
+
+def _texto(v) -> str:
+    """Sem acento, sem caixa e sem espaço sobrando: "Grupo  Blác" e "grupo blac" são o mesmo."""
+    t = unicodedata.normalize("NFKD", str(v or "")).encode("ascii", "ignore").decode().casefold()
+    return " ".join(t.split())
+
+
+def _cnpj(v) -> str | None:
+    """Só os dígitos, com os zeros da frente (a planilha às vezes perde o primeiro zero)."""
+    d = "".join(c for c in str(v or "") if c.isdigit())
+    return d.zfill(14) if d else None
+
+
+class _Chaves:
+    """A chave natural de cada registro de uma cópia, por tabela e id: o que as referências usam."""
+
+    def __init__(self) -> None:
+        self.por_id: dict[str, dict[object, Chave]] = {}
+
+    def de(self, tabela: str, id_) -> Chave | None:
+        if id_ is None:
+            return None
+        return self.por_id.get(tabela, {}).get(id_, ("sem registro", tabela, id_))
+
+
+def _ref(k: _Chaves, l: Linha, coluna: str) -> Chave | None:
+    return k.de(REFERENCIAS[coluna], l.get(coluna))
+
+
+#: A chave natural de cada tabela, na ordem em que as referências precisam (quem aponta vem depois).
+CHAVES: dict[str, Callable[[Linha, _Chaves], Chave]] = {
+    "grupo_economico": lambda l, k: ("grupo", _texto(l.get("nome"))),
+    "empresa": lambda l, k: (("cnpj", _cnpj(l.get("cnpj"))) if _cnpj(l.get("cnpj"))
+                             else ("empresa", _texto(l.get("razao_social")), _ref(k, l, "grupo_id"))),
+    "pessoa_contato": lambda l, k: (("email", _texto(l.get("email"))) if l.get("email")
+                                    else ("pessoa", _texto(l.get("nome")))),
+    "oportunidade": lambda l, k: (("planilha", l["chave_origem"]) if l.get("chave_origem")
+                                  else ("oportunidade", _ref(k, l, "grupo_id"), _texto(l.get("nome")))),
+    "vinculo_de_contato": lambda l, k: ("vinculo", _ref(k, l, "pessoa_id"), _ref(k, l, "empresa_id")),
+    "lead": lambda l, k: (("email", _texto(l.get("email"))) if l.get("email") else ("lead", _texto(l.get("nome")))),
+    "contrato": lambda l, k: (("da oportunidade", _ref(k, l, "oportunidade_id")) if l.get("oportunidade_id")
+                              else ("contrato", _ref(k, l, "grupo_id"), _ref(k, l, "empresa_id"), _texto(l.get("escopo")))),
+    "evento_de_contrato": lambda l, k: ("evento", _ref(k, l, "contrato_id"), l.get("tipo"), _valor(l.get("data_do_evento"))),
+    "proposta": lambda l, k: ("proposta", _valor(l.get("ano")), _valor(l.get("numero"))),
+    "pendencia_da_proposta": lambda l, k: ("pendencia", _ref(k, l, "oportunidade_id"), l.get("chave")),
+    "questionario_recebido": lambda l, k: ("questionario", l.get("externo_id")),
+    "classificacao_do_grupo": lambda l, k: ("leitura", _ref(k, l, "grupo_id"), _valor(l.get("referencia")),
+                                            _valor(l.get("revisao"))),
+    "reuniao_de_resultado": lambda l, k: ("reuniao", _ref(k, l, "grupo_id"), l.get("tipo"), _valor(l.get("data"))),
+    "ajuste_tecnico": lambda l, k: ("ajuste", _ref(k, l, "reuniao_id"), _texto(l.get("descricao"))),
+    "oportunidade_da_reuniao": lambda l, k: ("venda", _ref(k, l, "reuniao_id"), l.get("servico"), _texto(l.get("lacuna"))),
+    "reuniao_da_carteira": lambda l, k: ("carteira", _valor(l.get("data"))),
 }
 
 Nomes = dict[str, dict[object, str]]
@@ -94,6 +163,15 @@ def _instante(v) -> str:
     return d.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
 
+def _hora_local(v) -> str:
+    """Para a tela: dd/mm hh:mm no horário de Brasília."""
+    t = _instante(v)
+    if not t:
+        return "?"
+    d = datetime.fromisoformat(t).replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=-3)))
+    return d.strftime("%d/%m %H:%M")
+
+
 def _valor(v) -> str:
     """O mesmo valor escrito do mesmo jeito: falso = 0, 1000 = 1000.00, data e hora em UTC."""
     if v is None or v == "":
@@ -123,16 +201,46 @@ def _valor(v) -> str:
     return texto
 
 
-def _chave(tabela: str, linha: dict, nomes: Nomes) -> tuple:
-    return (_instante(linha.get("criado_em")), _rotulo(tabela, linha, nomes).strip().casefold())
+def _chaves_da_copia(tabelas: dict[str, list[Linha]]) -> tuple[_Chaves, dict[str, dict[Chave, list[Linha]]]]:
+    """Calcula a chave natural de todos os registros de uma cópia e agrupa por chave (dois registros
+    com a mesma chave contam como dois)."""
+    k = _Chaves()
+    grupos: dict[str, dict[Chave, list[Linha]]] = {}
+    for tabela, chave_de in CHAVES.items():
+        linhas = sorted(tabelas.get(tabela) or [], key=lambda l: (_instante(l.get("criado_em")), str(l.get("id"))))
+        k.por_id[tabela] = {}
+        por_chave: dict[Chave, list[Linha]] = {}
+        for l in linhas:
+            chave = chave_de(l, k)
+            k.por_id[tabela][l.get("id")] = chave
+            por_chave.setdefault(chave, []).append(l)
+        grupos[tabela] = por_chave
+    return k, grupos
 
 
-def _agrupar(tabela: str, linhas: list[dict], nomes: Nomes) -> dict[tuple, list[dict]]:
-    """Por chave, todos os registros com ela: dois iguais criados no mesmo segundo contam como dois."""
-    grupos: dict[tuple, list[dict]] = {}
-    for l in linhas:
-        grupos.setdefault(_chave(tabela, l, nomes), []).append(l)
-    return grupos
+def _diferencas(tabela: str, la: Linha, aqui: Linha, k_la: _Chaves, k_aqui: _Chaves, nomes_la: Nomes,
+                nomes_aqui: Nomes) -> list[tuple[str, str, str, str]]:
+    """(campo, valor aqui, valor lá, tipo) de cada campo diferente. Referência se compara pelo registro
+    apontado e aparece pelo nome dele."""
+    saida = []
+    for campo in sorted(set(la) | set(aqui)):
+        if campo in _IGNORAR or campo not in la or campo not in aqui:
+            continue
+        if campo in REFERENCIAS and REFERENCIAS[campo] != tabela:
+            ref = REFERENCIAS[campo]
+            if k_la.de(ref, la[campo]) == k_aqui.de(ref, aqui[campo]):
+                continue
+            v_la = nomes_la[ref].get(la[campo], "") if la[campo] is not None else ""
+            v_aqui = nomes_aqui[ref].get(aqui[campo], "") if aqui[campo] is not None else ""
+        elif campo.endswith("_id"):
+            continue  # aponta para tabela técnica (matriz, fusão…): o número não diz nada
+        else:
+            v_la, v_aqui = _valor(la[campo]), _valor(aqui[campo])
+            if v_la == v_aqui:
+                continue
+        tipo = "preencher" if not v_aqui else ("vazio lá" if not v_la else "conflito")
+        saida.append((campo, v_aqui, v_la, tipo))
+    return saida
 
 
 def _do_arquivo(caminho: Path) -> dict[str, list[dict]]:
@@ -155,39 +263,44 @@ def _do_banco(engine: sa.Engine, tabela: str) -> list[dict] | None:
 
 
 def comparar(arquivo: dict[str, list[dict]], engine: sa.Engine) -> dict[str, dict]:
-    """Por tabela: `so_no_arquivo`, `alterados_no_arquivo` (com os campos que mudaram) e
-    `so_no_banco` (só a contagem). Tabelas que o banco daqui não tem vêm com `banco=None`."""
-    resultado = {}
-    do_banco = {t: _do_banco(engine, t) for t in arquivo}
-    nomes_arquivo = _nomes(arquivo)
-    nomes_banco = _nomes({t: v for t, v in do_banco.items() if v is not None})
+    """Por tabela: `so_no_arquivo` (linhas), `diferencas` [(linha lá, linha aqui, [(campo, aqui, lá,
+    tipo)])], `so_no_banco` (contagem), `la_mexeu_depois` (por diferença) e `nomes` do arquivo.
+    Tabelas que o banco daqui não tem vêm com `banco=None`; as técnicas (fora de `CHAVES`), de fora."""
+    do_banco = {t: _do_banco(engine, t) for t in set(arquivo) | set(CHAVES)}
+    banco = {t: v for t, v in do_banco.items() if v is not None}
+    nomes_la, nomes_aqui = _nomes(arquivo), _nomes(banco)
+    k_la, grupos_la = _chaves_da_copia(arquivo)
+    k_aqui, grupos_aqui = _chaves_da_copia(banco)
+    resultado: dict[str, dict] = {}
     for tabela in sorted(arquivo):
-        linhas_arquivo = arquivo[tabela]
-        linhas_banco = do_banco[tabela]
-        if linhas_banco is None:
-            resultado[tabela] = {"banco": None, "arquivo": len(linhas_arquivo)}
+        if do_banco.get(tabela) is None:
+            resultado[tabela] = {"banco": None, "arquivo": len(arquivo[tabela])}
             continue
-        if tabela not in ROTULOS:
+        if tabela not in CHAVES:
             continue  # tabelas técnicas (parâmetros, carga, perfis…): não são inclusões de tela
-        banco = _agrupar(tabela, linhas_banco, nomes_banco)
-        do_arquivo = _agrupar(tabela, linhas_arquivo, nomes_arquivo)
-        so_no_arquivo, alterados = [], []
-        for chave, ls in do_arquivo.items():
-            daqui = banco.get(chave, [])
+        la, aqui = grupos_la[tabela], grupos_aqui.get(tabela, {})
+        so_no_arquivo, diferencas = [], []
+        for chave, ls in la.items():
+            daqui = aqui.get(chave, [])
             so_no_arquivo += ls[len(daqui):]
             for l, d in zip(ls, daqui):
-                if _instante(l.get("atualizado_em")) > _instante(d.get("atualizado_em")):
-                    mudou = [c for c, v in l.items() if c not in _IGNORAR_NA_DIFERENCA and not c.endswith("_id")
-                             and c in d and _valor(v) != _valor(d[c])]
-                    if mudou:
-                        alterados.append((l, mudou))
+                campos = _diferencas(tabela, l, d, k_la, k_aqui, nomes_la, nomes_aqui)
+                if campos:
+                    depois = _instante(l.get("atualizado_em")) > _instante(d.get("atualizado_em"))
+                    diferencas.append((l, d, campos, depois))
         resultado[tabela] = {
-            "banco": len(linhas_banco), "arquivo": len(linhas_arquivo),
-            "so_no_arquivo": so_no_arquivo, "alterados_no_arquivo": alterados,
-            "so_no_banco": sum(max(0, len(d) - len(do_arquivo.get(k, []))) for k, d in banco.items()),
-            "nomes": nomes_arquivo,
+            "banco": len(banco[tabela]), "arquivo": len(arquivo[tabela]),
+            "so_no_arquivo": so_no_arquivo, "diferencas": diferencas,
+            "so_no_banco": sum(max(0, len(d) - len(la.get(c, []))) for c, d in aqui.items()),
+            "nomes": nomes_la,
         }
     return resultado
+
+
+def _curto(v: str, tamanho: int = 60) -> str:
+    if not v:
+        return "—"
+    return v if len(v) <= tamanho else v[: tamanho - 1] + "…"
 
 
 def main() -> int:
@@ -199,19 +312,23 @@ def main() -> int:
         print(f"✗ Não achei o arquivo {caminho}.", file=sys.stderr)
         return 1
     resultado = comparar(_do_arquivo(caminho), criar_engine())
-    print("Nada foi gravado.\n")
+    print("Nada foi gravado. \"Lá\" é o arquivo; \"aqui\" é este banco. Horas no horário de Brasília.\n")
     for tabela, r in resultado.items():
         if r["banco"] is None:
             print(f"• {tabela}: só existe no CRM do arquivo ({r['arquivo']} registros) — esta versão não tem essa tabela.")
             continue
-        novos, alterados = r["so_no_arquivo"], r["alterados_no_arquivo"]
-        if not novos and not alterados:
+        novos, difs = r["so_no_arquivo"], r["diferencas"]
+        if not novos and not difs:
             continue
-        print(f"• {tabela}: {len(novos)} só no arquivo · {len(alterados)} alterados lá depois · {r['so_no_banco']} só no banco daqui")
-        for l in sorted(novos, key=lambda x: str(x.get("criado_em"))):
-            print(f"    + {_rotulo(tabela, l, r['nomes'])}   (criado em {str(l.get('criado_em'))[:16]})")
-        for l, campos in alterados:
-            print(f"    ~ {_rotulo(tabela, l, r['nomes'])}   (alterado em {str(l.get('atualizado_em'))[:16]}: {', '.join(campos)})")
+        print(f"• {tabela}: {len(novos)} só lá · {len(difs)} com diferença · {r['so_no_banco']} só aqui")
+        for l in sorted(novos, key=lambda x: _instante(x.get("criado_em"))):
+            print(f"    + {_rotulo(tabela, l, r['nomes'])}   (criado lá em {_hora_local(l.get('criado_em'))})")
+        for l, d, campos, depois in difs:
+            quem = f"lá mexeu por último, {_hora_local(l.get('atualizado_em'))}" if depois \
+                else f"aqui mexeu por último, {_hora_local(d.get('atualizado_em'))}"
+            print(f"    ~ {_rotulo(tabela, l, r['nomes'])}   ({quem})")
+            for campo, v_aqui, v_la, tipo in campos:
+                print(f"        {campo} [{tipo}]: aqui {_curto(v_aqui)}  →  lá {_curto(v_la)}")
     print("\nFim. Mande esta saída para o Claude decidir com você o que trazer.")
     return 0
 

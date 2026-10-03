@@ -29,8 +29,10 @@ como lá).
   os serviços da Critério que as cobrem**. A semestral começa por "entender a estratégia e os desafios
   da empresa". Reuniões bimestrais e anuais já registradas ficam no histórico, sem cobrança.
 - **Visões:** Consolidado · Classe A · Classe B · Classe C · Sem classe (lembrada no navegador), em
-  **Kanban** ou **Grade**, como o Funil comercial. O que se faz em cada etapa saiu de dentro da coluna:
-  aparece no **ⓘ** do cabeçalho (mouse, foco ou clique). A Grade tem uma linha por cliente, as mais
+  **Kanban** ou **Grade**, como o Funil comercial: **as mesmas colunas e os mesmos cartões** (pedido
+  de Eduardo em 03/10/2026). Embaixo do nome da coluna, a fase e o MRR somado; no cartão, o MRR bruto
+  do cliente por mês, a classe e a reunião. O que se faz em cada etapa, e quem participa, só aparece
+  no **ⓘ** do cabeçalho (mouse, foco ou clique). A Grade tem uma linha por cliente, as mais
   atrasadas primeiro, e ordena por qualquer coluna.
 - **Consolidado:** um quadro compara as classes (clientes, **MRR bruto** dos contratos ativos, % de
   reuniões em dia, vencidas, ajustes pendentes e **vendas abertas**, com o valor por mês e o de projeto
@@ -63,16 +65,24 @@ como lá).
 
 Para quando alguém trabalhou num **outro** CRM (outro computador, outra cópia do banco) e mandou o
 backup. `scripts/comparar_backup.py <arquivo>` **só lê**: mostra, tabela por tabela, o que está
-só no arquivo (incluído lá), o que foi alterado lá depois da versão daqui (e quais campos), e
-quantos registros estão só no banco daqui. Reconhece o mesmo registro nas duas cópias pela data de
-criação mais o nome, com o grupo, empresa ou pessoa a que ele pertence (o número não serve: cada
-cópia numerou por conta própria). A saída tem nomes de clientes: fica na tela.
+só no arquivo (incluído lá), o que tem diferença entre as duas cópias (e quais campos), e quantos
+registros estão só no banco daqui. Reconhece o mesmo registro nas duas cópias pelo que o identifica de verdade, e não pela hora em que nasceu (revisto em 03/10/2026): empresa
+pelo CNPJ, contato pelo e-mail ou nome, oportunidade pela chave da planilha ou grupo e nome, contrato
+pela oportunidade ou grupo, empresa e escopo. Cada diferença diz se é para **preencher** (vazio aqui),
+um **conflito** (preenchido nos dois) ou **vazio lá**, e qual cópia mexeu por último. A saída tem nomes
+de clientes: fica na tela.
 
 ```
 cd app/backend && ~/.venvs/criterio-crm/bin/python scripts/comparar_backup.py ~/Downloads/<arquivo>.zip
 ```
 
 **Não importe o backup de outra cópia pela tela:** a importação substitui o banco inteiro.
+
+**Apagar um grupo de teste** (03/10/2026, para o "Karine ON"): `scripts/apagar_grupo.py --cnpj <CNPJ>`
+(ou `--grupo <nome>`) mostra tudo o que sairia: grupo, empresas, oportunidades com proposta e
+questionário, vínculos, os contatos que só existem nele, leitura do Score, jornada e reuniões. Com
+`--apagar`, apaga numa transação só, sem backup antes (para guardar, rode `backup.py exportar` antes).
+Recusa grupo com contrato ou em fusão. O histórico de alterações fica.
 
 ## Busca automática dos questionários (02/10/2026)
 

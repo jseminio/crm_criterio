@@ -929,24 +929,6 @@
 
 /* ------------------------------------------------- funil do sucesso do cliente (02/10/2026) */
 .sucesso { display: grid; gap: var(--e3); }
-.sucesso-kanban { gap: var(--e3); }
-/* Sete colunas cabem na largura: a implantação ocupa 3 partes, em curso 4 (uma por coluna); abaixo
-   de 140px por coluna, rola na horizontal como o funil comercial. */
-.sucesso-fase { display: grid; gap: var(--e2); align-content: start; min-width: 0; }
-.sucesso-fase:first-child { flex: 3 1 0; }
-.sucesso-fase:last-child { flex: 4 1 0; }
-.sucesso-fase-nome { margin: 0; font-size: 12px; font-weight: 600; color: var(--texto-medio); text-transform: uppercase;
-  letter-spacing: .04em; padding-bottom: var(--e1); border-bottom: 2px solid var(--borda-forte); }
-.sucesso-fase-colunas { display: flex; gap: var(--e2); align-items: flex-start; }
-.sucesso-kanban .coluna { min-width: 140px; max-width: none; flex: 1 1 0; max-height: none; }
-/* A seta do fluxograma (Macroprocesso Comercial & Sucesso do Cliente). */
-.sucesso-seta { background: var(--surface-brand); color: var(--texto-sobre-marca); text-align: left;
-  padding: var(--e2) var(--e5); border-radius: var(--raio-md) var(--raio-md) 0 0;
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%); }
-.sucesso-fase-colunas > .coluna:first-child .sucesso-seta { clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%); }
-.sucesso-seta-nome { margin: 0; font: 600 14px var(--fonte-ui); }
-.sucesso-seta-quem { margin: 2px 0 0; font-size: 11.5px; font-style: italic; opacity: .9; }
-.sucesso-contagem { margin: 0; padding: var(--e2) var(--e3) 0; font-size: 12px; color: var(--texto-medio); font-variant-numeric: tabular-nums; }
 .sucesso-sem-classe { margin: 0; }
 .cartao-clicavel { cursor: pointer; font: inherit; color: inherit; }
 .cartao-clicavel:active { cursor: pointer; }
@@ -1015,11 +997,11 @@ td > .celula-fonte { display: block; }
 .quadro th { font-size: 12px; color: var(--texto-medio); font-weight: 500; }
 .sucesso-intencao { display: grid; gap: var(--e1); border-left: 4px solid var(--surface-brand); background: var(--surface-card);
   padding: var(--e3) var(--e4); border-radius: var(--raio-sm); font-size: 13px; }
-.sucesso-seta-nome { display: flex; justify-content: space-between; align-items: center; gap: var(--e2); text-align: left; }
-.sucesso-seta-quantas { font-weight: 400; font-size: 12px; opacity: .85; margin-left: 4px; }
-.sucesso-info { display: inline-grid; place-items: center; width: 18px; height: 18px; flex: none; border-radius: 50%; padding: 0;
-  border: 1px solid currentColor; background: transparent; color: inherit; font: italic 600 11px var(--fonte-ui); cursor: help; opacity: .9; }
-.sucesso-info:focus-visible { outline: 2px solid var(--texto-sobre-marca); outline-offset: 2px; }
+.sucesso-coluna-direita { display: inline-flex; align-items: center; gap: var(--e2); }
+.sucesso-info { display: inline-grid; place-items: center; width: 16px; height: 16px; flex: none; border-radius: 50%; padding: 0;
+  border: 1px solid var(--texto-medio); background: transparent; color: var(--texto-medio); font: italic 600 10px var(--fonte-ui); cursor: help; }
+.sucesso-info:hover, .sucesso-info[aria-expanded="true"] { border-color: var(--texto-forte); color: var(--texto-forte); }
+.sucesso-info:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
 .sucesso-dica { position: fixed; z-index: 30; width: 300px; max-width: calc(100vw - 16px); background: var(--surface-card);
   color: var(--texto-forte); border: 1px solid var(--borda-forte); border-radius: var(--raio-md); box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
   padding: var(--e3) var(--e4); font-size: 12.5px; line-height: 1.4; }

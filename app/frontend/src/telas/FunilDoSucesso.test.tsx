@@ -135,6 +135,10 @@ describe("Funil do Sucesso do Cliente por classe (03/10/2026)", () => {
     expect(within(trimestral).getByText("⚠ venceu em 01/08/2026 (62 d)")).toBeInTheDocument();
     expect(within(trimestral).getByText("⚠ nenhuma registrada ainda")).toBeInTheDocument();
     expect(within(trimestral).getByText("2 vendas abertas")).toBeInTheDocument();
+    // colunas e cartões como no Funil comercial: a fase e o MRR da coluna embaixo do nome; o MRR no cartão
+    expect(within(trimestral).getByText("Em curso · R$ 12 mil/mês")).toBeInTheDocument();
+    expect(within(trimestral).getByText("R$ 10 mil/mês")).toBeInTheDocument();
+    expect(within(coluna("Contrato")).getByText(/^Implantação · /)).toBeInTheDocument();
     expect(within(coluna("Mensal")).getByText("Nenhum grupo nesta etapa.")).toBeInTheDocument();
   });
 

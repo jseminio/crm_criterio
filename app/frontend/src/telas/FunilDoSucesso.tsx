@@ -14,7 +14,7 @@ import type { FunilDoSucesso as Funil, GrupoNoFunilDoSucesso as Grupo, ReuniaoDe
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { usarAcesso } from "../entrada";
-import { data, dinheiro } from "../formato";
+import { data, dinheiro, dinheiroCurto } from "../formato";
 import { usarDados } from "../usarDados";
 import { PainelDaCarteira } from "./PainelDaCarteira";
 import { PainelDoGrupo } from "./PainelDoGrupo";
@@ -28,11 +28,14 @@ type Visao = "kanban" | "grade";
 
 type Coluna = {
   chave: string;
+  fase: string;
   nome: string;
   quem: string | null;
   itens: string[];
   quantas: number;
   vencidas: number;
+  /** Soma do MRR bruto dos clientes da coluna, como o "ao ano" do Funil comercial. */
+  mrr: number;
   cartoes: ReactNode[];
 };
 
@@ -78,16 +81,21 @@ function Vendas({ g }: { g: Grupo }) {
   return <span className="cartao-prazo">{plural(g.vendas_abertas, "venda aberta", "vendas abertas")}</span>;
 }
 
+/** O valor do cartão, como no Funil comercial: o MRR bruto do cliente, por mês. */
+function MrrDoCartao({ g }: { g: Grupo }) {
+  const mrr = Number(g.mrr_bruto);
+  return mrr > 0 ? <span className="cartao-valor">{dinheiroCurto(mrr)}/mês</span> : null;
+}
+
 function CartaoDaImplantacao({ f, g, aoAbrir }: { f: Funil; g: Grupo; aoAbrir: () => void }) {
   const itens = f.checklist[g.etapa] ?? [];
   const feitos = itens.filter((i) => g.itens_feitos.includes(i.chave)).length;
   return (
     <button type="button" className="cartao cartao-clicavel" onClick={aoAbrir}>
       <span className="cartao-grupo">{g.nome}</span>
-      <span className="cartao-linha">
-        {g.classe && <span className="etiqueta etiqueta-neutra">Classe {g.classe}</span>}
-        <span className="cartao-prazo">{feitos} de {plural(itens.length, "item feito", "itens feitos")}</span>
-      </span>
+      <MrrDoCartao g={g} />
+      {g.classe && <span className="cartao-linha"><span className="etiqueta etiqueta-neutra">Classe {g.classe}</span></span>}
+      <span className="cartao-prazo">{feitos} de {plural(itens.length, "item feito", "itens feitos")}</span>
     </button>
   );
 }
@@ -96,11 +104,12 @@ function CartaoDaReuniao({ g, r, aoAbrir }: { g: Grupo; r: ReuniaoDevida | null;
   return (
     <button type="button" className="cartao cartao-clicavel" onClick={aoAbrir}>
       <span className="cartao-grupo">{g.nome}</span>
+      <MrrDoCartao g={g} />
       <span className="cartao-linha">
         {g.classe ? <span className="etiqueta etiqueta-neutra">Classe {g.classe}</span>
           : <span className="etiqueta etiqueta-perda">⚠ sem classe</span>}
-        {r && <span className={`cartao-prazo ${r.atrasada ? "cartao-prazo-atrasado" : ""}`}>{textoDaReuniao(r)}</span>}
       </span>
+      {r && <span className={`cartao-prazo ${r.atrasada ? "cartao-prazo-atrasado" : ""}`}>{textoDaReuniao(r)}</span>}
       <Ajustes g={g} />
       <Vendas g={g} />
     </button>
@@ -138,22 +147,26 @@ function CabecalhoDaColuna({ c, dica, aoMostrar, aoEsconder }: {
     aoMostrar({ chave: c.chave, titulo: `${c.nome}${c.quem ? ` · ${c.quem}` : ""}`, itens: c.itens, topo: caixa.bottom + 6, esquerda, fixa });
   };
   return (
-    <header className="sucesso-seta">
-      <h2 className="sucesso-seta-nome">
-        <span>{c.nome} <span className="sucesso-seta-quantas">{c.quantas}</span></span>
-        {c.itens.length > 0 && (
-          <button
-            type="button" className="sucesso-info" aria-label={`O que se faz em ${c.nome}`} aria-expanded={aberta}
-            aria-describedby={aberta ? "sucesso-dica" : undefined}
-            onMouseEnter={(e) => mostrar(e.currentTarget, false)} onMouseLeave={() => aoEsconder()}
-            onFocus={(e) => mostrar(e.currentTarget, false)} onBlur={() => aoEsconder(true)}
-            onClick={(e) => (aberta && dica?.fixa ? aoEsconder(true) : mostrar(e.currentTarget, true))}
-          >
-            i
-          </button>
-        )}
+    <header className="coluna-topo">
+      <h2 className="coluna-nome">
+        <span>{c.nome}</span>
+        <span className="sucesso-coluna-direita">
+          <span className="coluna-quantas">{c.quantas}</span>
+          {c.itens.length > 0 && (
+            <button
+              type="button" className="sucesso-info" aria-label={`O que se faz em ${c.nome}`} aria-expanded={aberta}
+              aria-describedby={aberta ? "sucesso-dica" : undefined}
+              onMouseEnter={(e) => mostrar(e.currentTarget, false)} onMouseLeave={() => aoEsconder()}
+              onFocus={(e) => mostrar(e.currentTarget, false)} onBlur={() => aoEsconder(true)}
+              onClick={(e) => (aberta && dica?.fixa ? aoEsconder(true) : mostrar(e.currentTarget, true))}
+            >
+              i
+            </button>
+          )}
+        </span>
       </h2>
-      {c.quem && <p className="sucesso-seta-quem">{c.quem}</p>}
+      <p className="coluna-valor">{c.fase} · {dinheiroCurto(c.mrr)}/mês</p>
+      {c.vencidas > 0 && <p className="coluna-valor cartao-prazo-atrasado">⚠ {c.vencidas} vencida{c.vencidas === 1 ? "" : "s"}</p>}
     </header>
   );
 }
@@ -164,24 +177,18 @@ function Kanban({ fases, dica, definirDica }: {
   const esconder = (forcar = false) => {
     if (forcar || !dica?.fixa) definirDica(null);
   };
+  // As mesmas colunas e cartões do Funil comercial (Eduardo, 03/10/2026): uma fileira só, rolando
+  // na horizontal; a fase e quem participa ficam na linha de baixo e no ⓘ.
   return (
-    <div className="kanban sucesso-kanban">
-      {fases.filter(([, cols]) => cols.length > 0).map(([fase, cols]) => (
-        <div className="sucesso-fase" key={fase} style={{ flexGrow: cols.length }}>
-          <p className="sucesso-fase-nome">{fase}</p>
-          <div className="sucesso-fase-colunas">
-            {cols.map((c) => (
-              <section className="coluna" key={c.chave} aria-label={c.nome}>
-                <CabecalhoDaColuna c={c} dica={dica} aoMostrar={definirDica} aoEsconder={esconder} />
-                {c.vencidas > 0 && <p className="sucesso-contagem cartao-prazo-atrasado">⚠ {c.vencidas} vencida{c.vencidas === 1 ? "" : "s"}</p>}
-                <div className="coluna-cartoes">
-                  {c.cartoes}
-                  {c.quantas === 0 && <p className="coluna-vazia">Nenhum grupo nesta etapa.</p>}
-                </div>
-              </section>
-            ))}
+    <div className="kanban">
+      {fases.flatMap(([, cols]) => cols).map((c) => (
+        <section className="coluna" key={c.chave} aria-label={c.nome}>
+          <CabecalhoDaColuna c={c} dica={dica} aoMostrar={definirDica} aoEsconder={esconder} />
+          <div className="coluna-cartoes">
+            {c.cartoes}
+            {c.quantas === 0 && <p className="coluna-vazia">Nenhum grupo nesta etapa.</p>}
           </div>
-        </div>
+        </section>
       ))}
     </div>
   );
@@ -410,8 +417,9 @@ export function FunilDoSucesso() {
   const implantacao: Coluna[] = recorte === "sem" ? [] : dados.etapas.filter((e) => e.chave !== "em_curso").map((e) => {
     const grupos = filtrados.filter((g) => g.etapa === e.chave);
     return {
-      chave: e.chave, nome: e.nome, quem: e.participantes, itens: (dados.checklist[e.chave] ?? []).map((i) => i.rotulo),
-      quantas: grupos.length, vencidas: 0,
+      chave: e.chave, fase: "Implantação", nome: e.nome, quem: e.participantes,
+      itens: (dados.checklist[e.chave] ?? []).map((i) => i.rotulo),
+      quantas: grupos.length, vencidas: 0, mrr: grupos.reduce((t, g) => t + Number(g.mrr_bruto), 0),
       cartoes: grupos.map((g) => <CartaoDaImplantacao key={g.grupo_id} f={dados} g={g} aoAbrir={() => abrir(g)} />),
     };
   });
@@ -419,7 +427,8 @@ export function FunilDoSucesso() {
     ? dados.tipos : dados.tipos.filter((t) => (dados.cadencia[recorte] ?? []).includes(t.chave));
   const emCurso: Coluna[] = recorte === "sem"
     ? [{
-      chave: "sem_classe", nome: "Sem classe", quem: null,
+      chave: "sem_classe", fase: "Em curso", nome: "Sem classe", quem: null,
+      mrr: filtrados.reduce((t, g) => t + Number(g.mrr_bruto), 0),
       itens: ["Sem a leitura do Score, não há reunião cobrada.", "Avalie o grupo na aba Saúde da carteira: a classe diz qual reunião ele recebe."],
       quantas: filtrados.length, vencidas: 0,
       cartoes: filtrados.map((g) => <CartaoDaReuniao key={g.grupo_id} g={g} r={null} aoAbrir={() => abrir(g)} />),
@@ -428,8 +437,9 @@ export function FunilDoSucesso() {
       const pares = filtrados.flatMap((g) => g.reunioes.filter((r) => r.tipo === t.chave).map((r) => ({ g, r })))
         .sort((a, b) => ordemDaReuniao(a.r, b.r) || a.g.nome.localeCompare(b.g.nome, "pt-BR"));
       return {
-        chave: t.chave, nome: t.nome, quem: t.participantes, itens: t.pauta,
+        chave: t.chave, fase: "Em curso", nome: t.nome, quem: t.participantes, itens: t.pauta,
         quantas: pares.length, vencidas: pares.filter((p) => p.r.atrasada).length,
+        mrr: pares.reduce((total, p) => total + Number(p.g.mrr_bruto), 0),
         cartoes: pares.map(({ g, r }) => <CartaoDaReuniao key={g.grupo_id} g={g} r={r} aoAbrir={() => abrir(g, t.chave)} />),
       };
     });

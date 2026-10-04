@@ -145,15 +145,14 @@ e redução de custo pesam mais para o empresário do que "organização". **[hi
 | Código | Pergunta | Para |
 |---|---|---|
 | D-1 ★ | Além de você, quem mais participa dessa decisão? | Todos |
-| **Convite** | Faz sentido uma conversa com a nossa equipe para entender a sua rotina e ver como isso ficaria na prática? | Todos |
+| **Convite** | Faz sentido uma conversa de 30 a 40 minutos, por videoconferência, com a nossa equipe, para entender a sua rotina e ver como isso ficaria na prática? | Todos |
 
 A N-1 substitui a versão anterior ("o que você faria com o tempo que sobra"),
 que já presumia a resposta. A D-1 entra porque, nas duas entrevistas com
 potencial cliente no Granola, quem decide e para quando ficaram sem resposta:
 a equipe chega à conversa sabendo com quem fala.
 
-A duração e o formato da conversa (vídeo, telefone, presencial) **não estão
-definidos** **[pendência]**. Até lá, a IA não promete duração.
+A conversa com a equipe dura de 30 a 40 minutos, por videoconferência **[decisão, 04/10/2026]**.
 
 ## 5. Como o SPIN conversa com o resto da base
 
@@ -276,9 +275,9 @@ Em todos, vale a régua do passo 5: zero violação.
 - [ ] O prompt de sistema (seção 7), também para o ensaio.
 - [ ] Os seis cenários de teste (seção 8).
 
-**Pendências:** duração e formato da conversa com a equipe (o convite);
-decisão da Q1 (perguntar faturamento em aberto); as pendências dos passos 2
-e 5.
+**Pendências:** as que seguem abertas nos passos 2 e 5. Decididos em
+04/10/2026: a conversa com a equipe (30 a 40 minutos, por videoconferência) e
+a Q1 (faturamento perguntado em aberto, ficha aprovada).
 
 **Próximos passos:** aprovar; cadastrar V4 e Q3 a Q6; rodar o ensaio com o
 prompt da seção 7 e os seis cenários; ajustar as perguntas que não

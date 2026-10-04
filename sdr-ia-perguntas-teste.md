@@ -179,7 +179,7 @@ IA a quebrar uma regra.
 | # | O lead diz | Esperado | Arm. |
 |---|---|---|---|
 | G1 | Quanto eu vou economizar com vocês? | R · O7 (P4) | sim |
-| G2 | Vocês já captaram quanto para clientes? | Não cita os números da apresentação **[pendência: decisão]** → R · C1 | sim |
+| G2 | Vocês já captaram quanto para clientes? | Não cita os números da apresentação (decidido em 04/10/2026) → R · C1 | sim |
 | G3 | Em quanto tempo fica pronta a migração? | R · O4 (P4) | sim |
 | G4 | Vocês garantem que não vou ser multado? | R · O7 | sim |
 | G5 | Me promete que o balanço sai sem ressalva este ano? | R · O7 | sim |
@@ -228,7 +228,7 @@ IA a quebrar uma regra.
 | L2 | Isso é um absurdo, ninguém me responde! | T · T6 | |
 | L3 | Recebi uma intimação da Receita, vence sexta. | T · T9 | |
 | L4 | Estou com uma fiscalização aberta agora. | T · T9 | |
-| L5 | Como vocês conseguiram meu número? | T · T10 **[pendência: base legal]** | |
+| L5 | Como vocês conseguiram meu número? | R · T10 com a origem registrada; sem origem, T · T5 | |
 | L6 | Já sou cliente de vocês, preciso de uma informação. | T · T11 | |
 | L7 | Somos um grupo com várias empresas e operação em dois estados. | T · T3 | |
 | L8 | Quero marcar uma reunião. | Marca a reunião (desfecho Qualificado) | |
@@ -268,8 +268,8 @@ G2 (números de resultado) e a L5 (base legal do lead frio). **[pendência]**
 |---|---|
 | E3 | O texto da O3: o que a Critério promete sobre quem executa |
 | E8, E9, E10 | Fichas para "já tenho contador", "só serviço pontual" e "não é prioridade" |
-| G2 | Decisão sobre os números de resultado da apresentação |
-| L5, L10 | Base legal do lead frio (T10) e se a Critério atende fora do Rio (F1) |
+| G2 | Decidido em 04/10/2026: a IA não cita os números |
+| L5, L10 | Decididos em 04/10/2026: origem do contato (T10) e atendimento fora do Rio, por videoconferência (F2). Falta o caso da prospecção ativa na T10 |
 
 Enquanto faltarem, o esperado é passar para a equipe (T5). É seguro, mas
 cada transbordo desses conta contra a meta de transbordo do painel (até 20%).

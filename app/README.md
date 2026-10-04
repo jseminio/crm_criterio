@@ -16,6 +16,30 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Funil comercial › Inteligência de Conversão: o plano de MRR (03/10/2026)
+
+Aprovado por Eduardo em 03/10/2026, Entrega 1. Terceira aba do Funil comercial ("Inteligência de
+Conversão", permissão "Funil comercial: ver"). Regras em `crm.domain.plano_de_mrr`; a tela lê
+`GET /api/inteligencia/plano` (`crm.api.inteligencia`).
+
+- **A meta é acréscimo líquido sobre a receita atual** (R$ 250 mil até 30/06/2027): venda nova e
+  escada menos churn e contração. A barra mostra o realizado contra o previsto até hoje; a situação
+  vem com palavra e seta (no ritmo ≥ 100% do previsto, atenção de 90% a 99%, abaixo < 90%).
+- **Três motores**: BPO Financeiro (clientes por mês no ticket, até o teto da célula), Contábil
+  (limitado pelas vagas de onboarding; o atípico ocupa duas; os contratos previstos do pipeline
+  entram no mês deles) e a **escada** (Plus e depois CFO as a Service, após o prazo). Churn mensal de
+  `churn_anual_pct ÷ 12` sobre a carteira do começo do mês.
+- **Três cenários** com as mesmas regras: alerta, previsto (o compromisso) e otimista. O gráfico
+  compara o acumulado realizado com os três; "Ver o gráfico em tabela" mostra os mesmos números.
+- **Realizado** = movimento do MRR dos contratos do CRM, em bruto, separado por motor pelo serviço.
+  Reajuste e expansão de contrato contábil entram em "outros movimentos", sem previsto.
+- **Premissas**: só quem tem "Configurações: metas" muda (`PUT /api/inteligencia/plano`), e a mudança
+  vai para o histórico de alterações. Sem nada gravado, valem as de `PADRAO`.
+- **Cenários de ticket** saíram da aba Oportunidades e passaram a ser por serviço, nesta aba
+  (`GET /api/inteligencia/cenarios-de-ticket`).
+- Migração `a7c3e9f1b5d2`: só acrescenta as tabelas `plano_de_mrr` (vazia) e
+  `contrato_previsto_do_plano`, com os três contratos previstos de 03/10/2026, sem nome de cliente.
+
 ## Funil do Sucesso do Cliente por classe, com vendas na ata (03/10/2026)
 
 Aprovado por Eduardo em 03/10/2026, a partir das amostras. **Substitui a cadência e as colunas** das

@@ -46,9 +46,9 @@ describe("Sucesso do Cliente (02/10/2026)", () => {
 describe("Funil em abas (02/10/2026)", () => {
   beforeEach(() => localStorage.clear());
 
-  it("Oportunidades e Questionários, lembrando a última aba", () => {
+  it("Oportunidades, Questionários e Inteligência de Conversão, lembrando a última aba", () => {
     const { unmount } = render(<FunilEQuestionarios listas={null} />);
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Oportunidades", "Questionários"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Oportunidades", "Questionários", "Inteligência de Conversão"]);
     expect(screen.getByText("tela do funil")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Questionários" }));
     expect(screen.getByText("tela de questionários")).toBeInTheDocument();

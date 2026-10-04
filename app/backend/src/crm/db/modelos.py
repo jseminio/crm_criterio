@@ -1617,3 +1617,56 @@ class CadenciaDeReuniao(Base):
     """O que a Critério quer com a classe (03/10/2026). Vazia: vale `INTENCAO_PADRAO`."""
     alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
     alterado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+
+QUANTIDADE = sa.Numeric(6, 2)
+
+
+class PlanoDeMrr(Base):
+    """As premissas do plano de MRR da aba Inteligência de Conversão (03/10/2026, aprovado por
+    Eduardo). Uma linha só (`id` = 1); sem ela, valem as de `crm.domain.plano_de_mrr.PADRAO`. Só o
+    Administrador muda, e cada campo alterado vai para o histórico de alterações."""
+
+    __tablename__ = "plano_de_mrr"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    meta_liquida: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    inicio: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    fim: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    inicio_da_projecao: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    ponto_de_partida: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    mrr_de_partida: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    churn_anual_pct: Mapped[Decimal] = mapped_column(QUANTIDADE, nullable=False)
+    bpo_ticket: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    bpo_teto: Mapped[Decimal] = mapped_column(QUANTIDADE, nullable=False)
+    contabil_vagas: Mapped[Decimal] = mapped_column(QUANTIDADE, nullable=False)
+    atipico_vagas: Mapped[Decimal] = mapped_column(QUANTIDADE, nullable=False)
+    escada_prazo_meses: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    plus_acrescimo: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    plus_pct: Mapped[Decimal] = mapped_column(QUANTIDADE, nullable=False)
+    cfo_acrescimo: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    cfo_pct: Mapped[Decimal] = mapped_column(QUANTIDADE, nullable=False)
+    alerta_bpo_por_mes: Mapped[Decimal] = mapped_column(QUANTIDADE, nullable=False)
+    previsto_bpo_por_mes: Mapped[Decimal] = mapped_column(QUANTIDADE, nullable=False)
+    otimista_bpo_por_mes: Mapped[Decimal] = mapped_column(QUANTIDADE, nullable=False)
+    alerta_ticket_contabil: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    previsto_ticket_contabil: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    otimista_ticket_contabil: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    alerta_com_previstos: Mapped[bool] = mapped_column(sa.Boolean, nullable=False)
+    previsto_com_previstos: Mapped[bool] = mapped_column(sa.Boolean, nullable=False)
+    otimista_com_previstos: Mapped[bool] = mapped_column(sa.Boolean, nullable=False)
+    alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
+    alterado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+
+class ContratoPrevistoDoPlano(Base):
+    """Um contrato contábil que o plano já conta num mês (o pipeline conhecido). O atípico ocupa
+    mais de uma vaga do onboarding. Sem nome de cliente: a descrição é para quem edita o plano."""
+
+    __tablename__ = "contrato_previsto_do_plano"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    descricao: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    mes: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    valor: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    atipico: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)

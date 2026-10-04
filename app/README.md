@@ -155,6 +155,12 @@ recepciona o que a SDR de IA pode dizer. As regras de atuação que toda ficha r
 - Rotas em `crm/api/base_de_conhecimento.py`, regras em `crm/domain/base_de_conhecimento.py`, tela
   em `telas/BaseDeConhecimento.tsx`. **Migração `e4a7c1b9d2f6`, só aditiva** (tabela
   `ficha_da_base`): rode `scripts/backup.py exportar` e depois `alembic upgrade head`.
+- **Ensaio do SDR (04/10/2026):** `scripts/ensaio_sdr.py <pasta fora do repositório>` põe o modelo do
+  agente no papel do SDR, com o prompt do `../sdr-ia-roteiro-spin.md` e as fichas que valem para a IA,
+  e responde às 96 perguntas e às 6 conversas de `../sdr-ia-perguntas-teste.md`. Grava
+  `respostas.json` e `relatorio.md` (cada resposta ao lado do esperado, com alerta da trava de preço);
+  a correção é humana. Precisa de `ANTHROPIC_API_KEY`; sem ela, para antes de chamar. Lógica em
+  `crm/agente/ensaio_sdr.py`. Cerca de 130 chamadas por rodada, com o texto de sistema em cache.
 - ⚠️ **Ainda não liga na IA.** A integração do canal não existe; quando existir, ela lê só as
   fichas com `vale_para_a_ia`, e cada mensagem deve registrar as fichas usadas (passo 6 do plano).
 
@@ -545,7 +551,7 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.257** no backend e **527** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Testes | **1.275** no backend e **531** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
 | Banco | PostgreSQL 18 local, 46 tabelas, migrações até `e4a7c1b9d2f6` (base de conhecimento do SDR, depois do plano de MRR, 04/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 149 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens, SDR da IA e Base de conhecimento) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |

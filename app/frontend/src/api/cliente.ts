@@ -29,7 +29,9 @@ import type {
   ResultadoDaEdicao,
   SugestaoDePorte,
   VolumetriaEntrada,
-  CenariosDeTicket,
+  CenariosDoServico,
+  PlanoDeMrr,
+  PremissasDoPlano,
   ColunaDoFunil,
   ConversaDoSdr,
   InvestimentoEmMidia,
@@ -439,8 +441,10 @@ export const api = {
   recortes: (dimensao: DimensaoDeRecorte, filtros: FiltrosDoFunil = {}) =>
     pedir<LinhaDeRecorte[]>(comParametros("/api/indicadores/recortes", { dimensao, ...filtros })),
 
-  cenariosDeTicket: (filtros: FiltrosDoFunil = {}) =>
-    pedir<CenariosDeTicket | null>(comParametros("/api/indicadores/cenarios-de-ticket", { ...filtros })),
+  planoDeMrr: () => pedir<PlanoDeMrr>("/api/inteligencia/plano"),
+  mudarPlanoDeMrr: (premissas: PremissasDoPlano) =>
+    pedir<PlanoDeMrr>("/api/inteligencia/plano", { method: "PUT", body: JSON.stringify(premissas) }),
+  cenariosPorServico: () => pedir<CenariosDoServico[]>("/api/inteligencia/cenarios-de-ticket"),
 
   oportunidades: (filtros: FiltrosDoFunil & { situacao?: string[]; grupo_id?: number } = {}) =>
     pedir<Pagina<OportunidadeResumo>>(

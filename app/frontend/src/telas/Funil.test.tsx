@@ -19,7 +19,7 @@ vi.mock("../api/cliente", async () => {
     ...real,
     api: {
       funil: vi.fn(), indicadores: vi.fn(), oportunidade: vi.fn(), editarOportunidade: vi.fn(),
-      recortes: vi.fn().mockResolvedValue([]), cenariosDeTicket: vi.fn().mockResolvedValue(null),
+      recortes: vi.fn().mockResolvedValue([]),
       oportunidades: vi.fn(), questionarios: vi.fn().mockResolvedValue([]),
       questionarioDaOportunidade: vi.fn().mockResolvedValue(null),
       enderecoDaExportacaoDoFunil: real.api.enderecoDaExportacaoDoFunil,

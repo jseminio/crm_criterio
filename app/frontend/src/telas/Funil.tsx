@@ -18,7 +18,6 @@ import {
 } from "../componentes/Filtros";
 import { NovaOportunidade } from "../componentes/NovaOportunidade";
 import { BotaoBuscarQuestionarios, QuestionariosDoSite, usarQuestionarios } from "../componentes/QuestionariosDoSite";
-import { CenariosDeTicket } from "../componentes/CenariosDeTicket";
 import { Numeros } from "../componentes/Numeros";
 import { Recolhivel } from "../componentes/Recolhivel";
 import { Recortes } from "../componentes/Recortes";
@@ -188,9 +187,6 @@ export function Funil({ listas }: { listas: Listas | null }) {
       <div className="funil-analises">
         <Recolhivel titulo="Recortes do funil" resumo="por serviço, canal e captador">
           <Recortes filtros={filtros} />
-        </Recolhivel>
-        <Recolhivel titulo="Cenários de ticket" resumo="conservador, base e otimista">
-          <CenariosDeTicket filtros={filtros} />
         </Recolhivel>
       </div>
       <Filtros

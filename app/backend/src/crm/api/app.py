@@ -38,6 +38,7 @@ from crm.acesso.catalogo import PUBLICAS, permissoes_da_rota
 from crm.acesso.entrada import ConfiguracaoDeEntrada, EntradaRecusada, ler_configuracao, pessoa_do_token, validador_da_microsoft
 from crm.api import esquemas as e
 from crm.api.acesso import quem_fez, roteador_do_acesso
+from crm.api.inteligencia import roteador_de_inteligencia
 from crm.api.metas import metas_vigentes, roteador_de_metas
 from crm.api.ajustes import roteador_de_ajustes
 from crm.api.sucesso import ServicosDaAta, roteador_do_sucesso, servicos_da_ata_reais
@@ -235,6 +236,7 @@ def criar_app(
     api.include_router(roteador_de_propostas(obter_sessao))
     api.include_router(roteador_da_ficha(obter_sessao))
     api.include_router(roteador_de_metas(obter_sessao))
+    api.include_router(roteador_de_inteligencia(obter_sessao))
     api.include_router(roteador_do_sucesso(obter_sessao, servicos_da_ata or servicos_da_ata_reais))
     api.include_router(roteador_de_ajustes(obter_sessao))
     api.include_router(roteador_do_acesso(obter_sessao, lambda: config_de_entrada))

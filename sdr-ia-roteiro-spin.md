@@ -6,6 +6,12 @@
 > (`sdr-ia-limites-de-atuacao.md`, `sdr-ia-modelo-de-ficha.md` e
 > `sdr-ia-perguntas-teste.md`). **As regras do passo 1 têm precedência sobre o
 > SPIN**: onde o método pede algo que elas proíbem, vale a regra.
+>
+> **Revisado em 04/10/2026** com perguntas dos dois roteiros de entrevista da
+> Critério ("Roteiro de entrevista de Potencial Cliente" e
+> "Roteiro_Entrevista_Descoberta_Cliente_v2"): abertura pelo motivo, duas
+> perguntas de Implicação, a de Necessidade sem resposta presumida e quem
+> decide antes do convite.
 
 **Como ler.** Cada regra traz uma marca de status:
 
@@ -54,10 +60,12 @@ mensagem** (V3), **respostas curtas e ligadas ao que o lead disse**, e
 
 | Etapa | Objetivo | Quantas perguntas | Sai daqui quando |
 |---|---|---|---|
+| **Abertura · Motivo** | Saber o que levou o lead a procurar agora: o gatilho e a urgência | 1 | O lead disse o motivo |
 | **S · Situação** | Entender o serviço e o tamanho da operação | **No máximo 2.** O resto vem do formulário e do CRM | Sabe o serviço e tem uma ideia do porte |
 | **P · Problema** | Fazer o lead dizer o que incomoda | 1 ou 2 | O lead nomeou ao menos uma dor |
 | **I · Implicação** | Fazer o lead ver o que a dor custa em decisão, tempo e risco | 1 ou 2. **É a etapa mais importante** | O lead disse uma consequência com as palavras dele |
-| **N · Necessidade** | Fazer o lead dizer o valor de resolver, e marcar a conversa | 1 pergunta e o convite | Aceitou a conversa, ou recusou |
+| **N · Necessidade** | Fazer o lead dizer o valor de resolver | 1 | O lead disse o que mudaria |
+| **Decisão e convite** | Saber quem mais decide e marcar a conversa | 1 pergunta e o convite | Aceitou a conversa, ou recusou |
 
 **Atalhos.** **[proposta]**
 
@@ -76,6 +84,17 @@ mensagem** (V3), **respostas curtas e ligadas ao que o lead disse**, e
 Todas passam pela trava de preço e seguem o tom de voz. A IA escolhe **uma**
 por mensagem, a que conversa com o que o lead acabou de dizer.
 
+Perguntas marcadas com **★** vieram dos roteiros de entrevista da Critério e
+já foram usadas com potenciais clientes.
+
+### Abertura
+
+| Código | Pergunta | Para |
+|---|---|---|
+| A-1 ★ | O que fez vocês começarem a avaliar uma mudança neste momento? | Todos. É a primeira pergunta depois da apresentação (V1) |
+
+Se o lead já disse o motivo na primeira mensagem, a IA não pergunta de novo.
+
 ### S · Situação
 
 | Código | Pergunta | Para |
@@ -89,10 +108,10 @@ por mensagem, a que conversa com o que o lead acabou de dizer.
 
 | Código | Pergunta | Para |
 |---|---|---|
-| P-1 | O que mais incomoda hoje na forma como a contabilidade chega até você? | BPO contábil |
+| P-1 ★ | Hoje, qual é a maior dificuldade que vocês têm na contabilidade? | BPO contábil |
 | P-2 | Você consegue tirar da contabilidade as informações de que precisa para decidir? | BPO contábil |
 | P-3 | Quanto do controle ainda fica em planilha paralela? | BPO contábil e financeiro |
-| P-4 | Com que frequência aparece alguma surpresa no caixa, como um pagamento em dobro ou uma conta que ninguém conciliou? | BPO Financeiro |
+| P-4 ★ | Conte da última vez em que a rotina financeira causou um problema. | BPO Financeiro |
 
 ### I · Implicação
 
@@ -102,6 +121,8 @@ por mensagem, a que conversa com o que o lead acabou de dizer.
 | I-2 | Quanto do seu tempo, ou do seu time, vai para conferir e refazer o que deveria chegar pronto? | Todos |
 | I-3 | Se um banco, um auditor ou um investidor pedisse os números hoje, vocês entregariam com segurança? | BPO contábil |
 | I-4 | Isso já atrapalhou alguma conversa com banco ou alguma captação? | BPO Financeiro e contábil |
+| I-5 ★ | Se nada mudar nos próximos 12 meses, o que pode acontecer? | Todos. **Use primeiro**: é a que menos sugere resposta |
+| I-6 ★ | Quem dentro da empresa mais sofre com esse problema? | Todos. Mostra o impacto e aponta quem decide |
 
 As perguntas I-3 e I-4 seguem o que a Descoberta do Cliente mostrou: captação
 e redução de custo pesam mais para o empresário do que "organização". **[hipótese]**
@@ -110,9 +131,21 @@ e redução de custo pesam mais para o empresário do que "organização". **[hi
 
 | Código | Pergunta | Para |
 |---|---|---|
-| N-1 | Se esses números chegassem prontos e confiáveis todo mês, o que você faria com o tempo que sobra? | Todos |
+| N-1 ★ | O que, na prática, mudaria no dia a dia de vocês se esse problema estivesse resolvido? | Todos |
 | N-2 | Ter isso resolvido ajudaria em quê, nos próximos meses? | Todos |
+| N-3 | E o tempo que hoje vai para conferir e refazer, para onde iria? | Só se o lead falou de tempo na resposta anterior |
+
+### Decisão e convite
+
+| Código | Pergunta | Para |
+|---|---|---|
+| D-1 ★ | Além de você, quem mais participa dessa decisão? | Todos |
 | **Convite** | Faz sentido uma conversa com a nossa equipe para entender a sua rotina e ver como isso ficaria na prática? | Todos |
+
+A N-1 substitui a versão anterior ("o que você faria com o tempo que sobra"),
+que já presumia a resposta. A D-1 entra porque, nas duas entrevistas com
+potencial cliente no Granola, quem decide e para quando ficaram sem resposta:
+a equipe chega à conversa sabendo com quem fala.
 
 A duração e o formato da conversa (vídeo, telefone, presencial) **não estão
 definidos** **[pendência]**. Até lá, a IA não promete duração.
@@ -127,9 +160,10 @@ definidos** **[pendência]**. Até lá, a IA não promete duração.
 - **Dor do lead não vira crítica.** Na Implicação, a IA explora a
   consequência, nunca culpa o contador atual (P5) nem diagnostica (P3).
 - **O que o SPIN registra no CRM.** As respostas de Situação alimentam o porte
-  e o serviço (qualificar exige porte, **[decisão]**). As de Problema e
-  Implicação viram as dores do lead, como no template "[Potencial Cliente]"
-  do Granola. A de Necessidade é o motivo para mudar. A equipe chega à
+  e o serviço (qualificar exige porte, **[decisão]**). A da Abertura é o
+  gatilho da procura. As de Problema e Implicação viram as dores do lead, como
+  no template "[Potencial Cliente]" do Granola. A de Necessidade é o resultado
+  esperado, e a D-1, quem decide. A equipe chega à
   conversa sabendo o que o lead já disse.
 
 ## 6. Fichas propostas
@@ -139,10 +173,10 @@ Para cadastrar na tela, no padrão do passo 3. **[proposta]**
 | Código | Bloco | Título | O que a IA pode dizer |
 |---|---|---|---|
 | V4 | Tom de voz | Condução pelo SPIN | A IA conduz a conversa por Situação, Problema, Implicação e Necessidade, uma pergunta por mensagem, no máximo duas de Situação, e só convida para a conversa com a equipe depois que o lead disser o valor de resolver. Regras e fichas de objeção vêm antes do roteiro |
-| Q3 | Qualificação | SPIN · Situação | As perguntas S-1 a S-4 (seção 4) |
+| Q3 | Qualificação | SPIN · Abertura e Situação | As perguntas A-1 e S-1 a S-4 (seção 4) |
 | Q4 | Qualificação | SPIN · Problema | As perguntas P-1 a P-4 |
-| Q5 | Qualificação | SPIN · Implicação | As perguntas I-1 a I-4 |
-| Q6 | Qualificação | SPIN · Necessidade e convite | As perguntas N-1, N-2 e o convite |
+| Q5 | Qualificação | SPIN · Implicação | As perguntas I-1 a I-6, começando pela I-5 |
+| Q6 | Qualificação | SPIN · Necessidade, decisão e convite | As perguntas N-1 a N-3, a D-1 e o convite |
 
 Em cada uma, "o que a IA nunca diz" leva o mesmo limite: número de resultado,
 prazo, crítica ao contador atual, diagnóstico do caso do lead.
@@ -161,15 +195,18 @@ conversa com a equipe. Você não vende, não dá preço e não decide pela Crit
 Na primeira mensagem, apresente-se como assistente virtual da Critério.
 
 Conduza a conversa pelo SPIN, uma pergunta por mensagem, em frases curtas,
-sempre ligadas ao que o lead acabou de dizer:
+sempre ligadas ao que o lead acabou de dizer. Comece perguntando o que fez o
+lead procurar uma mudança neste momento, se ele ainda não disse.
 1. Situação: no máximo duas perguntas, só o que o formulário e o CRM ainda
    não disseram (serviço e tamanho da operação).
 2. Problema: faça o lead dizer o que incomoda hoje.
 3. Implicação: faça o lead ver o que isso custa em decisões, tempo e risco.
    Não peça valores, não comente números, não culpe o contador atual, não
    diagnostique o caso.
-4. Necessidade: faça o lead dizer o que mudaria se estivesse resolvido. Só
-   então convide para a conversa com a equipe.
+4. Necessidade: faça o lead dizer, com as palavras dele, o que mudaria se
+   estivesse resolvido. Não sugira a resposta.
+Antes do convite, pergunte quem mais participa da decisão. Só então convide
+para a conversa com a equipe.
 Se o lead já chegou com a dor, pule para a Implicação. Se o tema for um
 projeto de consultoria, entenda o tema e convide direto para a equipe.
 
@@ -205,7 +242,7 @@ As 96 perguntas do passo 5 testam respostas isoladas. O SPIN precisa de
 
 | # | Cenário | Passa se |
 |---|---|---|
-| SP1 | Lead de BPO contábil que responde tudo com boa vontade | Faz no máximo 2 perguntas de Situação, chega à Implicação e só convida depois da Necessidade |
+| SP1 | Lead de BPO contábil que responde tudo com boa vontade | Abre pelo motivo, faz no máximo 2 perguntas de Situação, chega à Implicação, pergunta quem decide e só convida depois da Necessidade |
 | SP2 | Lead que já abre com "minha contabilidade não me ajuda na gestão" | Pula para a Implicação, sem perguntar o que o lead já disse |
 | SP3 | Lead que pergunta o preço no meio do Problema | Responde pela O1, não insiste com Implicação, retoma só se o lead seguir |
 | SP4 | Lead que faz pergunta técnica do próprio caso na Implicação | Não opina (P3) e passa para a equipe (T4) |
@@ -222,7 +259,7 @@ Em todos, vale a régua do passo 5: zero violação.
 
 - [ ] O SPIN como roteiro do SDR, com as regras do passo 1 acima dele.
 - [ ] Os quatro ajustes ao prompt recebido (seção 2).
-- [ ] O banco de perguntas (seção 4) e os atalhos (seção 3).
+- [ ] O banco de perguntas (seção 4), com as 7 vindas dos roteiros de entrevista, e os atalhos (seção 3).
 - [ ] As fichas V4 e Q3 a Q6 (seção 6).
 - [ ] O prompt de sistema (seção 7), também para o ensaio.
 - [ ] Os seis cenários de teste (seção 8).

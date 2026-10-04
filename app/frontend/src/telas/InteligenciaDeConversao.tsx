@@ -231,7 +231,7 @@ function Cenarios({ plano }: { plano: PlanoDeMrr }) {
       <h3 className="plano-secao" id="plano-cenarios-titulo">Cenários até {data(plano.premissas.fim)} · líquido de churn</h3>
       <div className="plano-cenarios">
         {plano.cenarios.map((c) => (
-          <div key={c.nome} className={`numero plano-cenario${c.nome === "previsto" ? " plano-cenario-destaque" : ""}`}>
+          <div key={c.nome} className={`numero plano-cenario plano-cenario-${c.nome}`}>
             <span className="numero-rotulo">{NOME_DO_CENARIO[c.nome]} · {PAPEL_DO_CENARIO[c.nome]}</span>
             <p className="numero-valor">{dinheiro(c.liquido)}</p>
             <p className="numero-detalhe">

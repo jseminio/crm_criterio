@@ -61,7 +61,7 @@ function Cadeia({ etapas, gargalo }: { etapas: EtapaDaCadeia[]; gargalo: string 
     <ol className="cadeia" aria-label="Cadeia do funil no mês, realizado sobre previsto">
       {etapas.map((e, i) => (
         <li key={e.chave} className="cadeia-passo">
-          <div className={`cadeia-etapa${e.chave === gargalo ? " cadeia-gargalo" : ""}`}>
+          <div className={`cadeia-etapa${e.chave === "mrr_novo" ? " cadeia-mrr" : ""}${e.chave === gargalo ? " cadeia-gargalo" : ""}`}>
             <span className="cadeia-rotulo">{e.rotulo}{e.chave === gargalo && " · gargalo"}</span>
             <span className="cadeia-valor">
               {e.chave === "mrr_novo" ? dinheiroCurto(e.realizado) : valor(e.realizado, "numero")}
@@ -84,7 +84,7 @@ function Cartao({ fase, gargalo }: { fase: FaseDoCliente; gargalo: boolean }) {
   const tom = fase.situacao ? SITUACAO[fase.situacao.chave].tom : "neutra";
   const k = fase.kpi;
   return (
-    <section className={`fase${gargalo ? " fase-gargalo" : ""}`} aria-labelledby={`fase-${fase.chave}`}>
+    <section className={`fase fase-${tom}${gargalo ? " fase-gargalo" : ""}`} aria-labelledby={`fase-${fase.chave}`}>
       <header className="fase-topo">
         <div>
           <h4 className="fase-titulo" id={`fase-${fase.chave}`}>{NUMERO_DA_FASE[fase.chave]} · {fase.titulo}</h4>

@@ -2,7 +2,9 @@
  * Recepciona as fichas que a SDR de IA consulta: uma ficha por assunto, com o que a IA pode dizer, o
  * que nunca diz, como o lead pergunta, fonte, dono e validade. Só a ficha aprovada e dentro da
  * validade vale para a IA; o bloco Referências é consulta da equipe e nunca vai para a IA.
- * Editar uma ficha aprovada a devolve para "Em revisão" — a regra está no servidor. */
+ * Editar uma ficha aprovada a devolve para "Em revisão" — a regra está no servidor.
+ * Código editável (M1, amostra aprovada em 04/10/2026): a letra do bloco e um número; a tela sugere o
+ * próximo livre, o servidor recusa repetido, e o código da carga inicial não se edita. */
 
 import { useMemo, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
@@ -17,6 +19,7 @@ import { usarDados } from "../usarDados";
 const VENCIDAS = "Vencidas";
 
 interface Rascunho {
+  codigo: string;
   titulo: string;
   bloco: string;
   servico: string;
@@ -28,8 +31,9 @@ interface Rascunho {
   depende_de_hipotese: boolean;
 }
 
-function rascunhoDe(f: FichaDaBase | null, bloco: string): Rascunho {
+function rascunhoDe(f: FichaDaBase | null, bloco: string, sugerido: string): Rascunho {
   return {
+    codigo: f ? (f.codigo ?? "") : sugerido,
     titulo: f?.titulo ?? "",
     bloco: f?.bloco ?? bloco,
     servico: f?.servico ?? "",
@@ -83,19 +87,24 @@ function PainelDaFicha({
   ficha,
   blocos,
   blocoInicial,
+  proximos,
   aoFechar,
   aoGravar,
 }: {
   ficha: FichaDaBase | null;
   blocos: string[];
   blocoInicial: string;
+  proximos: Record<string, string>;
   aoFechar: () => void;
   aoGravar: (f: FichaDaBase, recado: string) => void;
 }) {
   const { pode, eu } = usarAcesso();
   const edita = pode("sdr.base");
   const aprova = pode("sdr.base_aprovar");
-  const original = useMemo(() => rascunhoDe(ficha, blocoInicial), [ficha, blocoInicial]);
+  const original = useMemo(
+    () => rascunhoDe(ficha, blocoInicial, proximos[blocoInicial] ?? ""),
+    [ficha, blocoInicial, proximos],
+  );
   const [r, definirR] = useState<Rascunho>(original);
   const [aprovador, definirAprovador] = useState("");
   const [ocupado, definirOcupado] = useState(false);
@@ -104,6 +113,14 @@ function PainelDaFicha({
   const somenteLeitura = !edita || arquivada;
   const alterado = Object.keys(mudancas(original, r)).length > 0;
   const mudar = <K extends keyof Rascunho>(campo: K, valor: Rascunho[K]) => definirR((x) => ({ ...x, [campo]: valor }));
+  const travado = ficha?.codigo_travado ?? false;
+  const letra = (proximos[r.bloco] ?? "").charAt(0);
+  // Trocar de bloco: se o código não começa com a letra do bloco novo, sugere o próximo livre dele.
+  const mudarBloco = (bloco: string) => definirR((x) => {
+    const novaLetra = (proximos[bloco] ?? "").charAt(0);
+    const codigo = x.codigo && !x.codigo.toUpperCase().startsWith(novaLetra) ? (proximos[bloco] ?? "") : x.codigo;
+    return { ...x, bloco, codigo: x.codigo ? codigo : x.codigo };
+  });
 
   const fazer = async (acao: () => Promise<FichaDaBase>, recado: string) => {
     definirOcupado(true);
@@ -184,16 +201,31 @@ function PainelDaFicha({
         {!edita && <p className="campo-ajuda">{SEM_PERMISSAO}</p>}
         {arquivada && edita && <p className="campo-ajuda">Ficha arquivada: reabra para editar.</p>}
 
-        <div className="campo-bloco">
-          <label className="campo-rotulo" htmlFor={id("titulo")}>Título</label>
-          <input id={id("titulo")} className="entrada" maxLength={200} value={r.titulo} readOnly={somenteLeitura}
-            onChange={(e) => mudar("titulo", e.target.value)} />
+        <div className="base-codigo-titulo">
+          <div className="campo-bloco">
+            <label className="campo-rotulo" htmlFor={id("codigo")}>Código</label>
+            <input id={id("codigo")} className="entrada" maxLength={20} value={r.codigo}
+              readOnly={somenteLeitura || travado} aria-describedby={id("codigo-ajuda")}
+              onChange={(e) => mudar("codigo", e.target.value.toUpperCase())} />
+          </div>
+          <div className="campo-bloco">
+            <label className="campo-rotulo" htmlFor={id("titulo")}>Título</label>
+            <input id={id("titulo")} className="entrada" maxLength={200} value={r.titulo} readOnly={somenteLeitura}
+              onChange={(e) => mudar("titulo", e.target.value)} />
+          </div>
         </div>
+        <span className="campo-ajuda" id={id("codigo-ajuda")}>
+          {travado
+            ? "Travado: código da carga inicial, não se edita. É por ele que a carga sabe que a ficha já entrou."
+            : r.codigo && r.codigo === proximos[r.bloco]
+              ? `Sugerido: o próximo livre em ${r.bloco}. Pode trocar. Começa sempre com ${letra}, a letra do bloco.`
+              : `Começa sempre com ${letra}, a letra do bloco, seguida de número.`}
+        </span>
         <div className="formulario-duplo">
           <div className="campo-bloco">
             <label className="campo-rotulo" htmlFor={id("bloco")}>Bloco</label>
-            <select id={id("bloco")} className="selecao" value={r.bloco} disabled={somenteLeitura}
-              onChange={(e) => mudar("bloco", e.target.value)}>
+            <select id={id("bloco")} className="selecao" value={r.bloco} disabled={somenteLeitura || travado}
+              onChange={(e) => mudarBloco(e.target.value)}>
               {blocos.map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
           </div>
@@ -388,6 +420,7 @@ export function BaseDeConhecimento() {
           ficha={fichaAberta}
           blocos={nomesDosBlocos}
           blocoInicial={bloco || nomesDosBlocos[0]}
+          proximos={dados.proximos_codigos}
           aoFechar={() => definirAberta(null)}
           aoGravar={(f, texto) => { definirRecado(texto); definirAberta(f.id); recarregar(); }}
         />

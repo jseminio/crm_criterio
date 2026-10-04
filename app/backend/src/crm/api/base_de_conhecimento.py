@@ -8,7 +8,9 @@ Recepciona as fichas que a SDR de IA vai consultar. As regras ficam em
 - aprovar exige título, texto, fonte e dono, e o texto não pode falar de preço (422);
 - quem aprova é quem entrou (com login) ou quem a tela informou (sem login), e o servidor
   carimba a data e a validade;
-- a carga inicial só acrescenta: ficha cujo código já existe não entra de novo.
+- a carga inicial só acrescenta: ficha cujo código já existe não entra de novo;
+- o código (M1, 04/10/2026) é a letra do bloco e um número, não se repete, e o das fichas da carga
+  não se edita nem se reusa (409). Aprovar exige código.
 """
 
 from __future__ import annotations
@@ -52,6 +54,7 @@ class FichaResposta(BaseModel):
     vencida: bool
     vale_para_a_ia: bool
     problemas_para_aprovar: list[str]
+    codigo_travado: bool
 
 
 class BlocoResposta(BaseModel):
@@ -68,9 +71,12 @@ class BaseResposta(BaseModel):
     blocos: list[BlocoResposta]
     situacoes: list[str]
     fichas: list[FichaResposta]
+    proximos_codigos: dict[str, str]
+    """Bloco → o próximo código livre, para a tela sugerir."""
 
 
 class FichaNova(BaseModel):
+    codigo: str | None = Field(default=None, max_length=20)
     titulo: str = Field(min_length=1, max_length=200)
     bloco: BlocoDaBase
     servico: str | None = Field(default=None, max_length=120)
@@ -83,6 +89,7 @@ class FichaNova(BaseModel):
 
 
 class FichaAlterada(BaseModel):
+    codigo: str | None = Field(default=None, max_length=20)
     titulo: str | None = Field(default=None, min_length=1, max_length=200)
     bloco: BlocoDaBase | None = None
     servico: str | None = Field(default=None, max_length=120)
@@ -120,6 +127,7 @@ def _resposta(f: FichaDaBase, hoje: date) -> FichaResposta:
         aprovada_em=f.aprovada_em, atualizado_em=f.atualizado_em,
         vencida=regras.vencida(f, hoje), vale_para_a_ia=regras.vale_para_a_ia(f, hoje),
         problemas_para_aprovar=regras.problemas_para_aprovar(f),
+        codigo_travado=regras.codigo_travado(f.codigo),
     )
 
 
@@ -139,6 +147,20 @@ def roteador_da_base(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
             raise HTTPException(404, "ficha não encontrada")
         return f
 
+    def _codigos(sessao: Session) -> list[str]:
+        return list(sessao.scalars(sa.select(FichaDaBase.codigo).where(FichaDaBase.codigo.is_not(None))))
+
+    def _conferir_codigo(sessao: Session, codigo: str, bloco: BlocoDaBase, ficha_id: int | None) -> None:
+        problema = regras.problema_no_codigo(codigo, bloco)
+        if problema:
+            raise HTTPException(422, problema)
+        dono = sessao.scalar(sa.select(FichaDaBase).where(FichaDaBase.codigo == codigo))
+        if dono is not None and dono.id != ficha_id:
+            proximo = regras.proximo_codigo(bloco, [*_codigos(sessao), *regras.CODIGOS_DA_CARGA])
+            raise HTTPException(409, f'O código {codigo} já é da ficha "{dono.titulo}". Use {proximo}, o próximo livre.')
+        if dono is None and regras.codigo_travado(codigo):
+            raise HTTPException(409, f"O código {codigo} é reservado da carga inicial")
+
     def _gravar(sessao: Session, f: FichaDaBase) -> FichaResposta:
         sessao.flush()
         sessao.commit()
@@ -150,10 +172,12 @@ def roteador_da_base(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
         fichas = sessao.scalars(sa.select(FichaDaBase).order_by(FichaDaBase.id)).all()
         ordem = {b: i for i, b in enumerate(BlocoDaBase)}
         fichas = sorted(fichas, key=lambda f: (ordem[f.bloco], f.id))
+        usados = [*(f.codigo for f in fichas), *regras.CODIGOS_DA_CARGA]
         return BaseResposta(
             blocos=[BlocoResposta(**vars(b)) for b in regras.resumir(fichas, hoje)],
             situacoes=[s.value for s in SituacaoDaFicha],
             fichas=[_resposta(f, hoje) for f in fichas],
+            proximos_codigos={b.value: regras.proximo_codigo(b, usados) for b in BlocoDaBase},
         )
 
     @r.post("/fichas", response_model=FichaResposta, status_code=201)
@@ -161,6 +185,9 @@ def roteador_da_base(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
         dados = {k: _limpo(v) for k, v in corpo.model_dump().items()}
         if not dados["titulo"]:
             raise HTTPException(422, "Falta o título")
+        dados["codigo"] = regras.normalizar_codigo(dados["codigo"])
+        if dados["codigo"]:
+            _conferir_codigo(sessao, dados["codigo"], dados["bloco"], None)
         f = FichaDaBase(**dados, situacao=SituacaoDaFicha.RASCUNHO)
         sessao.add(f)
         return _gravar(sessao, f)
@@ -170,8 +197,19 @@ def roteador_da_base(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
         f = _ficha(sessao, ficha_id)
         if f.situacao is SituacaoDaFicha.ARQUIVADA:
             raise HTTPException(409, "a ficha está arquivada: reabra antes de editar")
+        pedido = corpo.model_dump(exclude_unset=True)
+        if "codigo" in pedido:
+            pedido["codigo"] = regras.normalizar_codigo(pedido["codigo"])
+        codigo = pedido.get("codigo", f.codigo)
+        bloco = pedido.get("bloco") or f.bloco
+        if regras.codigo_travado(f.codigo) and (codigo != f.codigo or bloco is not f.bloco):
+            raise HTTPException(409, f"A ficha {f.codigo} é da carga inicial: o código e o bloco não se editam")
+        if codigo and (codigo != f.codigo or bloco is not f.bloco):
+            _conferir_codigo(sessao, codigo, bloco, f.id)
+        if not codigo and f.situacao is SituacaoDaFicha.APROVADA:
+            raise HTTPException(422, "Ficha aprovada precisa de código")
         mudou_conteudo = False
-        for campo, valor in corpo.model_dump(exclude_unset=True).items():
+        for campo, valor in pedido.items():
             valor = _limpo(valor)
             if campo == "titulo" and not valor:
                 raise HTTPException(422, "Falta o título")

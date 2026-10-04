@@ -69,6 +69,14 @@ recepciona o que a SDR de IA pode dizer. As regras de atuação que toda ficha r
   referências (todas "Rascunho"). O FSCP entra com a terminologia fixa da Critério, não com o texto
   do catálogo. **As 17 objeções da Matriz não entram pela carga**: ficam fora do repositório
   (posições jurídicas); a equipe cadastra cada uma pela tela, na versão para a IA.
+- **Código editável (M1, amostra aprovada em 04/10/2026).** O código é a letra do bloco e um número
+  (P, T, S, O, V, C, Q, F, R; serviços com dois dígitos, como S01), conforme `../sdr-ia-modelo-de-ficha.md`.
+  A tela sugere o próximo livre do bloco (`proximos_codigos` em `GET /api/sdr/base`, que já conta os
+  códigos da carga mesmo antes de trazê-la) e, ao trocar de bloco, sugere um código com a letra nova.
+  Código repetido é recusado (409) com o próximo livre na mensagem; letra que não combina com o bloco,
+  422. **Os códigos da carga inicial são reservados e travados:** não se editam, não se reusam, e a
+  ficha da carga não muda de bloco. **Aprovar exige código**, e ficha aprovada não fica sem ele. Trocar
+  só o código não devolve a ficha para revisão. Sem migração: a coluna `codigo` já existia.
 - Rotas em `crm/api/base_de_conhecimento.py`, regras em `crm/domain/base_de_conhecimento.py`, tela
   em `telas/BaseDeConhecimento.tsx`. **Migração `e4a7c1b9d2f6`, só aditiva** (tabela
   `ficha_da_base`): rode `scripts/backup.py exportar` e depois `alembic upgrade head`.
@@ -462,7 +470,7 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.248** no backend e **524** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Testes | **1.257** no backend e **527** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
 | Banco | PostgreSQL 18 local, 46 tabelas, migrações até `e4a7c1b9d2f6` (base de conhecimento do SDR, depois do plano de MRR, 04/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 149 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens, SDR da IA e Base de conhecimento) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |

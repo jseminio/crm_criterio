@@ -22,7 +22,7 @@ HOJE = date.today()
 
 
 def ficha(**campos):
-    padrao = dict(bloco=B.REGRAS, situacao=S.EM_REVISAO, titulo="P3", texto="Vou passar para a equipe.",
+    padrao = dict(codigo="P3", bloco=B.REGRAS, situacao=S.EM_REVISAO, titulo="P3", texto="Vou passar para a equipe.",
                   fonte="doc", dono="Eduardo", validade=None)
     return NS(**(padrao | campos))
 
@@ -42,8 +42,8 @@ class TestRegras:
 
     def test_aprovar_exige_texto_fonte_e_dono(self):
         assert regras.problemas_para_aprovar(ficha()) == []
-        problemas = regras.problemas_para_aprovar(ficha(texto=" ", fonte=None, dono=""))
-        assert problemas == ["Falta o que a IA pode dizer", "Falta a fonte", "Falta o dono"]
+        problemas = regras.problemas_para_aprovar(ficha(codigo=None, texto=" ", fonte=None, dono=""))
+        assert problemas == ["Falta o código", "Falta o que a IA pode dizer", "Falta a fonte", "Falta o dono"]
 
     def test_texto_que_fala_de_preco_nao_aprova_mas_referencia_pode_citar_numero(self):
         assert any("preço" in p for p in regras.problemas_para_aprovar(ficha(texto="Custa R$ 5 mil")))
@@ -100,8 +100,11 @@ def cliente(engine: sa.Engine) -> TestClient:
 
 
 def nova(cliente, **campos) -> dict:
+    """Sem código pedido, usa o próximo livre do bloco, como a tela sugere."""
     corpo = {"titulo": "Prazo de implantação", "bloco": "Perguntas frequentes",
              "texto": "A implantação é combinada na proposta.", "fonte": "Comercial", "dono": "Karine"} | campos
+    if "codigo" not in corpo:
+        corpo["codigo"] = cliente.get("/api/sdr/base").json()["proximos_codigos"][corpo["bloco"]]
     r = cliente.post("/api/sdr/base/fichas", json=corpo)
     assert r.status_code == 201, r.text
     return r.json()
@@ -232,9 +235,74 @@ def test_quem_edita_nao_aprova_e_com_login_quem_aprova_e_quem_entrou(com_login):
     karine = _cab("karine@grupocriterio.com.br", "Karine N")
     eduardo = _cab("eduardo@grupocriterio.com.br", "Eduardo Luiz")
     r = com_login.post("/api/sdr/base/fichas", headers=karine, json={
-        "titulo": "Prazo", "bloco": "Perguntas frequentes", "texto": "Combinado na proposta.", "fonte": "x", "dono": "Karine"})
+        "codigo": "F1", "titulo": "Prazo", "bloco": "Perguntas frequentes", "texto": "Combinado na proposta.", "fonte": "x", "dono": "Karine"})
     assert r.status_code == 201
     fid = r.json()["id"]
     assert com_login.post(f"/api/sdr/base/fichas/{fid}/aprovar", headers=karine, json={}).status_code == 403
     a = com_login.post(f"/api/sdr/base/fichas/{fid}/aprovar", headers=eduardo, json={"aprovador": "Outro"}).json()
     assert a["aprovada_por"] == "Eduardo Luiz"
+
+
+# ------------------------------------------------- M1: código editável (04/10/2026)
+class TestCodigo:
+    def test_regras_do_codigo(self):
+        assert regras.proximo_codigo(B.OBJECOES, ["O1", "O2", "P9", None]) == "O3"
+        assert regras.proximo_codigo(B.SERVICOS, ["S12"]) == "S13"
+        assert regras.proximo_codigo(B.PERGUNTAS, []) == "F1"
+        assert regras.problema_no_codigo("F1", B.PERGUNTAS) is None
+        assert "comece com F" in regras.problema_no_codigo("C2", B.PERGUNTAS)
+        assert "letra do bloco" in regras.problema_no_codigo("O-1", B.OBJECOES)
+        assert regras.normalizar_codigo(" o3 ") == "O3" and regras.normalizar_codigo("  ") is None
+        assert regras.codigo_travado("T9") and not regras.codigo_travado("T12")
+
+    def test_sugestao_conta_a_carga_mesmo_antes_de_trazer(self, cliente):
+        proximos = cliente.get("/api/sdr/base").json()["proximos_codigos"]
+        assert (proximos["Regras de atuação"], proximos["Serviços"], proximos["Objeções"]) == ("P13", "S13", "O1")
+
+    def test_ficha_nova_com_codigo_normalizado(self, cliente):
+        f = nova(cliente, bloco="Objeções", codigo=" o2 ")
+        assert f["codigo"] == "O2" and not f["codigo_travado"]
+        assert cliente.get("/api/sdr/base").json()["proximos_codigos"]["Objeções"] == "O3"
+
+    def test_codigo_que_nao_combina_com_o_bloco(self, cliente):
+        r = cliente.post("/api/sdr/base/fichas", json={"titulo": "Onde fica", "bloco": "Perguntas frequentes", "codigo": "C2"})
+        assert r.status_code == 422 and "comece com F" in r.json()["detail"]
+
+    def test_codigo_repetido_indica_o_proximo(self, cliente):
+        nova(cliente, bloco="Objeções", codigo="O1", titulo="Preço")
+        r = cliente.post("/api/sdr/base/fichas", json={"titulo": "Outra", "bloco": "Objeções", "codigo": "O1"})
+        assert r.status_code == 409
+        assert r.json()["detail"] == 'O código O1 já é da ficha "Preço". Use O2, o próximo livre.'
+
+    def test_codigo_da_carga_e_reservado_e_travado(self, cliente):
+        r = cliente.post("/api/sdr/base/fichas", json={"titulo": "X", "bloco": "Transbordo", "codigo": "T9"})
+        assert r.status_code == 409 and "reservado" in r.json()["detail"]
+        cliente.post("/api/sdr/base/carga-inicial")
+        t9 = next(f for f in cliente.get("/api/sdr/base").json()["fichas"] if f["codigo"] == "T9")
+        assert t9["codigo_travado"]
+        for mudanca in ({"codigo": "T20"}, {"bloco": "Objeções"}):
+            r = cliente.patch(f"/api/sdr/base/fichas/{t9['id']}", json=mudanca)
+            assert r.status_code == 409 and "carga inicial" in r.json()["detail"]
+        assert cliente.patch(f"/api/sdr/base/fichas/{t9['id']}", json={"dono": "Bruno"}).status_code == 200
+
+    def test_trocar_de_bloco_pede_codigo_novo(self, cliente):
+        f = nova(cliente, bloco="Quem é a Critério", codigo="C2", titulo="Onde fica")
+        r = cliente.patch(f"/api/sdr/base/fichas/{f['id']}", json={"bloco": "Perguntas frequentes"})
+        assert r.status_code == 422 and "comece com F" in r.json()["detail"]
+        e = cliente.patch(f"/api/sdr/base/fichas/{f['id']}", json={"bloco": "Perguntas frequentes", "codigo": "F1"}).json()
+        assert (e["bloco"], e["codigo"]) == ("Perguntas frequentes", "F1")
+
+    def test_aprovar_exige_codigo_e_aprovada_nao_perde_o_codigo(self, cliente):
+        sem = nova(cliente, codigo=None)
+        r = aprovar(cliente, sem["id"])
+        assert r.status_code == 422 and "Falta o código" in r.json()["detail"]
+        cliente.patch(f"/api/sdr/base/fichas/{sem['id']}", json={"codigo": "F7"})
+        assert aprovar(cliente, sem["id"]).json()["situacao"] == "Aprovada"
+        r = cliente.patch(f"/api/sdr/base/fichas/{sem['id']}", json={"codigo": ""})
+        assert r.status_code == 422 and "precisa de código" in r.json()["detail"]
+
+    def test_trocar_so_o_codigo_nao_desaprova(self, cliente):
+        f = nova(cliente)
+        aprovar(cliente, f["id"])
+        e = cliente.patch(f"/api/sdr/base/fichas/{f['id']}", json={"codigo": "F9"}).json()
+        assert (e["situacao"], e["codigo"]) == ("Aprovada", "F9")

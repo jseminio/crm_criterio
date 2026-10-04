@@ -1,6 +1,9 @@
 /** O acesso à API. Um lugar só, para o erro ter uma forma só. */
 
 import type {
+  BaseDeConhecimento,
+  EdicaoDeFicha,
+  FichaDaBase,
   AbordagemDetalhe,
   AbordagemResumo,
   Agenda,
@@ -584,6 +587,17 @@ export const api = {
   marcarAjusteFeito: (id: number, observacao: string) =>
     pedir<AjusteTecnico>(`/api/ajustes/${id}/feito`, { method: "POST", body: JSON.stringify({ observacao }) }),
   reabrirAjuste: (id: number) => pedir<AjusteTecnico>(`/api/ajustes/${id}/reabrir`, { method: "POST" }),
+  baseDoSdr: () => pedir<BaseDeConhecimento>("/api/sdr/base"),
+  criarFicha: (ficha: EdicaoDeFicha) =>
+    pedir<FichaDaBase>("/api/sdr/base/fichas", { method: "POST", body: JSON.stringify(ficha) }),
+  alterarFicha: (id: number, mudanca: EdicaoDeFicha) =>
+    pedir<FichaDaBase>(`/api/sdr/base/fichas/${id}`, { method: "PATCH", body: JSON.stringify(mudanca) }),
+  moverFicha: (id: number, acao: "revisao" | "arquivar" | "reabrir") =>
+    pedir<FichaDaBase>(`/api/sdr/base/fichas/${id}/${acao}`, { method: "POST" }),
+  aprovarFicha: (id: number, aprovador: string | null) =>
+    pedir<FichaDaBase>(`/api/sdr/base/fichas/${id}/aprovar`, { method: "POST", body: JSON.stringify({ aprovador }) }),
+  cargaInicialDaBase: () =>
+    pedir<{ acrescentadas: number; ja_existiam: number }>("/api/sdr/base/carga-inicial", { method: "POST" }),
   cadenciaDeReunioes: () => pedir<CadenciaDeReunioes>("/api/sucesso/cadencia"),
   mudarCadenciaDeReunioes: (mudanca: { cadencia?: Record<string, string[]>; intencao?: Record<string, string> }) =>
     pedir<CadenciaDeReunioes>("/api/sucesso/cadencia", { method: "PUT", body: JSON.stringify(mudanca) }),

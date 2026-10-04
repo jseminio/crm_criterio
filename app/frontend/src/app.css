@@ -1024,6 +1024,25 @@ td > .celula-fonte { display: block; }
 .ata-venda-num { font-size: 12px; font-weight: 600; color: var(--texto-medio); }
 .ata-venda-abrir { display: flex; gap: var(--e2); align-items: center; font-size: 13px; }
 
+/* Base de conhecimento do SDR de IA (03/10/2026) */
+.base { display: grid; gap: var(--e4); }
+.base-blocos { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--e3); }
+.base-bloco { appearance: none; text-align: left; font: inherit; cursor: pointer; display: flex; flex-direction: column;
+  gap: var(--e1); padding: var(--e3) var(--e4); background: var(--surface-card); border: 1px solid var(--borda);
+  border-radius: var(--raio-md); color: var(--texto-forte); }
+.base-bloco:hover { border-color: var(--borda-forte); }
+.base-bloco:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.base-bloco[aria-pressed="true"] { border-color: var(--surface-brand); box-shadow: inset 0 0 0 1px var(--surface-brand); }
+.base-bloco-nome { font-size: 12px; font-weight: 500; color: var(--texto-medio); }
+.base-bloco-valor { font-family: var(--fonte-titulo); font-size: 22px; font-weight: 600; line-height: 1.15; }
+.base-bloco-valor small { font-family: var(--fonte-ui); font-size: 12px; font-weight: 500; color: var(--texto-medio); }
+.base-bloco-sub { font-size: 11.5px; color: var(--texto-fraco); }
+.base-busca { flex: 1; min-width: 200px; }
+.base-acoes { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center; width: 100%; }
+.base-situacao { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center; margin: 0; }
+.base-marcador { display: flex; gap: var(--e2); align-items: flex-start; font-size: 13px; color: var(--texto-medio); }
+.base-faltas { margin: var(--e1) 0 0; padding-left: 18px; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -5,6 +5,7 @@ import { SdrEAbordagens } from "./SdrEAbordagens";
 
 vi.mock("./Abordagens", () => ({ Abordagens: () => <p>tela de abordagens</p> }));
 vi.mock("./Sdr", () => ({ Sdr: () => <p>tela da SDR de IA</p> }));
+vi.mock("./BaseDeConhecimento", () => ({ BaseDeConhecimento: () => <p>tela da base</p> }));
 
 const eu = (permissoes: string[]) => ({
   modo: "microsoft" as const, email: "x@grupocriterio.com.br", nome: "X", perfil: "P", administrador: false, permissoes,
@@ -13,13 +14,15 @@ const eu = (permissoes: string[]) => ({
 describe("SDR · Abordagens e conhecimento (02/10/2026)", () => {
   beforeEach(() => localStorage.clear());
 
-  it("junta Abordagens e SDR da IA em abas", () => {
+  it("junta Abordagens, SDR da IA e a base de conhecimento em abas", () => {
     render(<SdrEAbordagens listas={null} />);
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Abordagens", "SDR da IA"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Abordagens", "SDR da IA", "Base de conhecimento"]);
     expect(screen.getByText("tela de abordagens")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "SDR da IA" }));
     expect(screen.getByText("tela da SDR de IA")).toBeInTheDocument();
     expect(screen.getByText(/quantos a IA qualificou/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Base de conhecimento" }));
+    expect(screen.getByText("tela da base")).toBeInTheDocument();
   });
 
   it("cada aba só aparece para quem pode vê-la", () => {
@@ -28,7 +31,7 @@ describe("SDR · Abordagens e conhecimento (02/10/2026)", () => {
         <SdrEAbordagens listas={null} />
       </ProvedorDeAcesso>,
     );
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["SDR da IA"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["SDR da IA", "Base de conhecimento"]);
     expect(screen.getByText("tela da SDR de IA")).toBeInTheDocument();
   });
 });

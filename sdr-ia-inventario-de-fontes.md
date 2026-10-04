@@ -352,6 +352,24 @@ o passo 3 (modelo de ficha) e o passo 5 (conjunto de perguntas-teste).
   (seção 6); a regra do precedente "sim" e o gatilho T12 como regra escrita
   (seção 8); acrescentar O2 e O3 à Matriz de Objeções.
 
+**Decidido em 04/10/2026, à tarde** (respostas de Eduardo às decisões abertas):
+
+| Decisão | Resposta | Onde ficou |
+|---|---|---|
+| Números de resultado da apresentação | **A IA não cita** | Ficha C1 ("nunca diz") |
+| Gatilho T12 (contrato, dados, multa, tecnologia) | **Oficial** | Ficha T12, nova |
+| Origem do contato (T10) | Sempre a origem real e registrada, nunca resposta genérica, sempre com a opção de sair; texto de Eduardo para indicação e para tráfego pago | Ficha T10 |
+| Atendimento fora do Rio | **Sempre por videoconferência** | Ficha F2 |
+| Duração e formato da conversa com a equipe | **30 a 40 minutos, por videoconferência** | Ficha Q6 (convite) |
+| Permissões da base para a Karine | Ela já é Administradora: edita e aprova | Nada a mudar |
+| Acrescentar O2 e O3 à Matriz de Objeções | **Sim** | Matriz no SharePoint **[pendência: quem edita]** |
+| "Terceirizamos" e local da apresentação | Eduardo ajusta a apresentação | Fora do CRM |
+
+**Seguem abertos:** a regra do precedente "sim" (explicada a Eduardo em
+04/10/2026, à espera da resposta); o caso da **prospecção ativa** na T10 (de
+onde vem a lista e o texto da resposta); o texto da S06 (Representante Legal);
+e a aprovação formal dos documentos dos passos 1, 2, 3 e 5 e do roteiro SPIN.
+
 **A revalidar:** se os motivos de descarte do CRM continuam sendo a melhor
 amostra das objeções de topo depois dos primeiros 60 dias ou 300 leads, na
 mesma revisão das metas do SDR.

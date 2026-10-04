@@ -28,6 +28,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from crm.db.base import Base, CarimboMixin, agora, coluna_lista
 from crm.domain.base_de_conhecimento import BlocoDaBase, SituacaoDaFicha
 from crm.domain.listas import (
+    AderenciaDaPromessa,
     AutorDaMensagem,
     CanalDeAbordagem,
     DesfechoDaConversa,
@@ -358,6 +359,19 @@ class Lead(CarimboMixin, Base):
     """Pedido de não ser contatado. Nenhuma mensagem da IA ou da equipe é
     registrada para este lead depois disso — a rota recusa."""
     nao_contatar_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    # Primeiro contato e aderência da promessa (amostra aprovada por Eduardo em 04/10/2026).
+    primeiro_contato_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    """Quando a Critério falou com o lead pela primeira vez. Vazio: vale a primeira mensagem do SDR."""
+    aderencia: Mapped[AderenciaDaPromessa | None] = mapped_column(coluna_lista(AderenciaDaPromessa, 20))
+    aderencia_sobre: Mapped[list | None] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"))
+    """Sobre o quê a expectativa não bateu: valores de `TemaDaExpectativa`."""
+    aderencia_esperava: Mapped[str | None] = mapped_column(sa.String(300))
+
+    @property
+    def primeiro_contato_pelo_sdr(self) -> datetime | None:
+        """A primeira mensagem da IA ou da equipe nas conversas do SDR: a sugestão do primeiro contato."""
+        datas = [m.enviada_em for c in self.conversas for m in c.mensagens if m.autor is not AutorDaMensagem.LEAD]
+        return min(datas) if datas else None
 
     conversas: Mapped[list["ConversaDoSdr"]] = relationship(
         back_populates="lead", order_by="ConversaDoSdr.id"
@@ -1695,6 +1709,7 @@ class PlanoDeMrr(Base):
     indicacoes_por_mes: Mapped[Decimal | None] = mapped_column(QUANTIDADE)
     primeiro_contato_horas: Mapped[Decimal | None] = mapped_column(QUANTIDADE)
     ciclo_alvo_dias: Mapped[Decimal | None] = mapped_column(QUANTIDADE)
+    aderencia_alvo_pct: Mapped[Decimal | None] = mapped_column(QUANTIDADE)
     alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
     alterado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 

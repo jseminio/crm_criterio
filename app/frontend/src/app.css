@@ -1140,6 +1140,26 @@ td > .celula-fonte { display: block; }
 .fase-nota { color: var(--texto-fraco); }
 .fase-ajuste { margin: 0; padding-top: var(--e2); border-top: 1px solid var(--borda); font-size: 13px; line-height: 1.5; color: var(--texto-forte); }
 
+
+/* --------------------------------------------------------- Primeiro contato e aderência (04/10/2026)
+   A escolha marcada tem borda dupla e sinal (✓ ~ ✗), nunca só cor (regra 4 do PAD-002). */
+.primeiro-contato { border: 1px solid var(--borda); border-radius: var(--raio-md); padding: var(--e3) var(--e4); margin: 0;
+  display: grid; gap: var(--e3); }
+.primeiro-contato-titulo { padding: 0 var(--e1); font-size: 14px; font-weight: 600; color: var(--texto-forte); }
+.primeiro-contato-origem { margin: 0; padding: var(--e2) var(--e3); background: var(--surface-sunken); border-radius: var(--raio-md);
+  font-size: 12px; color: var(--texto-medio); line-height: 1.5; }
+.primeiro-contato-origem strong { color: var(--texto-forte); font-weight: 500; }
+.aderencia-opcoes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e2); }
+.aderencia-opcao { appearance: none; text-align: left; cursor: pointer; background: var(--surface-card); color: var(--texto-forte);
+  border: 1px solid var(--borda-forte); border-radius: var(--raio-md); padding: var(--e2) var(--e3); font: 500 13px var(--fonte-ui); }
+.aderencia-opcao small { display: block; margin-top: 2px; font-weight: 400; font-size: 11px; color: var(--texto-medio); }
+.aderencia-opcao-escolhida { border: 2px solid var(--texto-forte); padding: calc(var(--e2) - 1px) calc(var(--e3) - 1px); background: var(--surface-sunken); }
+.aderencia-opcao:focus-visible, .aderencia-tema:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.aderencia-temas { display: flex; flex-wrap: wrap; gap: var(--e2); }
+.aderencia-tema { appearance: none; cursor: pointer; background: var(--surface-card); color: var(--texto-forte);
+  border: 1px solid var(--borda-forte); border-radius: 999px; padding: 3px var(--e3); font: 12px var(--fonte-ui); }
+.aderencia-tema-marcado { background: var(--surface-sunken); border-color: var(--texto-forte); font-weight: 500; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

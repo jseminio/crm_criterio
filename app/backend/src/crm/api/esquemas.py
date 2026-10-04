@@ -14,6 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from crm.domain.listas import (
+    AderenciaDaPromessa,
     AutorDaMensagem,
     CanalDeAbordagem,
     DesfechoDaConversa,
@@ -31,6 +32,7 @@ from crm.domain.listas import (
     SituacaoContrato,
     SituacaoGrupo,
     SituacaoLead,
+    TemaDaExpectativa,
     Temperatura,
     TipoCanal,
     IniciativaDoEncerramento,
@@ -433,6 +435,12 @@ class LeadResumo(Base):
     reuniao_marcada_para: datetime | None = None
     nao_contatar: bool = False
     criado_em: datetime | None = None
+    primeiro_contato_em: datetime | None = None
+    primeiro_contato_pelo_sdr: datetime | None = None
+    """A primeira mensagem do SDR: a tela sugere esta data enquanto o primeiro contato não foi gravado."""
+    aderencia: AderenciaDaPromessa | None = None
+    aderencia_sobre: list[TemaDaExpectativa] | None = None
+    aderencia_esperava: str | None = None
 
 
 class LeadNovo(BaseModel):
@@ -478,6 +486,11 @@ class LeadEdicao(BaseModel):
     motivo_descarte: MotivoDeDescarte | None = None
     reuniao_marcada_para: datetime | None = None
     nao_contatar: bool | None = None
+    primeiro_contato_em: datetime | None = None
+    aderencia: AderenciaDaPromessa | None = None
+    """"Bate" limpa o "sobre o quê" e o "o que esperava": só fazem sentido quando não bate."""
+    aderencia_sobre: list[TemaDaExpectativa] | None = Field(default=None, max_length=5)
+    aderencia_esperava: str | None = Field(default=None, max_length=300)
 
 
 class ConversaoDeLead(BaseModel):
@@ -876,6 +889,8 @@ class Listas(BaseModel):
     portes: list[str]
     servicos: list[str]
     motivos_de_descarte: list[str] = []
+    aderencias: list[str] = []
+    temas_de_expectativa: list[str] = []
     indices_de_reajuste: list[str] = []
 
 

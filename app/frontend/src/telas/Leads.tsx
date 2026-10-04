@@ -10,6 +10,7 @@ import type { ConversaDoSdr, LeadResumo, Listas, Pagina } from "../api/tipos";
 import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { PainelLateral } from "../componentes/PainelLateral";
+import { PrimeiroContato, type RascunhoDoPrimeiroContato } from "../componentes/PrimeiroContato";
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
 import { data, dataHora, prazo } from "../formato";
 import { usarDados } from "../usarDados";
@@ -286,6 +287,14 @@ function EdicaoDeLead({
     reuniao_marcada_para: paraCampoLocal(lead.reuniao_marcada_para),
   });
   const [naoContatar, definirNaoContatar] = useState(Boolean(lead.nao_contatar));
+  const contatoSugerido = !lead.primeiro_contato_em && Boolean(lead.primeiro_contato_pelo_sdr);
+  const contatoInicial: RascunhoDoPrimeiroContato = {
+    primeiro_contato_em: paraCampoLocal(lead.primeiro_contato_em ?? lead.primeiro_contato_pelo_sdr),
+    aderencia: lead.aderencia ?? "",
+    aderencia_sobre: lead.aderencia_sobre ?? [],
+    aderencia_esperava: lead.aderencia_esperava ?? "",
+  };
+  const [contato, definirContato] = useState(contatoInicial);
   const qualificando = !convertido && rascunho.situacao === "Qualificado";
   const descartando = !convertido && rascunho.situacao === "Descartado";
   // As mesmas exigências da API, ditas antes de salvar: qualificar pede o
@@ -315,6 +324,16 @@ function EdicaoDeLead({
       // motivo em lead aberto.
       if (!descartando) delete mudancas.motivo_descarte;
       if (naoContatar !== Boolean(lead.nao_contatar)) mudancas.nao_contatar = naoContatar;
+      // Primeiro contato e aderência: só vai o que mudou (a sugestão do SDR, ao salvar, fica gravada).
+      if (contato.primeiro_contato_em !== paraCampoLocal(lead.primeiro_contato_em)) {
+        mudancas.primeiro_contato_em = contato.primeiro_contato_em ? new Date(contato.primeiro_contato_em).toISOString() : null;
+      }
+      if (contato.aderencia !== (lead.aderencia ?? "")) mudancas.aderencia = contato.aderencia || null;
+      const comDetalhe = contato.aderencia === "Em parte" || contato.aderencia === "Não bate";
+      if (comDetalhe) {
+        mudancas.aderencia_sobre = contato.aderencia_sobre;
+        mudancas.aderencia_esperava = contato.aderencia_esperava.trim() || null;
+      }
       // Lead convertido tem a situação decidida pela oportunidade: não a enviamos.
       if (convertido) delete mudancas.situacao;
       await api.editarLead(lead.id, mudancas);
@@ -385,6 +404,8 @@ function EdicaoDeLead({
             </select>
           )}
         </div>
+
+        <PrimeiroContato lead={lead} listas={listas} rascunho={contato} aoMudar={definirContato} sugerido={contatoSugerido} />
 
         {qualificando && (
           <div className="formulario-duplo">

@@ -159,6 +159,13 @@ export interface LeadResumo {
   reuniao_marcada_para?: string | null;
   nao_contatar?: boolean;
   criado_em?: string | null;
+  /** Primeiro contato e aderência da promessa (04/10/2026). */
+  primeiro_contato_em?: string | null;
+  /** A primeira mensagem do SDR: a tela sugere esta data enquanto o primeiro contato não foi gravado. */
+  primeiro_contato_pelo_sdr?: string | null;
+  aderencia?: string | null;
+  aderencia_sobre?: string[] | null;
+  aderencia_esperava?: string | null;
 }
 
 export interface Listas {
@@ -179,6 +186,8 @@ export interface Listas {
   portes: string[];
   servicos: string[];
   motivos_de_descarte?: string[];
+  aderencias?: string[];
+  temas_de_expectativa?: string[];
 }
 
 export interface Recorte {
@@ -1825,6 +1834,7 @@ export interface PremissasDoPlano {
   indicacoes_por_mes?: string | null;
   primeiro_contato_horas?: string | null;
   ciclo_alvo_dias?: string | null;
+  aderencia_alvo_pct?: string | null;
 }
 
 export interface SituacaoDoPlano {

@@ -100,6 +100,7 @@ class Premissas:
     indicacoes_por_mes: Decimal | None = None
     primeiro_contato_horas: Decimal | None = None
     ciclo_alvo_dias: Decimal | None = None
+    aderencia_alvo_pct: Decimal | None = None
 
     def cenario(self, nome: str) -> Cenario:
         return getattr(self, nome)

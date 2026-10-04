@@ -50,6 +50,8 @@ const LISTAS: Listas = {
   portes: ["Micro", "Pequeno", "Médio", "Grande", "Extra Grande"],
   servicos: [],
   motivos_de_descarte: ["Porte abaixo do mínimo", "Pediu para não ser contatado"],
+  aderencias: ["Bate", "Em parte", "Não bate"],
+  temas_de_expectativa: ["Preço", "Serviço / escopo", "Prazo", "Porte ou segmento", "Outro"],
 };
 
 function lead(extra: Partial<LeadResumo> = {}): LeadResumo {
@@ -323,5 +325,41 @@ describe("conversão em oportunidade", () => {
     await userEvent.click(screen.getByRole("button", { name: "Converter" }));
 
     expect(screen.getByLabelText(/grupo econômico/i)).toHaveValue("Fulano de Tal");
+  });
+
+  it("primeiro contato: sugere a data do SDR, registra a aderência e o que não bateu", async () => {
+    vi.mocked(api.editarLead).mockResolvedValue(lead());
+    await abrir([lead({ campanha: "BPO Financeiro — Tempo para Crescer", primeiro_contato_pelo_sdr: "2026-11-03T17:20:00Z" })]);
+    await userEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    expect(screen.getByText(/campanha “BPO Financeiro — Tempo para Crescer”/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Data e hora do 1º contato")).not.toHaveValue("");
+    expect(screen.getByText(/Preenchido pela primeira mensagem do SDR/)).toBeInTheDocument();
+    expect(screen.queryByText(/Sobre o quê/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", { name: /Em parte/ }));
+    expect(screen.getByRole("radio", { name: /Em parte/ })).toHaveAttribute("aria-checked", "true");
+    await userEvent.click(screen.getByRole("button", { name: "Preço" }));
+    await userEvent.type(screen.getByLabelText("O que ele esperava, em uma frase"), "Achou que custava menos");
+    await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+    await waitFor(() => expect(api.editarLead).toHaveBeenCalledOnce());
+    const [, mudancas] = vi.mocked(api.editarLead).mock.calls[0];
+    expect(mudancas.aderencia).toBe("Em parte");
+    expect(mudancas.aderencia_sobre).toEqual(["Preço"]);
+    expect(mudancas.aderencia_esperava).toBe("Achou que custava menos");
+    expect(mudancas.primeiro_contato_em).toBe("2026-11-03T17:20:00.000Z");
+  });
+
+  it("'Bate' esconde o detalhe e não manda o que não bateu", async () => {
+    vi.mocked(api.editarLead).mockResolvedValue(lead());
+    await abrir([lead({ aderencia: "Não bate", aderencia_sobre: ["Prazo"], primeiro_contato_em: "2026-11-03T17:20:00Z" })]);
+    await userEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    expect(screen.getByRole("button", { name: /Prazo/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("radio", { name: /^Bate/ }));
+    expect(screen.queryByText(/Sobre o quê/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+    await waitFor(() => expect(api.editarLead).toHaveBeenCalledOnce());
+    const [, mudancas] = vi.mocked(api.editarLead).mock.calls[0];
+    expect(mudancas.aderencia).toBe("Bate");
+    expect(mudancas).not.toHaveProperty("aderencia_sobre");
+    expect(mudancas).not.toHaveProperty("primeiro_contato_em");
   });
 });

@@ -91,7 +91,9 @@ from crm.domain.servicos import (
     CATALOGO as CATALOGO_DE_SERVICOS, OUTRO, linha_do_servico, meses_no_ano, problema_na_descricao, problema_no_tema,
 )
 from crm.domain.listas import (
+    AderenciaDaPromessa,
     SituacaoDaAprovacao,
+    TemaDaExpectativa,
     ORIGEM_DA_MUDANCA_NO_CRM,
     IndiceDeReajuste,
     IniciativaDoEncerramento,
@@ -388,6 +390,8 @@ def _registrar(api: FastAPI) -> None:
             portes=[p.value for p in regras_de_porte.Porte],
             servicos=list(servicos),
             motivos_de_descarte=_valores(MotivoDeDescarte),
+            aderencias=_valores(AderenciaDaPromessa),
+            temas_de_expectativa=_valores(TemaDaExpectativa),
             indices_de_reajuste=_valores(IndiceDeReajuste),
         )
 
@@ -1739,6 +1743,11 @@ def _registrar(api: FastAPI) -> None:
         porte = mudancas.pop("porte_estimado", None)
         motivo = mudancas.pop("motivo_descarte", None)
         nao_contatar = mudancas.pop("nao_contatar", None)
+        if "aderencia_sobre" in mudancas and mudancas["aderencia_sobre"] is not None:
+            # Guarda o texto legível (como as listas), sem repetir item.
+            mudancas["aderencia_sobre"] = list(dict.fromkeys(t.value for t in corpo.aderencia_sobre or []))
+        if "aderencia_esperava" in mudancas:
+            mudancas["aderencia_esperava"] = (mudancas["aderencia_esperava"] or "").strip() or None
         try:
             if porte is not None:
                 lead.porte_estimado = regras_do_lead.validar_porte(porte)
@@ -1779,6 +1788,10 @@ def _registrar(api: FastAPI) -> None:
             problema = problema_no_tema(lead.interesse, lead.interesse_tema, exigir=interesse_mudou)
             if problema:
                 raise HTTPException(422, problema)
+
+        if lead.aderencia is not AderenciaDaPromessa.EM_PARTE and lead.aderencia is not AderenciaDaPromessa.NAO_BATE:
+            # "Bate" (ou sem resposta) não tem "sobre o quê" nem "o que esperava".
+            lead.aderencia_sobre, lead.aderencia_esperava = None, None
 
         sessao.flush()
         return e.LeadResumo.model_validate(lead)

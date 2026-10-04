@@ -25,12 +25,12 @@ from crm.api.acesso import quem_fez
 from crm.api.classificacao import parametros_vigentes
 from crm.db.base import agora
 from crm.db.modelos import (
-    ConversaDoSdr, Contrato, ContratoPrevistoDoPlano, InvestimentoEmMidia, Lead, Oportunidade, PlanoDeMrr,
+    Contrato, ContratoPrevistoDoPlano, InvestimentoEmMidia, Lead, Oportunidade, PlanoDeMrr,
 )
 from crm.domain import fases_do_cliente as fases
 from crm.domain import mrr as regras_de_mrr
 from crm.domain import plano_de_mrr as regras
-from crm.domain.listas import AutorDaMensagem, MotivoDeDescarte, TipoCanal, TipoDeEventoDeContrato
+from crm.domain.listas import AderenciaDaPromessa, MotivoDeDescarte, MotivoRecusa, TipoCanal, TipoDeEventoDeContrato
 from crm.domain.recortes import cenarios_de_ticket
 
 __all__ = ["montar_fases", "premissas_vigentes", "roteador_de_inteligencia"]
@@ -43,7 +43,7 @@ _CAMPOS = (
     "cfo_acrescimo", "cfo_pct",
     # as quatro fases (04/10/2026): opcionais
     "taxa_lead_reuniao_pct", "taxa_reuniao_proposta_pct", "taxa_conversao_pct", "icp_alvo_pct", "indicacoes_por_mes",
-    "primeiro_contato_horas", "ciclo_alvo_dias",
+    "primeiro_contato_horas", "ciclo_alvo_dias", "aderencia_alvo_pct",
 )
 
 
@@ -110,6 +110,7 @@ class PremissasDoPlano(BaseModel):
     indicacoes_por_mes: Decimal | None = Field(default=None, ge=0)
     primeiro_contato_horas: Decimal | None = Field(default=None, gt=0)
     ciclo_alvo_dias: Decimal | None = Field(default=None, gt=0)
+    aderencia_alvo_pct: Decimal | None = Field(default=None, gt=0, le=100)
 
 
 class PremissasResposta(PremissasDoPlano):
@@ -616,40 +617,70 @@ def montar_fases(sessao: Session, mes: date, hoje: date) -> FasesResposta:
         situacao=sit(k_atr.realizado, k_atr.previsto), ajuste=aj_atr,
     )
 
-    # ---- 2. Engajamento
+    # ---- 2. Engajamento (aderência medida desde 04/10/2026)
     taxa_lr_real = fases.proporcao(len(reunioes_mes), len(icp_mes)) if passou else None
+    respondidos = [l for l in leads_mes if l.aderencia is not None]
+    bate = sum(1 for l in respondidos if l.aderencia is AderenciaDaPromessa.BATE)
+    em_parte = sum(1 for l in respondidos if l.aderencia is AderenciaDaPromessa.EM_PARTE)
+    aderencia = fases.proporcao(bate, len(respondidos)) if passou else None
     primeiras = []
-    if passou:
-        criados = {l.id: l.criado_em for l in leads_mes}
-        for conversa in sessao.scalars(sa.select(ConversaDoSdr).where(ConversaDoSdr.lead_id.in_(list(criados) or [-1]))):
-            nossas = [m.enviada_em for m in conversa.mensagens if m.autor is not AutorDaMensagem.LEAD]
-            if nossas:
-                inicio = criados[conversa.lead_id]
-                t0 = inicio if inicio.tzinfo else inicio.replace(tzinfo=ZoneInfo("UTC"))
-                t1 = min(nossas)
-                t1 = t1 if t1.tzinfo else t1.replace(tzinfo=ZoneInfo("UTC"))
-                primeiras.append(max((t1 - t0).total_seconds() / 3600, 0))
+    for l in leads_mes:
+        contato = l.primeiro_contato_em or l.primeiro_contato_pelo_sdr
+        if contato is not None and l.criado_em is not None:
+            t0 = l.criado_em if l.criado_em.tzinfo else l.criado_em.replace(tzinfo=ZoneInfo("UTC"))
+            t1 = contato if contato.tzinfo else contato.replace(tzinfo=ZoneInfo("UTC"))
+            primeiras.append(max((t1 - t0).total_seconds() / 3600, 0))
     horas = D(str(round(median(primeiras), 1))) if primeiras else None
-    k_eng = IndicadorDaFase(rotulo="Aderência da promessa", unidade="pct", previsto=None, realizado=None,
-                            nota="ainda não medida: falta o campo no primeiro contato")
+    perdidos = None
+    if passou:
+        perdidos = D(
+            sum(1 for l in leads if l.motivo_descarte is MotivoDeDescarte.EXPECTATIVA and dentro(_dia_local(l.descartado_em), ini, fim))
+            + sum(1 for o in propostas_mes if o.motivo_recusa is MotivoRecusa.EXPECTATIVA)
+        )
+    k_eng = IndicadorDaFase(rotulo="Aderência da promessa", unidade="pct", previsto=p.aderencia_alvo_pct, realizado=aderencia,
+                            nota=None if aderencia is not None else "nenhum lead do mês com a aderência respondida")
     apoio_lr = IndicadorDaFase(rotulo="Lead no ICP → reunião", unidade="pct", previsto=taxas["lead_reuniao"].valor, realizado=taxa_lr_real)
     partes = []
+    if k_eng.previsto is not None and aderencia is not None and aderencia < k_eng.previsto:
+        nao_aderentes = len(respondidos) - bate
+        partes.append(f"{nao_aderentes} de {len(respondidos)} leads não encontraram o que a peça prometeu.")
+    por_origem: dict[str, list] = {}
+    for l in respondidos:
+        origem = l.campanha or l.canal or (l.tipo_canal.value if l.tipo_canal else None)
+        if origem:
+            por_origem.setdefault(origem, []).append(l)
+    candidatas = [(fases.proporcao(sum(1 for l in ls if l.aderencia is AderenciaDaPromessa.BATE), len(ls)), o, len(ls))
+                  for o, ls in por_origem.items() if len(ls) >= 2]
+    if candidatas:
+        pct, origem, n = min(candidatas)
+        if pct < 100:
+            partes.append(f"Revise primeiro a peça de “{origem}”: aderência de {_texto_num(pct)}% em {n} respostas.")
+    temas: dict[str, int] = {}
+    for l in respondidos:
+        for t in l.aderencia_sobre or []:
+            temas[t] = temas.get(t, 0) + 1
+    if temas:
+        tema, vezes = max(temas.items(), key=lambda x: (x[1], x[0]))
+        partes.append(f"A expectativa erra mais em {tema.lower()} ({vezes} {'vez' if vezes == 1 else 'vezes'}).")
     if apoio_lr.previsto is not None and apoio_lr.realizado is not None and apoio_lr.realizado < apoio_lr.previsto:
         partes.append(f"Só {_texto_num(apoio_lr.realizado)}% dos leads no ICP chegaram a reunião (previsto "
-                      f"{_texto_num(apoio_lr.previsto)}%): revise a peça do canal com menos reuniões antes de investir mais em Atração.")
+                      f"{_texto_num(apoio_lr.previsto)}%): corrija a peça antes de investir mais em Atração.")
     if p.primeiro_contato_horas and horas is not None and horas > p.primeiro_contato_horas:
         partes.append(f"O primeiro contato leva {_texto_num(horas)} h; o alvo é {_texto_num(p.primeiro_contato_horas)} h.")
-    partes.append("A aderência da promessa ainda não é medida: precisa de um campo no primeiro contato.")
+    if passou and not respondidos:
+        partes.append("Responda a aderência no primeiro contato de cada lead para medir o Engajamento.")
     engajamento = FaseResposta(
         chave="engajamento", titulo="Engajamento", pergunta="A promessa bate com o 1º contato?", kpi=k_eng,
         apoio=[
             apoio_lr,
+            IndicadorDaFase(rotulo="Aderência parcial (em parte)", unidade="pct", previsto=None,
+                            realizado=fases.proporcao(em_parte, len(respondidos)) if passou else None),
             IndicadorDaFase(rotulo="Tempo até o 1º contato (mediana)", unidade="horas", previsto=p.primeiro_contato_horas, realizado=horas,
-                            nota=None if horas is not None else "sem conversa do SDR registrada no mês"),
-            IndicadorDaFase(rotulo="Perdidos por expectativa", unidade="numero", previsto=None, realizado=None,
-                            nota="ainda não medido: falta o motivo na recusa"),
+                            nota=None if horas is not None or not passou else "sem primeiro contato registrado no mês"),
+            IndicadorDaFase(rotulo="Perdidos por expectativa", unidade="numero", previsto=None, realizado=perdidos),
         ],
-        situacao=sit(apoio_lr.realizado, apoio_lr.previsto), ajuste=" ".join(partes),
+        situacao=sit(k_eng.realizado, k_eng.previsto) or sit(apoio_lr.realizado, apoio_lr.previsto),
+        ajuste=" ".join(partes) or "No ritmo do previsto: nenhum ajuste.",
     )
 
     # ---- 3. Conversão

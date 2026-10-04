@@ -40,6 +40,7 @@ const TAXAS_E_ALVOS = [
   ["taxa_reuniao_proposta_pct", "Reunião → proposta", "%"],
   ["taxa_conversao_pct", "Conversão", "%"],
   ["icp_alvo_pct", "Leads dentro do ICP", "%"],
+  ["aderencia_alvo_pct", "Aderência da promessa", "%"],
   ["indicacoes_por_mes", "Leads por indicação/mês", ""],
   ["primeiro_contato_horas", "1º contato em até", " h"],
   ["ciclo_alvo_dias", "Ciclo de venda", " dias"],

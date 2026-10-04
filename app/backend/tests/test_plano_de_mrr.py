@@ -244,7 +244,8 @@ def test_as_quatro_fases_do_mes_com_premissas_de_taxa(cliente, novembro):
     assert D(atr["% dos leads dentro do ICP"]["realizado"]) == D("66.7")
     assert D(atr["Leads por indicação"]["realizado"]) == 1
     assert "fora do ICP" in por["atracao"]["ajuste"]
-    assert por["engajamento"]["kpi"]["realizado"] is None and "primeiro contato" in por["engajamento"]["kpi"]["nota"]
+    assert por["engajamento"]["kpi"]["realizado"] is None and "aderência respondida" in por["engajamento"]["kpi"]["nota"]
+    assert "Responda a aderência" in por["engajamento"]["ajuste"]
     assert "Faltou 2 BPO Financeiro" in por["conversao"]["ajuste"]
     assert por["conversao"]["situacao"]["chave"] == "abaixo"
 
@@ -254,3 +255,62 @@ def test_mes_fora_da_projecao_mostra_so_o_realizado(cliente):
     assert not f["tem_previsto"] and f["aviso"]
     assert all(e["previsto"] is None for e in f["cadeia"])
     assert f["meses"][0] == "2026-09-01" and f["meses"][-1] == "2027-06-01"
+
+
+
+# ---------------------------------------------------------------- aderência e primeiro contato (04/10/2026)
+
+from crm.domain.listas import AderenciaDaPromessa  # noqa: E402
+
+
+def test_editar_a_aderencia_do_lead_e_bate_limpa_o_detalhe(cliente, engine):
+    with Session(engine) as s:
+        lead = Lead(nome="x", situacao=SituacaoLead.EM_CONTATO)
+        s.add(lead)
+        s.commit()
+        lead_id = lead.id
+    r = cliente.patch(f"/api/leads/{lead_id}", headers=ADMIN, json={
+        "primeiro_contato_em": "2026-11-03T14:20:00-03:00", "aderencia": "Não bate",
+        "aderencia_sobre": ["Preço", "Preço", "Prazo"], "aderencia_esperava": "  Achou que custava menos  ",
+    })
+    assert r.status_code == 200, r.text
+    l = r.json()
+    assert (l["aderencia"], l["aderencia_sobre"], l["aderencia_esperava"]) == ("Não bate", ["Preço", "Prazo"], "Achou que custava menos")
+    assert l["primeiro_contato_em"].startswith("2026-11-03")
+    l = cliente.patch(f"/api/leads/{lead_id}", headers=ADMIN, json={"aderencia": "Bate"}).json()
+    assert (l["aderencia"], l["aderencia_sobre"], l["aderencia_esperava"]) == ("Bate", None, None)
+    assert cliente.patch(f"/api/leads/{lead_id}", headers=ADMIN, json={"aderencia_sobre": ["Cor"]}).status_code == 422
+    listas = cliente.get("/api/listas", headers=ADMIN).json()
+    assert listas["aderencias"] == ["Bate", "Em parte", "Não bate"]
+    assert "Esperava outra coisa (a promessa não bate)" in listas["motivos_de_descarte"]
+    assert "Expectativa diferente" in listas["motivos_de_recusa"]
+
+
+def test_engajamento_mede_a_aderencia_a_origem_e_o_tema(cliente, engine):
+    criado = datetime(2026, 11, 3, 12, tzinfo=timezone.utc)
+    with Session(engine) as s:
+        for i, (aderencia, sobre, campanha) in enumerate([
+            (AderenciaDaPromessa.BATE, None, "Campanha A"), (AderenciaDaPromessa.BATE, None, "Campanha A"),
+            (AderenciaDaPromessa.NAO_BATE, ["Preço"], "Campanha B"), (AderenciaDaPromessa.EM_PARTE, ["Preço", "Prazo"], "Campanha B"),
+        ]):
+            s.add(Lead(nome=f"l{i}", situacao=SituacaoLead.EM_CONTATO, criado_em=criado, campanha=campanha, aderencia=aderencia,
+                       aderencia_sobre=sobre, primeiro_contato_em=datetime(2026, 11, 3, 12 + 2 * (i + 1), tzinfo=timezone.utc)))
+        s.add(Lead(nome="perdido", situacao=SituacaoLead.DESCARTADO, criado_em=criado,
+                   motivo_descarte=MotivoDeDescarte.EXPECTATIVA, descartado_em=datetime(2026, 11, 5, tzinfo=timezone.utc)))
+        s.commit()
+    premissas = cliente.get("/api/inteligencia/plano", headers=ADMIN).json()["premissas"]
+    premissas.pop("alterado_por"), premissas.pop("alterado_em")
+    premissas |= {"aderencia_alvo_pct": "80", "primeiro_contato_horas": "3"}
+    assert cliente.put("/api/inteligencia/plano", headers=ADMIN, json=premissas).status_code == 200
+    f = cliente.get("/api/inteligencia/fases", headers=KARINE, params={"mes": "2026-11-01", "hoje": "2026-11-20"}).json()
+    eng = next(x for x in f["fases"] if x["chave"] == "engajamento")
+    assert (D(eng["kpi"]["realizado"]), D(eng["kpi"]["previsto"])) == (50, 80)
+    assert eng["situacao"]["chave"] == "abaixo"
+    apoio = {a["rotulo"]: a for a in eng["apoio"]}
+    assert D(apoio["Aderência parcial (em parte)"]["realizado"]) == 25
+    assert D(apoio["Tempo até o 1º contato (mediana)"]["realizado"]) == 5  # 2, 4, 6 e 8 h
+    assert D(apoio["Perdidos por expectativa"]["realizado"]) == 1
+    assert "2 de 4 leads" in eng["ajuste"]
+    assert "“Campanha B”: aderência de 0%" in eng["ajuste"]
+    assert "erra mais em preço (2 vezes)" in eng["ajuste"]
+    assert "o alvo é 3 h" in eng["ajuste"]

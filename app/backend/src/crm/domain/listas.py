@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 __all__ = [
+    "AderenciaDaPromessa",
+    "TemaDaExpectativa",
     "Situacao",
     "SituacaoLead",
     "MotivoDeDescarte",
@@ -350,6 +352,8 @@ class MotivoDeDescarte(Enum):
     NAO_CONTATAR = "Pediu para não ser contatado"
     SEGMENTO = "Segmento que a Critério não atende"
     ORCAMENTO = "Orçamento abaixo do piso"
+    EXPECTATIVA = "Esperava outra coisa (a promessa não bate)"
+    """Entrou em 04/10/2026 com a aderência da promessa: conta em "perdidos por expectativa"."""
     OUTRO = "Outro"
 
 
@@ -452,6 +456,8 @@ class MotivoRecusa(Enum):
     CONCORRENCIA = "Concorrência"
     MOMENTO = "Momento"
     ESCOPO = "Escopo"
+    EXPECTATIVA = "Expectativa diferente"
+    """Entrou em 04/10/2026 com a aderência da promessa: conta em "perdidos por expectativa"."""
     PRO_BONO = "Pro bono"
     OUTRO = "Outro"
 
@@ -608,3 +614,23 @@ def normalizar_captador(bruto: str | None) -> Normalizacao[str]:
     if str(bruto) != sigla:
         return Normalizacao(sigla, bruto, f"{bruto!r} convertido para {sigla!r}")
     return Normalizacao(sigla, bruto)
+
+
+class AderenciaDaPromessa(Enum):
+    """O que o lead esperava bate com o que a peça prometeu? Registrado no primeiro contato (amostra
+    aprovada por Eduardo em 04/10/2026). Aderência = "Bate" ÷ respondidos; "Em parte" não conta como
+    aderente e aparece separado."""
+
+    BATE = "Bate"
+    EM_PARTE = "Em parte"
+    NAO_BATE = "Não bate"
+
+
+class TemaDaExpectativa(Enum):
+    """Sobre o quê a expectativa não bateu (pode ser mais de um). Insumo da Descoberta do Cliente."""
+
+    PRECO = "Preço"
+    ESCOPO = "Serviço / escopo"
+    PRAZO = "Prazo"
+    PERFIL = "Porte ou segmento"
+    OUTRO = "Outro"

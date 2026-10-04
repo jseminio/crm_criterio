@@ -16,6 +16,35 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Primeiro contato e aderência da promessa no lead (04/10/2026)
+
+Amostra aprovada por Eduardo em 04/10/2026. O painel do lead ganha o bloco **Primeiro contato**,
+logo abaixo da Situação. Nenhum campo dele é obrigatório para salvar.
+
+- **Veio por**: o canal, a campanha e o interesse do lead. Ficam à vista para comparar com o que o
+  lead diz.
+- **Data e hora do 1º contato**: vem preenchida com a primeira mensagem da IA ou da equipe nas
+  conversas do SDR (`Lead.primeiro_contato_pelo_sdr`). Quem atende ajusta se o contato foi por
+  telefone ou presencial. Ao salvar, a data fica gravada.
+- **O que o lead esperava bate com o que a peça prometeu?** As respostas são Bate, Em parte ou Não
+  bate. Quando não bate, aparecem **sobre o quê** (Preço, Serviço / escopo, Prazo, Porte ou
+  segmento, Outro; pode marcar mais de um) e **o que ele esperava**, em uma frase. "Bate" limpa os
+  dois campos, e o servidor também os limpa.
+- **Motivos novos**: "Esperava outra coisa (a promessa não bate)" no descarte do lead e "Expectativa
+  diferente" na recusa da oportunidade. Os dois contam em "perdidos por expectativa".
+
+**No Engajamento da Inteligência de Conversão:**
+
+- **KPI**: aderência da promessa = "Bate" ÷ respondidos, entre os leads criados no mês. "Em parte"
+  não conta como aderente e aparece no apoio como "aderência parcial".
+- **Alvo**: é a premissa "Aderência da promessa (%)".
+- **Tempo até o 1º contato**: usa a data gravada e, sem ela, a primeira mensagem do SDR.
+- **Ajuste**: aponta a origem (campanha, canal ou tipo de canal) com a menor aderência, entre as
+  que têm pelo menos 2 respostas, e o tema em que a expectativa mais erra.
+
+Migração `20261004_1300_aderencia_e_primeiro_contato`. Ela só acrescenta colunas: quatro em `lead`
+e o alvo em `plano_de_mrr`.
+
 ## Inteligência de Conversão: as quatro fases do cliente (04/10/2026)
 
 O quadro da amostra aprovada em 03/10/2026 foi construído a pedido de Eduardo em 04/10/2026. Ele
@@ -43,10 +72,10 @@ fica entre a meta e o gráfico da aba e tem seletor de mês (padrão: o mês cor
   - *Apoio*: % dentro do ICP; leads por indicação (Sócios, Parceiros, Advogados, Carteira,
     Colaboradores); custo por lead, que é o investimento em mídia do mês ÷ os leads de tráfego pago.
 - **Engajamento**
-  - *KPI*: aderência da promessa. **Ainda não é medida**: falta o campo no primeiro contato, e a
-    tela diz isso em vez de mostrar zero.
-  - *Apoio*: lead no ICP → reunião (pela reunião marcada); mediana de horas até a primeira mensagem
-    da IA ou da equipe nas conversas do SDR; perdidos por expectativa, também ainda não medido.
+  - *KPI*: aderência da promessa, medida desde 04/10/2026 (ver "Primeiro contato e aderência da
+    promessa no lead", acima).
+  - *Apoio*: lead no ICP → reunião (pela reunião marcada); aderência parcial; mediana de horas até o
+    primeiro contato; perdidos por expectativa.
   - A situação do cartão vem do lead → reunião.
 - **Conversão**
   - *KPI*: contratos novos no mês contra o previsto por motor.

@@ -78,6 +78,17 @@ cd app/backend && ~/.venvs/criterio-crm/bin/python scripts/comparar_backup.py ~/
 
 **Não importe o backup de outra cópia pela tela:** a importação substitui o banco inteiro.
 
+**Trazer o que foi feito no outro CRM** (03/10/2026, regras aprovadas por Eduardo):
+`scripts/importar_do_backup.py <arquivo>` mostra o que faria; com `--gravar`, grava numa transação
+só. **Acrescenta** empresas (no grupo de mesmo nome daqui), contatos e vínculos que só existem lá,
+sem duplicar contato sem e-mail cujo nome está contido no de outro da mesma empresa. **Preenche**
+o que está vazio aqui (CNPJ, telefone, cargo, data de aceite, data de colocação…). **Troca** só
+quando lá mexeu por último: nos contatos, nome, cargo, papel, telefone e observação (que junta as
+duas); nas oportunidades, temperatura e nome. Os outros conflitos (preço, parcelas, situação) ficam
+como estão e aparecem na lista. Não apaga nada; não mexe em contrato, proposta nem Score. A
+comparação agora também reconhece a empresa com CNPJ de um lado e sem do outro, e o contrato sem a
+empresa preenchida.
+
 **Apagar um grupo de teste** (03/10/2026, para o "Karine ON"): `scripts/apagar_grupo.py --cnpj <CNPJ>`
 (ou `--grupo <nome>`) mostra tudo o que sairia: grupo, empresas, oportunidades com proposta e
 questionário, vínculos, os contatos que só existem nele, leitura do Score, jornada e reuniões. Com

@@ -602,6 +602,23 @@ class ContratoEdicao(BaseModel):
     observacao: str | None = None
 
 
+class ExclusaoDaOportunidade(BaseModel):
+    """O que sai e o que fica se a oportunidade for excluída (04/10/2026). `recusa` preenchida: não sai."""
+
+    recusa: str | None
+    propostas: int
+    pendencias: int
+    precos: int
+    questionarios: int
+    leads: int
+    vendas_da_reuniao: int
+    sai_da_conversao: bool
+
+
+class PedidoDeExclusao(BaseModel):
+    motivo: str = Field(min_length=1, max_length=1000)
+
+
 class ConversaoEmContrato(BaseModel):
     """Vira contrato. Escopo e preço partem da oportunidade aceita, mas podem
     ser ajustados aqui — o que foi aceito na proposta nem sempre é exatamente

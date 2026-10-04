@@ -156,3 +156,20 @@ describe("Configurações para o perfil Comercial (02/10/2026)", () => {
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Grupos", "Conferência", "Serviços pedidos"]);
   });
 });
+
+describe("histórico de alterações", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("a exclusão de oportunidade mostra o motivo (04/10/2026)", async () => {
+    semMatrizes();
+    vi.mocked(api.historico).mockResolvedValue([
+      { id: 1, quando: "2026-10-04T12:00:00Z", usuario_email: "sem login", usuario_nome: null, acao: "excluiu",
+        tabela: "oportunidade", registro_id: 3, descricao: "Rede Farma", campo: "motivo", antes: null,
+        depois: "Cadastrada em duplicidade" },
+    ]);
+    abrirAba("Histórico");
+    const linha = (await screen.findByText("Cadastrada em duplicidade")).closest("tr")!;
+    expect(linha).toHaveTextContent("registro excluído · motivo: Cadastrada em duplicidade");
+    expect(within(linha).getAllByRole("cell")[3]).toHaveTextContent(/^excluiu$/);
+  });
+});

@@ -71,6 +71,18 @@ export interface MudancaDePreco {
   preco_anual_novo: string | null;
 }
 
+/** O que a exclusão leva junto (04/10/2026). `recusa` preenchida: não pode sair. */
+export interface ExclusaoDaOportunidade {
+  recusa: string | null;
+  propostas: number;
+  pendencias: number;
+  precos: number;
+  questionarios: number;
+  leads: number;
+  vendas_da_reuniao: number;
+  sai_da_conversao: boolean;
+}
+
 export interface OportunidadeDetalhe extends OportunidadeResumo {
   /** Já virou contrato: a empresa não troca mais pelo detalhe. */
   tem_contrato?: boolean;

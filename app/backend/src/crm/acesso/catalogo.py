@@ -25,6 +25,7 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         ("converter", "converter em contrato"),
         ("exportar", "exportar para Excel"),
         ("questionarios", "buscar e resolver questionários do site"),
+        ("excluir", "excluir oportunidade"),
     )),
     ("questionarios", "Questionários", (("ver", "ver"),)),
     ("grupos", "Grupos", (("ver", "ver"), ("editar", "editar"), ("fundir", "fundir e desfazer fusão"))),
@@ -51,11 +52,11 @@ PERMISSOES: frozenset[str] = frozenset(f"{m}.{f}" for m, _, fs in MENUS for f, _
 def permissoes_do_comercial() -> list[str]:
     """O perfil inicial da Karine (decisão de Eduardo, 02/10/2026): o comercial inteiro, sem converter
     em contrato, sem Carteira e sem Configurações; contratos e grupos só para ver. O menu Questionários
-    entrou em 02/10/2026, também para ver."""
+    entrou em 02/10/2026, também para ver. Excluir oportunidade (04/10/2026) começa só no Administrador."""
     return sorted(
         {"agenda.ver", "questionarios.ver", "contatos.ver", "contatos.editar", "contatos.excluir", "grupos.ver", "contratos.ver",
          "abordagens.ver", "abordagens.editar", "sdr.ver", "sdr.editar", "conferencia.ver"}
-        | {f"funil.{f}" for m, _, fs in MENUS if m == "funil" for f, _ in fs if f != "converter"}
+        | {f"funil.{f}" for m, _, fs in MENUS if m == "funil" for f, _ in fs if f not in ("converter", "excluir")}
     )
 
 
@@ -95,6 +96,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/oportunidades/\d+(/(ficha|pendencias|proposta|questionario))?", ("funil.ver", "agenda.ver")),
     ("PATCH", r"/api/oportunidades/\d+", ("funil.editar",)),
     ("POST", r"/api/oportunidades/\d+/converter-em-contrato", ("funil.converter",)),
+    ("GET", r"/api/oportunidades/\d+/exclusao", ("funil.excluir",)),
+    ("POST", r"/api/oportunidades/\d+/excluir", ("funil.excluir",)),
     ("PUT", r"/api/oportunidades/\d+/ficha/[^/]+", ("funil.editar", "funil.proposta")),
     ("POST|PATCH", r"/api/oportunidades/\d+/pendencias(/[^/]+)?", ("funil.editar", "funil.proposta")),
     ("POST", r"/api/oportunidades/\d+/proposta", ("funil.proposta",)),

@@ -16,6 +16,30 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Funil comercial › Inteligência de Conversão: o plano de MRR (03/10/2026)
+
+Aprovado por Eduardo em 03/10/2026, Entrega 1. Terceira aba do Funil comercial ("Inteligência de
+Conversão", permissão "Funil comercial: ver"). Regras em `crm.domain.plano_de_mrr`; a tela lê
+`GET /api/inteligencia/plano` (`crm.api.inteligencia`).
+
+- **A meta é acréscimo líquido sobre a receita atual** (R$ 250 mil até 30/06/2027): venda nova e
+  escada menos churn e contração. A barra mostra o realizado contra o previsto até hoje; a situação
+  vem com palavra e seta (no ritmo ≥ 100% do previsto, atenção de 90% a 99%, abaixo < 90%).
+- **Três motores**: BPO Financeiro (clientes por mês no ticket, até o teto da célula), Contábil
+  (limitado pelas vagas de onboarding; o atípico ocupa duas; os contratos previstos do pipeline
+  entram no mês deles) e a **escada** (Plus e depois CFO as a Service, após o prazo). Churn mensal de
+  `churn_anual_pct ÷ 12` sobre a carteira do começo do mês.
+- **Três cenários** com as mesmas regras: alerta, previsto (o compromisso) e otimista. O gráfico
+  compara o acumulado realizado com os três; "Ver o gráfico em tabela" mostra os mesmos números.
+- **Realizado** = movimento do MRR dos contratos do CRM, em bruto, separado por motor pelo serviço.
+  Reajuste e expansão de contrato contábil entram em "outros movimentos", sem previsto.
+- **Premissas**: só quem tem "Configurações: metas" muda (`PUT /api/inteligencia/plano`), e a mudança
+  vai para o histórico de alterações. Sem nada gravado, valem as de `PADRAO`.
+- **Cenários de ticket** saíram da aba Oportunidades e passaram a ser por serviço, nesta aba
+  (`GET /api/inteligencia/cenarios-de-ticket`).
+- Migração `a7c3e9f1b5d2`: só acrescenta as tabelas `plano_de_mrr` (vazia) e
+  `contrato_previsto_do_plano`, com os três contratos previstos de 03/10/2026, sem nome de cliente.
+
 ## Base de conhecimento do SDR de IA (03/10/2026)
 
 Amostra aprovada por Eduardo em 03/10/2026. Terceira aba de **SDR · Abordagens e conhecimento**:
@@ -438,9 +462,9 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.185** no backend e **504** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
-| Banco | PostgreSQL 18 local, 43 tabelas, migrações até `e4a7c1b9d2f6` (base de conhecimento do SDR, 03/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
-| API | 144 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
+| Testes | **1.248** no backend e **524** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Banco | PostgreSQL 18 local, 46 tabelas, migrações até `e4a7c1b9d2f6` (base de conhecimento do SDR, depois do plano de MRR, 04/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
+| API | 149 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens, SDR da IA e Base de conhecimento) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos; faltam a nuvem e o backup fora da máquina |
 | Fora do ar | **E1:** nuvem em região brasileira (custo a estimar antes de contratar) e backup fora da máquina com restauração testada. Login, perfis e histórico já estão no código, à espera do registro no Microsoft Entra. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto. O dashboard do cliente para as reuniões de resultado (fonte dos números e ferramenta a decidir). Buscar a transcrição direto no Granola, sem colar (depende de o plano do Granola ter API) |
@@ -1085,6 +1109,22 @@ passos**, dizendo o que vai sumir ("Não dá para desfazer").
 - **Empresa com contrato não pode ser excluída**, em qualquer situação do contrato: apagar quebraria o
   histórico, o MRR e a carteira. A API responde 409 e o painel mostra o motivo no lugar do botão
   (`tem_contrato` em `GET /api/contatos/empresas`).
+
+**Excluir oportunidade (04/10/2026).** Amostra aprovada por Eduardo. O botão "Excluir oportunidade…"
+fica no rodapé do detalhe, à esquerda e longe do "Salvar"; não fica no cartão. Exige a permissão
+**Funil comercial: excluir** (`funil.excluir`), que começa só no Administrador; o perfil Comercial não
+a recebe. Regra em `crm.db.excluir_oportunidade`.
+
+- Ao clicar, `GET /api/oportunidades/{id}/exclusao` diz o que **sai junto** (propostas, pendências da
+  proposta, histórico de preço) e o que **fica sem apontar para ela** (lead de origem, questionário do
+  site, venda anotada em reunião). Grupo, empresas, contatos e reuniões ficam. Se ela está como
+  Perdido, a tela avisa que sai da taxa de conversão.
+- O **motivo é obrigatório**. `POST /api/oportunidades/{id}/excluir` grava no Histórico de alterações
+  uma linha "excluiu" com o motivo, **mesmo sem login** (quem fica "sem login"): a exclusão não se
+  desfaz pela tela, e o porquê é o que sobra dela. O Histórico mostra "registro excluído · motivo: …".
+- **Recusa** (409, com o motivo no lugar do botão): oportunidade **Aceita** ou **Recusada** (conta na
+  taxa de conversão; se a venda não aconteceu, mude para Perdido) e a que **virou contrato**.
+- Apagar um grupo inteiro continua só por script (`scripts/apagar_grupo.py`).
 
 **Contato só por empresa; o grupo mora na empresa (01/10/2026).** Pedido de Karine, aprovado: as
 empresas de uma pessoa nem sempre são do mesmo grupo, então o contato deixou de ser ligado ao grupo.

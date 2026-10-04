@@ -71,6 +71,18 @@ export interface MudancaDePreco {
   preco_anual_novo: string | null;
 }
 
+/** O que a exclusão leva junto (04/10/2026). `recusa` preenchida: não pode sair. */
+export interface ExclusaoDaOportunidade {
+  recusa: string | null;
+  propostas: number;
+  pendencias: number;
+  precos: number;
+  questionarios: number;
+  leads: number;
+  vendas_da_reuniao: number;
+  sai_da_conversao: boolean;
+}
+
 export interface OportunidadeDetalhe extends OportunidadeResumo {
   /** Já virou contrato: a empresa não troca mais pelo detalhe. */
   tem_contrato?: boolean;
@@ -453,19 +465,6 @@ export interface LinhaDeRecorte {
   valor_mensal: string;
   ticket_medio: string | null;
   mediana: string | null;
-}
-
-/** Hipóteses de trabalho, não meta. Atípico = acima de 3 × a mediana. */
-export interface CenariosDeTicket {
-  contratos: number;
-  atipicos: number;
-  limite_do_atipico: string;
-  conservador: string;
-  base: string;
-  otimista: string;
-  atipico_minimo: string | null;
-  atipico_medio: string | null;
-  atipico_maximo: string | null;
 }
 
 export type BaldeDaAgenda = "atrasada" | "hoje" | "proximos_7_dias" | "depois" | "sem_data" | "sem_acao";
@@ -1773,4 +1772,127 @@ export interface EdicaoDeFicha {
   fonte?: string | null;
   dono?: string | null;
   depende_de_hipotese?: boolean;
+}
+
+/** Inteligência de Conversão (03/10/2026): o plano de MRR. Valores em reais vêm como texto. */
+export type NomeDoCenario = "alerta" | "previsto" | "otimista";
+export type ChaveDaSituacao = "no_ritmo" | "atencao" | "abaixo";
+
+export interface CenarioDoPlano {
+  bpo_por_mes: string;
+  ticket_contabil: string;
+  com_contratos_previstos: boolean;
+}
+
+export interface ContratoPrevistoDoPlano {
+  descricao: string;
+  mes: string;
+  valor: string;
+  atipico: boolean;
+}
+
+export interface PremissasDoPlano {
+  meta_liquida: string;
+  inicio: string;
+  fim: string;
+  inicio_da_projecao: string;
+  ponto_de_partida: string;
+  mrr_de_partida: string;
+  churn_anual_pct: string;
+  bpo_ticket: string;
+  bpo_teto: string;
+  contabil_vagas: string;
+  atipico_vagas: string;
+  escada_prazo_meses: number;
+  plus_acrescimo: string;
+  plus_pct: string;
+  cfo_acrescimo: string;
+  cfo_pct: string;
+  alerta: CenarioDoPlano;
+  previsto: CenarioDoPlano;
+  otimista: CenarioDoPlano;
+  contratos_previstos: ContratoPrevistoDoPlano[];
+}
+
+export interface SituacaoDoPlano {
+  chave: ChaveDaSituacao;
+  percentual: string | null;
+}
+
+export interface LinhaPrevistaDoPlano {
+  mes: string;
+  contabil: string;
+  bpo: string;
+  escada: string;
+  churn: string;
+  acumulado: string;
+  contratos_bpo: string;
+  contratos_contabil: string;
+}
+
+export interface CenarioProjetado {
+  nome: NomeDoCenario;
+  contabil: string;
+  bpo: string;
+  escada: string;
+  churn: string;
+  bruto: string;
+  liquido: string;
+  percentual_da_meta: string | null;
+  linhas: LinhaPrevistaDoPlano[];
+}
+
+export interface LinhaRealizadaDoPlano {
+  mes: string;
+  novo_contabil: string;
+  novo_bpo: string;
+  escada: string;
+  outros: string;
+  perdas: string;
+  acumulado: string;
+  contratos_contabil: number;
+  contratos_bpo: number;
+}
+
+export interface MotorDoPlano {
+  motor: "bpo" | "contabil" | "escada" | "perdas" | "outros";
+  rotulo: string;
+  previsto_no_plano: string | null;
+  previsto_ate_hoje: string | null;
+  realizado: string;
+  situacao: SituacaoDoPlano | null;
+  ajuste: string;
+}
+
+export interface PlanoDeMrr {
+  hoje: string;
+  premissas: PremissasDoPlano & { alterado_por: string | null; alterado_em: string | null };
+  meta: {
+    meta_liquida: string;
+    realizado: string;
+    previsto_ate_hoje: string;
+    alerta_ate_hoje: string;
+    situacao: SituacaoDoPlano;
+    percentual_da_meta: string;
+    meses_restantes: number;
+    ritmo_necessario: string | null;
+  };
+  cenarios: CenarioProjetado[];
+  realizado: LinhaRealizadaDoPlano[];
+  motores: MotorDoPlano[];
+  aviso: string | null;
+}
+
+export interface CenariosDoServico {
+  servico: string;
+  contratos: number;
+  contratos_recorrentes: number;
+  limite_do_atipico: string | null;
+  conservador: string | null;
+  base: string | null;
+  otimista: string | null;
+  atipicos: number;
+  atipico_minimo: string | null;
+  atipico_medio: string | null;
+  atipico_maximo: string | null;
 }

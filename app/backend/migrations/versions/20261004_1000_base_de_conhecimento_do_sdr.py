@@ -5,7 +5,7 @@ o que a IA pode dizer, o que nunca diz, fonte, dono, situação e validade. **S�
 tabela existente muda. As fichas iniciais entram pela tela ("Trazer a carga inicial"), não aqui.
 
 Revisão: e4a7c1b9d2f6
-Revisão anterior: d1e5b8c3f7a2
+Revisão anterior: a7c3e9f1b5d2 (plano de MRR)
 Criada em: 2026-10-03 18:00:00
 """
 
@@ -15,7 +15,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = 'e4a7c1b9d2f6'
-down_revision: str | None = 'd1e5b8c3f7a2'
+down_revision: str | None = 'a7c3e9f1b5d2'
 branch_labels: str | None = None
 depends_on: str | None = None
 

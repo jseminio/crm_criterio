@@ -8,6 +8,7 @@ import type {
   AbordagemResumo,
   Agenda,
   EnderecoDeContato,
+  ExclusaoDaOportunidade,
   FusaoFeita,
   EntidadeDeContato,
   EmpresaEncontrada,
@@ -31,7 +32,9 @@ import type {
   ResultadoDaEdicao,
   SugestaoDePorte,
   VolumetriaEntrada,
-  CenariosDeTicket,
+  CenariosDoServico,
+  PlanoDeMrr,
+  PremissasDoPlano,
   ColunaDoFunil,
   ConversaDoSdr,
   InvestimentoEmMidia,
@@ -441,8 +444,10 @@ export const api = {
   recortes: (dimensao: DimensaoDeRecorte, filtros: FiltrosDoFunil = {}) =>
     pedir<LinhaDeRecorte[]>(comParametros("/api/indicadores/recortes", { dimensao, ...filtros })),
 
-  cenariosDeTicket: (filtros: FiltrosDoFunil = {}) =>
-    pedir<CenariosDeTicket | null>(comParametros("/api/indicadores/cenarios-de-ticket", { ...filtros })),
+  planoDeMrr: () => pedir<PlanoDeMrr>("/api/inteligencia/plano"),
+  mudarPlanoDeMrr: (premissas: PremissasDoPlano) =>
+    pedir<PlanoDeMrr>("/api/inteligencia/plano", { method: "PUT", body: JSON.stringify(premissas) }),
+  cenariosPorServico: () => pedir<CenariosDoServico[]>("/api/inteligencia/cenarios-de-ticket"),
 
   oportunidades: (filtros: FiltrosDoFunil & { situacao?: string[]; grupo_id?: number } = {}) =>
     pedir<Pagina<OportunidadeResumo>>(
@@ -620,6 +625,10 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(mudancas),
     }),
+
+  exclusaoDaOportunidade: (id: number) => pedir<ExclusaoDaOportunidade>(`/api/oportunidades/${id}/exclusao`),
+  excluirOportunidade: (id: number, motivo: string) =>
+    pedir<unknown>(`/api/oportunidades/${id}/excluir`, { method: "POST", body: JSON.stringify({ motivo }) }),
 
   converterEmContrato: (oportunidadeId: number, dados: Record<string, unknown> = {}) =>
     pedir<ContratoDetalhe>(`/api/oportunidades/${oportunidadeId}/converter-em-contrato`, {

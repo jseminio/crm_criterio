@@ -38,6 +38,7 @@ from crm.acesso.catalogo import PUBLICAS, permissoes_da_rota
 from crm.acesso.entrada import ConfiguracaoDeEntrada, EntradaRecusada, ler_configuracao, pessoa_do_token, validador_da_microsoft
 from crm.api import esquemas as e
 from crm.api.acesso import quem_fez, roteador_do_acesso
+from crm.api.inteligencia import roteador_de_inteligencia
 from crm.api.metas import metas_vigentes, roteador_de_metas
 from crm.api.ajustes import roteador_de_ajustes
 from crm.api.base_de_conhecimento import roteador_da_base
@@ -59,6 +60,7 @@ from crm.carga.persistencia import CAMPOS as CAMPOS_DA_CARGA
 from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, desfazer_fusao, fundir_grupos
 from crm.db import leads as regras_do_lead
+from crm.db import excluir_oportunidade as regras_da_exclusao
 from crm.db.modelos import (
     PedidoDeAprovacao,
     Contrato,
@@ -236,6 +238,7 @@ def criar_app(
     api.include_router(roteador_de_propostas(obter_sessao))
     api.include_router(roteador_da_ficha(obter_sessao))
     api.include_router(roteador_de_metas(obter_sessao))
+    api.include_router(roteador_de_inteligencia(obter_sessao))
     api.include_router(roteador_do_sucesso(obter_sessao, servicos_da_ata or servicos_da_ata_reais))
     api.include_router(roteador_de_ajustes(obter_sessao))
     api.include_router(roteador_do_acesso(obter_sessao, lambda: config_de_entrada))
@@ -1249,6 +1252,32 @@ def _registrar(api: FastAPI) -> None:
             oportunidade.grupo.situacao = SituacaoGrupo.CLIENTE
         sessao.flush()
         return _detalhe_de(oportunidade, oportunidade.grupo.nome)
+
+    @api.get(
+        "/api/oportunidades/{oportunidade_id}/exclusao",
+        response_model=e.ExclusaoDaOportunidade,
+        tags=["funil"],
+    )
+    def ver_exclusao(oportunidade_id: int, sessao: Session = Depends(obter_sessao)) -> e.ExclusaoDaOportunidade:
+        """O que a exclusão leva junto, para a tela confirmar antes (04/10/2026)."""
+        oportunidade = sessao.get(Oportunidade, oportunidade_id)
+        if oportunidade is None:
+            raise HTTPException(404, "oportunidade não encontrada")
+        return e.ExclusaoDaOportunidade(**vars(regras_da_exclusao.o_que_sai(sessao, oportunidade)))
+
+    @api.post("/api/oportunidades/{oportunidade_id}/excluir", status_code=204, tags=["funil"])
+    def excluir_oportunidade(
+        oportunidade_id: int, corpo: e.PedidoDeExclusao, sessao: Session = Depends(obter_sessao)
+    ) -> None:
+        """Apaga a oportunidade com o motivo (`crm.db.excluir_oportunidade`). Irreversível: a tela
+        mostra o que sai e pede o motivo antes."""
+        oportunidade = sessao.get(Oportunidade, oportunidade_id)
+        if oportunidade is None:
+            raise HTTPException(404, "oportunidade não encontrada")
+        try:
+            regras_da_exclusao.excluir(sessao, oportunidade, corpo.motivo)
+        except regras_da_exclusao.ExclusaoRecusada as recusa:
+            raise HTTPException(409, str(recusa)) from recusa
 
     @api.post(
         "/api/oportunidades/{oportunidade_id}/converter-em-contrato",

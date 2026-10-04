@@ -41,6 +41,7 @@ from crm.api.acesso import quem_fez, roteador_do_acesso
 from crm.api.inteligencia import roteador_de_inteligencia
 from crm.api.metas import metas_vigentes, roteador_de_metas
 from crm.api.ajustes import roteador_de_ajustes
+from crm.api.base_de_conhecimento import roteador_da_base
 from crm.api.sucesso import ServicosDaAta, roteador_do_sucesso, servicos_da_ata_reais
 from crm.domain.alcada import motivo_da_alcada
 from crm.api.abordagens import Servicos, roteador_de_abordagens, servicos_reais
@@ -229,6 +230,7 @@ def criar_app(
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
     api.include_router(roteador_do_sdr(obter_sessao))
+    api.include_router(roteador_da_base(obter_sessao))
     # Endereço pelo CNPJ na importação do questionário: a BrasilAPI no uso real; no teste (que passa a
     # própria `fabrica`), só se o teste mandar uma busca — teste não sai para a rede.
     endereco = busca_de_endereco or (None if fabrica is not None else endereco_pelo_cnpj)

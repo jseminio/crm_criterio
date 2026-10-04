@@ -38,6 +38,11 @@ const TOM_POR_SITUACAO: Record<string, string> = {
   Descartada: "neutra",
   Erro: "perda",
   Bloqueada: "perda",
+  // Base de conhecimento do SDR de IA (03/10/2026); "Aprovada" já vem das abordagens
+  Rascunho: "neutra",
+  "Em revisão": "espera",
+  Arquivada: "neutra",
+  Vencida: "perda",
 };
 
 const TOM_POR_TEMPERATURA: Record<string, string> = {

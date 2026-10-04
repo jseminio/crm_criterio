@@ -26,6 +26,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from crm.db.base import Base, CarimboMixin, agora, coluna_lista
+from crm.domain.base_de_conhecimento import BlocoDaBase, SituacaoDaFicha
 from crm.domain.listas import (
     AutorDaMensagem,
     CanalDeAbordagem,
@@ -57,6 +58,7 @@ from crm.domain.listas import (
 )
 
 __all__ = [
+    "FichaDaBase",
     "GrupoEconomico",
     "Empresa",
     "PessoaContato",
@@ -1618,6 +1620,36 @@ class CadenciaDeReuniao(Base):
     alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
     alterado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 
+
+class FichaDaBase(CarimboMixin, Base):
+    """Uma ficha da base de conhecimento do SDR de IA (03/10/2026): um assunto, o que a IA pode
+    dizer, o que nunca diz e de onde veio. Só a aprovada e dentro da validade vale para a IA
+    (`crm.domain.base_de_conhecimento.vale_para_a_ia`). Quem aprova e quando, carimbados pelo
+    servidor."""
+
+    __tablename__ = "ficha_da_base"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    codigo: Mapped[str | None] = mapped_column(sa.String(20), unique=True)
+    """Só das fichas da carga inicial (P1, T9, S04...): é como a carga sabe o que já entrou."""
+    titulo: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    bloco: Mapped[BlocoDaBase] = mapped_column(coluna_lista(BlocoDaBase), nullable=False, index=True)
+    servico: Mapped[str | None] = mapped_column(sa.String(120))
+    texto: Mapped[str | None] = mapped_column(sa.Text)
+    """O que a IA pode dizer."""
+    nunca_dizer: Mapped[str | None] = mapped_column(sa.Text)
+    como_o_lead_pergunta: Mapped[str | None] = mapped_column(sa.Text)
+    fonte: Mapped[str | None] = mapped_column(sa.String(300))
+    dono: Mapped[str | None] = mapped_column(sa.String(120))
+    depende_de_hipotese: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default=sa.false()
+    )
+    situacao: Mapped[SituacaoDaFicha] = mapped_column(
+        coluna_lista(SituacaoDaFicha), nullable=False, default=SituacaoDaFicha.RASCUNHO, index=True
+    )
+    validade: Mapped[date | None] = mapped_column(sa.Date)
+    aprovada_por: Mapped[str | None] = mapped_column(sa.String(200))
+    aprovada_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 
 QUANTIDADE = sa.Numeric(6, 2)
 

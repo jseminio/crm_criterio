@@ -1723,6 +1723,57 @@ export interface CadenciaDeReunioes {
   alterado_em: string | null;
 }
 
+/** Base de conhecimento do SDR de IA (03/10/2026). */
+export interface FichaDaBase {
+  id: number;
+  codigo: string | null;
+  titulo: string;
+  bloco: string;
+  servico: string | null;
+  texto: string | null;
+  nunca_dizer: string | null;
+  como_o_lead_pergunta: string | null;
+  fonte: string | null;
+  dono: string | null;
+  depende_de_hipotese: boolean;
+  situacao: string;
+  validade: string | null;
+  aprovada_por: string | null;
+  aprovada_em: string | null;
+  atualizado_em: string;
+  vencida: boolean;
+  vale_para_a_ia: boolean;
+  problemas_para_aprovar: string[];
+}
+
+export interface BlocoDaBase {
+  bloco: string;
+  total: number;
+  valem: number;
+  em_revisao: number;
+  rascunhos: number;
+  vencidas: number;
+  vai_para_a_ia: boolean;
+}
+
+export interface BaseDeConhecimento {
+  blocos: BlocoDaBase[];
+  situacoes: string[];
+  fichas: FichaDaBase[];
+}
+
+export interface EdicaoDeFicha {
+  titulo?: string;
+  bloco?: string;
+  servico?: string | null;
+  texto?: string | null;
+  nunca_dizer?: string | null;
+  como_o_lead_pergunta?: string | null;
+  fonte?: string | null;
+  dono?: string | null;
+  depende_de_hipotese?: boolean;
+}
+
 /** Inteligência de Conversão (03/10/2026): o plano de MRR. Valores em reais vêm como texto. */
 export type NomeDoCenario = "alerta" | "previsto" | "otimista";
 export type ChaveDaSituacao = "no_ritmo" | "atencao" | "abaixo";

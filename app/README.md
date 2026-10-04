@@ -40,6 +40,41 @@ Conversão", permissão "Funil comercial: ver"). Regras em `crm.domain.plano_de_
 - Migração `a7c3e9f1b5d2`: só acrescenta as tabelas `plano_de_mrr` (vazia) e
   `contrato_previsto_do_plano`, com os três contratos previstos de 03/10/2026, sem nome de cliente.
 
+## Base de conhecimento do SDR de IA (03/10/2026)
+
+Amostra aprovada por Eduardo em 03/10/2026. Terceira aba de **SDR · Abordagens e conhecimento**:
+recepciona o que a SDR de IA pode dizer. As regras de atuação que toda ficha respeita estão em
+`../sdr-ia-limites-de-atuacao.md` (passo 1, **proposta em validação** com Eduardo e Bruno).
+
+- **Uma ficha por assunto**, de 3 a 8 linhas: título, bloco, serviço (se for de um só), o que a IA
+  pode dizer, o que nunca diz, como o lead pergunta, fonte, dono e "depende de hipótese".
+- **Nove blocos:** Regras de atuação, Transbordo, Serviços, Objeções, Tom de voz, Quem é a Critério,
+  Qualificação, Perguntas frequentes e Referências. **Referências nunca vão para a IA**: são
+  fontes e estudos para a equipe consultar.
+- **Situações:** Rascunho → Em revisão → Aprovada → Arquivada. **Só a aprovada e dentro da
+  validade vale para a IA.** Validade carimbada ao aprovar: 6 meses; 60 dias se depende de hipótese
+  (ICP, preço, fronteiras entre BPO Financeiro, BPO Plus e CFO as a Service). Vencida aparece com
+  aviso em texto e a IA deixa de usá-la.
+- **Aprovar exige** título, texto, fonte e dono, e o texto **não pode falar de preço** — a mesma
+  trava das mensagens (`fala_de_preco`). Com login, quem aprova é quem entrou; sem login, a tela
+  pede o nome. **Editar o conteúdo de uma ficha aprovada a devolve para "Em revisão"** (trocar só
+  o dono, não). Arquivada não se edita: reabre como rascunho.
+- **Permissões novas** no menu SDR da IA: `sdr.base` (criar e editar fichas) e `sdr.base_aprovar`
+  (aprovar). Ver a aba pede `sdr.ver`. **Nenhum perfil existente ganhou as duas**: o Administrador
+  tem tudo; os demais, por Configurações › Perfis e acesso.
+- **Carga inicial** (botão na base vazia, `POST /api/sdr/base/carga-inicial`): **só acrescenta**,
+  pela chave `codigo`; ficha que já entrou, mesmo editada ou arquivada, fica como está. Traz as 12
+  regras (P1–P12) e os 11 gatilhos de transbordo (T1–T11) do documento, 3 fichas de tom de voz
+  (todas "Em revisão"), uma ficha por serviço do catálogo, Quem é a Critério, Qualificação e 6
+  referências (todas "Rascunho"). O FSCP entra com a terminologia fixa da Critério, não com o texto
+  do catálogo. **As 17 objeções da Matriz não entram pela carga**: ficam fora do repositório
+  (posições jurídicas); a equipe cadastra cada uma pela tela, na versão para a IA.
+- Rotas em `crm/api/base_de_conhecimento.py`, regras em `crm/domain/base_de_conhecimento.py`, tela
+  em `telas/BaseDeConhecimento.tsx`. **Migração `e4a7c1b9d2f6`, só aditiva** (tabela
+  `ficha_da_base`): rode `scripts/backup.py exportar` e depois `alembic upgrade head`.
+- ⚠️ **Ainda não liga na IA.** A integração do canal não existe; quando existir, ela lê só as
+  fichas com `vale_para_a_ia`, e cada mensagem deve registrar as fichas usadas (passo 6 do plano).
+
 ## Funil do Sucesso do Cliente por classe, com vendas na ata (03/10/2026)
 
 Aprovado por Eduardo em 03/10/2026, a partir das amostras. **Substitui a cadência e as colunas** das
@@ -257,8 +292,8 @@ SDR - Abordagens e conhecimento · Configurações**.
   Grupos, Conferência e Serviços pedidos. A fileira de abas usa a largura toda; os formulários,
   até 960px; Grupos e Conferência, a largura toda.
 - **SDR - Abordagens e conhecimento** junta, em abas, **Abordagens** (o agente SDR de prospecção) e
-  **SDR da IA** (a qualificação de leads). A base de conhecimento da SDR de IA vai ganhar uma aba
-  aqui quando for construída.
+  **SDR da IA** (a qualificação de leads) e, desde 03/10/2026, **Base de conhecimento** (ver a seção
+  de 03/10/2026, acima).
 - Os dois lugares abrem na primeira aba visível, e o navegador lembra a última escolhida.
 
 No mesmo dia, a pedido de Eduardo, o menu **Carteira** passou a se chamar **Saúde da Carteira** (também na
@@ -427,10 +462,10 @@ Atualizado em 02/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil, contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", agente SDR, SDR de IA, backup lógico (manual e diário) e dez telas |
-| Testes | **1.185** no backend e **504** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
-| Banco | PostgreSQL 18 local, 42 tabelas, migrações até `d1e5b8c3f7a2` (funil do sucesso por classe, 03/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
-| API | 136 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
-| Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens e SDR da IA) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
+| Testes | **1.248** no backend e **524** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Banco | PostgreSQL 18 local, 46 tabelas, migrações até `e4a7c1b9d2f6` (base de conhecimento do SDR, depois do plano de MRR, 04/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
+| API | 149 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
+| Telas | Agenda, Contatos, Funil comercial (Oportunidades e Questionários), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens, SDR da IA e Base de conhecimento) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos; faltam a nuvem e o backup fora da máquina |
 | Fora do ar | **E1:** nuvem em região brasileira (custo a estimar antes de contratar) e backup fora da máquina com restauração testada. Login, perfis e histórico já estão no código, à espera do registro no Microsoft Entra. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto. O dashboard do cliente para as reuniões de resultado (fonte dos números e ferramenta a decidir). Buscar a transcrição direto no Granola, sem colar (depende de o plano do Granola ter API) |
 

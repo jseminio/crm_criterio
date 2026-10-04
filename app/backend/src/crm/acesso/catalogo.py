@@ -39,7 +39,10 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     ("sucesso", "Funil do Sucesso do Cliente", (("ver", "ver"), ("editar", "marcar etapas e registrar reuniões"))),
     ("ajustes", "Ajustes da área técnica", (("ver", "ver os de todos"), ("concluir", "ver os seus e marcar feito"))),
     ("abordagens", "Abordagens", (("ver", "ver"), ("editar", "preparar, editar e descartar"), ("aprovar", "aprovar e marcar enviada"))),
-    ("sdr", "SDR da IA", (("ver", "ver"), ("editar", "registrar conversas"), ("parametros", "parâmetros e custos"))),
+    ("sdr", "SDR da IA", (
+        ("ver", "ver"), ("editar", "registrar conversas"), ("parametros", "parâmetros e custos"),
+        ("base", "base de conhecimento: criar e editar fichas"), ("base_aprovar", "base de conhecimento: aprovar fichas"),
+    )),
     ("conferencia", "Conferência", (("ver", "ver"),)),
     ("configuracoes", "Configurações", (
         ("propostas", "matrizes e numeração das propostas"), ("backup", "backup"),
@@ -151,6 +154,9 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/sdr/.+", ("sdr.ver",)),
     ("PUT", r"/api/sdr/(parametros|midia)", ("sdr.parametros",)),
     ("POST", r"/api/sdr/conversas(/\d+/(encerrar|mensagens|nota))?", ("sdr.editar",)),
+    # base de conhecimento do SDR de IA (03/10/2026); o GET está na linha "/api/sdr/.+"
+    ("POST", r"/api/sdr/base/fichas/\d+/aprovar", ("sdr.base_aprovar",)),
+    ("POST|PATCH", r"/api/sdr/base/(carga-inicial|fichas(/\d+(/(revisao|arquivar|reabrir))?)?)", ("sdr.base",)),
     # conferência da carga
     ("GET", r"/api/cargas(/\d+(/ocorrencias)?)?", ("conferencia.ver",)),
     # metas dos indicadores

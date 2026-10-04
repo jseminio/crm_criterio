@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type {
-  EmpresaEncontrada, Listas, MudancaDePreco, OportunidadeDetalhe, PendenciasDaProposta, ServicoDoCatalogo,
+  EmpresaEncontrada, ExclusaoDaOportunidade, Listas, MudancaDePreco, OportunidadeDetalhe, PendenciasDaProposta,
+  ServicoDoCatalogo,
 } from "../api/tipos";
 import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { DIRECIONADORES_DE_PORTE } from "../componentes/direcionadoresDePorte";
@@ -20,6 +21,7 @@ import { BuscaDeEmpresa } from "../componentes/BuscaDeEmpresa";
 import { usarAcesso } from "../entrada";
 import { precoPelasParcelas } from "../parcelas";
 import { HistoricoDoRegistro } from "../componentes/HistoricoDeAlteracoes";
+import { ConfirmacaoDeExclusao } from "../componentes/ConfirmacaoDeExclusao";
 
 function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
@@ -291,6 +293,9 @@ export function DetalheDaOportunidade({
   const [rascunho, definirRascunho] = useState<Record<string, string>>({});
   const [convertendoEmContrato, definirConvertendoEmContrato] = useState(false);
   const [avisoDeContrato, definirAvisoDeContrato] = useState<string | null>(null);
+  // Excluir (04/10/2026): ao clicar, a API diz o que sai junto, ou por que não pode sair.
+  const [exclusao, definirExclusao] = useState<ExclusaoDaOportunidade | null>(null);
+  const [abrindoExclusao, definirAbrindoExclusao] = useState(false);
   const [aba, definirAba] = useState<"cadastro" | "volumetria" | "ficha" | "proposta" | "historico">("cadastro");
   // O que falta para a proposta (E4): a contagem fica no rótulo da aba; falhar aqui não impede o painel.
   const [pendencias, definirPendencias] = useState<PendenciasDaProposta | null>(null);
@@ -436,6 +441,57 @@ export function DetalheDaOportunidade({
     }
   };
 
+  const abrirExclusao = async () => {
+    definirAbrindoExclusao(true);
+    definirErro(null);
+    try {
+      definirExclusao(await api.exclusaoDaOportunidade(id));
+    } catch (falha) {
+      definirErro(falha instanceof ErroDaApi ? falha.message : "Falha ao preparar a exclusão.");
+    } finally {
+      definirAbrindoExclusao(false);
+    }
+  };
+
+  const excluir = async (motivo: string) => {
+    await api.excluirOportunidade(id, motivo);
+    aoSalvar();
+    aoFechar();
+  };
+
+  // Os botões de sempre do rodapé; a recusa de exclusão, quando há, vai numa linha acima deles.
+  const botoesDeSempre = detalhe && (
+    <>
+      <button type="button" className="botao botao-secundario" onClick={aoFechar}>
+        Cancelar
+      </button>
+      {!pode("funil.editar") && <span className="campo-ajuda">Só leitura: o seu perfil não libera editar.</span>}
+      {detalhe.situacao === "Aceita" && pode("funil.converter") && (
+        <button
+          type="button"
+          className="botao botao-secundario"
+          onClick={converterEmContrato}
+          disabled={convertendoEmContrato}
+        >
+          {convertendoEmContrato ? "Convertendo…" : "Converter em contrato"}
+        </button>
+      )}
+      {detalhe.situacao === "Aceita" && !pode("funil.converter") && (
+        <span className="campo-ajuda">Converter em contrato: o seu perfil não libera.</span>
+      )}
+      {/* Uma ação primária por painel — regra 2 do PAD-002. Na aba Proposta a primária é
+          "Gerar PowerPoint", e salvar a oportunidade fica secundário. */}
+      <button
+        type="button"
+        className={`botao ${aba === "proposta" ? "botao-secundario" : "botao-primario"}`}
+        onClick={salvar}
+        disabled={salvando || exigeDataDeAceite || !pode("funil.editar")}
+      >
+        {salvando ? "Salvando…" : "Salvar alterações"}
+      </button>
+    </>
+  );
+
   return (
     <PainelLateral
       titulo={detalhe?.grupo_nome ?? "Oportunidade"}
@@ -445,35 +501,31 @@ export function DetalheDaOportunidade({
       subtitulo={detalhe && detalhe.nome !== detalhe.grupo_nome ? detalhe.nome : undefined}
       aoFechar={aoFechar}
       rodape={
-        detalhe && (
+        detalhe && exclusao && !exclusao.recusa ? (
+          <ConfirmacaoDeExclusao
+            nome={detalhe.nome}
+            exclusao={exclusao}
+            aoCancelar={() => definirExclusao(null)}
+            aoExcluir={excluir}
+          />
+        ) : detalhe && exclusao?.recusa ? (
+          <div className="exclusao">
+            <p className="campo-ajuda exclusao-recusa" role="status">⚠ {exclusao.recusa}</p>
+            <div className="exclusao-acoes">{botoesDeSempre}</div>
+          </div>
+        ) : detalhe && (
           <>
-            <button type="button" className="botao botao-secundario" onClick={aoFechar}>
-              Cancelar
-            </button>
-            {!pode("funil.editar") && <span className="campo-ajuda">Só leitura: o seu perfil não libera editar.</span>}
-            {detalhe.situacao === "Aceita" && pode("funil.converter") && (
+            {pode("funil.excluir") && (
               <button
                 type="button"
-                className="botao botao-secundario"
-                onClick={converterEmContrato}
-                disabled={convertendoEmContrato}
+                className="botao botao-texto-perigo exclusao-botao"
+                onClick={abrirExclusao}
+                disabled={abrindoExclusao}
               >
-                {convertendoEmContrato ? "Convertendo…" : "Converter em contrato"}
+                {abrindoExclusao ? "Conferindo…" : "Excluir oportunidade…"}
               </button>
             )}
-            {detalhe.situacao === "Aceita" && !pode("funil.converter") && (
-              <span className="campo-ajuda">Converter em contrato: o seu perfil não libera.</span>
-            )}
-            {/* Uma ação primária por painel — regra 2 do PAD-002. Na aba Proposta a primária é
-                "Gerar PowerPoint", e salvar a oportunidade fica secundário. */}
-            <button
-              type="button"
-              className={`botao ${aba === "proposta" ? "botao-secundario" : "botao-primario"}`}
-              onClick={salvar}
-              disabled={salvando || exigeDataDeAceite || !pode("funil.editar")}
-            >
-              {salvando ? "Salvando…" : "Salvar alterações"}
-            </button>
+            {botoesDeSempre}
           </>
         )
       }

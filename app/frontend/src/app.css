@@ -1024,6 +1024,17 @@ td > .celula-fonte { display: block; }
 .ata-venda-num { font-size: 12px; font-weight: 600; color: var(--texto-medio); }
 .ata-venda-abrir { display: flex; gap: var(--e2); align-items: center; font-size: 13px; }
 
+/* Excluir oportunidade (04/10/2026): a confirmação toma o rodapé do painel. */
+.exclusao { flex: 1; display: flex; flex-direction: column; gap: var(--e3); }
+.exclusao-caixa { border: 1px solid var(--perda); background: var(--perda-suave); border-radius: var(--raio-md);
+  padding: var(--e4); font-size: 14px; line-height: 1.5; display: flex; flex-direction: column; gap: var(--e2); }
+.exclusao-caixa p { margin: 0; }
+.exclusao-titulo { font-size: 15px; }
+.exclusao-erro { color: var(--perda); font-weight: 500; }
+.exclusao-acoes { display: flex; gap: var(--e2); justify-content: flex-end; }
+.exclusao-botao { margin-left: 0; margin-right: auto; white-space: nowrap; }
+.exclusao-recusa { margin: 0; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

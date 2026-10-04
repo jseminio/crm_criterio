@@ -1051,6 +1051,22 @@ passos**, dizendo o que vai sumir ("Não dá para desfazer").
   histórico, o MRR e a carteira. A API responde 409 e o painel mostra o motivo no lugar do botão
   (`tem_contrato` em `GET /api/contatos/empresas`).
 
+**Excluir oportunidade (04/10/2026).** Amostra aprovada por Eduardo. O botão "Excluir oportunidade…"
+fica no rodapé do detalhe, à esquerda e longe do "Salvar"; não fica no cartão. Exige a permissão
+**Funil comercial: excluir** (`funil.excluir`), que começa só no Administrador; o perfil Comercial não
+a recebe. Regra em `crm.db.excluir_oportunidade`.
+
+- Ao clicar, `GET /api/oportunidades/{id}/exclusao` diz o que **sai junto** (propostas, pendências da
+  proposta, histórico de preço) e o que **fica sem apontar para ela** (lead de origem, questionário do
+  site, venda anotada em reunião). Grupo, empresas, contatos e reuniões ficam. Se ela está como
+  Perdido, a tela avisa que sai da taxa de conversão.
+- O **motivo é obrigatório**. `POST /api/oportunidades/{id}/excluir` grava no Histórico de alterações
+  uma linha "excluiu" com o motivo, **mesmo sem login** (quem fica "sem login"): a exclusão não se
+  desfaz pela tela, e o porquê é o que sobra dela. O Histórico mostra "registro excluído · motivo: …".
+- **Recusa** (409, com o motivo no lugar do botão): oportunidade **Aceita** ou **Recusada** (conta na
+  taxa de conversão; se a venda não aconteceu, mude para Perdido) e a que **virou contrato**.
+- Apagar um grupo inteiro continua só por script (`scripts/apagar_grupo.py`).
+
 **Contato só por empresa; o grupo mora na empresa (01/10/2026).** Pedido de Karine, aprovado: as
 empresas de uma pessoa nem sempre são do mesmo grupo, então o contato deixou de ser ligado ao grupo.
 

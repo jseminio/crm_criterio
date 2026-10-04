@@ -12,11 +12,13 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
 import type { Listas, OportunidadeDetalhe } from "../api/tipos";
+import { ProvedorDeAcesso } from "../entrada";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
   return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(), pendencias: vi.fn(), ficha: vi.fn(),
+    exclusaoDaOportunidade: vi.fn(), excluirOportunidade: vi.fn(),
     historico: vi.fn().mockResolvedValue([]),
     buscarEmpresas: vi.fn().mockResolvedValue([
       { id: 9, razao_social: "Beta Serviços Ltda", nome_fantasia: null, cnpj: "11444777000161",
@@ -436,6 +438,74 @@ describe("Histórico de preço e origem da volumetria (E4, 25/09/2026)", () => {
       await abrir(oportunidade({ empresa_id: null }));
       expect(screen.getByLabelText("Empresa")).toBeInTheDocument();
       expect(screen.getByText(/Escolha a empresa na base/)).toBeInTheDocument();
+    });
+  });
+
+  describe("Excluir oportunidade (04/10/2026)", () => {
+    const sai = { recusa: null, propostas: 1, pendencias: 2, precos: 1, questionarios: 1, leads: 1,
+      vendas_da_reuniao: 0, sai_da_conversao: false };
+
+    it("mostra o que sai e o que fica, e só exclui com motivo", async () => {
+      vi.mocked(api.exclusaoDaOportunidade).mockResolvedValue(sai);
+      vi.mocked(api.excluirOportunidade).mockResolvedValue(undefined);
+      const aoSalvar = await abrir(oportunidade());
+      await userEvent.click(screen.getByRole("button", { name: "Excluir oportunidade…" }));
+      const caixa = await screen.findByRole("group", { name: "Confirmar exclusão" });
+      expect(caixa).toHaveTextContent("Excluir a oportunidade “Alfa BPO”?");
+      expect(caixa).toHaveTextContent("Sai junto: 1 proposta, 2 pendências da proposta e o histórico de preço desta oportunidade.");
+      expect(caixa).toHaveTextContent("Continuam, sem apontar para ela: o lead de origem e 1 questionário do site.");
+      const excluir = screen.getByRole("button", { name: "Excluir de vez" });
+      expect(excluir).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Salvar alterações" })).not.toBeInTheDocument();
+      await userEvent.type(screen.getByLabelText("Motivo (obrigatório)"), "   ");
+      expect(excluir).toBeDisabled();
+      await userEvent.type(screen.getByLabelText("Motivo (obrigatório)"), "Duplicada");
+      await userEvent.click(excluir);
+      await waitFor(() => expect(api.excluirOportunidade).toHaveBeenCalledWith(1, "Duplicada"));
+      expect(aoSalvar).toHaveBeenCalled();
+    });
+
+    it("cancelar volta ao rodapé de sempre, sem excluir", async () => {
+      vi.mocked(api.exclusaoDaOportunidade).mockResolvedValue({ ...sai, propostas: 0, pendencias: 0, precos: 0 });
+      await abrir(oportunidade());
+      await userEvent.click(screen.getByRole("button", { name: "Excluir oportunidade…" }));
+      expect(await screen.findByText(/Sai só a oportunidade/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+      expect(screen.getByRole("button", { name: "Salvar alterações" })).toBeInTheDocument();
+      expect(api.excluirOportunidade).not.toHaveBeenCalled();
+    });
+
+    it("mostra a recusa com texto, sem abrir a confirmação", async () => {
+      vi.mocked(api.exclusaoDaOportunidade).mockResolvedValue({ ...sai,
+        recusa: "Não dá para excluir uma oportunidade Aceita: ela conta na taxa de conversão. Se a venda não aconteceu, mude a situação para Perdido." });
+      await abrir(oportunidade({ situacao: "Aceita" }));
+      await userEvent.click(screen.getByRole("button", { name: "Excluir oportunidade…" }));
+      expect(await screen.findByText(/⚠ Não dá para excluir uma oportunidade Aceita/)).toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Confirmar exclusão" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Excluir oportunidade…" })).not.toBeInTheDocument();
+    });
+
+    it("a falha da API aparece na confirmação", async () => {
+      vi.mocked(api.exclusaoDaOportunidade).mockResolvedValue(sai);
+      vi.mocked(api.excluirOportunidade).mockRejectedValue(new Error("esta oportunidade virou contrato"));
+      const aoSalvar = await abrir(oportunidade());
+      await userEvent.click(screen.getByRole("button", { name: "Excluir oportunidade…" }));
+      await userEvent.type(await screen.findByLabelText("Motivo (obrigatório)"), "x");
+      await userEvent.click(screen.getByRole("button", { name: "Excluir de vez" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("esta oportunidade virou contrato");
+      expect(aoSalvar).not.toHaveBeenCalled();
+    });
+
+    it("sem a permissão, o botão não aparece", async () => {
+      vi.mocked(api.oportunidade).mockResolvedValue(oportunidade());
+      render(
+        <ProvedorDeAcesso eu={{ modo: "microsoft", email: "k@x.com", nome: "K", perfil: "Comercial", administrador: false,
+          permissoes: ["funil.ver", "funil.editar"] }}>
+          <DetalheDaOportunidade id={1} listas={LISTAS} aoFechar={() => {}} aoSalvar={() => {}} />
+        </ProvedorDeAcesso>,
+      );
+      await screen.findByLabelText("Situação");
+      expect(screen.queryByRole("button", { name: "Excluir oportunidade…" })).not.toBeInTheDocument();
     });
   });
 });

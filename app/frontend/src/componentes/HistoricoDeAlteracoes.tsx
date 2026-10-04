@@ -43,14 +43,18 @@ function Linhas({ itens, comQuem }: { itens: Alteracao[]; comQuem: boolean }) {
                 {TABELAS[a.tabela] ?? a.tabela}
                 {a.descricao && <span className="celula-fonte">{a.descricao}</span>}
               </td>
-              <td>{a.campo ?? ACAO[a.acao]}</td>
+              <td>{a.acao === "alterou" ? a.campo : ACAO[a.acao]}</td>
               <td className="historico-mudanca">
                 {a.acao === "alterou" ? (
                   <>
                     <span className="historico-antes">{a.antes ?? "—"}</span> → <span className="historico-depois">{a.depois ?? "—"}</span>
                   </>
                 ) : (
-                  <span className="campo-ajuda">{a.acao === "criou" ? "registro criado" : "registro excluído"}</span>
+                  <span className="campo-ajuda">
+                    {a.acao === "criou" ? "registro criado" : "registro excluído"}
+                    {/* A exclusão de oportunidade guarda o porquê (04/10/2026). */}
+                    {a.campo === "motivo" && a.depois && <> · motivo: <span className="historico-depois">{a.depois}</span></>}
+                  </span>
                 )}
               </td>
             </tr>

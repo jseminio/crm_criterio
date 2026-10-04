@@ -4,6 +4,9 @@
 > Escrita em 04/10/2026 a pedido de Eduardo. É o **passo 2** da base de
 > conhecimento do SDR de IA. O passo 1 está em `sdr-ia-limites-de-atuacao.md`.
 > Os donos sugeridos abaixo são **proposta**: ninguém foi consultado ainda.
+>
+> **Atualizado em 04/10/2026** com as decisões de Eduardo e as fichas aprovadas
+> na tela (seção "Decidido em 04/10/2026", no fim).
 
 **Como ler.** Cada fonte traz uma marca de status:
 
@@ -139,6 +142,10 @@ Todos passam pela trava de preço.
   12º andar, no Centro do Rio de Janeiro."
 - **O que a IA nunca diz:** se atende fora do Rio ou se atende só a distância.
   A apresentação não diz **[pendência]**.
+- **[decisão, 04/10/2026]** A Critério atende fora do Rio. Esta ficha virou
+  duas, pelo modelo de ficha (um assunto por ficha): **F1 · Onde fica a
+  Critério** e **F2 · Atendem fora do Rio?**, ambas aprovadas. Como é o
+  atendimento fora do Rio (a distância ou presencial) continua sem definição.
 - **Como o lead pergunta:** "Onde vocês ficam?" · "Vocês têm escritório?"
 
 **C3 · Como a Critério trabalha** (bloco Quem é a Critério)
@@ -209,7 +216,10 @@ Cliente contou de um fornecedor descartado por falta de vivência operacional
 (O3). **Para a base:** a resposta da O3 precisa de uma promessa que a Critério
 consiga cumprir (por exemplo, apresentar na reunião quem vai atender). **O
 texto depende de decisão sua** **[pendência]**; até lá, a O3 vira transbordo
-para os sócios.
+para os sócios. **[decisão, 04/10/2026]** Eduardo escreveu o texto: a execução
+é organizada em duas frentes (BPO Financeiro, com Head e analistas;
+contabilidade, fiscal e folha, com Head, supervisores por frente e
+analistas). A ficha O3 está aprovada.
 
 **4. Saving e funding vendem mais do que organização.** A Descoberta do
 Cliente disse que organização financeira é vista como "bom ter", e redução de
@@ -230,8 +240,8 @@ validação) e P9 (nome de cliente). Nenhuma ficha deve levar esse conteúdo.
   "A troca de sistema muda o que a contabilidade precisa receber, então vale
   conversar antes, para nada ser feito duas vezes. Posso marcar uma conversa
   com a equipe para entender o seu calendário?"
-- **O3 · "Quem vai fazer o dia a dia?"** (Objeções). Até haver texto aprovado:
-  transbordo para Sócios · conta grande, com a frase da T1.
+- **O3 · "Quem vai fazer o dia a dia?"** (Objeções). Texto de Eduardo
+  (04/10/2026), condensado no padrão do modelo de ficha e aprovado.
 - **O4 · "Quanto tempo leva?"** (Objeções). Usa a frase da P4: "Isso entra na
   proposta, depois do levantamento."
 - **Q2 · A dor que a IA reconhece** (Qualificação). O que a IA pode dizer:
@@ -311,14 +321,15 @@ viva das objeções da casa. **[proposta]**
 - [ ] As cinco primeiras objeções de topo (seção 4).
 - [ ] Os textos de C1, C2 e C3 e os três pontos da seção 6.
 - [ ] As objeções revistas (seção 4) e as fichas O2, O4 e Q2 (seção 7).
-- [ ] O que a Critério pode prometer sobre quem executa o dia a dia (O3).
+- [x] O que a Critério pode prometer sobre quem executa o dia a dia (O3).
+  Decidido em 04/10/2026.
 - [ ] A regra da seção 8 (só precedente "sim" vira ficha), os textos O1, O7,
   O8 e O9 e o gatilho T12.
 - [ ] Acrescentar O2 e O3 à Matriz de Objeções.
 
 **Pendências:**
 
-- A Critério atende fora do Rio, ou só a distância? (C2)
+- Como é o atendimento fora do Rio: a distância, presencial ou os dois? (F2)
 - Ampliar a amostra do Granola: compartilhar as notas da Karine com a conta
   de Eduardo, ou avaliar o plano pago para ler as conversas anteriores a
   04/09/2026.
@@ -327,6 +338,19 @@ viva das objeções da casa. **[proposta]**
 
 **Próximos passos:** aprovar este inventário; executar as ordens 1 a 5; depois,
 o passo 3 (modelo de ficha) e o passo 5 (conjunto de perguntas-teste).
+
+**Decidido em 04/10/2026** (Eduardo, no chat e na tela):
+
+- A Critério atende fora do Rio: fichas F1 e F2.
+- O texto da O3 (quem executa o dia a dia).
+- A P1 oferece o questionário e mantém a palavra "volumetria": "…depois de
+  entender a sua volumetria pelo nosso questionário. Posso te enviar o
+  questionário?"
+- Fichas aprovadas na tela, entre as propostas deste inventário: C1, C3, F1,
+  F2, O1 a O7, O9, O10 e Q2, além dos 12 serviços (S01 a S12).
+- Ficam abertos: os números de resultado e o "terceirizamos" da apresentação
+  (seção 6); a regra do precedente "sim" e o gatilho T12 como regra escrita
+  (seção 8); acrescentar O2 e O3 à Matriz de Objeções.
 
 **A revalidar:** se os motivos de descarte do CRM continuam sendo a melhor
 amostra das objeções de topo depois dos primeiros 60 dias ou 300 leads, na

@@ -15,6 +15,7 @@ import type {
 import { CampoDeValor } from "../componentes/CampoDeValor";
 import { Carregando, Erro } from "../componentes/estados";
 import { PainelLateral } from "../componentes/PainelLateral";
+import { QuatroFases } from "../componentes/QuatroFases";
 import { Recolhivel } from "../componentes/Recolhivel";
 import { usarAcesso } from "../entrada";
 import { data, dataHora, dinheiro, dinheiroCurto, percentual } from "../formato";
@@ -32,6 +33,17 @@ const SITUACAO: Record<ChaveDaSituacao, { texto: string; tom: string; sinal: str
   abaixo: { texto: "Abaixo do previsto", tom: "perda", sinal: "↓" },
 };
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+/** As premissas opcionais das quatro fases: [campo, rótulo, sufixo]. */
+const TAXAS_E_ALVOS = [
+  ["taxa_lead_reuniao_pct", "Lead no ICP → reunião", "%"],
+  ["taxa_reuniao_proposta_pct", "Reunião → proposta", "%"],
+  ["taxa_conversao_pct", "Conversão", "%"],
+  ["icp_alvo_pct", "Leads dentro do ICP", "%"],
+  ["indicacoes_por_mes", "Leads por indicação/mês", ""],
+  ["primeiro_contato_horas", "1º contato em até", " h"],
+  ["ciclo_alvo_dias", "Ciclo de venda", " dias"],
+] as const satisfies readonly (readonly [keyof PremissasDoPlano, string, string])[];
 
 const n = (v: string | null | undefined) => (v === null || v === undefined ? 0 : Number(v));
 const mesCurto = (iso: string) => `${MESES[Number(iso.slice(5, 7)) - 1]}/${iso.slice(2, 4)}`;
@@ -257,6 +269,10 @@ function Premissas({ plano }: { plano: PlanoDeMrr }) {
           {p.contratos_previstos.length === 0 ? "nenhum" : p.contratos_previstos
             .map((c) => `${c.descricao} (${mesCurto(c.mes)}, ${dinheiro(c.valor)}${c.atipico ? ", atípico" : ""})`).join(" · ")}
         </li>
+        <li>
+          Quatro fases: {TAXAS_E_ALVOS.map(([k, rotulo, sufixo]) =>
+            `${rotulo} ${p[k] ? `${numeroBr(p[k] as string)}${sufixo}` : "pelo histórico"}`).join(" · ")}
+        </li>
       </ul>
       <p className="campo-ajuda">
         {p.alterado_em ? `Última mudança: ${p.alterado_por ? `${p.alterado_por}, ` : ""}${dataHora(p.alterado_em)}.` : "Premissas de 03/10/2026, ainda não alteradas."}{" "}
@@ -434,6 +450,14 @@ function EditarPremissas({ plano, aoFechar, aoSalvar }: { plano: PlanoDeMrr; aoF
           </fieldset>
         ))}
         <fieldset>
+          <legend>Quatro fases: taxas do funil e alvos</legend>
+          <p className="campo-ajuda">Deixe vazio para o previsto usar a taxa histórica do CRM (três meses fechados).</p>
+          {TAXAS_E_ALVOS.map(([k, rotulo, sufixo]) => (
+            <CampoNumero key={k} rotulo={`${rotulo}${sufixo ? ` (${sufixo.trim()})` : ""}`} value={r[k] ?? ""}
+              aoMudar={(v) => mudar(k, v === "" ? null : v)} />
+          ))}
+        </fieldset>
+        <fieldset>
           <legend>Contratos previstos (contábil)</legend>
           <p className="campo-ajuda">Sem nome de cliente: descreva o contrato para quem edita o plano.</p>
           {r.contratos_previstos.map((c, i) => (
@@ -500,6 +524,7 @@ export function InteligenciaDeConversao() {
       {recado && <p className="recado" role="status">✓ {recado}</p>}
       {plano.aviso && <p className="aviso-de-movimento" role="note">{plano.aviso}</p>}
       <BlocoDaMeta plano={plano} />
+      <QuatroFases key={plano.premissas.alterado_em ?? "padrao"} />
       <GraficoAcumulado plano={plano} />
       <PlanoPorMotor plano={plano} />
       <Cenarios plano={plano} />

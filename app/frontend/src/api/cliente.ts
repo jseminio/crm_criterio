@@ -33,6 +33,7 @@ import type {
   SugestaoDePorte,
   VolumetriaEntrada,
   CenariosDoServico,
+  FasesDoMes,
   PlanoDeMrr,
   PremissasDoPlano,
   ColunaDoFunil,
@@ -448,6 +449,7 @@ export const api = {
   mudarPlanoDeMrr: (premissas: PremissasDoPlano) =>
     pedir<PlanoDeMrr>("/api/inteligencia/plano", { method: "PUT", body: JSON.stringify(premissas) }),
   cenariosPorServico: () => pedir<CenariosDoServico[]>("/api/inteligencia/cenarios-de-ticket"),
+  fasesDoMes: (mes?: string) => pedir<FasesDoMes>(comParametros("/api/inteligencia/fases", { mes })),
 
   oportunidades: (filtros: FiltrosDoFunil & { situacao?: string[]; grupo_id?: number } = {}) =>
     pedir<Pagina<OportunidadeResumo>>(

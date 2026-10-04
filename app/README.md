@@ -16,6 +16,52 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Inteligência de Conversão: as quatro fases do cliente (04/10/2026)
+
+O quadro da amostra aprovada em 03/10/2026 foi construído a pedido de Eduardo em 04/10/2026. Ele
+fica entre a meta e o gráfico da aba e tem seletor de mês (padrão: o mês corrente). Regras em
+`crm.domain.fases_do_cliente`; a tela lê `GET /api/inteligencia/fases?mes=` (funil.ver).
+
+- **Cadeia do funil no mês**: leads no ICP → reuniões → propostas → contratos → MRR novo, com
+  realizado / previsto e a taxa entre as etapas.
+  - O previsto sai **do fim para o começo**: contratos e MRR novo do cenário previsto do plano;
+    propostas = contratos ÷ conversão; reuniões = propostas ÷ (reunião → proposta); leads no ICP =
+    reuniões ÷ (lead no ICP → reunião).
+  - O **gargalo** é a etapa com a menor proporção do previsto. Ele aparece com borda e com a palavra
+    "gargalo", na cadeia e no cartão da fase.
+- **Taxas**: vale a premissa do Administrador (formulário "Quatro fases: taxas do funil e alvos").
+  Vazia, vale a **histórica** do CRM nos três meses fechados antes do mês. Sem base, a tela mostra
+  "sem dado", e o previsto que depende dela também fica sem dado. A tela diz a origem de cada taxa.
+- **Um cartão por fase**, cada um com o KPI principal, os indicadores de apoio (previsto ×
+  realizado), a situação (no ritmo, atenção ou abaixo) e o ajuste, que é regra fixa e nunca IA.
+
+**Como cada fase é medida:**
+
+- **Atração**
+  - *KPI*: leads no ICP (criados no mês, menos os descartados por porte, segmento, orçamento ou
+    serviço pontual).
+  - *Apoio*: % dentro do ICP; leads por indicação (Sócios, Parceiros, Advogados, Carteira,
+    Colaboradores); custo por lead, que é o investimento em mídia do mês ÷ os leads de tráfego pago.
+- **Engajamento**
+  - *KPI*: aderência da promessa. **Ainda não é medida**: falta o campo no primeiro contato, e a
+    tela diz isso em vez de mostrar zero.
+  - *Apoio*: lead no ICP → reunião (pela reunião marcada); mediana de horas até a primeira mensagem
+    da IA ou da equipe nas conversas do SDR; perdidos por expectativa, também ainda não medido.
+  - A situação do cartão vem do lead → reunião.
+- **Conversão**
+  - *KPI*: contratos novos no mês contra o previsto por motor.
+  - *Apoio*: conversão das propostas colocadas no mês (aceitas ÷ decididas); ticket contábil
+    normal (sem os acima de 3 × o ticket previsto); ciclo de venda (colocação → aceite).
+- **Pós-venda**
+  - *KPI*: NRR do mês. O previsto é (carteira − churn + escada) ÷ carteira.
+  - *Apoio*: churn e contração; upgrades na escada (expansão em contrato de BPO); reuniões de
+    resultado em dia, pela cadência do Funil do Sucesso do Cliente, só no mês corrente
+    (`crm.api.sucesso.reunioes_em_dia`).
+
+Novas premissas, todas opcionais (migração `20261004_1200_plano_de_mrr_quatro_fases`, só acrescenta
+colunas): lead no ICP → reunião, reunião → proposta, conversão, % no ICP, indicações por mês, horas
+até o primeiro contato e ciclo de venda.
+
 ## Funil comercial › Inteligência de Conversão: o plano de MRR (03/10/2026)
 
 Aprovado por Eduardo em 03/10/2026, Entrega 1. Terceira aba do Funil comercial ("Inteligência de

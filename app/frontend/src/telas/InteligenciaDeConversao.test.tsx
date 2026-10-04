@@ -2,13 +2,13 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
-import type { Eu, PlanoDeMrr } from "../api/tipos";
+import type { Eu, FasesDoMes, PlanoDeMrr } from "../api/tipos";
 import { ProvedorDeAcesso } from "../entrada";
 import { InteligenciaDeConversao } from "./InteligenciaDeConversao";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { planoDeMrr: vi.fn(), mudarPlanoDeMrr: vi.fn(), cenariosPorServico: vi.fn() } };
+  return { ...real, api: { planoDeMrr: vi.fn(), mudarPlanoDeMrr: vi.fn(), cenariosPorServico: vi.fn(), fasesDoMes: vi.fn() } };
 });
 
 const cenario = (bpo: string) => ({ bpo_por_mes: bpo, ticket_contabil: "2903.28", com_contratos_previstos: true });
@@ -49,6 +49,42 @@ const PLANO: PlanoDeMrr = {
   aviso: null,
 };
 
+const indicador = (rotulo: string, unidade: "numero" | "pct" | "reais" | "horas" | "dias", previsto: string | null, realizado: string | null, nota: string | null = null) =>
+  ({ rotulo, unidade, previsto, realizado, nota });
+
+const FASES: FasesDoMes = {
+  mes: "2026-11-01",
+  meses: ["2026-09-01", "2026-10-01", "2026-11-01", "2026-12-01"],
+  mes_fechado: false,
+  tem_previsto: true,
+  cadeia: [
+    { chave: "leads_icp", rotulo: "Leads no ICP", previsto: "60.0", realizado: "54", taxa_prevista: "40", taxa_realizada: "31.5" },
+    { chave: "reunioes", rotulo: "Reuniões", previsto: "24.0", realizado: "17", taxa_prevista: "83", taxa_realizada: "94.1" },
+    { chave: "propostas", rotulo: "Propostas", previsto: "20.0", realizado: "16", taxa_prevista: "30", taxa_realizada: "31.3" },
+    { chave: "contratos", rotulo: "Contratos", previsto: "6", realizado: "5", taxa_prevista: null, taxa_realizada: null },
+    { chave: "mrr_novo", rotulo: "MRR novo", previsto: "47403.28", realizado: "43100", taxa_prevista: null, taxa_realizada: null },
+  ],
+  gargalo: "reunioes",
+  gargalo_texto: "Gargalo: reuniões, com 70,8% do previsto no mês.",
+  fases: [
+    { chave: "atracao", titulo: "Atração", pergunta: "Trazemos gente certa em volume?", kpi: indicador("Leads no ICP no mês", "numero", "60.0", "54"),
+      apoio: [indicador("% dos leads dentro do ICP", "pct", "55", "46")], situacao: { chave: "atencao", percentual: "90.0" },
+      ajuste: "Faltaram 6 leads no ICP para o previsto do mês." },
+    { chave: "engajamento", titulo: "Engajamento", pergunta: "A promessa bate com o 1º contato?",
+      kpi: indicador("Aderência da promessa", "pct", null, null, "ainda não medida: falta o campo no primeiro contato"),
+      apoio: [indicador("Lead no ICP → reunião", "pct", "40", "31.5"), indicador("Tempo até o 1º contato (mediana)", "horas", "24", "31")],
+      situacao: { chave: "abaixo", percentual: "78.8" }, ajuste: "Só 31,5% dos leads no ICP chegaram a reunião." },
+    { chave: "conversao", titulo: "Conversão", pergunta: "Fechamos no ritmo e no preço?", kpi: indicador("Contratos no mês", "numero", "6", "5"),
+      apoio: [indicador("Ticket contábil normal", "reais", "2903.28", "4100.00")], situacao: { chave: "abaixo", percentual: "83.3" },
+      ajuste: "Faltou 1 BPO Financeiro (−R$ 7.000)." },
+    { chave: "pos_venda", titulo: "Pós-venda", pergunta: "O cliente fica, cresce e indica?", kpi: indicador("NRR do mês", "pct", "99.0", "99.4"),
+      apoio: [indicador("Reuniões de resultado em dia", "pct", "100", "92.0")], situacao: { chave: "no_ritmo", percentual: "100.4" },
+      ajuste: "Nenhum ajuste no número." },
+  ],
+  taxas: { lead_reuniao: { valor: "40", origem: "premissa" }, reuniao_proposta: { valor: "83", origem: "historico" }, conversao: { valor: null, origem: "sem_dado" } },
+  aviso: null,
+};
+
 const COMERCIAL: Eu = { modo: "microsoft", email: "k@x", nome: "Karine", perfil: "Comercial", administrador: false, permissoes: ["funil.ver"] };
 
 describe("Funil › Inteligência de Conversão", () => {
@@ -56,6 +92,7 @@ describe("Funil › Inteligência de Conversão", () => {
     vi.resetAllMocks();
     vi.mocked(api.planoDeMrr).mockResolvedValue(PLANO);
     vi.mocked(api.cenariosPorServico).mockResolvedValue([]);
+    vi.mocked(api.fasesDoMes).mockResolvedValue(FASES);
   });
 
   it("mostra a meta líquida com a situação em palavra, o plano por motor e os três cenários", async () => {
@@ -94,5 +131,26 @@ describe("Funil › Inteligência de Conversão", () => {
     expect(enviado).not.toHaveProperty("alterado_por");
     expect(await screen.findByRole("status")).toHaveTextContent("Premissas salvas");
     expect(screen.getByText("No ritmo · 100,0%")).toBeInTheDocument();
+  });
+
+  it("mostra a cadeia com o gargalo em palavra e os quatro cartões com o ajuste", async () => {
+    render(<InteligenciaDeConversao />);
+    expect(await screen.findByText("Gargalo: reuniões, com 70,8% do previsto no mês.")).toBeInTheDocument();
+    expect(screen.getByText("Reuniões · gargalo")).toBeInTheDocument();
+    const engajamento = screen.getByRole("region", { name: "2 · Engajamento" });
+    expect(within(engajamento).getByText("ainda não medida: falta o campo no primeiro contato")).toBeInTheDocument();
+    expect(within(engajamento).getByText(/Abaixo do previsto · gargalo/)).toBeInTheDocument();
+    expect(within(engajamento).getByText("31 h")).toBeInTheDocument();
+    const conversao = screen.getByRole("region", { name: "3 · Conversão" });
+    expect(within(conversao).getByText(/Faltou 1 BPO Financeiro/)).toBeInTheDocument();
+    expect(within(conversao).getByText("R$ 4.100,00")).toBeInTheDocument();
+    expect(screen.getByText(/conversão — \(sem dado\)/)).toBeInTheDocument();
+  });
+
+  it("troca o mês e busca as fases dele", async () => {
+    render(<InteligenciaDeConversao />);
+    const mes = await screen.findByLabelText("Mês");
+    await userEvent.selectOptions(mes, "2026-12-01");
+    expect(api.fasesDoMes).toHaveBeenLastCalledWith("2026-12-01");
   });
 });

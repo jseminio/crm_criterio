@@ -4,10 +4,11 @@ realizado por motor, ajuste — e as premissas, que só o Administrador muda."""
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal as D
 
 import pytest
+from sqlalchemy import select as sa_select
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -170,3 +171,86 @@ def test_cenarios_de_ticket_por_servico(cliente):
 def test_sem_linha_gravada_nao_ha_plano_no_banco(engine, cliente):
     with Session(engine) as s:
         assert s.get(PlanoDeMrr, 1) is None
+
+
+# ---------------------------------------------------------------- as quatro fases (04/10/2026)
+
+from crm.domain import fases_do_cliente as fases  # noqa: E402
+from crm.db.modelos import Lead  # noqa: E402
+from crm.domain.listas import MotivoDeDescarte, SituacaoLead, TipoCanal  # noqa: E402
+
+
+def test_cadeia_prevista_do_fim_para_o_comeco_e_sem_taxa_fica_sem_dado():
+    t = lambda v: fases.taxa(None, D(v))
+    c = fases.cadeia_prevista(D("6"), D("47403"), t("30"), t("83"), t("40"))
+    assert (c["propostas"], c["reunioes"], c["leads_icp"]) == (D("20.0"), D("24.1"), D("60.3"))
+    sem = fases.cadeia_prevista(D("6"), D("47403"), fases.taxa(None, None), t("83"), t("40"))
+    assert sem["propostas"] is None and sem["leads_icp"] is None and sem["contratos"] == 6
+
+
+def test_a_premissa_vale_sobre_o_historico():
+    assert fases.taxa(D("35"), D("20")) == fases.Taxa(D("35"), "premissa")
+    assert fases.taxa(None, D("20")).origem == "historico"
+
+
+def test_gargalo_e_a_etapa_mais_atrasada():
+    e = lambda c, p, r: fases.Etapa(c, c, None if p is None else D(p), None if r is None else D(r))
+    pior = fases.gargalo([e("leads", 60, 54), e("reunioes", 24, 17), e("propostas", 20, 16), e("mrr", None, 5)])
+    assert pior.chave == "reunioes"
+    assert fases.gargalo([e("leads", 60, 70)]) is None
+
+
+@pytest.fixture
+def novembro(engine, base):
+    with Session(engine) as s:
+        g = s.scalars(sa_select(GrupoEconomico)).first()
+        for nome, motivo, canal in (("a", None, TipoCanal.PARCEIROS), ("b", None, TipoCanal.TRAFEGO_PAGO),
+                                    ("c", MotivoDeDescarte.PORTE_ABAIXO, TipoCanal.TRAFEGO_PAGO)):
+            s.add(Lead(nome=nome, situacao=SituacaoLead.NOVO, tipo_canal=canal, motivo_descarte=motivo,
+                       criado_em=datetime(2026, 11, 3, 15, tzinfo=timezone.utc),
+                       reuniao_marcada_para=datetime(2026, 11, 10, 15, tzinfo=timezone.utc) if nome == "a" else None))
+        for situacao in (Situacao.ACEITA, Situacao.RECUSADA):
+            s.add(Oportunidade(grupo_id=g.id, nome="nov", situacao=situacao, data_colocacao=date(2026, 11, 4),
+                               data_aceite=date(2026, 11, 14) if situacao is Situacao.ACEITA else None))
+        bpo = Oportunidade(grupo_id=g.id, nome="bpo nov", servico="BPO Financeiro", situacao=Situacao.ACEITA, preco_mensal=D("7000"))
+        s.add(bpo)
+        s.flush()
+        s.add(Contrato(grupo_id=g.id, oportunidade_id=bpo.id, situacao=SituacaoContrato.ATIVO, preco_mensal=D("7000"),
+                       data_inicio=date(2026, 11, 12)))
+        s.commit()
+
+
+def test_as_quatro_fases_do_mes_com_premissas_de_taxa(cliente, novembro):
+    premissas = cliente.get("/api/inteligencia/plano", headers=ADMIN).json()["premissas"]
+    premissas.pop("alterado_por"), premissas.pop("alterado_em")
+    premissas |= {"taxa_conversao_pct": "30", "taxa_reuniao_proposta_pct": "80", "taxa_lead_reuniao_pct": "40", "icp_alvo_pct": "90"}
+    assert cliente.put("/api/inteligencia/plano", headers=ADMIN, json=premissas).status_code == 200
+    r = cliente.get("/api/inteligencia/fases", headers=KARINE, params={"mes": "2026-11-01", "hoje": "2026-11-20"})
+    assert r.status_code == 200, r.text
+    f = r.json()
+    assert f["tem_previsto"] and not f["mes_fechado"]
+    cadeia = {e["chave"]: e for e in f["cadeia"]}
+    assert D(cadeia["leads_icp"]["realizado"]) == 2  # o descartado por porte fica fora do ICP
+    assert D(cadeia["reunioes"]["realizado"]) == 1
+    assert D(cadeia["propostas"]["realizado"]) == 2  # a do contrato BPO não tem data de colocação
+    assert D(cadeia["contratos"]["realizado"]) == 1
+    assert D(cadeia["contratos"]["previsto"]) == 6  # 3 BPO + 3 vagas contábeis (o atípico ocupa 2 de 4)
+    assert D(cadeia["propostas"]["previsto"]) == 20  # 6 ÷ 30%
+    assert f["gargalo"] is not None and f["gargalo_texto"].startswith("Gargalo:")
+    assert (D(f["taxas"]["conversao"]["valor"]), f["taxas"]["conversao"]["origem"]) == (30, "premissa")
+    por = {x["chave"]: x for x in f["fases"]}
+    assert [x["chave"] for x in f["fases"]] == ["atracao", "engajamento", "conversao", "pos_venda"]
+    atr = {a["rotulo"]: a for a in por["atracao"]["apoio"]}
+    assert D(atr["% dos leads dentro do ICP"]["realizado"]) == D("66.7")
+    assert D(atr["Leads por indicação"]["realizado"]) == 1
+    assert "fora do ICP" in por["atracao"]["ajuste"]
+    assert por["engajamento"]["kpi"]["realizado"] is None and "primeiro contato" in por["engajamento"]["kpi"]["nota"]
+    assert "Faltou 2 BPO Financeiro" in por["conversao"]["ajuste"]
+    assert por["conversao"]["situacao"]["chave"] == "abaixo"
+
+
+def test_mes_fora_da_projecao_mostra_so_o_realizado(cliente):
+    f = cliente.get("/api/inteligencia/fases", headers=KARINE, params={"mes": "2026-10-01", "hoje": "2026-10-04"}).json()
+    assert not f["tem_previsto"] and f["aviso"]
+    assert all(e["previsto"] is None for e in f["cadeia"])
+    assert f["meses"][0] == "2026-09-01" and f["meses"][-1] == "2027-06-01"

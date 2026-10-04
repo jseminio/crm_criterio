@@ -1687,6 +1687,14 @@ class PlanoDeMrr(Base):
     alerta_com_previstos: Mapped[bool] = mapped_column(sa.Boolean, nullable=False)
     previsto_com_previstos: Mapped[bool] = mapped_column(sa.Boolean, nullable=False)
     otimista_com_previstos: Mapped[bool] = mapped_column(sa.Boolean, nullable=False)
+    # As quatro fases (04/10/2026). Vazias: o previsto usa a taxa histórica do CRM, e sem ela, "sem dado".
+    taxa_lead_reuniao_pct: Mapped[Decimal | None] = mapped_column(QUANTIDADE)
+    taxa_reuniao_proposta_pct: Mapped[Decimal | None] = mapped_column(QUANTIDADE)
+    taxa_conversao_pct: Mapped[Decimal | None] = mapped_column(QUANTIDADE)
+    icp_alvo_pct: Mapped[Decimal | None] = mapped_column(QUANTIDADE)
+    indicacoes_por_mes: Mapped[Decimal | None] = mapped_column(QUANTIDADE)
+    primeiro_contato_horas: Mapped[Decimal | None] = mapped_column(QUANTIDADE)
+    ciclo_alvo_dias: Mapped[Decimal | None] = mapped_column(QUANTIDADE)
     alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
     alterado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 

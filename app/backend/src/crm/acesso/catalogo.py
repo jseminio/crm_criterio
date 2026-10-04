@@ -95,7 +95,7 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/oportunidades/exportar", ("funil.exportar",)),
     ("GET", r"/api/(oportunidades|funil|indicadores(/recortes|/cenarios-de-ticket)?)", ("funil.ver",)),
     ("GET", r"/api/mrr", ("funil.ver", "contratos.ver", "carteira.ver")),
-    ("GET", r"/api/inteligencia/(plano|cenarios-de-ticket)", ("funil.ver",)),
+    ("GET", r"/api/inteligencia/(plano|cenarios-de-ticket|fases)", ("funil.ver",)),
     ("PUT", r"/api/inteligencia/plano", ("configuracoes.metas",)),  # só o Administrador (03/10/2026)
     ("POST", r"/api/oportunidades", ("funil.editar",)),
     ("GET", r"/api/oportunidades/\d+(/(ficha|pendencias|proposta|questionario))?", ("funil.ver", "agenda.ver")),

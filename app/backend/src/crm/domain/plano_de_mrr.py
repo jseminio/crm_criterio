@@ -92,6 +92,14 @@ class Premissas:
     previsto: Cenario
     otimista: Cenario
     contratos_previstos: tuple[ContratoPrevisto, ...] = ()
+    # As quatro fases (04/10/2026). `None`: o previsto usa a taxa histórica do CRM.
+    taxa_lead_reuniao_pct: Decimal | None = None
+    taxa_reuniao_proposta_pct: Decimal | None = None
+    taxa_conversao_pct: Decimal | None = None
+    icp_alvo_pct: Decimal | None = None
+    indicacoes_por_mes: Decimal | None = None
+    primeiro_contato_horas: Decimal | None = None
+    ciclo_alvo_dias: Decimal | None = None
 
     def cenario(self, nome: str) -> Cenario:
         return getattr(self, nome)

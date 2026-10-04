@@ -436,6 +436,14 @@ enviam. A proposta fica em PowerPoint justamente para isso: dá para mudar um de
   tela. Horas do porte × (1 + atrito) × custo/hora ÷ (1 − imposto − margem alvo) dá o **bruto**;
   × (1 − imposto) dá o **líquido sugerido**. Disciplina entra 3 (cliente novo não tem nota);
   complexidade ou risco sem nota também entram 3, e a tela diz isso. Sem porte, não há sugestão.
+- **Honorários e horas de consulta** (03/10/2026, Eduardo): **Contábil/Fiscal** vem do valor
+  apurado pelo questionário (o preço sugerido, ao múltiplo de R$ 50), mesmo quando há DP; **DP** vem
+  de **R$ 50 por colaborador** (CLT da volumetria + PJs/estagiários e jovens aprendizes do
+  questionário; o item "Jovens aprendizes" entrou no questionário em 03/10/2026, e o que chegou antes
+  conta zero). Os dois se editam, com "voltar ao apurado" e
+  "voltar ao calculado". As **horas de consulta por ano** não se digitam: 50% do 13º honorário
+  (Contábil + DP, líquidos) ÷ **R$ 350/h**, ao inteiro mais próximo; Contábil fica com 70% e DP com
+  o resto (sem DP, todas são de Contábil). O servidor refaz a conta ao gerar (`crm.proposta.conta`).
 - **Líquido e bruto:** a proposta mostra o líquido (o que vai no contrato) e o bruto com a alíquota
   estimada, prática da Critério para a Reforma Tributária. Bruto = líquido ÷ (1 − alíquota),
   **arredondado ao múltiplo de R$ 50 mais próximo** (NRH: 6.900 → 7.750). A alíquota é o imposto de
@@ -445,7 +453,14 @@ enviam. A proposta fica em PowerPoint justamente para isso: dá para mudar um de
   proposta, com o mesmo número; depois de enviada, gerar abre número novo. Número usado nunca volta.
 - **Marcar como enviada:** pede quem enviou (Eduardo ou Karine) e a data. A oportunidade em
   "Enviar proposta" passa a "Em avaliação pela empresa"; na matriz Contábil, o total líquido vira o
-  preço mensal, com linha no Histórico de preço.
+  preço mensal e o anual o acompanha (× 13 ou × 12, pelo serviço), com linha no Histórico de preço.
+- **Preço anual pelo serviço** (03/10/2026, Eduardo): nos serviços de contábil e DP (BPO Contábil,
+  Fiscal e Dep. Pessoal · BPO Contábil e Fiscal · Dep. Pessoal) o anual é **mensal × 13**; no BPO
+  Financeiro, **mensal × 12**. Na Nova oportunidade e no detalhe o campo fica travado e as parcelas
+  não se pedem; os outros serviços C1 seguem mensal × parcelas. O anual só se recalcula quando o
+  mensal ou o serviço muda. Os anuais gravados antes da regra foram recalculados em 03/10/2026
+  (autorizado por Eduardo) com `scripts/recalcular_anual_por_servico.py` (ensaio por padrão;
+  `--aplicar` grava com backup antes e deixa linha no Histórico de preço). Contratos não mudam.
 - **Baixar de novo** sai igual, com a matriz e os valores da época, mesmo depois de trocar a matriz.
 - **Valores no padrão brasileiro** (02/10/2026): os honorários e os planos aceitam `3.287,38`,
   `3287,38` ou `3287`; valor que não dá para ler avisa no campo e fica em branco, em vez de valer o

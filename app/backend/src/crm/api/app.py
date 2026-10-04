@@ -84,7 +84,9 @@ from crm.domain import recortes as regras_de_recortes
 from crm.relatorios.exportacao_do_funil import LinhaDoFunil, gerar_planilha_do_funil
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
-from crm.domain.servicos import CATALOGO as CATALOGO_DE_SERVICOS, OUTRO, linha_do_servico, problema_na_descricao, problema_no_tema
+from crm.domain.servicos import (
+    CATALOGO as CATALOGO_DE_SERVICOS, OUTRO, linha_do_servico, meses_no_ano, problema_na_descricao, problema_no_tema,
+)
 from crm.domain.listas import (
     SituacaoDaAprovacao,
     ORIGEM_DA_MUDANCA_NO_CRM,
@@ -393,6 +395,7 @@ def _registrar(api: FastAPI) -> None:
                 nome_por_extenso=s.nome_por_extenso,
                 linha=s.linha,
                 recorrente=s.linha is LinhaServico.C1,
+                meses_no_ano=s.meses_no_ano,
                 para_quem=s.para_quem,
                 perguntas=[e.PerguntaDoCatalogo(texto=p.texto, direcionador=p.direcionador) for p in s.perguntas],
                 fora_do_perfil=list(s.fora_do_perfil),
@@ -770,10 +773,15 @@ def _registrar(api: FastAPI) -> None:
         # Recorrente (C1) com parcelas: o preço anual é mensal × parcelas e
         # não aceita ajuste à mão. Pedido de Karine em 30/09/2026. Fora do C1
         # a quantidade de parcelas não se aplica e é descartada.
+        # Desde 03/10/2026 (Eduardo), contábil e DP têm 13 mensalidades no ano e financeiro 12:
+        # nesses serviços as parcelas saem do serviço, e o anual digitado é ignorado.
         linha = linha_do_servico(corpo.servico)
-        parcelas = corpo.quantidade_parcelas if linha is LinhaServico.C1 else None
+        meses = meses_no_ano(corpo.servico)
+        parcelas = meses or (corpo.quantidade_parcelas if linha is LinhaServico.C1 else None)
         preco_anual = corpo.preco_anual
-        if parcelas is not None:
+        if meses is not None:
+            preco_anual = corpo.preco_mensal * meses if corpo.preco_mensal is not None else None
+        elif parcelas is not None:
             if corpo.preco_mensal is None:
                 raise HTTPException(422, "informe o preço mensal para calcular o preço anual pelas parcelas")
             preco_anual = corpo.preco_mensal * parcelas
@@ -1164,6 +1172,21 @@ def _registrar(api: FastAPI) -> None:
             if nova_linha is not None and nova_linha is not oportunidade.linha_servico:
                 oportunidade.linha_servico = nova_linha
                 editados.add("linha_servico")
+        # Contábil e DP: anual = mensal × 13; financeiro: × 12 (Eduardo, 03/10/2026). O anual não
+        # se digita nesses serviços. Só se recalcula quando o mensal ou o serviço mudou: salvar
+        # outro campo não mexe no anual que já estava gravado.
+        meses = meses_no_ano(oportunidade.servico)
+        if meses is not None:
+            if oportunidade.preco_mensal != preco_antes[0] or oportunidade.servico != servico_antes:
+                mensal = oportunidade.preco_mensal
+                oportunidade.preco_anual = mensal * meses if mensal is not None else None
+                oportunidade.quantidade_parcelas = meses
+            else:
+                oportunidade.preco_anual = preco_antes[1]
+            if "preco_anual" in CAMPOS_DA_CARGA and oportunidade.preco_anual != preco_antes[1]:
+                editados.add("preco_anual")
+            else:
+                editados.discard("preco_anual")
         # Histórico de preço: só quando o valor mudou de fato (a tela manda o
         # rascunho inteiro a cada salvar). Guarda antes e depois; nada é apagado.
         preco_depois = (oportunidade.preco_mensal, oportunidade.preco_anual)

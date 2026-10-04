@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { EmpresaEncontrada, Listas, MudancaDePreco, OportunidadeDetalhe, PendenciasDaProposta } from "../api/tipos";
+import type {
+  EmpresaEncontrada, Listas, MudancaDePreco, OportunidadeDetalhe, PendenciasDaProposta, ServicoDoCatalogo,
+} from "../api/tipos";
 import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { DIRECIONADORES_DE_PORTE } from "../componentes/direcionadoresDePorte";
 import { Etiqueta } from "../componentes/Etiqueta";
@@ -16,6 +18,7 @@ import { dataHora, dinheiro } from "../formato";
 import { CampoDeData } from "../componentes/CampoDeData";
 import { BuscaDeEmpresa } from "../componentes/BuscaDeEmpresa";
 import { usarAcesso } from "../entrada";
+import { precoPelasParcelas } from "../parcelas";
 import { HistoricoDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 
 function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
@@ -298,6 +301,15 @@ export function DetalheDaOportunidade({
       .catch(() => definirPendencias(null));
   };
   useEffect(carregarPendencias, [id]);
+  // Contábil e DP: anual = mensal × 13; financeiro: × 12 (Eduardo, 03/10/2026). Sem o catálogo, o
+  // campo só fica como antes; o servidor aplica a regra de qualquer jeito.
+  const [catalogo, definirCatalogo] = useState<ServicoDoCatalogo[] | null>(null);
+  useEffect(() => {
+    Promise.resolve()
+      .then(() => api.servicos())
+      .then((c) => definirCatalogo(c ?? null))
+      .catch(() => definirCatalogo(null));
+  }, []);
 
   const carregar = () => {
     definirErro(null);
@@ -393,10 +405,19 @@ export function DetalheDaOportunidade({
     }
   };
 
+  const meses =
+    catalogo?.find((s) => s.nome === rascunho.servico || s.nomes_antigos?.includes(rascunho.servico))?.meses_no_ano ?? null;
+  // Só recalcula quando o mensal ou o serviço mudou, como o servidor: salvar outro campo não mexe no anual gravado.
+  const anualRecalcula =
+    !!meses &&
+    !!detalhe &&
+    (Number(rascunho.preco_mensal || 0) !== Number(detalhe.preco_mensal || 0) || rascunho.servico !== (detalhe.servico ?? ""));
+  const anualExibido = anualRecalcula ? precoPelasParcelas(rascunho.preco_mensal, String(meses)) : rascunho.preco_anual;
+
   const precoMudou =
     !!detalhe &&
     (Number(rascunho.preco_mensal || 0) !== Number(detalhe.preco_mensal || 0) ||
-      Number(rascunho.preco_anual || 0) !== Number(detalhe.preco_anual || 0));
+      Number(anualExibido || 0) !== Number(detalhe.preco_anual || 0));
 
   const exigeDataDeAceite = rascunho.situacao === "Aceita" && !rascunho.data_aceite;
 
@@ -619,9 +640,16 @@ export function DetalheDaOportunidade({
                   step="0.01"
                   min="0"
                   className="entrada"
-                  value={rascunho.preco_anual}
+                  value={anualExibido}
+                  readOnly={!!meses}
+                  aria-describedby={meses ? "d-preco-anual-ajuda" : undefined}
                   onChange={(e) => mudar("preco_anual", e.target.value)}
                 />
+                {meses && (
+                  <p id="d-preco-anual-ajuda" className="campo-ajuda">
+                    {rascunho.servico}: preço mensal × {meses}. Não se ajusta à mão.
+                  </p>
+                )}
               </div>
             </div>
 

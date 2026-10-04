@@ -825,6 +825,8 @@ class ServicoDoCatalogo(BaseModel):
     nome_por_extenso: str | None = None
     linha: LinhaServico
     recorrente: bool
+    meses_no_ano: int | None = None
+    """13 (contábil, DP) ou 12 (financeiro): o preço anual é mensal × isso."""
     para_quem: str
     perguntas: list[PerguntaDoCatalogo]
     fora_do_perfil: list[str]

@@ -22,7 +22,7 @@ vi.mock("../api/cliente", async () => {
       { id: 9, razao_social: "Beta Serviços Ltda", nome_fantasia: null, cnpj: "11444777000161",
         grupo_id: 2, grupo_nome: "Grupo Beta", tipo: "cliente" },
     ]), questionarioDaOportunidade: vi.fn().mockResolvedValue(null), servicos: vi.fn().mockResolvedValue([
-        { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
+        { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true, meses_no_ano: 13,
           para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],
           fora_do_perfil: ["MEI"], transbordo: "Comercial · BPO (C1)", nomes_antigos: ["BPO Contábil"], rascunho: true, temas: [] },
         { nome: "Auditoria", nome_por_extenso: null, linha: "C2", recorrente: false,
@@ -220,6 +220,22 @@ describe("DetalheDaOportunidade", () => {
     await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledOnce());
     const [, mudancas] = vi.mocked(api.editarOportunidade).mock.calls[0];
     expect(mudancas.preco_mensal).toBe("5500");
+  });
+
+  it("contábil: o anual é mensal × 13, travado, e só se recalcula quando o mensal muda", async () => {
+    vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
+    await abrir(oportunidade());
+    const anual = await screen.findByLabelText("Preço anual");
+    await waitFor(() => expect(anual).toHaveAttribute("readonly"));
+    expect(anual).toHaveValue(65000); // o gravado fica enquanto o mensal não muda
+    expect(screen.getByText(/preço mensal × 13/)).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByLabelText("Preço mensal"));
+    await userEvent.type(screen.getByLabelText("Preço mensal"), "14250");
+    expect(anual).toHaveValue(185250);
+    await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+    await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledOnce());
+    expect(vi.mocked(api.editarOportunidade).mock.calls[0][1]).toMatchObject({ preco_mensal: "14250" });
   });
 
   it("mostra o motivo só quando a situação é Recusada ou Perdido", async () => {

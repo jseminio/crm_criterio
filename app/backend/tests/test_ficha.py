@@ -29,7 +29,7 @@ class TestMontar:
         assert "auditoria_det" in [c.campo.chave for c in por_numero[4].campos]
         assert not por_numero[6].no_escopo and not por_numero[7].no_escopo  # sem Folha nem Financeiro
         assert por_numero[9].no_escopo and not por_numero[9].conta_pendencia  # implantação: não conta
-        assert por_numero[3].respondidas == 1 and por_numero[3].total == 13
+        assert por_numero[3].respondidas == 1 and por_numero[3].total == 14
         assert f.total == sum(s.total for s in f.secoes if s.numero in (1, 2, 3, 4, 5, 8))
 
     def test_correcao_vale_como_entrevista_e_decide_o_que_aparece(self):
@@ -83,7 +83,7 @@ class TestFicha:
         razao = next(c for c in s1["campos"] if c["chave"] == "razao_social")
         assert razao["valor"] == "Exemplo Alfa Comércio Ltda" and razao["origem"] == "Questionário"
         vol = f["secoes"][2]
-        assert (vol["respondidas"], vol["total"]) == (7, 13)
+        assert (vol["respondidas"], vol["total"]) == (7, 14)
         assert f["revisores"] == ["Eduardo", "Karine"] and 0 < f["respondidas"] < f["total"]
 
     def test_corrigir_grava_como_entrevista_e_valida(self, cliente):
@@ -127,7 +127,7 @@ class TestPendencias:
     def test_automaticas_abrem_e_fecham_sozinhas(self, cliente):
         oid = _oportunidade_do_questionario(cliente)
         d = _pendencias(cliente, oid)
-        assert _item(d, "volumes")["aberta"] and "6 de 13" in _item(d, "volumes")["descricao"]
+        assert _item(d, "volumes")["aberta"] and "7 de 14" in _item(d, "volumes")["descricao"]
         assert _item(d, "matriz")["aberta"] and _item(d, "proposta")["aberta"]
         assert not _item(d, "contato-email")["aberta"]  # o questionário trouxe o contato com e-mail
         assert all(i["automatica"] for i in d["itens"])

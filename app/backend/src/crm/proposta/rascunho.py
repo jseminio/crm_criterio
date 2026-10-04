@@ -16,6 +16,7 @@ from crm.db.modelos import Empresa, GrupoEconomico, Oportunidade, PessoaContato,
 from crm.domain import porte as regras_de_porte
 from crm.domain.listas import TipoDeMatriz
 from crm.proposta.conta import faturamento_por_extenso
+from crm.questionario.leitura import inteiro_ou_nada
 
 __all__ = ["ND", "Base", "base_da_proposta", "porte_da_oportunidade", "matriz_pelos_servicos", "cnpj_formatado"]
 
@@ -35,6 +36,10 @@ class Base:
     perfil: dict[str, str]
     """Os marcadores do perfil do cliente já como texto final."""
     questionario_id: int | None
+    pjs_estagiarios: int | None
+    """PJs e estagiários do questionário (entram no honorário de DP com os CLT da oportunidade)."""
+    jovens_aprendizes: int | None
+    """Do questionário desde 03/10/2026; o que chegou antes conta zero."""
 
 
 def cnpj_formatado(cnpj: str | None) -> str:
@@ -159,4 +164,6 @@ def base_da_proposta(sessao: Session, o: Oportunidade) -> Base:
         cliente=cliente, tratamento=f"Prezado(a) Sr(a). {contato}",
         contextualizacao=_contextualizacao(cliente, r, servicos), perfil=perfil,
         questionario_id=q.id if q else None,
+        pjs_estagiarios=inteiro_ou_nada((r.get("vol") or {}).get("pjs_estagiarios")),
+        jovens_aprendizes=inteiro_ou_nada((r.get("vol") or {}).get("jovens_aprendizes")),
     )

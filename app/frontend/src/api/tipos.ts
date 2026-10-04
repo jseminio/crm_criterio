@@ -1744,6 +1744,8 @@ export interface FichaDaBase {
   vencida: boolean;
   vale_para_a_ia: boolean;
   problemas_para_aprovar: string[];
+  /** Código da carga inicial: não se edita (M1, 04/10/2026). */
+  codigo_travado: boolean;
 }
 
 export interface BlocoDaBase {
@@ -1760,9 +1762,12 @@ export interface BaseDeConhecimento {
   blocos: BlocoDaBase[];
   situacoes: string[];
   fichas: FichaDaBase[];
+  /** Bloco → o próximo código livre, para sugerir. */
+  proximos_codigos: Record<string, string>;
 }
 
 export interface EdicaoDeFicha {
+  codigo?: string | null;
   titulo?: string;
   bloco?: string;
   servico?: string | null;

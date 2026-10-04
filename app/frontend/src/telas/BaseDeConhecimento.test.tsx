@@ -29,13 +29,14 @@ const P3: FichaDaBase = {
   texto: "Vou passar a sua pergunta para eles.", nunca_dizer: "Opinião sobre regime.", como_o_lead_pergunta: null,
   fonte: "doc", dono: "Eduardo", depende_de_hipotese: false, situacao: "Em revisão", validade: null, aprovada_por: null,
   aprovada_em: null, atualizado_em: "2026-10-03T12:00:00+00:00", vencida: false, vale_para_a_ia: false, problemas_para_aprovar: [],
+  codigo_travado: true,
 };
 const VENCIDA: FichaDaBase = {
   ...P3, id: 40, codigo: "R1", titulo: "Speed-to-lead", bloco: "Referências", situacao: "Aprovada", validade: "2026-01-01",
   vencida: true,
 };
 const SEM_FONTE: FichaDaBase = {
-  ...P3, id: 50, codigo: null, titulo: "Prazo de implantação", bloco: "Perguntas frequentes", situacao: "Rascunho",
+  ...P3, id: 50, codigo: null, codigo_travado: false, titulo: "Prazo de implantação", bloco: "Perguntas frequentes", situacao: "Rascunho",
   fonte: null, problemas_para_aprovar: ["Falta a fonte"],
 };
 
@@ -44,6 +45,7 @@ function base(fichas: FichaDaBase[]): Base {
     situacoes: ["Rascunho", "Em revisão", "Aprovada", "Arquivada"],
     blocos: NOMES.map((n) => bloco(n, n === "Regras de atuação" ? { total: 12, em_revisao: 12 } : n === "Referências" ? { total: 1, vencidas: 1 } : {})),
     fichas,
+    proximos_codigos: Object.fromEntries(NOMES.map((n, i) => [n, `${"PTSOVCQFR"[i]}${i === 2 ? "13" : i === 0 ? "13" : "1"}`])),
   };
 }
 
@@ -118,7 +120,7 @@ describe("SDR › Base de conhecimento (03/10/2026)", () => {
     await userEvent.type(within(painel).getByLabelText("O que a IA pode dizer"), "Sim, atendemos todo o Brasil.");
     await userEvent.click(within(painel).getByRole("button", { name: "Criar ficha" }));
     expect(api.criarFicha).toHaveBeenCalledWith(expect.objectContaining({
-      titulo: "Atendem fora do Rio?", bloco: "Perguntas frequentes", texto: "Sim, atendemos todo o Brasil.",
+      codigo: "F1", titulo: "Atendem fora do Rio?", bloco: "Perguntas frequentes", texto: "Sim, atendemos todo o Brasil.",
     }));
     expect(await screen.findByText("✓ Ficha salva.")).toBeInTheDocument();
   });
@@ -162,5 +164,45 @@ describe("SDR › Base de conhecimento (03/10/2026)", () => {
     await userEvent.click(await screen.findByRole("button", { name: /^P3/ }));
     await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Arquivar" }));
     expect(await screen.findByText("✗ a ficha já está arquivada")).toBeInTheDocument();
+  });
+
+  describe("código editável (M1, 04/10/2026)", () => {
+    it("ficha nova já vem com o próximo código livre, que acompanha o bloco", async () => {
+      render(<BaseDeConhecimento />);
+      await userEvent.click(await screen.findByRole("button", { name: "Nova ficha" }));
+      const painel = screen.getByRole("dialog", { name: "Nova ficha" });
+      const codigo = within(painel).getByLabelText("Código");
+      expect(codigo).toHaveValue("P13");
+      expect(within(painel).getByText(/Sugerido: o próximo livre em Regras de atuação/)).toBeInTheDocument();
+      await userEvent.selectOptions(within(painel).getByLabelText("Bloco"), "Objeções");
+      expect(codigo).toHaveValue("O1");
+      await userEvent.clear(codigo);
+      await userEvent.type(codigo, "o7");
+      expect(codigo).toHaveValue("O7");
+      expect(within(painel).getByText(/Começa sempre com O, a letra do bloco/)).toBeInTheDocument();
+    });
+
+    it("ficha da carga mostra o código travado, sem trocar bloco", async () => {
+      render(<BaseDeConhecimento />);
+      await userEvent.click(await screen.findByRole("button", { name: /^P3/ }));
+      const painel = screen.getByRole("dialog");
+      expect(within(painel).getByLabelText("Código")).toHaveAttribute("readonly");
+      expect(within(painel).getByLabelText("Bloco")).toBeDisabled();
+      expect(within(painel).getByText(/Travado: código da carga inicial/)).toBeInTheDocument();
+    });
+
+    it("ficha manual troca o código e mostra a recusa do servidor", async () => {
+      vi.mocked(api.alterarFicha).mockRejectedValue(
+        new ErroDaApi(409, 'O código F1 já é da ficha "Onde fica". Use F2, o próximo livre.'));
+      render(<BaseDeConhecimento />);
+      await userEvent.click(await screen.findByRole("button", { name: "Prazo de implantação" }));
+      const painel = screen.getByRole("dialog");
+      const codigo = within(painel).getByLabelText("Código");
+      expect(codigo).not.toHaveAttribute("readonly");
+      await userEvent.type(codigo, "F1");
+      await userEvent.click(within(painel).getByRole("button", { name: "Salvar" }));
+      expect(api.alterarFicha).toHaveBeenCalledWith(50, { codigo: "F1" });
+      expect(await within(painel).findByText(/Use F2, o próximo livre/)).toBeInTheDocument();
+    });
   });
 });

@@ -15,6 +15,8 @@ nasce aprovado: regras entram "Em revisão", serviços e o resto como
 
 from __future__ import annotations
 
+import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from enum import Enum
@@ -31,6 +33,12 @@ __all__ = [
     "FichaInicial",
     "FICHAS_INICIAIS",
     "validade_ao_aprovar",
+    "PREFIXO",
+    "CODIGOS_DA_CARGA",
+    "normalizar_codigo",
+    "problema_no_codigo",
+    "proximo_codigo",
+    "codigo_travado",
     "vencida",
     "vale_para_a_ia",
     "problemas_para_aprovar",
@@ -57,6 +65,48 @@ class BlocoDaBase(Enum):
         return self is not BlocoDaBase.REFERENCIAS
 
 
+#: A letra do código de cada bloco (modelo de ficha, passo 3, aprovado para construir em 04/10/2026).
+PREFIXO: dict[BlocoDaBase, str] = {
+    BlocoDaBase.REGRAS: "P",
+    BlocoDaBase.TRANSBORDO: "T",
+    BlocoDaBase.SERVICOS: "S",
+    BlocoDaBase.OBJECOES: "O",
+    BlocoDaBase.TOM: "V",
+    BlocoDaBase.CRITERIO: "C",
+    BlocoDaBase.QUALIFICACAO: "Q",
+    BlocoDaBase.PERGUNTAS: "F",
+    BlocoDaBase.REFERENCIAS: "R",
+}
+_CODIGO = re.compile(r"^([A-Z])(\d{1,4})$")
+
+
+def normalizar_codigo(bruto: str | None) -> str | None:
+    """Sem espaços e em maiúscula; vazio vira `None`."""
+    codigo = (bruto or "").strip().upper()
+    return codigo or None
+
+
+def problema_no_codigo(codigo: str, bloco: BlocoDaBase) -> str | None:
+    """Por que o código não serve para o bloco, ou `None` se serve."""
+    letra = PREFIXO[bloco]
+    achado = _CODIGO.match(codigo)
+    if achado is None:
+        return f"O código é a letra do bloco seguida de número, como {letra}1"
+    if achado.group(1) != letra:
+        return f"O código {codigo} não combina com o bloco {bloco.value}: comece com {letra}"
+    return None
+
+
+def proximo_codigo(bloco: BlocoDaBase, existentes: Iterable[str | None]) -> str:
+    """O próximo número livre do bloco. Serviços usam dois dígitos, como a carga (S01)."""
+    letra = PREFIXO[bloco]
+    numeros = [
+        int(m.group(2)) for c in existentes if c and (m := _CODIGO.match(c)) and m.group(1) == letra
+    ]
+    numero = max(numeros, default=0) + 1
+    return f"{letra}{numero:02d}" if bloco is BlocoDaBase.SERVICOS else f"{letra}{numero}"
+
+
 class SituacaoDaFicha(Enum):
     RASCUNHO = "Rascunho"
     EM_REVISAO = "Em revisão"
@@ -75,6 +125,7 @@ def validade_ao_aprovar(hoje: date, depende_de_hipotese: bool) -> date:
 
 
 class FichaLida(Protocol):
+    codigo: str | None
     bloco: BlocoDaBase
     situacao: SituacaoDaFicha
     titulo: str
@@ -105,6 +156,8 @@ def problemas_para_aprovar(ficha: FichaLida) -> list[str]:
     problemas: list[str] = []
     if ficha.situacao is SituacaoDaFicha.ARQUIVADA:
         problemas.append("A ficha está arquivada: reabra antes de aprovar")
+    if not (ficha.codigo or "").strip():
+        problemas.append("Falta o código")
     if not (ficha.titulo or "").strip():
         problemas.append("Falta o título")
     if not (ficha.texto or "").strip():
@@ -375,3 +428,11 @@ _REFERENCIAS = (
 FICHAS_INICIAIS: tuple[FichaInicial, ...] = (
     *_REGRAS, *_GATILHOS, *_TOM, *_servicos(), *_OUTROS, *_REFERENCIAS,
 )
+
+#: Os códigos da carga inicial são da carga: é por eles que ela sabe o que já entrou. Não se
+#: editam nem se reusam em ficha nova — trocado, a carga traria a ficha de novo.
+CODIGOS_DA_CARGA: frozenset[str] = frozenset(f.codigo for f in FICHAS_INICIAIS)
+
+
+def codigo_travado(codigo: str | None) -> bool:
+    return codigo in CODIGOS_DA_CARGA

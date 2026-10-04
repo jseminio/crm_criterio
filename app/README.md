@@ -16,6 +16,23 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Inteligência de Conversão com contraste (04/10/2026)
+
+Amostra aprovada por Eduardo em 04/10/2026. A aba usava quase só cinza e branco e passou a usar as
+cores que o Funil já usa nos indicadores (PAD-002 e o design base "Critério CRM"). Não entrou cor
+nova:
+
+- **Meta**: fundo azul-noturno da marca, número em branco e barra em azul-neve.
+- **Cadeia do funil**: cada etapa com faixa azul no topo e fundo azul-claro, como os indicadores do
+  Funil; o MRR novo em azul-noturno; o gargalo em vermelho, com contorno.
+- **Cartões das fases**: o cabeçalho, o KPI, a barra e o quadro do ajuste tingidos pela situação
+  (verde no ritmo, âmbar em atenção, vermelho abaixo); cinza quando não há previsto.
+- **Cenários**: alerta em âmbar, previsto em azul-noturno, otimista em verde.
+
+O estado continua sempre com palavra e sinal. Todo texto foi medido com contraste de pelo menos
+4,5:1, exceto o número de cada etapa da cadeia (4,4:1): é texto grande em negrito, cujo mínimo é
+3:1, na mesma cor dos indicadores do Funil.
+
 ## Primeiro contato e aderência da promessa no lead (04/10/2026)
 
 Amostra aprovada por Eduardo em 04/10/2026. O painel do lead ganha o bloco **Primeiro contato**,

@@ -1089,7 +1089,6 @@ td > .celula-fonte { display: block; }
 .plano-ajuste { font-size: 13px; color: var(--texto-medio); min-width: 260px; }
 .plano-cenarios { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e3); }
 @media (max-width: 900px) { .plano-cenarios { grid-template-columns: 1fr; } }
-.plano-cenario-destaque { border: 2px solid var(--azul-noturno); }
 .plano-premissas { margin: 0; padding-left: var(--e5); display: grid; gap: var(--e1); font-size: 13px; color: var(--texto-medio); }
 .plano-form { display: grid; gap: var(--e4); }
 .plano-form fieldset { border: 1px solid var(--borda); border-radius: var(--raio-md); padding: var(--e3) var(--e4); display: grid; gap: var(--e3); }
@@ -1159,6 +1158,55 @@ td > .celula-fonte { display: block; }
 .aderencia-tema { appearance: none; cursor: pointer; background: var(--surface-card); color: var(--texto-forte);
   border: 1px solid var(--borda-forte); border-radius: 999px; padding: 3px var(--e3); font: 12px var(--fonte-ui); }
 .aderencia-tema-marcado { background: var(--surface-sunken); border-color: var(--texto-forte); font-weight: 500; }
+
+
+/* --------------------------------------------------------- Inteligência de Conversão com contraste (04/10/2026)
+   Amostra aprovada por Eduardo em 04/10/2026: as cores que o Funil já usa nos indicadores (PAD-002 e
+   o design base "Critério CRM"). A meta no azul-noturno da marca; a cadeia como os indicadores do
+   Funil (faixa no topo e fundo suave); os cartões das fases tingidos pela situação; os cenários com
+   cor própria. O estado continua sempre com palavra e sinal. */
+.plano-meta { background: var(--surface-brand); border-color: var(--surface-brand); color: var(--texto-sobre-marca); }
+.plano-meta .numero-rotulo { color: var(--texto-sobre-marca-fraco); text-transform: uppercase; letter-spacing: 0.04em; }
+.plano-meta-valor { color: var(--texto-sobre-marca); }
+.plano-meta-detalhe, .plano-meta-rodape { color: var(--azul-gelo); }
+.plano-meta .plano-barra { background: #2c3956; }
+.plano-meta .plano-barra-feito { background: var(--azul-neve); }
+.plano-meta .plano-barra-marca { background: var(--texto-sobre-marca); width: 3px; }
+
+.cadeia-etapa { background: #e4eef8; border: 0; border-top: 4px solid #0072b2; }
+.cadeia-etapa .cadeia-valor { color: #0072b2; }
+.cadeia-etapa .cadeia-rotulo { color: #2a3242; }
+.cadeia-etapa .cadeia-previsto { color: var(--texto-medio); }
+.cadeia-mrr { background: #e8eef5; border-top-color: var(--azul-noturno); }
+.cadeia-mrr .cadeia-valor { color: var(--azul-noturno); }
+.cadeia-gargalo { background: #fce9e7; border-top-color: #a81f17; outline: 2px solid #a81f17; outline-offset: -2px; }
+.cadeia-gargalo .cadeia-valor, .cadeia-gargalo .cadeia-rotulo { color: #a81f17; }
+.cadeia-gargalo-texto { color: #a81f17; font-weight: 600; }
+
+.fase { overflow: hidden; }
+.fase .fase-topo { margin: calc(-1 * var(--e4)) calc(-1 * var(--e4)) 0; padding: var(--e3) var(--e4);
+  background: var(--surface-sunken); border-top: 4px solid var(--borda-forte); }
+.fase-ganho .fase-topo { background: var(--ganho-suave); border-top-color: var(--ganho); }
+.fase-espera .fase-topo { background: var(--espera-suave); border-top-color: var(--espera); }
+.fase-perda .fase-topo { background: var(--perda-suave); border-top-color: var(--perda); }
+.fase-ganho .fase-titulo, .fase-ganho .fase-kpi { color: var(--ganho); }
+.fase-espera .fase-titulo, .fase-espera .fase-kpi { color: var(--espera); }
+.fase-perda .fase-titulo, .fase-perda .fase-kpi { color: var(--perda); }
+.fase .fase-ajuste { border-top: 0; padding: var(--e2) var(--e3); border-radius: var(--raio-md); background: var(--surface-sunken); }
+.fase-ganho .fase-ajuste { background: var(--ganho-suave); }
+.fase-espera .fase-ajuste { background: var(--espera-suave); }
+.fase-perda .fase-ajuste { background: var(--perda-suave); }
+.fase-gargalo { border: 2px solid var(--perda); }
+
+.plano-cenario { border: 0; border-top: 4px solid var(--borda-forte); }
+.plano-cenario-alerta { background: #fbefdc; border-top-color: #8a5300; }
+.plano-cenario-alerta .numero-rotulo, .plano-cenario-alerta .numero-valor { color: #8a5300; }
+.plano-cenario-previsto { background: var(--surface-brand); border-top-color: var(--azul-neve); }
+.plano-cenario-previsto .numero-rotulo { color: var(--texto-sobre-marca-fraco); }
+.plano-cenario-previsto .numero-valor { color: var(--texto-sobre-marca); }
+.plano-cenario-previsto .numero-detalhe { color: var(--azul-gelo); }
+.plano-cenario-otimista { background: #e2f3ed; border-top-color: #0f6b52; }
+.plano-cenario-otimista .numero-rotulo, .plano-cenario-otimista .numero-valor { color: #0f6b52; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

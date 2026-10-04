@@ -1096,6 +1096,50 @@ td > .celula-fonte { display: block; }
 .plano-form legend { padding: 0 var(--e1); font-size: 13px; font-weight: 600; color: var(--texto-forte); }
 .plano-previsto { display: grid; gap: var(--e2); padding-bottom: var(--e3); border-bottom: 1px solid var(--borda); }
 
+
+/* --------------------------------------------------------- Quatro fases do cliente (04/10/2026)
+   Cadeia do funil com o gargalo e um cartão por fase. Estado sempre com palavra e sinal; o gargalo
+   ganha borda e a palavra "gargalo" (regra 4 do PAD-002). */
+.quatro-fases { display: grid; gap: var(--e3); }
+.quatro-fases-topo { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--e3); flex-wrap: wrap; }
+.quatro-fases-mes { display: grid; gap: var(--e1); min-width: 140px; }
+.cadeia { list-style: none; margin: 0; padding: 0; display: flex; align-items: stretch; gap: var(--e1); flex-wrap: wrap; }
+.cadeia-passo { display: flex; align-items: center; gap: var(--e1); flex: 1 1 140px; }
+.cadeia-etapa { flex: 1; display: grid; gap: 2px; text-align: center; padding: var(--e2) var(--e2);
+  background: var(--surface-sunken); border: 1px solid transparent; border-radius: var(--raio-md); }
+.cadeia-gargalo { background: var(--perda-suave); border-color: var(--perda); }
+.cadeia-gargalo .cadeia-rotulo, .cadeia-gargalo .cadeia-valor { color: var(--perda); }
+.cadeia-rotulo { font-size: 12px; color: var(--texto-medio); }
+.cadeia-valor { font-family: var(--fonte-titulo); font-size: 20px; font-weight: 600; color: var(--texto-forte); font-variant-numeric: tabular-nums; }
+.cadeia-previsto { font-family: var(--fonte-ui); font-size: 12px; font-weight: 400; color: var(--texto-fraco); }
+.cadeia-seta { font-size: 11px; color: var(--texto-fraco); white-space: nowrap; text-align: center; }
+.cadeia-gargalo-texto { margin: 0; font-size: 13px; font-weight: 500; color: var(--perda); }
+.fases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e3); }
+@media (max-width: 960px) { .fases { grid-template-columns: 1fr; } }
+.fase { background: var(--surface-card); border: 1px solid var(--borda); border-radius: var(--raio-lg); padding: var(--e4);
+  display: flex; flex-direction: column; gap: var(--e3); }
+.fase-gargalo { border: 2px solid var(--perda); }
+.fase-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--e2); }
+.fase-titulo { margin: 0; font-size: 15px; font-weight: 600; color: var(--texto-forte); }
+.fase-pergunta { margin: 2px 0 0; font-size: 12px; color: var(--texto-medio); }
+.fase-kpi-rotulo { margin: 0; font-size: 12px; color: var(--texto-medio); }
+.fase-kpi { margin: 2px 0 var(--e2); font-family: var(--fonte-titulo); font-size: 26px; font-weight: 600; color: var(--texto-forte); font-variant-numeric: tabular-nums; }
+.fase-kpi-previsto { font-family: var(--fonte-ui); font-size: 13px; font-weight: 400; color: var(--texto-medio); }
+.fase-kpi-pendente { margin: 2px 0 0; padding: var(--e2) var(--e3); font-size: 13px; font-weight: 500; color: var(--espera);
+  background: var(--surface-sunken); border: 1px dashed var(--borda-forte); border-radius: var(--raio-md); }
+.fase-barra { position: relative; height: 8px; background: var(--surface-sunken); border-radius: 999px; }
+.fase-barra-feito { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--texto-medio); }
+.fase-tom-ganho { background: var(--ganho); }
+.fase-tom-espera { background: var(--espera); }
+.fase-tom-perda { background: var(--perda); }
+.fase-barra-marca { position: absolute; top: -4px; width: 2px; height: 16px; background: var(--texto-forte); }
+.fase-apoio { width: 100%; border-collapse: collapse; font-size: 12px; }
+.fase-apoio th { text-align: left; font-weight: 500; color: var(--texto-medio); padding: var(--e1) 0; border-bottom: 1px solid var(--borda); }
+.fase-apoio td { padding: var(--e1) 0; border-bottom: 1px solid var(--borda); color: var(--texto-forte); }
+.fase-apoio th.tabela-numero, .fase-apoio td.tabela-numero { width: 84px; }
+.fase-nota { color: var(--texto-fraco); }
+.fase-ajuste { margin: 0; padding-top: var(--e2); border-top: 1px solid var(--borda); font-size: 13px; line-height: 1.5; color: var(--texto-forte); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

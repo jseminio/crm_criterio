@@ -1817,6 +1817,14 @@ export interface PremissasDoPlano {
   previsto: CenarioDoPlano;
   otimista: CenarioDoPlano;
   contratos_previstos: ContratoPrevistoDoPlano[];
+  /** As quatro fases (04/10/2026). Vazias: o previsto usa a taxa histórica do CRM. */
+  taxa_lead_reuniao_pct?: string | null;
+  taxa_reuniao_proposta_pct?: string | null;
+  taxa_conversao_pct?: string | null;
+  icp_alvo_pct?: string | null;
+  indicacoes_por_mes?: string | null;
+  primeiro_contato_horas?: string | null;
+  ciclo_alvo_dias?: string | null;
 }
 
 export interface SituacaoDoPlano {
@@ -1900,4 +1908,47 @@ export interface CenariosDoServico {
   atipico_minimo: string | null;
   atipico_medio: string | null;
   atipico_maximo: string | null;
+}
+
+/** Inteligência de Conversão › as quatro fases do cliente (04/10/2026). */
+export type UnidadeDoIndicador = "numero" | "pct" | "reais" | "horas" | "dias";
+
+export interface IndicadorDaFase {
+  rotulo: string;
+  unidade: UnidadeDoIndicador;
+  previsto: string | null;
+  realizado: string | null;
+  nota: string | null;
+}
+
+export interface FaseDoCliente {
+  chave: "atracao" | "engajamento" | "conversao" | "pos_venda";
+  titulo: string;
+  pergunta: string;
+  kpi: IndicadorDaFase;
+  apoio: IndicadorDaFase[];
+  situacao: SituacaoDoPlano | null;
+  ajuste: string;
+}
+
+export interface EtapaDaCadeia {
+  chave: string;
+  rotulo: string;
+  previsto: string | null;
+  realizado: string | null;
+  taxa_prevista: string | null;
+  taxa_realizada: string | null;
+}
+
+export interface FasesDoMes {
+  mes: string;
+  meses: string[];
+  mes_fechado: boolean;
+  tem_previsto: boolean;
+  cadeia: EtapaDaCadeia[];
+  gargalo: string | null;
+  gargalo_texto: string | null;
+  fases: FaseDoCliente[];
+  taxas: Record<string, { valor: string | null; origem: "premissa" | "historico" | "sem_dado" }>;
+  aviso: string | null;
 }

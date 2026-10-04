@@ -368,43 +368,62 @@ def _sugerida(o: dict) -> OportunidadeSugerida:
     )
 
 
+def _grupos(sessao: Session, so: int | None = None) -> list[tuple[GrupoEconomico, bool]]:
+    """Grupos não fundidos com contrato valendo, e se algum deles é anterior ao CRM."""
+    consulta = (
+        sa.select(GrupoEconomico, sa.func.max(sa.cast(Contrato.anterior_ao_crm, sa.Integer)))
+        .join(Contrato, Contrato.grupo_id == GrupoEconomico.id)
+        .where(GrupoEconomico.fundido_em_id.is_(None), Contrato.situacao.in_(_VALENDO))
+        .group_by(GrupoEconomico.id)
+        .order_by(GrupoEconomico.nome)
+    )
+    if so is not None:
+        consulta = consulta.where(GrupoEconomico.id == so)
+    return [(g, bool(anterior)) for g, anterior in sessao.execute(consulta)]
+
+def _classes(sessao: Session) -> dict[int, str]:
+    """A classe da leitura mais recente de cada grupo (referência maior, depois revisão maior)."""
+    classes: dict[int, str] = {}
+    for grupo_id, classe in sessao.execute(
+        sa.select(ClassificacaoDoGrupo.grupo_id, ClassificacaoDoGrupo.classe)
+        .order_by(ClassificacaoDoGrupo.referencia.desc(), ClassificacaoDoGrupo.revisao.desc())
+    ):
+        classes.setdefault(grupo_id, classe)
+    return classes
+
+def _ultimas(sessao: Session) -> dict[int, dict[str, date]]:
+    ultimas: dict[int, dict[str, date]] = {}
+    for grupo_id, tipo, dia in sessao.execute(
+        sa.select(ReuniaoDeResultado.grupo_id, ReuniaoDeResultado.tipo, sa.func.max(ReuniaoDeResultado.data))
+        .group_by(ReuniaoDeResultado.grupo_id, ReuniaoDeResultado.tipo)
+    ):
+        ultimas.setdefault(grupo_id, {})[tipo] = dia
+    return ultimas
+
+
+def reunioes_em_dia(sessao: Session, hoje: date) -> tuple[int, int]:
+    """(em dia, total) dos grupos em curso com classe, pela cadência vigente: a mesma regra do Funil do
+    Sucesso do Cliente. A Inteligência de Conversão usa no Pós-venda (03/10/2026)."""
+    jornadas = {j.grupo_id: j for j in sessao.scalars(sa.select(JornadaDoCliente))}
+    classes, ultimas, cadencia = _classes(sessao), _ultimas(sessao), cadencia_vigente(sessao)
+    em_dia = total = 0
+    for g, anterior in _grupos(sessao):
+        jornada = jornadas.get(g.id)
+        etapa = jornada.etapa if jornada else ("em_curso" if anterior else "contrato")
+        classe = classes.get(g.id)
+        if etapa != "em_curso" or classe is None:
+            continue
+        desde = (jornada.em_curso_desde if jornada else None) or regra.INICIO_DO_FUNIL
+        total += 1
+        em_dia += not any(d.atrasada for d in regra.devidas(cadencia.get(classe, []), ultimas.get(g.id, {}), desde, hoje))
+    return em_dia, total
+
+
 def roteador_do_sucesso(
     obter_sessao: Callable[[], Iterator[Session]],
     servicos_da_ata: Callable[[], ServicosDaAta] = servicos_da_ata_reais,
 ) -> APIRouter:
     r = APIRouter(prefix="/api/sucesso", tags=["sucesso"])
-
-    def _grupos(sessao: Session, so: int | None = None) -> list[tuple[GrupoEconomico, bool]]:
-        """Grupos não fundidos com contrato valendo, e se algum deles é anterior ao CRM."""
-        consulta = (
-            sa.select(GrupoEconomico, sa.func.max(sa.cast(Contrato.anterior_ao_crm, sa.Integer)))
-            .join(Contrato, Contrato.grupo_id == GrupoEconomico.id)
-            .where(GrupoEconomico.fundido_em_id.is_(None), Contrato.situacao.in_(_VALENDO))
-            .group_by(GrupoEconomico.id)
-            .order_by(GrupoEconomico.nome)
-        )
-        if so is not None:
-            consulta = consulta.where(GrupoEconomico.id == so)
-        return [(g, bool(anterior)) for g, anterior in sessao.execute(consulta)]
-
-    def _classes(sessao: Session) -> dict[int, str]:
-        """A classe da leitura mais recente de cada grupo (referência maior, depois revisão maior)."""
-        classes: dict[int, str] = {}
-        for grupo_id, classe in sessao.execute(
-            sa.select(ClassificacaoDoGrupo.grupo_id, ClassificacaoDoGrupo.classe)
-            .order_by(ClassificacaoDoGrupo.referencia.desc(), ClassificacaoDoGrupo.revisao.desc())
-        ):
-            classes.setdefault(grupo_id, classe)
-        return classes
-
-    def _ultimas(sessao: Session) -> dict[int, dict[str, date]]:
-        ultimas: dict[int, dict[str, date]] = {}
-        for grupo_id, tipo, dia in sessao.execute(
-            sa.select(ReuniaoDeResultado.grupo_id, ReuniaoDeResultado.tipo, sa.func.max(ReuniaoDeResultado.data))
-            .group_by(ReuniaoDeResultado.grupo_id, ReuniaoDeResultado.tipo)
-        ):
-            ultimas.setdefault(grupo_id, {})[tipo] = dia
-        return ultimas
 
     def _ajustes(sessao: Session, hoje: date) -> dict[int, tuple[int, int, int]]:
         """Grupo → (pendentes, pendentes com prazo vencido, feitos)."""

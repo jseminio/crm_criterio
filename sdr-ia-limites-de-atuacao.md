@@ -79,7 +79,7 @@ Os motivos e destinos abaixo são os que **já existem** no CRM
 | T7 | Integração ou agenda fora do ar | Sistema externo fora do ar | Comercial · BPO (C1) | "Tive um problema para marcar. A equipe vai falar com você." |
 | T8 | Serviço sem roteiro: "Outro", Representante Legal (texto ainda a escrever), BPO Plus, CFO as a Service | Outro **[proposta: motivo "Serviço sem roteiro"]** | Sócios | "Esse serviço é desenhado caso a caso. Vou passar para quem conduz." |
 | T9 | Urgência com prazo legal: fiscalização, autuação, multa, prazo de entrega vencendo | Outro **[proposta: motivo "Urgência com prazo legal"]** | Técnico fiscal | "Pelo prazo, vou passar agora para um especialista." |
-| T10 | "Como vocês conseguiram meu contato?" | Outro | Comercial · BPO (C1) | A origem real e específica, registrada no lead, com a opção de sair: texto de Eduardo para indicação e tráfego pago **[decisão, 04/10/2026]**. Sem origem registrada, ou lead de prospecção ativa (caso ainda sem texto **[pendência]**), passa para a equipe |
+| T10 | "Como vocês conseguiram meu contato?" | Outro | Comercial · BPO (C1) | A origem real e específica, registrada no lead, com a opção de sair: texto de Eduardo para indicação e tráfego pago **[decisão, 04/10/2026]**. Inclui a prospecção ativa, com a origem registrada no lead. Sem origem registrada, passa para a equipe |
 | T12 | Cláusula de contrato, proteção de dados, multa ou restrição a tecnologia | Outro | Sócios · conta grande | "Esse ponto é tratado pela nossa equipe na proposta. Vou passar para eles." **[decisão, 04/10/2026]** |
 | T11 | O lead conta que já é cliente da Critério | Outro | Sucesso do Cliente **[proposta: destino novo]** | "Vou te encaminhar para a equipe que já cuida da sua empresa." |
 

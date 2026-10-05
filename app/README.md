@@ -615,7 +615,7 @@ Atualizado em 05/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil (com exclusão de oportunidade), contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", plano de MRR (Inteligência de Conversão), agente SDR, SDR de IA com base de conhecimento, backup lógico (manual e diário) e as telas abaixo |
-| Testes | **1.315** no backend e **532** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Testes | **1.315** no backend e **563** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
 | Banco | PostgreSQL 18 local, 45 tabelas no modelo, migrações até `f4a7c2e9b1d3` (senha do usuário, 05/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 156 rotas, em `127.0.0.1:8000`. **Com login configurado (e-mail e senha ou conta Microsoft), toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Entrada | **Login com e-mail e senha do CRM** (05/10/2026, #89), o do servidor. O login pela conta Microsoft, ativo na máquina de Eduardo desde 03/10/2026, fica no código e vale só sem `CRM_ADMIN_EMAIL`. Perfis, permissões e histórico de alterações valem para todos |

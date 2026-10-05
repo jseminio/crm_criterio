@@ -365,10 +365,17 @@ o passo 3 (modelo de ficha) e o passo 5 (conjunto de perguntas-teste).
 | Acrescentar O2 e O3 à Matriz de Objeções | **Sim** | Matriz no SharePoint **[pendência: quem edita]** |
 | "Terceirizamos" e local da apresentação | Eduardo ajusta a apresentação | Fora do CRM |
 
-**Seguem abertos:** a regra do precedente "sim" (explicada a Eduardo em
-04/10/2026, à espera da resposta); o caso da **prospecção ativa** na T10 (de
-onde vem a lista e o texto da resposta); o texto da S06 (Representante Legal);
-e a aprovação formal dos documentos dos passos 1, 2, 3 e 5 e do roteiro SPIN.
+**Decidido em seguida, no mesmo dia:**
+
+| Decisão | Resposta | Onde ficou |
+|---|---|---|
+| Regra do precedente "sim" | **Oficial**: a IA só responde sozinha às objeções da Matriz com posição "sim"; as demais passam para a equipe | Seção 8; fichas O1, O7 e O9 |
+| S06 (Representante Legal) | **A pergunta passa para os sócios** | Ficha S06 |
+| Origem do lead (T10), inclusive prospecção ativa | **A origem tem de ser registrada na entrada do lead no funil**; a IA informa a origem registrada | Ficha T10 (caso da prospecção ativa acrescentado); mudança no CRM **[pendência: amostra]** |
+
+**Seguem abertos:** tornar a origem obrigatória na entrada do lead (mudança
+no CRM, com amostra antes); quem acrescenta O2 e O3 à Matriz de Objeções; e a
+aprovação formal dos documentos dos passos 1, 2, 3 e 5 e do roteiro SPIN.
 
 **A revalidar:** se os motivos de descarte do CRM continuam sendo a melhor
 amostra das objeções de topo depois dos primeiros 60 dias ou 300 leads, na

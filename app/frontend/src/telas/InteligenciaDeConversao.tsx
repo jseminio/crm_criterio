@@ -345,21 +345,27 @@ function deDados(p: PlanoDeMrr["premissas"]): Rascunho {
   return structuredClone(resto);
 }
 
-function CampoNumero({ rotulo, value, aoMudar, ajuda }: { rotulo: string; value: string | number; aoMudar: (v: string) => void; ajuda?: string }) {
+function CampoNumero({ rotulo, value, aoMudar, ajuda, erro }: {
+  rotulo: string; value: string | number; aoMudar: (v: string) => void; ajuda?: string; erro?: string | null;
+}) {
   return (
     <label className="campo">
       <span className="campo-rotulo">{rotulo}</span>
-      <input className="entrada" type="number" min={0} step="any" value={value} onChange={(e) => aoMudar(e.target.value)} />
+      <input className={`entrada${erro ? " entrada-com-erro" : ""}`} type="number" min={0} step="any" value={value}
+        aria-invalid={erro ? true : undefined} onChange={(e) => aoMudar(e.target.value)} />
+      {erro && <span className="campo-erro">{erro}</span>}
       {ajuda && <span className="campo-ajuda">{ajuda}</span>}
     </label>
   );
 }
 
-function CampoDinheiro({ rotulo, value, aoMudar }: { rotulo: string; value: string; aoMudar: (v: string) => void }) {
+function CampoDinheiro({ rotulo, value, aoMudar, erro }: { rotulo: string; value: string; aoMudar: (v: string) => void; erro?: string | null }) {
   return (
     <label className="campo">
       <span className="campo-rotulo">{rotulo}</span>
-      <CampoDeValor value={value} aoMudar={(v) => aoMudar(v ?? "")} aria-label={rotulo} />
+      <CampoDeValor value={value} aoMudar={(v) => aoMudar(v ?? "")} aria-label={rotulo}
+        className={`entrada${erro ? " entrada-com-erro" : ""}`} />
+      {erro && <span className="campo-erro">{erro}</span>}
     </label>
   );
 }
@@ -374,8 +380,44 @@ function CampoData({ rotulo, value, aoMudar, tipo = "date" }: { rotulo: string; 
   );
 }
 
+const ABAS_DAS_PREMISSAS = [
+  ["meta", "Meta", "A meta é acréscimo líquido sobre a receita: venda nova e escada menos churn."],
+  ["motores", "Motores", "BPO Financeiro é o motor de volume, com onboarding próprio; o contábil é limitado pelas vagas de onboarding."],
+  ["escada", "Escada", "BPO Financeiro → BPO Plus → CFO as a Service, um degrau a cada prazo."],
+  ["cenarios", "Cenários", "Os três cenários lado a lado, para comparar."],
+  ["fases", "Quatro fases", "Deixe vazio para o previsto usar a taxa histórica do CRM (três meses fechados)."],
+  ["previstos", "Contratos previstos", "O pipeline contábil que o plano já conta. Sem nome de cliente: descreva o contrato para quem edita o plano."],
+] as const;
+type AbaDasPremissas = (typeof ABAS_DAS_PREMISSAS)[number][0];
+
+const vazio = (v: string | number | null | undefined) => v === "" || v === null || v === undefined;
+const FALTA = "Preencha o valor";
+
+/** Os campos obrigatórios que estão vazios, por aba: o painel mostra "! n" na aba e marca o campo. */
+function errosDasPremissas(r: Rascunho): Record<AbaDasPremissas, Record<string, string>> {
+  const de = (pares: [string, string | number | null | undefined][]) =>
+    Object.fromEntries(pares.filter(([, v]) => vazio(v)).map(([k]) => [k, FALTA]));
+  const previstos: Record<string, string> = {};
+  r.contratos_previstos.forEach((c, i) => {
+    if (!c.descricao.trim()) previstos[`descricao-${i}`] = "Descreva o contrato";
+    if (vazio(c.valor)) previstos[`valor-${i}`] = FALTA;
+  });
+  return {
+    meta: de([["meta_liquida", r.meta_liquida], ["ponto_de_partida", r.ponto_de_partida], ["mrr_de_partida", r.mrr_de_partida],
+      ["churn_anual_pct", r.churn_anual_pct]]),
+    motores: de([["bpo_ticket", r.bpo_ticket], ["bpo_teto", r.bpo_teto], ["contabil_vagas", r.contabil_vagas], ["atipico_vagas", r.atipico_vagas]]),
+    escada: de([["escada_prazo_meses", r.escada_prazo_meses], ["plus_pct", r.plus_pct], ["plus_acrescimo", r.plus_acrescimo],
+      ["cfo_pct", r.cfo_pct], ["cfo_acrescimo", r.cfo_acrescimo]]),
+    cenarios: de((["alerta", "previsto", "otimista"] as const).flatMap((c) => [
+      [`${c}.bpo_por_mes`, r[c].bpo_por_mes], [`${c}.ticket_contabil`, r[c].ticket_contabil]] as [string, string][])),
+    fases: {},
+    previstos,
+  };
+}
+
 function EditarPremissas({ plano, aoFechar, aoSalvar }: { plano: PlanoDeMrr; aoFechar: () => void; aoSalvar: (novo: PlanoDeMrr) => void }) {
   const [r, definir] = useState<Rascunho>(() => deDados(plano.premissas));
+  const [aba, definirAba] = useState<AbaDasPremissas>("meta");
   const [salvando, definirSalvando] = useState(false);
   const [falha, definirFalha] = useState<string | null>(null);
   const mudar = <K extends keyof Rascunho>(k: K, v: Rascunho[K]) => definir((x) => ({ ...x, [k]: v }));
@@ -383,8 +425,10 @@ function EditarPremissas({ plano, aoFechar, aoSalvar }: { plano: PlanoDeMrr; aoF
     definir((x) => ({ ...x, [c]: { ...x[c], [campo]: v } }));
   const mudarPrevisto = (i: number, campo: keyof ContratoPrevistoDoPlano, v: string | boolean) =>
     definir((x) => ({ ...x, contratos_previstos: x.contratos_previstos.map((c, j) => (j === i ? { ...c, [campo]: v } : c)) }));
-  const vazio = [r.meta_liquida, r.ponto_de_partida, r.mrr_de_partida, r.bpo_ticket, r.plus_acrescimo, r.cfo_acrescimo,
-    r.alerta.ticket_contabil, r.previsto.ticket_contabil, r.otimista.ticket_contabil].some((v) => v === "" || v === null);
+  const erros = errosDasPremissas(r);
+  const total = Object.values(erros).reduce((n, e) => n + Object.keys(e).length, 0);
+  const e = erros[aba] as Record<string, string>;
+  const explicacao = ABAS_DAS_PREMISSAS.find(([k]) => k === aba)?.[2];
 
   const salvar = async () => {
     definirSalvando(true);
@@ -405,87 +449,115 @@ function EditarPremissas({ plano, aoFechar, aoSalvar }: { plano: PlanoDeMrr; aoF
       aoFechar={aoFechar}
       rodape={
         <div className="perfis-acoes">
-          <button type="button" className="botao botao-primario" disabled={salvando || vazio} onClick={() => void salvar()}>
+          <button type="button" className="botao botao-primario" disabled={salvando || total > 0} onClick={() => void salvar()}>
             {salvando ? "Salvando…" : "Salvar premissas"}
           </button>
           <button type="button" className="botao" onClick={aoFechar}>Cancelar</button>
-          {vazio && <span className="campo-ajuda">Preencha todos os valores em reais.</span>}
+          <span className="campo-ajuda">
+            {total > 0
+              ? `Corrija ${total} ${total === 1 ? "campo" : "campos"}: veja o "!" nas abas.`
+              : "Salva as seis abas juntas."}
+          </span>
         </div>
       }
     >
-      <div className="plano-form">
-        <fieldset>
-          <legend>Meta e prazo</legend>
-          <CampoDinheiro rotulo="Meta líquida (R$/mês)" value={r.meta_liquida} aoMudar={(v) => mudar("meta_liquida", v)} />
-          <CampoData rotulo="Início do realizado" tipo="month" value={r.inicio} aoMudar={(v) => mudar("inicio", v)} />
-          <CampoData rotulo="Fim do prazo" value={r.fim} aoMudar={(v) => mudar("fim", v)} />
-          <CampoData rotulo="Primeiro mês projetado" tipo="month" value={r.inicio_da_projecao} aoMudar={(v) => mudar("inicio_da_projecao", v)} />
-          <CampoDinheiro rotulo="Já realizado antes da projeção (R$/mês)" value={r.ponto_de_partida} aoMudar={(v) => mudar("ponto_de_partida", v)} />
-          <CampoDinheiro rotulo="MRR de partida, base do churn (R$/mês)" value={r.mrr_de_partida} aoMudar={(v) => mudar("mrr_de_partida", v)} />
-          <CampoNumero rotulo="Churn ao ano (%)" value={r.churn_anual_pct} aoMudar={(v) => mudar("churn_anual_pct", v)} />
-        </fieldset>
-        <fieldset>
-          <legend>BPO Financeiro e contábil</legend>
-          <CampoDinheiro rotulo="Entrada do BPO Financeiro (R$/mês)" value={r.bpo_ticket} aoMudar={(v) => mudar("bpo_ticket", v)} />
-          <CampoNumero rotulo="Teto da célula (clientes novos/mês)" value={r.bpo_teto} aoMudar={(v) => mudar("bpo_teto", v)} />
-          <CampoNumero rotulo="Vagas de onboarding contábil/mês" value={r.contabil_vagas} aoMudar={(v) => mudar("contabil_vagas", v)} />
-          <CampoNumero rotulo="Vagas que um atípico ocupa" value={r.atipico_vagas} aoMudar={(v) => mudar("atipico_vagas", v)} />
-        </fieldset>
-        <fieldset>
-          <legend>Escada</legend>
-          <CampoNumero rotulo="Prazo de cada degrau (meses)" value={r.escada_prazo_meses} aoMudar={(v) => mudar("escada_prazo_meses", Number(v))} />
-          <CampoNumero rotulo="Sobem para o BPO Plus (%)" value={r.plus_pct} aoMudar={(v) => mudar("plus_pct", v)} />
-          <CampoDinheiro rotulo="Acréscimo do BPO Plus (R$/mês)" value={r.plus_acrescimo} aoMudar={(v) => mudar("plus_acrescimo", v)} />
-          <CampoNumero rotulo="Desses, sobem para o CFO as a Service (%)" value={r.cfo_pct} aoMudar={(v) => mudar("cfo_pct", v)} />
-          <CampoDinheiro rotulo="Acréscimo do CFO as a Service (R$/mês)" value={r.cfo_acrescimo} aoMudar={(v) => mudar("cfo_acrescimo", v)} />
-        </fieldset>
-        {(["alerta", "previsto", "otimista"] as const).map((c) => (
-          <fieldset key={c}>
-            <legend>Cenário {NOME_DO_CENARIO[c].toLowerCase()}</legend>
-            <CampoNumero rotulo="BPO Financeiro novos/mês" value={r[c].bpo_por_mes} aoMudar={(v) => mudarCenario(c, "bpo_por_mes", v)} />
-            <CampoDinheiro rotulo="Ticket contábil (R$/mês)" value={r[c].ticket_contabil} aoMudar={(v) => mudarCenario(c, "ticket_contabil", v)} />
-            <label className="campo-marcar">
-              <input type="checkbox" checked={r[c].com_contratos_previstos} onChange={(e) => mudarCenario(c, "com_contratos_previstos", e.target.checked)} />
-              Conta os contratos previstos
-            </label>
-          </fieldset>
-        ))}
-        <fieldset>
-          <legend>Quatro fases: taxas do funil e alvos</legend>
-          <p className="campo-ajuda">Deixe vazio para o previsto usar a taxa histórica do CRM (três meses fechados).</p>
-          {TAXAS_E_ALVOS.map(([k, rotulo, sufixo]) => (
-            <CampoNumero key={k} rotulo={`${rotulo}${sufixo ? ` (${sufixo.trim()})` : ""}`} value={r[k] ?? ""}
-              aoMudar={(v) => mudar(k, v === "" ? null : v)} />
-          ))}
-        </fieldset>
-        <fieldset>
-          <legend>Contratos previstos (contábil)</legend>
-          <p className="campo-ajuda">Sem nome de cliente: descreva o contrato para quem edita o plano.</p>
-          {r.contratos_previstos.map((c, i) => (
-            <div key={i} className="plano-previsto">
-              <label className="campo">
-                <span className="campo-rotulo">Descrição</span>
-                <input className="entrada" value={c.descricao} maxLength={120} onChange={(e) => mudarPrevisto(i, "descricao", e.target.value)} />
-              </label>
-              <CampoData rotulo="Mês" tipo="month" value={c.mes} aoMudar={(v) => mudarPrevisto(i, "mes", v)} />
-              <CampoDinheiro rotulo="Valor (R$/mês)" value={c.valor} aoMudar={(v) => mudarPrevisto(i, "valor", v)} />
-              <label className="campo-marcar">
-                <input type="checkbox" checked={c.atipico} onChange={(e) => mudarPrevisto(i, "atipico", e.target.checked)} />
-                Atípico
-              </label>
-              <button type="button" className="botao" onClick={() => definir((x) => ({ ...x, contratos_previstos: x.contratos_previstos.filter((_, j) => j !== i) }))}>
-                Tirar do plano
-              </button>
-            </div>
-          ))}
-          <button type="button" className="botao"
-            onClick={() => definir((x) => ({
-              ...x,
-              contratos_previstos: [...x.contratos_previstos, { descricao: "", mes: x.inicio_da_projecao, valor: "", atipico: false }],
-            }))}>
-            Acrescentar contrato previsto
-          </button>
-        </fieldset>
+      <div className="abas premissas-abas" role="tablist" aria-label="Premissas do plano">
+        {ABAS_DAS_PREMISSAS.map(([k, rotulo]) => {
+          const n = Object.keys(erros[k]).length;
+          return (
+            <button key={k} type="button" role="tab" id={`premissas-aba-${k}`} aria-selected={aba === k}
+              aria-controls="premissas-conteudo" className="aba" onClick={() => definirAba(k)}>
+              {rotulo}
+              {n > 0 && <span className="premissas-alerta" aria-label={`${n} ${n === 1 ? "campo" : "campos"} a corrigir`}>! {n}</span>}
+            </button>
+          );
+        })}
+      </div>
+      <div className="plano-form" role="tabpanel" id="premissas-conteudo" aria-labelledby={`premissas-aba-${aba}`}>
+        {explicacao && <p className="campo-ajuda">{explicacao}</p>}
+        {aba === "meta" && (
+          <div className="premissas-grade">
+            <CampoDinheiro rotulo="Meta líquida (R$/mês)" value={r.meta_liquida} aoMudar={(v) => mudar("meta_liquida", v)} erro={e.meta_liquida} />
+            <CampoNumero rotulo="Churn ao ano (%)" value={r.churn_anual_pct} aoMudar={(v) => mudar("churn_anual_pct", v)} erro={e.churn_anual_pct} />
+            <CampoData rotulo="Início do realizado" tipo="month" value={r.inicio} aoMudar={(v) => mudar("inicio", v)} />
+            <CampoData rotulo="Fim do prazo" value={r.fim} aoMudar={(v) => mudar("fim", v)} />
+            <CampoData rotulo="Primeiro mês projetado" tipo="month" value={r.inicio_da_projecao} aoMudar={(v) => mudar("inicio_da_projecao", v)} />
+            <CampoDinheiro rotulo="Já realizado antes da projeção (R$/mês)" value={r.ponto_de_partida} aoMudar={(v) => mudar("ponto_de_partida", v)} erro={e.ponto_de_partida} />
+            <CampoDinheiro rotulo="MRR de partida, base do churn (R$/mês)" value={r.mrr_de_partida} aoMudar={(v) => mudar("mrr_de_partida", v)} erro={e.mrr_de_partida} />
+          </div>
+        )}
+        {aba === "motores" && (
+          <div className="premissas-grade">
+            <CampoDinheiro rotulo="Entrada do BPO Financeiro (R$/mês)" value={r.bpo_ticket} aoMudar={(v) => mudar("bpo_ticket", v)} erro={e.bpo_ticket} />
+            <CampoNumero rotulo="Teto da célula (clientes novos/mês)" value={r.bpo_teto} aoMudar={(v) => mudar("bpo_teto", v)} erro={e.bpo_teto} />
+            <CampoNumero rotulo="Vagas de onboarding contábil/mês" value={r.contabil_vagas} aoMudar={(v) => mudar("contabil_vagas", v)} erro={e.contabil_vagas} />
+            <CampoNumero rotulo="Vagas que um atípico ocupa" value={r.atipico_vagas} aoMudar={(v) => mudar("atipico_vagas", v)} erro={e.atipico_vagas} />
+          </div>
+        )}
+        {aba === "escada" && (
+          <div className="premissas-grade">
+            <CampoNumero rotulo="Prazo de cada degrau (meses)" value={r.escada_prazo_meses} aoMudar={(v) => mudar("escada_prazo_meses", v === "" ? ("" as unknown as number) : Number(v))} erro={e.escada_prazo_meses} />
+            <span />
+            <CampoNumero rotulo="Sobem para o BPO Plus (%)" value={r.plus_pct} aoMudar={(v) => mudar("plus_pct", v)} erro={e.plus_pct} />
+            <CampoDinheiro rotulo="Acréscimo do BPO Plus (R$/mês)" value={r.plus_acrescimo} aoMudar={(v) => mudar("plus_acrescimo", v)} erro={e.plus_acrescimo} />
+            <CampoNumero rotulo="Desses, sobem para o CFO as a Service (%)" value={r.cfo_pct} aoMudar={(v) => mudar("cfo_pct", v)} erro={e.cfo_pct} />
+            <CampoDinheiro rotulo="Acréscimo do CFO as a Service (R$/mês)" value={r.cfo_acrescimo} aoMudar={(v) => mudar("cfo_acrescimo", v)} erro={e.cfo_acrescimo} />
+          </div>
+        )}
+        {aba === "cenarios" && (
+          <div className="premissas-cenarios">
+            {(["alerta", "previsto", "otimista"] as const).map((c) => (
+              <fieldset key={c} className={`premissas-cenario premissas-cenario-${c}`}>
+                <legend>{NOME_DO_CENARIO[c]}</legend>
+                <CampoNumero rotulo="BPO Fin. novos/mês" value={r[c].bpo_por_mes} aoMudar={(v) => mudarCenario(c, "bpo_por_mes", v)} erro={e[`${c}.bpo_por_mes`]} />
+                <CampoDinheiro rotulo="Ticket contábil (R$)" value={r[c].ticket_contabil} aoMudar={(v) => mudarCenario(c, "ticket_contabil", v)} erro={e[`${c}.ticket_contabil`]} />
+                <label className="campo-marcar">
+                  <input type="checkbox" checked={r[c].com_contratos_previstos} onChange={(ev) => mudarCenario(c, "com_contratos_previstos", ev.target.checked)} />
+                  Conta o pipeline
+                </label>
+              </fieldset>
+            ))}
+          </div>
+        )}
+        {aba === "fases" && (
+          <div className="premissas-grade">
+            {TAXAS_E_ALVOS.map(([k, rotulo, sufixo]) => (
+              <CampoNumero key={k} rotulo={`${rotulo}${sufixo ? ` (${sufixo.trim()})` : ""}`} value={r[k] ?? ""}
+                aoMudar={(v) => mudar(k, v === "" ? null : v)} />
+            ))}
+          </div>
+        )}
+        {aba === "previstos" && (
+          <>
+            {r.contratos_previstos.length === 0 && <p className="campo-ajuda">Nenhum contrato previsto no plano.</p>}
+            {r.contratos_previstos.map((c, i) => (
+              <div key={i} className="plano-previsto">
+                <label className="campo">
+                  <span className="campo-rotulo">Descrição</span>
+                  <input className={`entrada${e[`descricao-${i}`] ? " entrada-com-erro" : ""}`} value={c.descricao} maxLength={120}
+                    aria-invalid={e[`descricao-${i}`] ? true : undefined} onChange={(ev) => mudarPrevisto(i, "descricao", ev.target.value)} />
+                  {e[`descricao-${i}`] && <span className="campo-erro">{e[`descricao-${i}`]}</span>}
+                </label>
+                <CampoData rotulo="Mês" tipo="month" value={c.mes} aoMudar={(v) => mudarPrevisto(i, "mes", v)} />
+                <CampoDinheiro rotulo="Valor (R$/mês)" value={c.valor} aoMudar={(v) => mudarPrevisto(i, "valor", v)} erro={e[`valor-${i}`]} />
+                <label className="campo-marcar">
+                  <input type="checkbox" checked={c.atipico} onChange={(ev) => mudarPrevisto(i, "atipico", ev.target.checked)} />
+                  Atípico
+                </label>
+                <button type="button" className="botao" onClick={() => definir((x) => ({ ...x, contratos_previstos: x.contratos_previstos.filter((_, j) => j !== i) }))}>
+                  Tirar do plano
+                </button>
+              </div>
+            ))}
+            <button type="button" className="botao"
+              onClick={() => definir((x) => ({
+                ...x,
+                contratos_previstos: [...x.contratos_previstos, { descricao: "", mes: x.inicio_da_projecao, valor: "", atipico: false }],
+              }))}>
+              Acrescentar contrato previsto
+            </button>
+          </>
+        )}
       </div>
       {falha && <p className="estado estado-erro estado-texto" role="alert">✗ {falha}</p>}
     </PainelLateral>

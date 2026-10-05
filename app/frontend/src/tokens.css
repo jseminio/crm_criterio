@@ -16,6 +16,9 @@
 
   /* Superfícies */
   --surface-brand: var(--azul-noturno);
+  /* Azul de destaque (04/10/2026, pedido de Eduardo): o azul do template de proposta da Critério,
+     onde o azul-noturno lia como preto. Branco sobre ele: 8,7:1; azul-gelo: 6,5:1; azul-neve: 4,6:1. */
+  --azul-destaque: #1541b1;
   --surface-page: #f4f6f9;
   --surface-card: var(--branco);
   --surface-sunken: #eceff4;

@@ -1208,6 +1208,38 @@ td > .celula-fonte { display: block; }
 .plano-cenario-otimista { background: #e2f3ed; border-top-color: #0f6b52; }
 .plano-cenario-otimista .numero-rotulo, .plano-cenario-otimista .numero-valor { color: #0f6b52; }
 
+
+/* --------------------------------------------------------- Premissas em abas e azul de destaque (04/10/2026)
+   Amostra aprovada por Eduardo em 04/10/2026: o painel "Editar premissas" em seis abas, com "! n" na aba
+   que tem campo a corrigir. Na aba Inteligência de Conversão, o que era fundo azul-noturno (lia como
+   preto) passa ao azul de destaque, com letra branca. */
+.plano .botao-primario { background: var(--azul-destaque); border-color: var(--azul-destaque); color: var(--branco); }
+.plano-meta { background: var(--azul-destaque); border-color: var(--azul-destaque); }
+.plano-meta .plano-barra { background: rgba(255, 255, 255, 0.22); }
+.plano-cenario-previsto { background: var(--azul-destaque); border-top-color: var(--azul-gelo); }
+.premissas-abas { margin: 0 0 var(--e3); flex-wrap: wrap; gap: 0; }
+.premissas-abas .aba { white-space: nowrap; padding-left: 4px; padding-right: 4px; font-size: 12px; }
+.premissas-abas { justify-content: space-between; position: sticky; top: 0; z-index: 2; background: var(--surface-card); flex-shrink: 0; }
+.premissas-alerta { display: inline-block; margin-left: var(--e1); padding: 0 6px; font-size: 11px; font-weight: 600;
+  color: var(--perda); background: var(--perda-suave); border: 1px solid var(--perda); border-radius: 999px; }
+.premissas-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e3); }
+@media (max-width: 720px) { .premissas-grade { grid-template-columns: 1fr; } }
+.premissas-cenarios { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e2); }
+@media (max-width: 720px) { .premissas-cenarios { grid-template-columns: 1fr; } }
+.premissas-cenario { border: 0; border-top: 4px solid var(--borda-forte); border-radius: var(--raio-md); padding: var(--e3); margin: 0;
+  display: grid; gap: var(--e2); }
+.premissas-cenario .campo, .premissas-cenario .entrada { min-width: 0; width: 100%; box-sizing: border-box; }
+.premissas-cenario .campo-rotulo { font-size: 12px; }
+.premissas-cenario legend { float: left; width: 100%; padding: 0; margin-bottom: var(--e1); font-size: 13px; font-weight: 600; }
+.premissas-cenario-alerta { background: #fbefdc; border-top-color: #8a5300; }
+.premissas-cenario-alerta legend { color: #8a5300; }
+.premissas-cenario-previsto { background: #e4eaf8; border-top-color: var(--azul-destaque); }
+.premissas-cenario-previsto legend { color: var(--azul-destaque); }
+.premissas-cenario-otimista { background: #e2f3ed; border-top-color: #0f6b52; }
+.premissas-cenario-otimista legend { color: #0f6b52; }
+.entrada-com-erro { border: 2px solid var(--perda) !important; }
+.campo-erro { font-size: 12px; font-weight: 500; color: var(--perda); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

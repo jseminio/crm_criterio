@@ -123,8 +123,12 @@ describe("Funil › Inteligência de Conversão", () => {
     vi.mocked(api.mudarPlanoDeMrr).mockResolvedValue(novo);
     render(<InteligenciaDeConversao />);
     await userEvent.click(await screen.findByRole("button", { name: "Editar premissas" }));
-    const previsto = screen.getByRole("group", { name: "Cenário previsto" });
-    fireEvent.change(within(previsto).getByLabelText("BPO Financeiro novos/mês"), { target: { value: "4" } });
+    await userEvent.click(screen.getByRole("tab", { name: "Cenários" }));
+    const previsto = screen.getByRole("group", { name: "Previsto" });
+    fireEvent.change(within(previsto).getByLabelText("BPO Fin. novos/mês"), { target: { value: "4" } });
+    await userEvent.click(screen.getByRole("tab", { name: "Meta" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Cenários" }));
+    expect(within(screen.getByRole("group", { name: "Previsto" })).getByLabelText("BPO Fin. novos/mês")).toHaveValue(4);
     await userEvent.click(screen.getByRole("button", { name: "Salvar premissas" }));
     const enviado = vi.mocked(api.mudarPlanoDeMrr).mock.calls[0][0];
     expect(enviado.previsto.bpo_por_mes).toBe("4");
@@ -152,5 +156,22 @@ describe("Funil › Inteligência de Conversão", () => {
     const mes = await screen.findByLabelText("Mês");
     await userEvent.selectOptions(mes, "2026-12-01");
     expect(api.fasesDoMes).toHaveBeenLastCalledWith("2026-12-01");
+  });
+
+  it("o painel de premissas tem seis abas e marca a aba com campo a corrigir", async () => {
+    render(<InteligenciaDeConversao />);
+    await userEvent.click(await screen.findByRole("button", { name: "Editar premissas" }));
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(
+      expect.arrayContaining(["Meta", "Motores", "Escada", "Cenários", "Quatro fases", "Contratos previstos"]),
+    );
+    expect(screen.getByRole("tab", { name: "Meta" })).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(screen.getByRole("tab", { name: "Contratos previstos" }));
+    await userEvent.click(screen.getByRole("button", { name: "Acrescentar contrato previsto" }));
+    expect(screen.getByRole("tab", { name: /Contratos previstos.*2 campos a corrigir/ })).toBeInTheDocument();
+    expect(screen.getByText("Descreva o contrato")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Salvar premissas" })).toBeDisabled();
+    expect(screen.getByText(/Corrija 2 campos/)).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole("button", { name: "Tirar do plano" }).at(-1)!);
+    expect(screen.getByRole("button", { name: "Salvar premissas" })).toBeEnabled();
   });
 });

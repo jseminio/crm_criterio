@@ -16,6 +16,24 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Premissas em abas e azul de destaque (04/10/2026)
+
+Amostra aprovada por Eduardo em 04/10/2026.
+
+- **Painel "Editar premissas do plano" em seis abas**: Meta, Motores, Escada, Cenários, Quatro fases
+  e Contratos previstos. Antes eram oito blocos empilhados. Os campos e as regras não mudaram.
+  - Um só "Salvar premissas" grava as seis abas juntas; trocar de aba não perde o que foi digitado.
+  - A aba com campo obrigatório vazio ganha "! n" (o número de campos a corrigir), o campo fica
+    marcado com a mensagem, e o rodapé diz quantos faltam. Enquanto houver erro, "Salvar" fica
+    bloqueado.
+  - Os três cenários ficam lado a lado, cada um na sua cor.
+  - As abas ficam fixas no topo do painel ao rolar e quebram em duas linhas só quando não cabem.
+- **Azul de destaque** (`--azul-destaque`, #1541b1, o azul do template de proposta da Critério): na
+  aba Inteligência de Conversão, o que tinha fundo azul-noturno, que lia como preto (a meta, o
+  cenário previsto e os botões "Editar premissas" e "Salvar premissas"), passa a esse azul, com
+  letra branca. Branco sobre ele tem contraste de 8,7:1. A barra lateral e o topo do CRM continuam
+  em azul-noturno, a cor da marca.
+
 ## Inteligência de Conversão com contraste (04/10/2026)
 
 Amostra aprovada por Eduardo em 04/10/2026. A aba usava quase só cinza e branco e passou a usar as

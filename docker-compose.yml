@@ -1,0 +1,105 @@
+# Stack local completa do Critério CRM (crmcs): PostgreSQL + API + tela, para ensaiar a produção.
+# NÃO é o arquivo do servidor: lá vale o docker-compose.coolify.yml (banco criado no painel).
+#
+#   cp .env.example .env      # e preencha (segredo: openssl rand -hex 32)
+#   docker compose up -d --build
+#   abra http://localhost:8080 (ou a FRONTEND_PORT)
+#
+# Portas só em 127.0.0.1 e fora das usadas no desenvolvimento (5432, 5173, 8000):
+#   tela 8080 · PostgreSQL 55433 (para psql/backup) · API sem porta (só a tela fala com ela).
+#
+# A URL do banco vai como "postgres://", do jeito que o Coolify entrega: o ensaio exercita a mesma
+# normalização (crm/db/sessao.py) que a produção usa.
+
+name: crmcs
+
+services:
+  postgres:
+    # 18, como no servidor. A partir da 18 a imagem guarda os dados em /var/lib/postgresql/<versão>:
+    # o volume vai em /var/lib/postgresql (não mais em .../data).
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: crmcs
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crmcs_local}
+      POSTGRES_DB: crmcs
+      TZ: America/Sao_Paulo
+      PGTZ: America/Sao_Paulo
+    volumes:
+      - crmcs_pg:/var/lib/postgresql
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crmcs -d crmcs"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [crmcs_net]
+
+  crmcs-api:
+    build: ./app/backend
+    image: crmcs-backend:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CRM_DATABASE_URL: postgres://crmcs:${POSTGRES_PASSWORD:-crmcs_local}@postgres:5432/crmcs
+      CRM_ADMIN_EMAIL: ${CRM_ADMIN_EMAIL:?defina CRM_ADMIN_EMAIL no .env (a conta que nasce Administrador)}
+      CRM_ADMIN_SENHA_INICIAL: ${CRM_ADMIN_SENHA_INICIAL:?defina CRM_ADMIN_SENHA_INICIAL no .env (8 caracteres ou mais)}
+      CRM_SEGREDO_SESSAO: ${CRM_SEGREDO_SESSAO:?defina CRM_SEGREDO_SESSAO no .env (gere com openssl rand -hex 32)}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CRM_AGENTE_MODELO: ${CRM_AGENTE_MODELO:-}
+      CRM_M365_TENANT_ID: ${CRM_M365_TENANT_ID:-}
+      CRM_M365_CLIENT_ID: ${CRM_M365_CLIENT_ID:-}
+      CRM_M365_CLIENT_SECRET: ${CRM_M365_CLIENT_SECRET:-}
+      CRM_M365_REMETENTE: ${CRM_M365_REMETENTE:-}
+      CRM_QUESTIONARIO_URL: ${CRM_QUESTIONARIO_URL:-}
+      CRM_QUESTIONARIO_CHAVE: ${CRM_QUESTIONARIO_CHAVE:-}
+      # Fixos do container (ver scripts/servir_producao.py): escuta na rede interna e confia no
+      # X-Forwarded-For só de quem está em faixa privada (o nginx da tela).
+      CRM_HOST: 0.0.0.0
+      CRM_PORTA: "8000"
+      CRM_PROXY_CONFIAVEL: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      TZ: America/Sao_Paulo
+    expose: ["8000"]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks: [crmcs_net]
+
+  crmcs-web:
+    build: ./app/frontend
+    image: crmcs-frontend:local
+    restart: unless-stopped
+    depends_on:
+      crmcs-api:
+        condition: service_healthy
+    environment:
+      TZ: America/Sao_Paulo
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:8080"
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks: [crmcs_net]
+
+volumes:
+  crmcs_pg:
+
+networks:
+  crmcs_net:

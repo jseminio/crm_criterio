@@ -1,0 +1,12 @@
+# Só o código da tela vai para o build; o node_modules é refeito com npm ci.
+node_modules
+dist
+coverage
+.vite
+.env
+.env.*
+*.log
+*.local
+.DS_Store
+Dockerfile
+.dockerignore

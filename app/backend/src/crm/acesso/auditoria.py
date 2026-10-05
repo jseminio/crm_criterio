@@ -27,6 +27,8 @@ __all__ = ["UsuarioAtual", "usuario_atual", "ligar"]
 # Campos que não dizem nada a quem lê o histórico, ou que são grandes demais para ele.
 _IGNORADOS = {"criado_em", "atualizado_em", "conteudo_base64", "pdf_base64", "respostas", "avaliacao_do_site", "campos_do_crm", "transcricao"}
 _TABELAS_IGNORADAS = {"registro_de_alteracao", "execucao_de_carga", "ocorrencia_de_carga"}
+_SEM_VALOR = {"senha_hash"}
+"""Que mudou fica no histórico (quem redefiniu a senha de quem); o valor, nem em hash (#89, 05/10/2026)."""
 _LIMITE = 1000
 
 
@@ -95,6 +97,10 @@ def _linhas(sessao: Session, quem: UsuarioAtual) -> list[dict[str, Any]]:
                 continue
             historia = estado.attrs[nome].history
             if not historia.has_changes():
+                continue
+            if nome in _SEM_VALOR:
+                linhas.append({**base, "acao": "alterou", "tabela": tabela, "registro_id": _id(obj),
+                               "descricao": _descricao(obj), "campo": nome, "antes": None, "depois": "(alterada)"})
                 continue
             antes = historia.deleted[0] if historia.deleted else None
             depois = historia.added[0] if historia.added else None

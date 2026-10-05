@@ -1,6 +1,7 @@
 """Rotas do acesso (E1, 02/10/2026): como entrar, quem entrou, perfis, pessoas e o histórico de
 alterações. A checagem de cada rota contra o perfil fica no meio do caminho (`crm.api.app`), pelo
-mapa de `crm.acesso.catalogo`."""
+mapa de `crm.acesso.catalogo`. Desde 05/10/2026 (#89), também o login com e-mail e senha, a troca da
+própria senha e a senha que quem administra define para os outros."""
 
 from __future__ import annotations
 
@@ -9,20 +10,25 @@ from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from crm.acesso.auditoria import usuario_atual
 from crm.acesso.catalogo import MENUS, PERMISSOES
-from crm.acesso.entrada import ConfiguracaoDeEntrada
+from crm.acesso.entrada import (
+    ConfiguracaoDeEntrada, ConfiguracaoDeSenha, EntradaRecusada, abrir_sessao, barrar_se_bloqueado, entrar_com_senha,
+    perfil_administrador,
+)
+from crm.acesso.senha import Tentativas, confere, gerar_hash, problema_na_senha
 from crm.db.modelos import Perfil, RegistroDeAlteracao, Usuario
 
 __all__ = ["roteador_do_acesso", "quem_fez"]
 
 
 def quem_fez(informado: str | None) -> str | None:
-    """Com login, quem fez é quem entrou (o nome da conta Microsoft); sem login, o que a tela informou."""
+    """Com login, quem fez é quem entrou (o nome, ou o e-mail de quem ainda não tem nome); sem login, o
+    que a tela informou."""
     u = usuario_atual.get()
     return (u.nome or u.email) if u else informado
 
@@ -31,10 +37,33 @@ def quem_fez(informado: str | None) -> str | None:
 
 class Entrada(BaseModel):
     modo: str
-    """"microsoft" ou "local" (sem login, só na máquina do CRM)."""
+    """"senha" (e-mail e senha do CRM), "microsoft" ou "local" (sem login, só na máquina do CRM)."""
     tenant_id: str | None = None
     client_id: str | None = None
     escopo: str | None = None
+
+
+class Login(BaseModel):
+    email: str = Field(max_length=200)
+    senha: str = Field(max_length=1000)
+
+
+class Sessao(BaseModel):
+    token: str
+    expira_em: datetime
+    email: str
+    nome: str | None
+    perfil: str
+    administrador: bool
+
+
+class TrocaDeSenha(BaseModel):
+    senha_atual: str = Field(max_length=1000)
+    senha_nova: str
+
+
+class SenhaNova(BaseModel):
+    senha: str
 
 
 class Eu(BaseModel):
@@ -88,7 +117,10 @@ class UsuarioResposta(BaseModel):
 
 class UsuarioNovo(BaseModel):
     email: str = Field(min_length=3, max_length=200, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-    perfil_id: int
+    perfil_id: int | None = None
+    """Sem perfil, a pessoa nasce Administrador (decisão de Eduardo, 05/10/2026)."""
+    senha: str | None = None
+    """A senha provisória, que a pessoa troca depois se quiser. Obrigatória no modo e-mail e senha."""
 
 
 class UsuarioMudanca(BaseModel):
@@ -123,8 +155,25 @@ _MENU_DA_TABELA = {
 
 # --------------------------------------------------------------------- rotas
 
-def roteador_do_acesso(obter_sessao: Callable[[], Iterator[Session]], config: Callable[[], ConfiguracaoDeEntrada | None]) -> APIRouter:
+def roteador_do_acesso(
+    obter_sessao: Callable[[], Iterator[Session]],
+    config: Callable[[], ConfiguracaoDeSenha | ConfiguracaoDeEntrada | None],
+    tentativas: Tentativas | None = None,
+) -> APIRouter:
     r = APIRouter(tags=["acesso"])
+    tentativas = tentativas or Tentativas()
+
+    def _modo_senha() -> ConfiguracaoDeSenha:
+        c = config()
+        if not isinstance(c, ConfiguracaoDeSenha):
+            raise HTTPException(404, "a entrada com e-mail e senha não está ligada neste CRM")
+        return c
+
+    def _senha_valida(senha: str) -> str:
+        problema = problema_na_senha(senha)
+        if problema:
+            raise HTTPException(422, problema)
+        return senha
 
     def _resposta_do_perfil(sessao: Session, p: Perfil) -> PerfilResposta:
         pessoas = sessao.scalar(sa.select(sa.func.count()).where(Usuario.perfil_id == p.id, Usuario.ativo.is_(True)))
@@ -147,19 +196,67 @@ def roteador_do_acesso(obter_sessao: Callable[[], Iterator[Session]], config: Ca
             .where(Perfil.administrador.is_(True), Usuario.ativo.is_(True), Usuario.id != sem_usuario)
         ) > 0
 
-    @r.get("/api/acesso/entrada", response_model=Entrada)
+    # Só sai o que foi preenchido: no modo senha, `{"modo": "senha"}`; os outros dois seguem com os
+    # campos da Microsoft, nulos ou não, como antes do #89.
+    @r.get("/api/acesso/entrada", response_model=Entrada, response_model_exclude_unset=True)
     def entrada() -> Entrada:
         c = config()
         if c is None:
-            return Entrada(modo="local")
+            return Entrada(modo="local", tenant_id=None, client_id=None, escopo=None)
+        if isinstance(c, ConfiguracaoDeSenha):
+            return Entrada(modo="senha")
         return Entrada(modo="microsoft", tenant_id=c.tenant_id, client_id=c.client_id, escopo=c.escopo)
+
+    def _sessao(u: Usuario, token: str, expira: datetime) -> Sessao:
+        return Sessao(token=token, expira_em=expira, email=u.email, nome=u.nome, perfil=u.perfil.nome,
+                      administrador=u.perfil.administrador)
+
+    def _ip(request: Request) -> str:
+        # Atrás do proxy, o uvicorn de produção (`proxy_headers`) já pôs aqui o IP de quem chamou.
+        return request.client.host if request.client else "?"
+
+    @r.post("/api/acesso/login", response_model=Sessao)
+    def login(corpo: Login, request: Request, sessao: Session = Depends(obter_sessao)) -> Sessao:
+        """Pública. Erros: 401 e-mail ou senha errados (a mesma frase para os dois), 403 conta
+        desativada (só depois da senha certa), 429 no bloqueio por tentativas (`Tentativas`)."""
+        c = _modo_senha()
+        try:
+            u, token, expira = entrar_com_senha(sessao, corpo.email, corpo.senha, c, tentativas, _ip(request))
+        except EntradaRecusada as recusa:
+            raise HTTPException(recusa.status, recusa.mensagem) from None
+        return _sessao(u, token, expira)
+
+    @r.post("/api/acesso/senha", response_model=Sessao)
+    def trocar_minha_senha(corpo: TrocaDeSenha, request: Request, sessao: Session = Depends(obter_sessao)) -> Sessao:
+        """Quem entrou troca a própria senha. A troca derruba as sessões abertas com a senha antiga,
+        inclusive a deste pedido: por isso devolve uma sessão nova, no formato do login, que a tela
+        guarda no lugar da antiga. Senha atual errada conta como tentativa errada (e respeita o
+        bloqueio): uma sessão roubada não serve para adivinhar a senha."""
+        c = _modo_senha()
+        quem = usuario_atual.get()
+        u = sessao.scalar(sa.select(Usuario).where(Usuario.email == quem.email)) if quem else None
+        if u is None:
+            raise HTTPException(404, "pessoa não encontrada")
+        ip = _ip(request)
+        try:
+            barrar_se_bloqueado(tentativas, ip, u.email)
+        except EntradaRecusada as recusa:
+            raise HTTPException(recusa.status, recusa.mensagem) from None
+        if not confere(corpo.senha_atual, u.senha_hash):
+            tentativas.errou(ip, u.email)
+            raise HTTPException(400, "A senha atual não confere.")
+        tentativas.acertou(ip, u.email)
+        u.senha_hash = gerar_hash(_senha_valida(corpo.senha_nova))
+        sessao.commit()
+        return _sessao(u, *abrir_sessao(u, c))
 
     @r.get("/api/eu", response_model=Eu)
     def eu() -> Eu:
         u = usuario_atual.get()
         if u is None:  # sem login: a única pessoa é quem está na máquina do CRM
             return Eu(modo="local", email=None, nome=None, perfil="Sem login", administrador=True, permissoes=sorted(PERMISSOES))
-        return Eu(modo="microsoft", email=u.email, nome=u.nome, perfil=u.perfil, administrador=u.administrador,
+        c = config()
+        return Eu(modo=c.modo if c else "local", email=u.email, nome=u.nome, perfil=u.perfil, administrador=u.administrador,
                   permissoes=sorted(PERMISSOES) if u.administrador else sorted(u.permissoes))
 
     @r.get("/api/acesso/catalogo", response_model=list[Menu])
@@ -205,15 +302,32 @@ def roteador_do_acesso(obter_sessao: Callable[[], Iterator[Session]], config: Ca
     @r.post("/api/acesso/usuarios", response_model=UsuarioResposta)
     def liberar(corpo: UsuarioNovo, sessao: Session = Depends(obter_sessao)) -> UsuarioResposta:
         email = corpo.email.strip().lower()
-        if sessao.get(Perfil, corpo.perfil_id) is None:
+        if corpo.perfil_id is not None and sessao.get(Perfil, corpo.perfil_id) is None:
             raise HTTPException(422, "perfil não encontrado")
+        if corpo.senha is None and isinstance(config(), ConfiguracaoDeSenha):
+            raise HTTPException(422, "Informe a senha provisória: sem ela a pessoa não consegue entrar.")
+        senha_hash = gerar_hash(_senha_valida(corpo.senha)) if corpo.senha is not None else None
         u = sessao.scalar(sa.select(Usuario).where(Usuario.email == email))
         if u is not None:
             raise HTTPException(422, f"{email} já está na lista: mude o perfil ou reative por aqui")
-        u = Usuario(email=email, perfil_id=corpo.perfil_id, liberado_por=quem_fez(None))
+        perfil_id = corpo.perfil_id if corpo.perfil_id is not None else perfil_administrador(sessao).id
+        u = Usuario(email=email, perfil_id=perfil_id, liberado_por=quem_fez(None), senha_hash=senha_hash)
         sessao.add(u)
         sessao.commit()
         return _resposta_do_usuario(u)
+
+    @r.post("/api/acesso/usuarios/{usuario_id}/senha", status_code=204)
+    def redefinir_senha(usuario_id: int, corpo: SenhaNova, sessao: Session = Depends(obter_sessao)) -> None:
+        """Quem administra define uma senha nova para alguém (esqueceu, ou veio do tempo da Microsoft).
+        Derruba as sessões abertas da pessoa (o carimbo da senha muda) e tira o bloqueio por tentativas
+        erradas desse e-mail, em todos os IPs. Só no modo e-mail e senha, como as outras rotas de senha."""
+        _modo_senha()
+        u = sessao.get(Usuario, usuario_id)
+        if u is None:
+            raise HTTPException(404, "pessoa não encontrada")
+        u.senha_hash = gerar_hash(_senha_valida(corpo.senha))
+        sessao.commit()
+        tentativas.liberar(u.email)
 
     @r.patch("/api/acesso/usuarios/{usuario_id}", response_model=UsuarioResposta)
     def mudar_usuario(usuario_id: int, corpo: UsuarioMudanca, sessao: Session = Depends(obter_sessao)) -> UsuarioResposta:

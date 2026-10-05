@@ -16,6 +16,35 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Login com e-mail e senha no próprio CRM (#89, 05/10/2026)
+
+Decisão de Eduardo em 05/10/2026: no servidor, cada pessoa entra com **e-mail e senha do CRM**; o
+login pela conta Microsoft fica desligado, com o código guardado.
+
+- **Qual entrada vale**, pelo `backend/.env`: com `CRM_ADMIN_EMAIL`, e-mail e senha; sem ele, com os
+  dois IDs do Entra, a conta Microsoft (como antes); sem nenhum, sem login, só na máquina. A tela
+  pergunta em `GET /api/acesso/entrada` (`{"modo":"senha"}`).
+- **Primeiro acesso:** ao subir, a API cria a conta de `CRM_ADMIN_EMAIL` como Administrador, com
+  `CRM_ADMIN_SENHA_INICIAL`. O `.env` só semeia: conta que já existe não tem a senha trocada (a não
+  ser que não tenha senha nenhuma, caso das contas do tempo da Microsoft). Sem
+  `CRM_SEGREDO_SESSAO` (gere com `openssl rand -hex 32`), a API não sobe.
+- **Entrar:** `POST /api/acesso/login` devolve uma sessão de 12 horas (JWT assinado com
+  `CRM_SEGREDO_SESSAO`), que a tela manda em cada pedido. E-mail inexistente e senha errada dão a
+  mesma frase ("E-mail ou senha incorretos."). **5 erros seguidos** para o mesmo e-mail em 15
+  minutos bloqueiam esse e-mail **só para aquele IP**, por 15 minutos; **20 erros** de um IP, com
+  quaisquer e-mails, bloqueiam o IP (na memória da API; reiniciar zera). Assim ninguém tranca o
+  Administrador de fora errando a senha dele de propósito. Trocar ou redefinir a senha derruba as
+  sessões abertas com a anterior (quem troca a própria recebe uma sessão nova). Com login ligado,
+  `/docs` e `/openapi.json` não existem. Conta
+  desativada não entra (403) e perde a sessão aberta no pedido seguinte (401).
+- **Senhas:** pelo menos 8 caracteres. Quem administra cadastra a pessoa com uma senha provisória
+  (sem perfil escolhido, ela nasce Administrador) e redefine a senha de quem esqueceu, em
+  **Configurações › Perfis e acesso**; cada um troca a própria senha quando quiser (não é
+  obrigatório). Guardada só em hash `scrypt` com sal; nunca sai em resposta da API nem em log. O
+  histórico de alterações registra que a senha de alguém mudou e quem mudou, sem o valor.
+- Migração `f4a7c2e9b1d3`, só aditiva (coluna `usuario.senha_hash`). **Rode `alembic upgrade head`**,
+  com o backup antes. Sem dependência nova.
+
 ## Premissas em abas e azul de destaque (04/10/2026)
 
 Amostra aprovada por Eduardo em 04/10/2026.
@@ -586,18 +615,21 @@ Atualizado em 05/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil (com exclusão de oportunidade), contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", plano de MRR (Inteligência de Conversão), agente SDR, SDR de IA com base de conhecimento, backup lógico (manual e diário) e as telas abaixo |
-| Testes | **1.281** no backend e **532** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
-| Banco | PostgreSQL 18 local, 45 tabelas no modelo, migrações até `c6e2a9d4f1b7` (aderência da promessa e primeiro contato do lead, 04/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
-| API | 153 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
-| Entrada | **Login pela conta Microsoft ativo** na máquina de Eduardo desde 03/10/2026 (app registrado no Microsoft Entra). Perfis, permissões e histórico de alterações valem para todos |
+| Testes | **1.315** no backend e **563** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Banco | PostgreSQL 18 local, 45 tabelas no modelo, migrações até `f4a7c2e9b1d3` (senha do usuário, 05/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
+| API | 156 rotas, em `127.0.0.1:8000`. **Com login configurado (e-mail e senha ou conta Microsoft), toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
+| Entrada | **Login com e-mail e senha do CRM** (05/10/2026, #89), o do servidor. O login pela conta Microsoft, ativo na máquina de Eduardo desde 03/10/2026, fica no código e vale só sem `CRM_ADMIN_EMAIL`. Perfis, permissões e histórico de alterações valem para todos |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades, Questionários e Inteligência de Conversão), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens, SDR da IA e Base de conhecimento) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos e em uso; faltam a nuvem e o backup fora da máquina |
 | Fora do ar | **E1:** nuvem em região brasileira e backup fora da máquina com restauração testada. Comparação de provedores feita em 04/10/2026 (Magalu Cloud, AWS Lightsail e Azure, todos em São Paulo; a mais barata que atende é a Magalu, ~R$ 140/mês); Eduardo lembra de um servidor já contratado, a confirmar (nome, local do data center e o que inclui) antes de decidir. Enquanto isso, o CRM para quando o Mac desliga ou reinicia. O passo a passo para a equipe do servidor está em `IMPLANTACAO.md` (05/10/2026). **Etapa 2:** Clicksign, renovação, saldo de horas de conforto. O dashboard do cliente para as reuniões de resultado (fonte dos números e ferramenta a decidir). Buscar a transcrição direto no Granola, sem colar (depende de o plano do Granola ter API). **SDR de IA:** a conversa com o lead pelo WhatsApp ainda não existe (há um rascunho do envio pela API da Meta na branch `claude/great-wozniak-hxnd8u`, de 28/09) |
 
 ## Como rodar
 
-**No servidor (produção):** siga `IMPLANTACAO.md`. A API sobe por `scripts/servir_producao.py`,
-que se recusa a subir sem o login Microsoft configurado. O que vem abaixo é o desenvolvimento local.
+**No servidor (produção):** siga `IMPLANTACAO.md`; no servidor da Critério, pelo Coolify (seção 13:
+`docker-compose.coolify.yml` na raiz, atualizar é clicar em Deploy). A API sobe por `scripts/servir_producao.py`,
+que se recusa a subir sem login configurado (e-mail e senha ou Microsoft). Para ensaiar a produção no
+computador: `docker compose up -d --build` na raiz, com o `.env` da raiz (modelo em `.env.example`).
+O que vem abaixo é o desenvolvimento local.
 
 ```bash
 cd backend

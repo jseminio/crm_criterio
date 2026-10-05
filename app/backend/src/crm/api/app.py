@@ -4,11 +4,12 @@ Serve o funil: grupos, oportunidades, leads e, a partir do início da Etapa 2
 (23/09/2026), o contrato que nasce de uma oportunidade aceita. Implantação e
 carteira classificada continuam de fora — ainda não passam por aqui.
 
-**Entrada (E1, 02/10/2026).** Com `CRM_ENTRA_TENANT_ID` e `CRM_ENTRA_CLIENT_ID` no `.env`, toda
-rota exige a entrada pela conta Microsoft e a permissão do perfil (`crm.acesso`), e cada gravação vai
-para o histórico de alterações com quem fez. **Sem essas duas variáveis, a API segue sem login**,
-como antes do E1: só na máquina do CRM, escutando em `localhost`. **Não publique a API em rede
-nenhuma sem a entrada configurada.**
+**Entrada (E1, 02/10/2026; e-mail e senha desde 05/10/2026, #89).** Com `CRM_ADMIN_EMAIL` no `.env`,
+toda rota exige a sessão aberta com e-mail e senha; sem ela, com `CRM_ENTRA_TENANT_ID` e
+`CRM_ENTRA_CLIENT_ID`, a entrada pela conta Microsoft. Nos dois casos vale a permissão do perfil
+(`crm.acesso`), e cada gravação vai para o histórico de alterações com quem fez. **Sem nenhuma das
+duas, a API segue sem login**, como antes do E1: só na máquina do CRM, escutando em `localhost`.
+**Não publique a API em rede nenhuma sem a entrada configurada.**
 """
 
 from __future__ import annotations
@@ -35,7 +36,11 @@ from starlette.responses import JSONResponse
 from crm.acesso import auditoria
 from crm.acesso.auditoria import usuario_atual
 from crm.acesso.catalogo import PUBLICAS, permissoes_da_rota
-from crm.acesso.entrada import ConfiguracaoDeEntrada, EntradaRecusada, ler_configuracao, pessoa_do_token, validador_da_microsoft
+from crm.acesso.entrada import (
+    ConfiguracaoDeEntrada, ConfiguracaoDeSenha, EntradaRecusada, ler_configuracao, pessoa_do_email, pessoa_do_token,
+    semear_administrador, validador_da_microsoft,
+)
+from crm.acesso.senha import Tentativas, ler_sessao
 from crm.api import esquemas as e
 from crm.api.acesso import quem_fez, roteador_do_acesso
 from crm.api.inteligencia import roteador_de_inteligencia
@@ -142,18 +147,25 @@ def criar_app(
     servicos_de_analise: Callable[[], ServicosDeAnalise] | None = None,
     fonte_de_questionarios: Callable[[], FonteDeQuestionarios | None] | None = None,
     busca_de_endereco: BuscaDeEndereco | None = None,
-    entrada: ConfiguracaoDeEntrada | None = None,
+    entrada: ConfiguracaoDeSenha | ConfiguracaoDeEntrada | None = None,
     validar_token: Callable[[str], dict] | None = None,
     servicos_da_ata: Callable[[], ServicosDaAta] | None = None,
     busca_automatica: bool | None = None,
+    tentativas: Tentativas | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
-    próprio banco e um agente falso, sem chave nem rede."""
+    próprio banco e um agente falso, sem chave nem rede; `tentativas`, para o
+    teste controlar o relógio do bloqueio de login."""
 
     @asynccontextmanager
     async def ciclo_de_vida(_: FastAPI):
         global _fabrica
         _fabrica = fabrica or criar_fabrica_de_sessao(criar_engine(url_do_banco()))
+        # Modo e-mail e senha: a conta de `CRM_ADMIN_EMAIL` nasce aqui, antes do primeiro pedido.
+        # Falta de senha inicial ou senha curta impede a subida, com a frase do que falta.
+        if isinstance(config_de_entrada, ConfiguracaoDeSenha):
+            with _fabrica() as sessao:
+                semear_administrador(sessao, config_de_entrada)
         # Busca automática dos questionários (02/10/2026): ligada no uso real; no teste, só se pedir.
         ligada = busca_automatica if busca_automatica is not None else fabrica is None
         tarefa = asyncio.create_task(
@@ -167,14 +179,30 @@ def criar_app(
                 with contextlib.suppress(asyncio.CancelledError):
                     await tarefa
 
+    # Entrada: no uso real, lida do `.env`; no teste (que passa a própria `fabrica`), só se o teste mandar.
+    # `.env` que pede o modo senha sem segredo para aqui mesmo (`EntradaMalConfigurada`): a API não sobe.
+    config_de_entrada = entrada if (entrada is not None or fabrica is not None) else ler_configuracao()
+    # Com login, sem /docs, /redoc nem /openapi.json: na internet, o mapa das rotas não fica à vista
+    # de quem não entrou (#89, 05/10/2026). Sem login (só na máquina), seguem para o desenvolvimento.
+    com_login = config_de_entrada is not None
     api = FastAPI(
         title="Critério CRM",
         version="0.1.0",
-        summary="Funil comercial. Sem autenticação — ver o aviso no módulo.",
+        summary="Funil comercial. Entrada conforme o `.env` — ver o aviso no módulo.",
         lifespan=ciclo_de_vida,
+        docs_url=None if com_login else "/docs",
+        redoc_url=None if com_login else "/redoc",
+        openapi_url=None if com_login else "/openapi.json",
     )
-    # Entrada: no uso real, lida do `.env`; no teste (que passa a própria `fabrica`), só se o teste mandar.
-    config_de_entrada = entrada if (entrada is not None or fabrica is not None) else ler_configuracao()
+    @api.get("/health", include_in_schema=False)
+    def saude() -> dict[str, str]:
+        """Para o healthcheck do container (05/10/2026). Fora de `/api`: o login não o pega, e o
+        proxy da tela não o repassa para fora. **Não consulta o banco, de propósito:** a API não sobe
+        sem banco (o administrador é semeado ao subir) e a conexão perdida se refaz sozinha
+        (`pool_pre_ping`); um soluço do PostgreSQL marcaria a API como doente sem nada nela a corrigir.
+        Diz só que o processo está de pé e respondendo."""
+        return {"status": "healthy"}
+
     validador: list[Callable[[str], dict]] = [validar_token] if validar_token else []
 
     def _validar(token: str) -> dict:
@@ -183,6 +211,7 @@ def criar_app(
         return validador[0](token)
 
     auditoria.ligar()
+    modo_senha = isinstance(config_de_entrada, ConfiguracaoDeSenha)
 
     @api.middleware("http")
     async def exigir_entrada(request: Request, call_next):
@@ -191,13 +220,18 @@ def criar_app(
             return await call_next(request)
         autorizacao = request.headers.get("authorization", "")
         if not autorizacao.lower().startswith("bearer "):
-            return JSONResponse({"detail": "Entre com a conta Microsoft para usar o CRM."}, status_code=401)
+            pedido = "Entre com e-mail e senha para usar o CRM." if modo_senha else "Entre com a conta Microsoft para usar o CRM."
+            return JSONResponse({"detail": pedido}, status_code=401)
+        token = autorizacao[7:].strip()
 
         def identificar():
-            claims = _validar(autorizacao[7:].strip())
+            # Modo senha: o token só diz o e-mail e o carimbo da senha; perfil, "ativo" e a senha
+            # atual vêm do banco, a cada pedido.
+            achar = (lambda s: pessoa_do_email(s, *(ler_sessao(token, config_de_entrada.segredo) or (None, None)))) \
+                if modo_senha else (lambda s: pessoa_do_token(s, _validar(token), config_de_entrada))
             sessao = _fabrica()
             try:
-                return pessoa_do_token(sessao, claims, config_de_entrada)
+                return achar(sessao)
             finally:
                 sessao.close()
 
@@ -243,7 +277,7 @@ def criar_app(
     api.include_router(roteador_de_inteligencia(obter_sessao))
     api.include_router(roteador_do_sucesso(obter_sessao, servicos_da_ata or servicos_da_ata_reais))
     api.include_router(roteador_de_ajustes(obter_sessao))
-    api.include_router(roteador_do_acesso(obter_sessao, lambda: config_de_entrada))
+    api.include_router(roteador_do_acesso(obter_sessao, lambda: config_de_entrada, tentativas))
     return api
 
 

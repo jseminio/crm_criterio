@@ -28,7 +28,7 @@ export function MatrizesDeProposta() {
   const [config, definirConfig] = useState<ConfiguracaoDeProposta | null>(null);
   const [rascunho, definirRascunho] = useState<Rascunho | null>(null);
   const [quem, definirQuem] = useState("");
-  const comLogin = usarAcesso().eu.modo === "microsoft";
+  const comLogin = usarAcesso().eu.modo !== "local"; // com login (senha ou Microsoft), o nome vem de quem entrou
   const [erroAoAbrir, definirErroAoAbrir] = useState<string | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
   const [feito, definirFeito] = useState<string | null>(null);

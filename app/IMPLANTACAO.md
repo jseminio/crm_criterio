@@ -9,7 +9,8 @@ Dúvida sobre o funcionamento do CRM: `app/README.md`.
 São decisões de Eduardo, registradas em `arquitetura.md` e `CLAUDE.md`:
 
 1. **Tudo no Brasil:** banco, arquivos e backup ficam em data center brasileiro (decisão de 19/09/2026).
-2. **Login Microsoft obrigatório.** Sem ele, a API não pede entrada. O script de produção
+2. **Login obrigatório, com e-mail e senha do próprio CRM** (decisão de 05/10/2026, #89; o login
+   Microsoft fica desligado). Sem login, a API não pede entrada. O script de produção
    (`servir_producao.py`) se recusa a subir sem a configuração.
 3. **Segredo só no `.env` do servidor** (permissão 600) ou num cofre. Nunca no GitHub, em e-mail,
    em chat ou em log.
@@ -31,6 +32,10 @@ navegador ──HTTPS──▶ proxy (nginx ou equivalente)
 - A API não serve a tela; quem serve é o proxy.
 - **Um processo só da API:** a busca automática dos questionários do site roda dentro dela, e
   vários processos repetiriam a busca.
+
+> **No servidor da Critério (Coolify), siga a seção 13.** Os passos 2 a 11 são o caminho manual
+> (systemd + nginx na máquina), para um servidor sem Coolify. As regras do passo 0 e a conferência do
+> passo 12 valem para os dois.
 
 ## 2. O que instalar
 
@@ -68,24 +73,39 @@ Copie `app/backend/.env.example` para `app/backend/.env`, rode `chmod 600 .env` 
 | Variável | Para quê | Obrigatória |
 |---|---|---|
 | `CRM_DATABASE_URL` | `postgresql+psycopg://usuario:senha@servidor:5432/banco`. Tem precedência sobre `CRM_DB_*` | sim |
-| `CRM_ENTRA_TENANT_ID`, `CRM_ENTRA_CLIENT_ID` | login Microsoft (os mesmos do Mac; são IDs, não senha) | **sim: sem elas a API não sobe** |
-| `CRM_ADMINISTRADORES` | e-mails que entram como Administrador na primeira vez | sim |
+| `CRM_ADMIN_EMAIL` | liga o login com e-mail e senha; a conta nasce Administrador ao subir a API, se ainda não existir | **sim: sem login a API não sobe** |
+| `CRM_ADMIN_SENHA_INICIAL` | a senha dessa conta quando ela nasce (8 caracteres ou mais). O `.env` só semeia: depois de trocada na tela, mudar aqui não muda nada | **sim** |
+| `CRM_SEGREDO_SESSAO` | assina as sessões (12 horas). Gere **no servidor** com `openssl rand -hex 32`; precisa de 32 caracteres ou mais. Trocá-lo encerra todas as sessões | **sim** |
+| `CRM_ENTRA_TENANT_ID`, `CRM_ENTRA_CLIENT_ID`, `CRM_ADMINISTRADORES` | login Microsoft, **desligado**: com `CRM_ADMIN_EMAIL` presente, é ignorado | não |
 | `ANTHROPIC_API_KEY` | ata pela IA, agente SDR, análise da carteira | para essas funções |
 | `CRM_M365_*` (4) | envio de e-mail pelo Microsoft 365 | para aprovar abordagem por e-mail |
 | `CRM_QUESTIONARIO_URL`, `CRM_QUESTIONARIO_CHAVE` | busca dos questionários do site | para a busca |
 | `CRM_HOST`, `CRM_PORTA` | onde a API escuta (padrão `127.0.0.1` e `8000`) | não |
+| `CRM_PROXY_CONFIAVEL` | de quem a API aceita `X-Forwarded-For` (IPs ou faixas, por vírgula; padrão `127.0.0.1`). `*` é recusado | não |
 
-## 5. Microsoft Entra (feito por quem administra o Microsoft 365)
+## 5. Primeiro acesso e as contas das pessoas
 
-O login hoje funciona para `http://localhost:5173/`. Para o servidor:
+Não há nada a configurar fora do servidor: o login com e-mail e senha é do próprio CRM.
 
-1. Entre em portal.azure.com › Microsoft Entra ID › Registros de aplicativo › o aplicativo do CRM
-   (o mesmo de `CRM_ENTRA_CLIENT_ID`).
-2. Abra **Autenticação** › plataforma **Aplicativo de página única (SPA)**.
-3. Acrescente o URI de redirecionamento `https://<endereço do CRM>/`, com a barra no fim. Faça o
-   mesmo para o endereço de teste.
+1. Ao subir (passo 8), a API cria a conta de `CRM_ADMIN_EMAIL` como **Administrador**, com
+   `CRM_ADMIN_SENHA_INICIAL`. Se a conta já existir (veio no backup do passo 7, por exemplo), a senha
+   dela **não** muda; se existir sem senha nenhuma (do tempo do login Microsoft), recebe a inicial.
+2. Quem administra entra com essa conta e, em **Configurações › Perfis e acesso**, cadastra cada
+   pessoa com uma senha provisória (sem perfil escolhido, ela nasce Administrador). A pessoa pode
+   trocar a própria senha depois; não é obrigatório.
+3. As contas que vieram do Mac (do tempo da Microsoft) **não têm senha**: quem administra define
+   uma para cada, na mesma tela.
+4. Passe cada senha provisória por canal seguro, nunca por e-mail ou chat aberto.
 
-Sem isso, a Microsoft recusa a entrada com o erro "redirect URI mismatch".
+Errar a senha 5 vezes seguidas em 15 minutos bloqueia aquele e-mail, só para aquele IP, por 15 minutos;
+20 erros de um IP com quaisquer e-mails bloqueiam o IP (redefinir a senha tira o bloqueio do e-mail).
+O IP vem do proxy (`X-Forwarded-For`), por isso o nginx do passo 8 precisa mandar esse cabeçalho.
+Trocar ou redefinir a senha encerra as sessões abertas com a senha anterior. Com login ligado, a API
+não publica `/docs` nem `/openapi.json`. Desativar a pessoa corta o acesso no pedido seguinte, mesmo com a sessão aberta.
+
+O login Microsoft fica no código, desligado. Para voltar a ele, tire `CRM_ADMIN_EMAIL` do `.env`,
+preencha o bloco da Microsoft e cadastre o endereço do CRM como URI de redirecionamento (SPA) no
+aplicativo do Entra; o passo a passo está no `README.md`, "Ligar a entrada pela conta Microsoft".
 
 ## 6. Criar as tabelas
 
@@ -161,7 +181,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 300s;      # a IA da ata e a proposta em PowerPoint demoram
-        client_max_body_size 50m;     # backup e matrizes de proposta sobem por arquivo
+        client_max_body_size 200m;    # backup e matrizes de proposta sobem por arquivo (a API aceita até 200 MB)
     }
 }
 ```
@@ -185,8 +205,8 @@ A porta 8000 **não** deve ficar aberta para fora; só o proxy fala com ela.
 
 O mesmo código em outro banco (`criterio_crm_teste`), outro `.env` e outra porta (`CRM_PORTA=8001`).
 Use outra pasta do código, outra unidade do systemd e outro endereço (por exemplo, `teste.<endereço>`).
-O endereço de teste também precisa estar cadastrado no Entra (passo 5). É nele que se testa a
-restauração do backup e cada atualização antes da produção.
+Use outro `CRM_SEGREDO_SESSAO` no teste: assim uma sessão aberta no teste não vale na produção. É nele
+que se testa a restauração do backup e cada atualização antes da produção.
 
 ## 11. Atualizar quando sair versão nova na `main`
 
@@ -204,12 +224,118 @@ Faça primeiro no ambiente de teste.
 
 ## 12. Conferência final
 
-- [ ] Abrir o endereço pede a conta Microsoft. Sem entrar, `https://<endereço>/api/listas` responde 401.
-- [ ] Eduardo entra como Administrador e vê os mesmos números do Mac: oportunidades, contratos, MRR.
+- [ ] Abrir o endereço pede e-mail e senha. Sem entrar, `https://<endereço>/api/listas` responde 401,
+      e `https://<endereço>/api/acesso/entrada` responde `{"modo":"senha"}`.
+- [ ] A conta de `CRM_ADMIN_EMAIL` entra como Administrador e vê os mesmos números do Mac:
+      oportunidades, contratos, MRR. Uma senha errada responde "E-mail ou senha incorretos.".
+- [ ] Cada pessoa que vai usar o CRM tem senha (as contas vindas do Mac começam sem) e consegue entrar.
+- [ ] `app/backend/.env` com permissão 600 e `CRM_SEGREDO_SESSAO` gerado no servidor, diferente do teste.
 - [ ] A porta 8000 não responde de fora do servidor.
 - [ ] O backup diário aparece na pasta e na cópia em outro data center.
 - [ ] A restauração no ambiente de teste foi feita uma vez, com os totais conferidos.
 - [ ] Os servidores, o banco e o backup ficam em data center no Brasil.
+
+## 13. Coolify (Docker Compose)
+
+Servidor da Critério com Coolify v4, endereço `https://crmcs.criterioconsultores.com.br`, a partir da
+`main` do repositório público. Depois de configurado, **atualizar é só clicar em Deploy**: a imagem é
+refeita, as migrações rodam sozinhas e a API e a tela voltam.
+
+```
+navegador ─HTTPS─▶ proxy do Coolify (Traefik, certificado automático)
+                    └─▶ crmcs-web :8080 (nginx sem root: a tela + /api/ repassado)
+                          └─▶ crmcs-api :8000 (servir_producao.py, 1 processo; sem domínio)
+                                └─▶ PostgreSQL criado no painel do Coolify
+```
+
+Arquivos: `docker-compose.coolify.yml` (raiz), `app/backend/Dockerfile`, `app/backend/entrypoint.sh`,
+`app/backend/atualizador.sh`, `app/frontend/Dockerfile`, `app/frontend/nginx.conf`. Para ensaiar no
+computador, o `docker-compose.yml` da raiz sobe tudo, com um PostgreSQL próprio (ver `.env.example`).
+
+### 13.1 Passo a passo (uma vez)
+
+1. **Banco.** No projeto do Coolify: *+ New › Database › PostgreSQL* (16 ou mais nova), no mesmo
+   servidor. Deixe **desligado** o *Make it publicly available*: o banco só é visto pela rede interna.
+   Inicie o banco e copie a **Postgres URL (internal)**, no formato
+   `postgres://usuario:senha@host:5432/postgres`. A API e as migrações aceitam esse formato como vem
+   (convertem para o driver do projeto); não é preciso editar.
+2. **Recurso.** *+ New › Public Repository* → `https://github.com/jseminio/crm_criterio`, branch
+   `main`, **Build Pack: Docker Compose**, **Base Directory: `/`**, **Docker Compose Location:
+   `/docker-compose.coolify.yml`**, e **ligue *Connect to Predefined Network*** (13.2). Salve: o
+   Coolify lê o compose e mostra os serviços `crmcs-api` e `crmcs-web`.
+3. **Variáveis** (*Environment Variables* do recurso). As obrigatórias aparecem marcadas; sem elas o
+   deploy recusa com a frase do que falta:
+
+   | Variável | Obrigatória | Valor / como gerar |
+   |---|---|---|
+   | `CRM_DATABASE_URL` | sim | a Postgres URL (internal) do passo 1 |
+   | `CRM_SEGREDO_SESSAO` | sim | `openssl rand -hex 32`, gerado na hora (64 caracteres; mínimo 32). Trocá-lo encerra todas as sessões |
+   | `CRM_ADMIN_EMAIL` | sim | o e-mail de quem administra; a conta nasce Administrador na primeira subida |
+   | `CRM_ADMIN_SENHA_INICIAL` | sim | 8 caracteres ou mais. Só semeia: depois de trocada na tela, mudar aqui não muda nada |
+   | `ANTHROPIC_API_KEY` | não | ata pela IA, agente SDR, análise da carteira |
+   | `CRM_AGENTE_MODELO` | não | vazio = modelo padrão do código |
+   | `CRM_M365_TENANT_ID`, `CRM_M365_CLIENT_ID`, `CRM_M365_CLIENT_SECRET`, `CRM_M365_REMETENTE` | não | envio de e-mail pelo Microsoft 365 (as quatro juntas) |
+   | `CRM_QUESTIONARIO_URL`, `CRM_QUESTIONARIO_CHAVE` | não | busca dos questionários do site (as duas juntas) |
+   | `SKIP_MIGRATIONS` | não | `1` pula as migrações numa subida (manutenção). Padrão `0` |
+   | `RUN_MIGRATIONS`, `STRICT_UPDATER` | não | padrão `true`; ver o cabeçalho de `app/backend/atualizador.sh` |
+
+   Marque as de segredo como *Secret* (não aparecem no log do deploy). `CRM_HOST`, `CRM_PORTA` e
+   `CRM_PROXY_CONFIAVEL` já vêm fixas no compose: não as crie no painel.
+4. **Domínio.** No serviço **`crmcs-web`**: `https://crmcs.criterioconsultores.com.br:8080`. O `:8080`
+   diz ao Coolify a porta do container; o público continua entrando pelo 443, com certificado
+   automático. O serviço **`crmcs-api` fica sem domínio**. Antes, o DNS de
+   `crmcs.criterioconsultores.com.br` precisa apontar (registro A) para `179.198.104.21`.
+5. **Deploy.** Na primeira vez, o log do `crmcs-api` mostra, nesta ordem: `aguardando PostgreSQL` →
+   `[ATUALIZADOR] aplicando migrações` → `Uvicorn running`. Os dois serviços ficam *healthy*.
+6. **Conferência:** o passo 12. Entre com `CRM_ADMIN_EMAIL` e troque a senha inicial na tela.
+7. **Dados do Mac:** em vez do passo 7 por linha de comando, use a tela: **Configurações › Backup**,
+   com o `.zip` exportado no Mac (`backup.py exportar`): ela confere o arquivo antes, e substituir os
+   dados exige confirmação (a mesma regra do `backup.py importar --substituir`). O limite é 200 MB.
+   Apague o `.zip` depois.
+
+### 13.2 Rede, porta e IP do cliente
+
+- **Ligue *Connect to Predefined Network*.** O PostgreSQL criado no painel fica na rede `coolify` do
+  servidor, e a URL interna usa o nome do container dele: sem a opção, a API não acha o banco.
+- **Por que os nomes `crmcs-api` e `crmcs-web`:** a rede `coolify` é compartilhada com os outros
+  projetos do servidor (Comercial, N8N, pensheet e outros), e nela o nome do serviço vira nome de DNS.
+  Com um `backend` genérico, o nginx da tela poderia mandar `/api` para a API de outro projeto (ou o
+  contrário). O prefixo `crmcs` evita a colisão. Não renomeie para nomes genéricos.
+- O `crmcs-api` só tem `expose`, sem `ports` e sem domínio: ninguém de fora do servidor chega nele.
+  **Dentro** do servidor, os containers dos outros projetos na rede `coolify` alcançam
+  `crmcs-api:8000` direto. O login continua valendo para eles, mas, por estarem em IP privado, podem
+  escolher o IP que a API vê e escapar do bloqueio de tentativas por IP. Esse é o preço da rede
+  compartilhada: um container comprometido de outro projeto poderia tentar senhas sem esse freio.
+- IP do cliente: o Traefik anota o IP em `X-Forwarded-For`; o nginx da tela o aceita só de IP privado
+  e o repassa; a API (`CRM_PROXY_CONFIAVEL` = faixas privadas) faz a mesma leitura, da direita para a
+  esquerda. Um IP forjado pelo navegador no começo do cabeçalho não vale. O bloqueio de tentativas de
+  senha por IP (passo 5) depende disso. **Não troque `CRM_PROXY_CONFIAVEL` por `*`**: a API recusa
+  subir, porque com `*` valeria o IP que o navegador escrevesse.
+- Se um dia houver Cloudflare (ou outro proxy) na frente do Coolify, o IP que chega passa a ser o do
+  Cloudflare: aí é preciso configurar o IP real no Traefik antes.
+
+### 13.3 Atualizar (o dia a dia)
+
+PR mesclada na `main` → **Deploy** no Coolify. Faça antes um backup (13.4). As migrações rodam
+sozinhas e só quando há alguma nova (o log diz `esquema em dia: nada a fazer` quando não há). Se uma
+migração falhar, a API **não sobe** (`STRICT_UPDATER=true`) e a tela responde 502 até corrigir: melhor
+que gravar em esquema desalinhado. Durante o Deploy, o CRM fica fora por alguns segundos.
+
+### 13.4 Backup do banco
+
+- No recurso do PostgreSQL: *Backups* → agendamento diário (por exemplo `0 3 * * *`), guardando 14,
+  com destino **S3 em data center brasileiro** (*Settings › S3 Storages* do Coolify), para cumprir o
+  passo 0, regra 1, e o passo 9: backup fora da máquina.
+- **Teste a restauração** uma vez na implantação e depois todo mês, num banco de teste: backup que
+  nunca foi restaurado é hipótese.
+- O backup lógico do próprio CRM (Configurações › Backup › Exportar) continua valendo como segunda
+  cópia, e é o formato que o passo 7 usa.
+
+### 13.5 Teste separado da produção (passo 0, regra 5)
+
+Outro recurso no Coolify, com outro banco do painel, outro `CRM_SEGREDO_SESSAO` e outro domínio
+(por exemplo `crmcs-teste.criterioconsultores.com.br:8080`). É nele que se ensaia a restauração e
+cada atualização antes da produção.
 
 ## O que não fazer
 
@@ -217,4 +343,5 @@ Faça primeiro no ambiente de teste.
   de produção.
 - Não abrir a porta 8000 nem usar ngrok/túnel.
 - Não versionar `.env`, backup, planilha ou qualquer arquivo com dado de cliente.
-- Não rodar mais de um processo da API no mesmo banco.
+- Não rodar mais de um processo da API no mesmo banco (no Coolify: não escale o `crmcs-api`).
+- Não deixar o banco do Coolify público nem dar domínio ao serviço `crmcs-api`.

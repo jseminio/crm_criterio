@@ -156,7 +156,7 @@ export function FichaDaOportunidade({ oportunidadeId, aoMudar }: { oportunidadeI
   const [ficha, definirFicha] = useState<Ficha | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
   const [quem, definirQuem] = usarQuemPreenche(ficha?.revisores ?? []);
-  const comLogin = usarAcesso().eu.modo === "microsoft";
+  const comLogin = usarAcesso().eu.modo !== "local"; // com login (senha ou Microsoft), o nome vem de quem entrou
 
   const carregar = () => {
     definirErro(null);

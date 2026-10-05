@@ -239,7 +239,11 @@ Faça primeiro no ambiente de teste.
 
 Servidor da Critério com Coolify v4, endereço `https://crmcs.criterioconsultores.com.br`, a partir da
 `main` do repositório público. Depois de configurado, **atualizar é só clicar em Deploy**: a imagem é
-refeita, as migrações rodam sozinhas e a API e a tela voltam.
+refeita, o atualizador aplica sozinho o que estiver pendente (13.3) e a API e a tela voltam.
+
+**Regra (#93, 05/10/2026): nada manual no servidor.** Nenhuma mudança de banco, dado, configuração ou
+variável exige comando no terminal do servidor: tudo vem no Redeploy, pelo `app/backend/atualizador.sh`.
+Se uma versão pedir "rode X depois do deploy", ela está errada (checklist no `CLAUDE.md` da raiz).
 
 ```
 navegador ─HTTPS─▶ proxy do Coolify (Traefik, certificado automático)
@@ -276,17 +280,24 @@ computador, o `docker-compose.yml` da raiz sobe tudo, com um PostgreSQL próprio
    | `CRM_AGENTE_MODELO` | não | vazio = modelo padrão do código |
    | `CRM_M365_TENANT_ID`, `CRM_M365_CLIENT_ID`, `CRM_M365_CLIENT_SECRET`, `CRM_M365_REMETENTE` | não | envio de e-mail pelo Microsoft 365 (as quatro juntas) |
    | `CRM_QUESTIONARIO_URL`, `CRM_QUESTIONARIO_CHAVE` | não | busca dos questionários do site (as duas juntas) |
-   | `SKIP_MIGRATIONS` | não | `1` pula as migrações numa subida (manutenção). Padrão `0` |
-   | `RUN_MIGRATIONS`, `STRICT_UPDATER` | não | padrão `true`; ver o cabeçalho de `app/backend/atualizador.sh` |
+   | `SKIP_MIGRATIONS` | não | `1`: nesta subida nada mexe no banco (sem backup, migração nem manutenção), para restauração à mão. Padrão `0` |
+   | `RUN_ENV_CHECK`, `RUN_BACKUP`, `RUN_MIGRATIONS`, `RUN_MAINTENANCE`, `RUN_CHECKS`, `STRICT_UPDATER` | não | padrão `true`; ver 13.3 e o cabeçalho de `app/backend/atualizador.sh` |
+   | `BACKUP_ANTES_DIAS` | não | por quantos dias guardar no volume local os backups de antes da migração (o mais recente fica sempre). Padrão `7` |
+   | `ESPERA_BANCO_SEGUNDOS` | não | quanto esperar o banco responder na subida. Padrão `60` |
 
    Marque as de segredo como *Secret* (não aparecem no log do deploy). `CRM_HOST`, `CRM_PORTA` e
-   `CRM_PROXY_CONFIAVEL` já vêm fixas no compose: não as crie no painel.
+   `CRM_PROXY_CONFIAVEL` já vêm fixas no compose: não as crie no painel. A lista completa, com o
+   padrão de cada uma, é o catálogo `app/backend/src/crm/config.py`; o atualizador confere o
+   ambiente contra ele a cada subida.
 4. **Domínio.** No serviço **`crmcs-web`**: `https://crmcs.criterioconsultores.com.br:8080`. O `:8080`
    diz ao Coolify a porta do container; o público continua entrando pelo 443, com certificado
    automático. O serviço **`crmcs-api` fica sem domínio**. Antes, o DNS de
    `crmcs.criterioconsultores.com.br` precisa apontar (registro A) para `179.198.104.21`.
 5. **Deploy.** Na primeira vez, o log do `crmcs-api` mostra, nesta ordem: `aguardando PostgreSQL` →
-   `[ATUALIZADOR] aplicando migrações` → `Uvicorn running`. Os dois serviços ficam *healthy*.
+   `[atualizador] ambiente: ambiente em dia` → `[atualizador] backup: [backup] OK` → `há migração
+   pendente — aplicando` → `manutenção: nenhuma tarefa registrada — nada a fazer` → `conferência: …` →
+   `Uvicorn running`. Os dois serviços ficam *healthy*. O volume `crmcs_backups` aparece em
+   *Persistent Storage* do recurso.
 6. **Conferência:** o passo 12. Entre com `CRM_ADMIN_EMAIL` e troque a senha inicial na tela.
 7. **Dados do Mac:** em vez do passo 7 por linha de comando, use a tela: **Configurações › Backup**,
    com o `.zip` exportado no Mac (`backup.py exportar`): ela confere o arquivo antes, e substituir os
@@ -316,16 +327,38 @@ computador, o `docker-compose.yml` da raiz sobe tudo, com um PostgreSQL próprio
 
 ### 13.3 Atualizar (o dia a dia)
 
-PR mesclada na `main` → **Deploy** no Coolify. Faça antes um backup (13.4). As migrações rodam
-sozinhas e só quando há alguma nova (o log diz `esquema em dia: nada a fazer` quando não há). Se uma
-migração falhar, a API **não sobe** (`STRICT_UPDATER=true`) e a tela responde 502 até corrigir: melhor
-que gravar em esquema desalinhado. Durante o Deploy, o CRM fica fora por alguns segundos.
+PR mesclada na `main` → **Deploy** no Coolify. Nada mais. A cada subida, o `atualizador.sh` faz, em
+ordem (log com o prefixo `[atualizador]`):
+
+1. **Ambiente:** confere as variáveis contra o catálogo. Obrigatória ausente ou inválida: a API não
+   sobe e o log diz qual e "configure em Coolify › crmcs › Environment Variables". Opcional ausente:
+   diz que usa o padrão.
+2. **Backup:** só quando há migração pendente, `pg_dump -Fc` do banco em `/app/backups` (volume
+   `crmcs_backups`, gravado local), conferido com `pg_restore -l`; apaga os com mais de
+   `BACKUP_ANTES_DIAS` dias (7). O mais recente fica sempre, por mais velho que seja.
+3. **Migrações:** só se o banco está atrás do head (`esquema em dia: nada a migrar` quando não está).
+4. **Manutenção:** tarefas de dados novas (`crm/manutencao/registro.py`), cada uma uma vez só,
+   registrada em `manutencao_aplicada`.
+5. **Conferências** (só relatam): esquema = head, conta de `CRM_ADMIN_EMAIL`, contagens de
+   oportunidades, contratos e usuários, espaço em `/app/backups`.
+
+Falha no backup, numa migração ou numa tarefa: a API **não sobe** (`STRICT_UPDATER=true`) e a tela
+responde 502 até corrigir: melhor que gravar em esquema desalinhado. A versão anterior do banco está
+no backup da etapa 2. Durante o Deploy, o CRM fica fora por alguns segundos.
+
+**Voltar ao backup de antes da migração** (só em incidente, decisão de quem responde pelo CRM):
+o arquivo está em *Persistent Storage › crmcs_backups*; a restauração é `pg_restore --clean
+--if-exists -d <banco>` com o cliente 18, numa subida com `SKIP_MIGRATIONS=1`, e a imagem da versão
+anterior. Ensaie no ambiente de teste (13.5) antes de precisar.
 
 ### 13.4 Backup do banco
 
-- No recurso do PostgreSQL: *Backups* → agendamento diário (por exemplo `0 3 * * *`), guardando 14,
-  com destino **S3 em data center brasileiro** (*Settings › S3 Storages* do Coolify), para cumprir o
-  passo 0, regra 1, e o passo 9: backup fora da máquina.
+- No recurso do PostgreSQL: *Backups* → agendamento diário **`0 6 * * *`**. O Coolify agenda em
+  UTC: 6h UTC = **3h de Brasília**. O backup é gravado **localmente** no servidor, com retenção de
+  **7 dias** (regra do dono, 05/10/2026). É o mesmo prazo do backup de antes da migração (13.3).
+- Gravado local quer dizer na mesma máquina do banco: um problema no servidor leva o banco e os
+  backups juntos. A cópia em outro data center brasileiro (passo 9, item 2) continua pendente, e
+  cabe ao dono decidir.
 - **Teste a restauração** uma vez na implantação e depois todo mês, num banco de teste: backup que
   nunca foi restaurado é hipótese.
 - O backup lógico do próprio CRM (Configurações › Backup › Exportar) continua valendo como segunda

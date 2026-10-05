@@ -31,6 +31,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ / "src"))
 
 from crm.acesso.entrada import ConfiguracaoDeSenha, EntradaMalConfigurada, ler_configuracao  # noqa: E402
+from crm.config import padrao_de  # noqa: E402
 from crm.db.sessao import ler_ambiente  # noqa: E402
 
 NADA = "Veja app/IMPLANTACAO.md, passo 4. Nada foi iniciado."
@@ -40,7 +41,10 @@ SEM_LOGIN = (
     f"e a carteira fica à vista de quem achar o endereço. {NADA}"
 )
 SEGREDO_MINIMO = 32
-PROXY_PADRAO = "127.0.0.1"
+# Os padrões vêm do catálogo único das variáveis (crm/config.py, #93): um lugar só para o literal.
+HOST_PADRAO = padrao_de("CRM_HOST")
+PORTA_PADRAO = padrao_de("CRM_PORTA")
+PROXY_PADRAO = padrao_de("CRM_PROXY_CONFIAVEL")
 
 
 def parametros(ambiente: dict[str, str]) -> dict:
@@ -60,7 +64,7 @@ def parametros(ambiente: dict[str, str]) -> dict:
                 f"✗ CRM_SEGREDO_SESSAO precisa de pelo menos {SEGREDO_MINIMO} caracteres "
                 f"(gere com: openssl rand -hex 32). {NADA}"
             )
-    host = (ambiente.get("CRM_HOST") or "127.0.0.1").strip()
+    host = (ambiente.get("CRM_HOST") or HOST_PADRAO).strip()
     confiavel = (ambiente.get("CRM_PROXY_CONFIAVEL") or "").strip() or PROXY_PADRAO
     if "*" in (parte.strip() for parte in confiavel.split(",")):
         raise SystemExit(
@@ -69,7 +73,7 @@ def parametros(ambiente: dict[str, str]) -> dict:
         )
     return {
         "host": host,
-        "port": int((ambiente.get("CRM_PORTA") or "8000").strip()),
+        "port": int((ambiente.get("CRM_PORTA") or PORTA_PADRAO).strip()),
         "workers": 1,
         "proxy_headers": True,
         "forwarded_allow_ips": confiavel,

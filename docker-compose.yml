@@ -56,6 +56,16 @@ services:
       CRM_M365_REMETENTE: ${CRM_M365_REMETENTE:-}
       CRM_QUESTIONARIO_URL: ${CRM_QUESTIONARIO_URL:-}
       CRM_QUESTIONARIO_CHAVE: ${CRM_QUESTIONARIO_CHAVE:-}
+      # Atualizador (app/backend/atualizador.sh), com os mesmos padrões do servidor.
+      SKIP_MIGRATIONS: ${SKIP_MIGRATIONS:-0}
+      RUN_ENV_CHECK: ${RUN_ENV_CHECK:-true}
+      RUN_BACKUP: ${RUN_BACKUP:-true}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      RUN_MAINTENANCE: ${RUN_MAINTENANCE:-true}
+      RUN_CHECKS: ${RUN_CHECKS:-true}
+      STRICT_UPDATER: ${STRICT_UPDATER:-true}
+      BACKUP_ANTES_DIAS: ${BACKUP_ANTES_DIAS:-7}
+      ESPERA_BANCO_SEGUNDOS: ${ESPERA_BANCO_SEGUNDOS:-60}
       # Fixos do container (ver scripts/servir_producao.py): escuta na rede interna e confia no
       # X-Forwarded-For só de quem está em faixa privada (o nginx da tela).
       CRM_HOST: 0.0.0.0
@@ -63,6 +73,9 @@ services:
       CRM_PROXY_CONFIAVEL: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
       TZ: America/Sao_Paulo
     expose: ["8000"]
+    # O pg_dump de antes de cada migração (atualizador.sh), como no servidor.
+    volumes:
+      - crmcs_backups:/app/backups
     read_only: true
     tmpfs: [/tmp]
     security_opt: ["no-new-privileges:true"]
@@ -100,6 +113,7 @@ services:
 
 volumes:
   crmcs_pg:
+  crmcs_backups:
 
 networks:
   crmcs_net:

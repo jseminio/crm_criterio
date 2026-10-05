@@ -615,8 +615,8 @@ Atualizado em 05/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil (com exclusão de oportunidade), contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", plano de MRR (Inteligência de Conversão), agente SDR, SDR de IA com base de conhecimento, backup lógico (manual e diário) e as telas abaixo |
-| Testes | **1.315** no backend e **563** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
-| Banco | PostgreSQL 18 local, 45 tabelas no modelo, migrações até `f4a7c2e9b1d3` (senha do usuário, 05/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
+| Testes | **1.394** no backend e **563** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Banco | PostgreSQL 18 local, 46 tabelas no modelo, migrações até `b8d3f1a6c2e4` (manutenção aplicada, 05/10/2026, #93). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 156 rotas, em `127.0.0.1:8000`. **Com login configurado (e-mail e senha ou conta Microsoft), toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Entrada | **Login com e-mail e senha do CRM** (05/10/2026, #89), o do servidor. O login pela conta Microsoft, ativo na máquina de Eduardo desde 03/10/2026, fica no código e vale só sem `CRM_ADMIN_EMAIL`. Perfis, permissões e histórico de alterações valem para todos |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades, Questionários e Inteligência de Conversão), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens, SDR da IA e Base de conhecimento) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
@@ -626,7 +626,13 @@ Atualizado em 05/10/2026.
 ## Como rodar
 
 **No servidor (produção):** siga `IMPLANTACAO.md`; no servidor da Critério, pelo Coolify (seção 13:
-`docker-compose.coolify.yml` na raiz, atualizar é clicar em Deploy). A API sobe por `scripts/servir_producao.py`,
+`docker-compose.coolify.yml` na raiz, atualizar é clicar em Deploy). **Regra (#93): nada manual no
+servidor** — o `backend/atualizador.sh` aplica no Redeploy tudo o que a versão traz: confere as
+variáveis (catálogo `crm/config.py`), faz `pg_dump` antes de migração pendente (gravado local, no
+volume `crmcs_backups`, retido por `BACKUP_ANTES_DIAS` dias: padrão 7, e o mais recente fica
+sempre), migra, roda as
+tarefas de dados novas (`crm/manutencao/registro.py`, uma vez cada) e relata o estado. Checklist de
+PR estrutural no `CLAUDE.md` da raiz. A API sobe por `scripts/servir_producao.py`,
 que se recusa a subir sem login configurado (e-mail e senha ou Microsoft). Para ensaiar a produção no
 computador: `docker compose up -d --build` na raiz, com o `.env` da raiz (modelo em `.env.example`).
 O que vem abaixo é o desenvolvimento local.

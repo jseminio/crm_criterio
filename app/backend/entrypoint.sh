@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Entrada do container da API (crmcs).
 #
-#   1. diretórios de runtime: nenhum. A API não grava em disco (matrizes, backups e arquivos gerados
-#      vivem no banco ou na memória); o único lugar gravável que ela usa é o /tmp, para upload grande;
+#   1. diretórios de runtime: a API não grava em disco (matrizes, backups lógicos e arquivos gerados
+#      vivem no banco ou na memória) e usa só o /tmp, para upload grande. O atualizador grava o
+#      backup de antes da migração em /app/backups (volume crmcs_backups);
 #   2. espera o PostgreSQL responder (pg_isready, até ESPERA_BANCO_SEGUNDOS, padrão 60);
-#   3. roda o atualizador (migrações; SKIP_MIGRATIONS=1 pula);
+#   3. roda o atualizador: ambiente, backup, migrações, manutenção e conferências (#93). Se ele
+#      falhar, a API não sobe e o motivo está no log, com a linha "[atualizador][ERRO]";
 #   4. exec do comando (CMD): a API vira o PID 1 e recebe o SIGTERM do docker direto.
 #
 # Nada aqui imprime a URL do banco nem a senha.
@@ -18,6 +20,10 @@ log() { printf '[entrypoint] %s\n' "$*"; }
 if [ ! -w /tmp ]; then
     log "ERRO: /tmp não é gravável; upload grande (backup, matriz de proposta) falharia."
     exit 1
+fi
+if [ ! -w /app/backups ]; then
+    # Não para aqui: só faz falta quando há migração pendente, e aí o atualizador diz o que fazer.
+    log "AVISO: /app/backups não é gravável (volume crmcs_backups montado?): o backup antes da migração vai falhar."
 fi
 
 # ---------------------------------------------------------------- 2. PostgreSQL
@@ -66,7 +72,7 @@ until pg_isready "${args[@]}" >/dev/null 2>&1; do
 done
 log "PostgreSQL pronto em $(( SECONDS - inicio ))s."
 
-# ---------------------------------------------------------------- 3. migrações
+# ---------------------------------------------------------------- 3. atualizador
 /app/atualizador.sh
 
 # ---------------------------------------------------------------- 4. a API

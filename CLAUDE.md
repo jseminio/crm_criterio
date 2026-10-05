@@ -39,6 +39,30 @@ Banco: PostgreSQL 18 local. Credenciais só em `app/backend/.env`, a partir do
 6. **Irreversível pede confirmação:** apagar, publicar, migração que descarta dado,
    carga que sobrescreve.
 
+## Regra de implantação: nada manual no servidor
+
+Decisão do dono em 05/10/2026 (#93). **Nenhuma mudança estrutural — banco, dados, configuração,
+variáveis de ambiente — pode exigir comando manual no servidor.** Tudo é aplicado pelo Redeploy da
+versão que sobe, via `app/backend/atualizador.sh` (chamado pelo `entrypoint.sh` antes da API):
+ambiente → backup (`pg_dump`, só com migração pendente; gravado local no volume `crmcs_backups`,
+retido 7 dias por `BACKUP_ANTES_DIAS`, sem nunca apagar o mais recente) → migrações → manutenção →
+conferências.
+Sem nada pendente, cada etapa diz "nada a fazer".
+
+Checklist de todo PR estrutural:
+
+- [ ] **Esquema:** migração Alembic nova, encadeada no head (`tests/test_migracoes.py`: uma ponta só).
+- [ ] **Dado** (corrigir, preencher, mover linhas em banco que já existe): uma `Tarefa` no fim de
+      `app/backend/src/crm/manutencao/registro.py`, com id `AAAA_MM_DD_assunto`, sem commit próprio e
+      com teste. Roda uma vez no Redeploy e fica registrada em `manutencao_aplicada`.
+- [ ] **Variável de ambiente nova:** no catálogo `app/backend/src/crm/config.py` com padrão seguro
+      (opcional, salvo se a API não tem como subir sem ela), no `app/backend/.env.example` e no
+      `docker-compose.coolify.yml` como `${NOME:-padrão}` (ou `${NOME:?…}` se obrigatória).
+      `tests/test_ambiente.py` derruba a suíte se faltar algum dos três.
+- [ ] Configuração que não é segredo e muda com o negócio vai para o código ou para o banco, não
+      para o painel.
+- [ ] Nada de "depois do deploy, rode X no terminal": se precisa rodar, é etapa do atualizador.
+
 ## Segurança e dados
 
 - Segredo só em `.env` ou cofre — nunca em código, JSON, nota ou log.

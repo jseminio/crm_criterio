@@ -18,7 +18,14 @@
 #   opcionais     ANTHROPIC_API_KEY, CRM_AGENTE_MODELO,
 #                 CRM_M365_TENANT_ID, CRM_M365_CLIENT_ID, CRM_M365_CLIENT_SECRET, CRM_M365_REMETENTE,
 #                 CRM_QUESTIONARIO_URL, CRM_QUESTIONARIO_CHAVE
-#   manutenção    SKIP_MIGRATIONS=1 (pula as migrações), RUN_MIGRATIONS, STRICT_UPDATER (ver atualizador.sh)
+#   atualizador   RUN_ENV_CHECK, RUN_BACKUP, RUN_MIGRATIONS, RUN_MAINTENANCE, RUN_CHECKS, STRICT_UPDATER,
+#                 BACKUP_ANTES_DIAS, SKIP_MIGRATIONS, ESPERA_BANCO_SEGUNDOS (padrões seguros; ver o
+#                 cabeçalho de app/backend/atualizador.sh). Não precisa criar nenhuma no painel.
+#
+# Regra do dono (#93): nada manual no servidor. Toda variável que o código lê está no catálogo
+# app/backend/src/crm/config.py e aqui, como ${NOME:?…} (obrigatória) ou ${NOME:-padrão}; os testes
+# (tests/test_ambiente.py) recusam variável lida no código que falte aqui. Variável nova nasce com
+# padrão seguro, para o Redeploy funcionar sem ninguém tocar no painel.
 #
 # Rede e nomes: o PostgreSQL criado no painel fica na rede "coolify" do servidor, e a URL interna usa o
 # nome do container dele; este recurso só o alcança com "Connect to Predefined Network" LIGADO. Essa
@@ -26,8 +33,10 @@
 # um "backend" ou "frontend" genérico colidiria com o de outro projeto, e o nginx poderia mandar /api
 # para a API errada. Por isso os nomes únicos, com o prefixo crmcs: crmcs-api e crmcs-web.
 #
-# Volumes: nenhum. A API não grava em disco (matrizes de proposta, backups importados e arquivos
-# gerados vivem no banco ou na memória); o dado está todo no PostgreSQL do painel.
+# Volumes: só crmcs_backups (/app/backups no crmcs-api), onde o atualizador guarda o pg_dump de antes
+# de cada migração, gravado local e retido por BACKUP_ANTES_DIAS dias (padrão 7; o mais recente
+# sempre fica). A API não grava em disco: o dado está todo no PostgreSQL do painel. O backup diário
+# é o do painel do banco (IMPLANTACAO.md, 13.4), também local, com 7 dias de retenção.
 #
 # Um processo só da API: não escale o crmcs-api para mais de uma réplica (busca automática dos
 # questionários e bloqueio de tentativas de senha vivem dentro do processo).
@@ -38,10 +47,10 @@ services:
       context: ./app/backend
     restart: always
     environment:
-      CRM_DATABASE_URL: ${CRM_DATABASE_URL:?copie a Postgres URL (internal) do banco criado no painel}
-      CRM_SEGREDO_SESSAO: ${CRM_SEGREDO_SESSAO:?gere com openssl rand -hex 32}
-      CRM_ADMIN_EMAIL: ${CRM_ADMIN_EMAIL:?e-mail da conta que nasce Administrador}
-      CRM_ADMIN_SENHA_INICIAL: ${CRM_ADMIN_SENHA_INICIAL:?senha inicial do administrador, 8 caracteres ou mais}
+      CRM_DATABASE_URL: ${CRM_DATABASE_URL:?falta a Postgres URL (internal) do banco do painel; configure em Coolify › crmcs › Environment Variables}
+      CRM_SEGREDO_SESSAO: ${CRM_SEGREDO_SESSAO:?falta o segredo das sessões (openssl rand -hex 32); configure em Coolify › crmcs › Environment Variables}
+      CRM_ADMIN_EMAIL: ${CRM_ADMIN_EMAIL:?falta o e-mail da conta que nasce Administrador; configure em Coolify › crmcs › Environment Variables}
+      CRM_ADMIN_SENHA_INICIAL: ${CRM_ADMIN_SENHA_INICIAL:?falta a senha inicial do administrador (8 ou mais); configure em Coolify › crmcs › Environment Variables}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       CRM_AGENTE_MODELO: ${CRM_AGENTE_MODELO:-}
       CRM_M365_TENANT_ID: ${CRM_M365_TENANT_ID:-}
@@ -50,9 +59,16 @@ services:
       CRM_M365_REMETENTE: ${CRM_M365_REMETENTE:-}
       CRM_QUESTIONARIO_URL: ${CRM_QUESTIONARIO_URL:-}
       CRM_QUESTIONARIO_CHAVE: ${CRM_QUESTIONARIO_CHAVE:-}
+      # Atualizador (app/backend/atualizador.sh): padrões seguros, nada a criar no painel.
       SKIP_MIGRATIONS: ${SKIP_MIGRATIONS:-0}
+      RUN_ENV_CHECK: ${RUN_ENV_CHECK:-true}
+      RUN_BACKUP: ${RUN_BACKUP:-true}
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      RUN_MAINTENANCE: ${RUN_MAINTENANCE:-true}
+      RUN_CHECKS: ${RUN_CHECKS:-true}
       STRICT_UPDATER: ${STRICT_UPDATER:-true}
+      BACKUP_ANTES_DIAS: ${BACKUP_ANTES_DIAS:-7}
+      ESPERA_BANCO_SEGUNDOS: ${ESPERA_BANCO_SEGUNDOS:-60}
       # Fixos do container (scripts/servir_producao.py). A API só tem "expose" e não tem domínio: o
       # proxy do Coolify não a roteia para fora. Confia no X-Forwarded-For só de IP privado (o nginx da
       # tela); "*" é recusado, porque deixaria o navegador escolher o IP e anularia o bloqueio de senha
@@ -63,6 +79,8 @@ services:
       TZ: America/Sao_Paulo
     expose:
       - "8000"
+    volumes:
+      - crmcs_backups:/app/backups
     read_only: true
     tmpfs:
       - /tmp
@@ -101,3 +119,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+volumes:
+  crmcs_backups:

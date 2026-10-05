@@ -1729,3 +1729,18 @@ class ContratoPrevistoDoPlano(Base):
     mes: Mapped[date] = mapped_column(sa.Date, nullable=False)
     valor: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
     atipico: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
+
+
+class ManutencaoAplicada(Base):
+    """Uma tarefa de manutenção de dados já aplicada pelo atualizador (#93, 05/10/2026). A linha nasce
+    na mesma transação da tarefa: se a tarefa falha, nem o efeito nem a linha ficam, e ela roda de novo
+    no próximo Redeploy. Por isso cada tarefa roda **uma vez só** (`crm.manutencao`). Não se edita."""
+
+    __tablename__ = "manutencao_aplicada"
+
+    id: Mapped[str] = mapped_column(sa.String(120), primary_key=True)
+    """O id estável da tarefa no registro (`AAAA_MM_DD_assunto`)."""
+    descricao: Mapped[str] = mapped_column(sa.String(300), nullable=False)
+    aplicada_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=agora)
+    resultado: Mapped[str | None] = mapped_column(sa.Text)
+    """O que a tarefa disse que fez, numa linha (contagens; nunca dado de cliente)."""

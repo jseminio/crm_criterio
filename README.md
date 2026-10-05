@@ -63,7 +63,8 @@ conciliada com o Balanço de Abertura (Contábil D ↔ Financeiro G6).
 - `tests/` — plano original de organização dos testes. Os testes que rodam estão em `app/`.
 - `docker-compose.coolify.yml` — o CRM no servidor, pelo Coolify (tela + API; banco criado no painel).
   Passo a passo em `app/IMPLANTACAO.md`, seção 13. `docker-compose.yml` + `.env.example` sobem a
-  mesma coisa no computador, com um PostgreSQL próprio, para ensaio.
+  mesma coisa no computador, com um PostgreSQL próprio, para ensaio. **Nada manual no servidor**
+  (#93): o Redeploy aplica tudo pelo `app/backend/atualizador.sh`; checklist no `CLAUDE.md`.
 
 ## Fonte dos dados
 

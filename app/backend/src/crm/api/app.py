@@ -194,6 +194,15 @@ def criar_app(
         redoc_url=None if com_login else "/redoc",
         openapi_url=None if com_login else "/openapi.json",
     )
+    @api.get("/health", include_in_schema=False)
+    def saude() -> dict[str, str]:
+        """Para o healthcheck do container (05/10/2026). Fora de `/api`: o login não o pega, e o
+        proxy da tela não o repassa para fora. **Não consulta o banco, de propósito:** a API não sobe
+        sem banco (o administrador é semeado ao subir) e a conexão perdida se refaz sozinha
+        (`pool_pre_ping`); um soluço do PostgreSQL marcaria a API como doente sem nada nela a corrigir.
+        Diz só que o processo está de pé e respondendo."""
+        return {"status": "healthy"}
+
     validador: list[Callable[[str], dict]] = [validar_token] if validar_token else []
 
     def _validar(token: str) -> dict:

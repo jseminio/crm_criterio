@@ -49,3 +49,37 @@ def test_email_e_senha_incompleto_nao_sobe_e_nao_mostra_o_segredo(falta, frase):
 def test_host_e_porta_pelo_ambiente():
     p = sp.parametros({**COM_LOGIN, "CRM_HOST": "0.0.0.0", "CRM_PORTA": "9000"})
     assert (p["host"], p["port"]) == ("0.0.0.0", 9000)
+
+
+PRIVADAS = "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
+
+@pytest.mark.parametrize("valor, esperado", [
+    (PRIVADAS, PRIVADAS),
+    (f"  {PRIVADAS} ", PRIVADAS),
+    ("", "127.0.0.1"),
+    ("   ", "127.0.0.1"),
+])
+def test_proxy_confiavel_pelo_ambiente(valor, esperado):
+    """No container o nginx da tela não tem IP fixo: a API confia na faixa da rede interna."""
+    assert sp.parametros({**COM_SENHA, "CRM_PROXY_CONFIAVEL": valor})["forwarded_allow_ips"] == esperado
+
+
+@pytest.mark.parametrize("valor", ["*", " * ", "10.0.0.0/8, *"])
+def test_proxy_confiavel_curinga_nao_sobe(valor):
+    """Com `*` o uvicorn usa o primeiro IP do X-Forwarded-For, que o navegador escreve: o bloqueio por IP
+    viraria enfeite."""
+    with pytest.raises(SystemExit, match="Nada foi iniciado"):
+        sp.parametros({**COM_SENHA, "CRM_PROXY_CONFIAVEL": valor})
+
+
+def test_faixas_confiaveis_dao_o_ip_do_cliente_e_nao_o_forjado():
+    """O comportamento do uvicorn instalado: com faixas, vale o primeiro IP de fora delas, lido da
+    direita. Cliente que forja `X-Forwarded-For: 1.2.3.4` não escapa do bloqueio."""
+    from uvicorn.middleware.proxy_headers import _TrustedHosts
+
+    confiaveis = _TrustedHosts(PRIVADAS)
+    # navegador forjou 1.2.3.4; o proxy de borda anotou o IP real (203.0.113.7); o nginx repetiu
+    assert confiaveis.get_trusted_client_address("1.2.3.4, 203.0.113.7, 203.0.113.7")[0] == "203.0.113.7"
+    assert confiaveis.get_trusted_client_address("203.0.113.7, 172.18.0.5")[0] == "203.0.113.7"
+    assert _TrustedHosts("*").get_trusted_client_address("1.2.3.4, 203.0.113.7")[0] == "1.2.3.4"  # o porquê da trava

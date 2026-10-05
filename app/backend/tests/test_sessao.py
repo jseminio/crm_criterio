@@ -33,6 +33,62 @@ class TestUrlDoBanco:
         assert url_do_banco("sqlite+pysqlite:///:memory:").startswith("postgresql")
 
 
+class TestNormalizacaoDaUrl:
+    """O Coolify entrega `postgres://usuario:senha@host:5432/postgres`; o SQLAlchemy não conhece
+    `postgres://` e leria `postgresql://` como psycopg2, que não está instalado."""
+
+    @pytest.mark.parametrize("entrada", [
+        "postgres://u:p@banco:5432/postgres",
+        "postgresql://u:p@banco:5432/postgres",
+        "POSTGRES://u:p@banco:5432/postgres",
+    ])
+    def test_esquema_sem_driver_vira_psycopg(self, monkeypatch, entrada):
+        monkeypatch.setenv(VARIAVEL, entrada)
+
+        assert url_do_banco() == "postgresql+psycopg://u:p@banco:5432/postgres"
+
+    @pytest.mark.parametrize("ja_certa", [
+        "postgresql+psycopg://u:p@banco:5432/crm",
+        "sqlite+pysqlite:///:memory:",
+    ])
+    def test_quem_ja_diz_o_driver_fica_igual(self, monkeypatch, ja_certa):
+        monkeypatch.setenv(VARIAVEL, ja_certa)
+
+        assert url_do_banco() == ja_certa
+
+    def test_senha_codificada_e_resto_da_url_ficam_intactos(self, monkeypatch):
+        import sqlalchemy as sa
+
+        monkeypatch.setenv(VARIAVEL, "postgres://crm:a%23b%40c@db-x1:6543/crm?sslmode=require")
+        url = sa.engine.make_url(url_do_banco())
+
+        assert (url.drivername, url.password, url.host, url.port, url.database) == (
+            "postgresql+psycopg", "a#b@c", "db-x1", 6543, "crm")
+        assert url.query == {"sslmode": "require"}
+
+    def test_vale_tambem_para_a_url_do_arquivo(self, tmp_path, monkeypatch):
+        from crm.db import sessao as modulo
+
+        arquivo = tmp_path / ".env"
+        arquivo.write_text(f"{VARIAVEL}=postgres://a@localhost/crm\n", encoding="utf-8")
+        monkeypatch.setattr(modulo, "ARQUIVO_ENV", arquivo)
+
+        assert modulo.url_do_banco() == "postgresql+psycopg://a@localhost/crm"
+
+    def test_a_engine_abre_com_o_driver_do_projeto(self, monkeypatch):
+        monkeypatch.setenv(VARIAVEL, "postgres://u:p@banco:5432/postgres")
+
+        assert criar_engine(url_do_banco()).dialect.driver == "psycopg"
+
+    def test_as_migracoes_leem_do_mesmo_ponto(self):
+        """`migrations/env.py` não pode ler a variável por conta própria: perderia a normalização."""
+        from pathlib import Path
+
+        env = (Path(__file__).resolve().parent.parent / "migrations" / "env.py").read_text(encoding="utf-8")
+        assert "from crm.db.sessao import criar_engine, url_do_banco" in env
+        assert "os.environ" not in env and "getenv" not in env
+
+
 class TestEngine:
     def test_cria_sem_tocar_no_banco(self):
         engine = criar_engine("sqlite+pysqlite:///:memory:")

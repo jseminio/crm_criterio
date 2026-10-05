@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 __all__ = [
     "url_do_banco",
+    "normalizar_url",
     "ler_ambiente",
     "criar_engine",
     "criar_fabrica_de_sessao",
@@ -157,6 +158,24 @@ def _ler_do_arquivo(arquivo: Path | None = None) -> str | None:
     return None
 
 
+#: Esquemas que o painel do servidor (Coolify) e outros provedores entregam sem dizer o driver.
+#: O SQLAlchemy leria `postgresql://` como psycopg2, que não está instalado, e nem conhece
+#: `postgres://`. O driver do projeto é o psycopg 3.
+_ESQUEMAS_SEM_DRIVER = ("postgres://", "postgresql://")
+_ESQUEMA_DO_PROJETO = "postgresql+psycopg://"
+
+
+def normalizar_url(url: str) -> str:
+    """`postgres://…` e `postgresql://…` viram `postgresql+psycopg://…`; o resto fica como está.
+
+    Só o começo muda: usuário, senha já codificada, servidor, porta e banco seguem intactos.
+    Quem já diz o driver (`postgresql+psycopg://`, `sqlite+pysqlite://`) não é tocado."""
+    for esquema in _ESQUEMAS_SEM_DRIVER:
+        if url[: len(esquema)].lower() == esquema:
+            return _ESQUEMA_DO_PROJETO + url[len(esquema):]
+    return url
+
+
 def url_do_banco(padrao: str | None = None) -> str:
     """Devolve a URL de conexão, nesta ordem de precedência:
 
@@ -165,9 +184,13 @@ def url_do_banco(padrao: str | None = None) -> str:
     3. as partes `CRM_DB_*`, montadas e codificadas aqui — o caminho recomendado
        em desenvolvimento, porque não exige acertar escape de endereço;
     4. `padrao`, que só o teste passa. Produção nunca adivinha um destino.
+
+    `CRM_DATABASE_URL` com `postgres://` ou `postgresql://` (como o Coolify entrega) passa por
+    `normalizar_url`; a API e as migrações (`migrations/env.py`) leem daqui.
     """
     valores = _ambiente()
-    url = valores.get(VARIAVEL) or _montar_das_partes(valores) or padrao
+    url = valores.get(VARIAVEL)
+    url = normalizar_url(url) if url else (_montar_das_partes(valores) or padrao)
     if not url:
         raise BancoNaoConfigurado(
             f"Não sei onde está o banco. Preencha {ARQUIVO_ENV} com "

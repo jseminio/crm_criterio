@@ -33,6 +33,10 @@ navegador ──HTTPS──▶ proxy (nginx ou equivalente)
 - **Um processo só da API:** a busca automática dos questionários do site roda dentro dela, e
   vários processos repetiriam a busca.
 
+> **No servidor da Critério (Coolify), siga a seção 13.** Os passos 2 a 11 são o caminho manual
+> (systemd + nginx na máquina), para um servidor sem Coolify. As regras do passo 0 e a conferência do
+> passo 12 valem para os dois.
+
 ## 2. O que instalar
 
 | Peça | Versão | Observação |
@@ -77,6 +81,7 @@ Copie `app/backend/.env.example` para `app/backend/.env`, rode `chmod 600 .env` 
 | `CRM_M365_*` (4) | envio de e-mail pelo Microsoft 365 | para aprovar abordagem por e-mail |
 | `CRM_QUESTIONARIO_URL`, `CRM_QUESTIONARIO_CHAVE` | busca dos questionários do site | para a busca |
 | `CRM_HOST`, `CRM_PORTA` | onde a API escuta (padrão `127.0.0.1` e `8000`) | não |
+| `CRM_PROXY_CONFIAVEL` | de quem a API aceita `X-Forwarded-For` (IPs ou faixas, por vírgula; padrão `127.0.0.1`). `*` é recusado | não |
 
 ## 5. Primeiro acesso e as contas das pessoas
 
@@ -176,7 +181,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 300s;      # a IA da ata e a proposta em PowerPoint demoram
-        client_max_body_size 50m;     # backup e matrizes de proposta sobem por arquivo
+        client_max_body_size 200m;    # backup e matrizes de proposta sobem por arquivo (a API aceita até 200 MB)
     }
 }
 ```
@@ -230,10 +235,106 @@ Faça primeiro no ambiente de teste.
 - [ ] A restauração no ambiente de teste foi feita uma vez, com os totais conferidos.
 - [ ] Os servidores, o banco e o backup ficam em data center no Brasil.
 
+## 13. Coolify (Docker Compose)
+
+Servidor da Critério com Coolify v4, endereço `https://crmcs.criterioconsultores.com.br`, a partir da
+`main` do repositório público. Depois de configurado, **atualizar é só clicar em Deploy**: a imagem é
+refeita, as migrações rodam sozinhas e a API e a tela voltam.
+
+```
+navegador ─HTTPS─▶ proxy do Coolify (Traefik, certificado automático)
+                    └─▶ frontend :8080 (nginx sem root: a tela + /api/ repassado)
+                          └─▶ backend :8000 (servir_producao.py, 1 processo; só rede interna)
+                                └─▶ PostgreSQL criado no painel do Coolify
+```
+
+Arquivos: `docker-compose.coolify.yml` (raiz), `app/backend/Dockerfile`, `app/backend/entrypoint.sh`,
+`app/backend/atualizador.sh`, `app/frontend/Dockerfile`, `app/frontend/nginx.conf`. Para ensaiar no
+computador, o `docker-compose.yml` da raiz sobe tudo, com um PostgreSQL próprio (ver `.env.example`).
+
+### 13.1 Passo a passo (uma vez)
+
+1. **Banco.** No projeto do Coolify: *+ New › Database › PostgreSQL* (16 ou mais nova), no mesmo
+   servidor. Deixe **desligado** o *Make it publicly available*: o banco só é visto pela rede interna.
+   Inicie o banco e copie a **Postgres URL (internal)**, no formato
+   `postgres://usuario:senha@host:5432/postgres`. A API e as migrações aceitam esse formato como vem
+   (convertem para o driver do projeto); não é preciso editar.
+2. **Recurso.** *+ New › Public Repository* → `https://github.com/jseminio/crm_criterio`, branch
+   `main`, **Build Pack: Docker Compose**, **Base Directory: `/`**, **Docker Compose Location:
+   `/docker-compose.coolify.yml`**. Salve: o Coolify lê o compose e mostra os serviços `backend` e
+   `frontend`.
+3. **Variáveis** (*Environment Variables* do recurso). As obrigatórias aparecem marcadas; sem elas o
+   deploy recusa com a frase do que falta:
+
+   | Variável | Obrigatória | Valor / como gerar |
+   |---|---|---|
+   | `CRM_DATABASE_URL` | sim | a Postgres URL (internal) do passo 1 |
+   | `CRM_SEGREDO_SESSAO` | sim | `openssl rand -hex 32`, gerado na hora (64 caracteres; mínimo 32). Trocá-lo encerra todas as sessões |
+   | `CRM_ADMIN_EMAIL` | sim | o e-mail de quem administra; a conta nasce Administrador na primeira subida |
+   | `CRM_ADMIN_SENHA_INICIAL` | sim | 8 caracteres ou mais. Só semeia: depois de trocada na tela, mudar aqui não muda nada |
+   | `ANTHROPIC_API_KEY` | não | ata pela IA, agente SDR, análise da carteira |
+   | `CRM_AGENTE_MODELO` | não | vazio = modelo padrão do código |
+   | `CRM_M365_TENANT_ID`, `CRM_M365_CLIENT_ID`, `CRM_M365_CLIENT_SECRET`, `CRM_M365_REMETENTE` | não | envio de e-mail pelo Microsoft 365 (as quatro juntas) |
+   | `CRM_QUESTIONARIO_URL`, `CRM_QUESTIONARIO_CHAVE` | não | busca dos questionários do site (as duas juntas) |
+   | `SKIP_MIGRATIONS` | não | `1` pula as migrações numa subida (manutenção). Padrão `0` |
+   | `RUN_MIGRATIONS`, `STRICT_UPDATER` | não | padrão `true`; ver o cabeçalho de `app/backend/atualizador.sh` |
+
+   Marque as de segredo como *Secret* (não aparecem no log do deploy). `CRM_HOST`, `CRM_PORTA` e
+   `CRM_PROXY_CONFIAVEL` já vêm fixas no compose: não as crie no painel.
+4. **Domínio.** No serviço **frontend**: `https://crmcs.criterioconsultores.com.br:8080`. O `:8080`
+   diz ao Coolify a porta do container; o público continua entrando pelo 443, com certificado
+   automático. O serviço **backend fica sem domínio**. Antes, o DNS de
+   `crmcs.criterioconsultores.com.br` precisa apontar (registro A) para `179.198.104.21`.
+5. **Deploy.** Na primeira vez, o log do backend mostra, nesta ordem: `aguardando PostgreSQL` →
+   `[ATUALIZADOR] aplicando migrações` → `Uvicorn running`. Os dois serviços ficam *healthy*.
+6. **Conferência:** o passo 12. Entre com `CRM_ADMIN_EMAIL` e troque a senha inicial na tela.
+7. **Dados do Mac:** em vez do passo 7 por linha de comando, use a tela: **Configurações › Backup**,
+   com o `.zip` exportado no Mac (`backup.py exportar`): ela confere o arquivo antes, e substituir os
+   dados exige confirmação (a mesma regra do `backup.py importar --substituir`). O limite é 200 MB.
+   Apague o `.zip` depois.
+
+### 13.2 Rede, porta e IP do cliente
+
+- Nenhuma rede declarada no compose, de propósito: o Coolify v4 dá a cada recurso compose uma rede
+  própria e liga o proxy a ela. **Não ligue *Connect to Predefined Network*:** na rede compartilhada,
+  outro recurso com um serviço chamado `backend` poderia pegar o nome.
+- O backend só tem `expose`, sem `ports` e sem domínio: ninguém de fora chega nele.
+- IP do cliente: o Traefik anota o IP em `X-Forwarded-For`; o nginx da tela o aceita só de IP privado
+  e o repassa; a API (`CRM_PROXY_CONFIAVEL` = faixas privadas) faz a mesma leitura, da direita para a
+  esquerda. Um IP forjado pelo navegador no começo do cabeçalho não vale. O bloqueio de tentativas de
+  senha por IP (passo 5) depende disso. **Não troque `CRM_PROXY_CONFIAVEL` por `*`**: a API recusa
+  subir, porque com `*` valeria o IP que o navegador escrevesse.
+- Se um dia houver Cloudflare (ou outro proxy) na frente do Coolify, o IP que chega passa a ser o do
+  Cloudflare: aí é preciso configurar o IP real no Traefik antes.
+
+### 13.3 Atualizar (o dia a dia)
+
+PR mesclada na `main` → **Deploy** no Coolify. Faça antes um backup (13.4). As migrações rodam
+sozinhas e só quando há alguma nova (o log diz `esquema em dia: nada a fazer` quando não há). Se uma
+migração falhar, a API **não sobe** (`STRICT_UPDATER=true`) e a tela responde 502 até corrigir: melhor
+que gravar em esquema desalinhado. Durante o Deploy, o CRM fica fora por alguns segundos.
+
+### 13.4 Backup do banco
+
+- No recurso do PostgreSQL: *Backups* → agendamento diário (por exemplo `0 3 * * *`), guardando 14,
+  com destino **S3 em data center brasileiro** (*Settings › S3 Storages* do Coolify), para cumprir o
+  passo 0, regra 1, e o passo 9: backup fora da máquina.
+- **Teste a restauração** uma vez na implantação e depois todo mês, num banco de teste: backup que
+  nunca foi restaurado é hipótese.
+- O backup lógico do próprio CRM (Configurações › Backup › Exportar) continua valendo como segunda
+  cópia, e é o formato que o passo 7 usa.
+
+### 13.5 Teste separado da produção (passo 0, regra 5)
+
+Outro recurso no Coolify, com outro banco do painel, outro `CRM_SEGREDO_SESSAO` e outro domínio
+(por exemplo `crmcs-teste.criterioconsultores.com.br:8080`). É nele que se ensaia a restauração e
+cada atualização antes da produção.
+
 ## O que não fazer
 
 - Não subir com `servir.py` nem com `iniciar.sh`: são do modo de desenvolvimento, sem as travas
   de produção.
 - Não abrir a porta 8000 nem usar ngrok/túnel.
 - Não versionar `.env`, backup, planilha ou qualquer arquivo com dado de cliente.
-- Não rodar mais de um processo da API no mesmo banco.
+- Não rodar mais de um processo da API no mesmo banco (no Coolify: não escale o `backend`).
+- Não deixar o banco do Coolify público nem dar domínio ao serviço `backend`.

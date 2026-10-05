@@ -14,6 +14,12 @@ Passo a passo completo em `app/IMPLANTACAO.md`. Diferenças do `servir.py` (dese
   memória do processo).
 - Escuta em `CRM_HOST`:`CRM_PORTA` (padrão `127.0.0.1:8000`): só o proxy da mesma máquina fala com
   ela. Confia nos cabeçalhos `X-Forwarded-*` só desse proxy.
+- `CRM_PROXY_CONFIAVEL` (padrão `127.0.0.1`): de quem a API aceita `X-Forwarded-For`, em IPs ou faixas
+  separados por vírgula. No container (`docker-compose*.yml`) são as faixas privadas, porque o IP do
+  nginx da tela muda a cada subida e a API só é alcançável pela rede interna do compose. **Não use
+  `*`:** com ele o uvicorn pega o primeiro IP do cabeçalho, que o próprio navegador escreve, e o
+  bloqueio de senha por IP deixa de valer. Com faixas, ele anda da direita para a esquerda e fica com
+  o primeiro IP fora delas: o do cliente, como o proxy de borda anotou.
 """
 
 from __future__ import annotations
@@ -34,6 +40,7 @@ SEM_LOGIN = (
     f"e a carteira fica à vista de quem achar o endereço. {NADA}"
 )
 SEGREDO_MINIMO = 32
+PROXY_PADRAO = "127.0.0.1"
 
 
 def parametros(ambiente: dict[str, str]) -> dict:
@@ -54,12 +61,18 @@ def parametros(ambiente: dict[str, str]) -> dict:
                 f"(gere com: openssl rand -hex 32). {NADA}"
             )
     host = (ambiente.get("CRM_HOST") or "127.0.0.1").strip()
+    confiavel = (ambiente.get("CRM_PROXY_CONFIAVEL") or "").strip() or PROXY_PADRAO
+    if "*" in (parte.strip() for parte in confiavel.split(",")):
+        raise SystemExit(
+            "✗ CRM_PROXY_CONFIAVEL=* deixa o navegador escolher o IP que a API vê, e o bloqueio de tentativas "
+            f"de senha por IP deixa de valer. Use IPs ou faixas (ex.: 172.16.0.0/12). {NADA}"
+        )
     return {
         "host": host,
         "port": int((ambiente.get("CRM_PORTA") or "8000").strip()),
         "workers": 1,
         "proxy_headers": True,
-        "forwarded_allow_ips": "127.0.0.1",
+        "forwarded_allow_ips": confiavel,
     }
 
 

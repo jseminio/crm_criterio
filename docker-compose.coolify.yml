@@ -1,0 +1,100 @@
+# Critério CRM (crmcs) no servidor, pelo Coolify v4 — recurso "Docker Compose".
+# Passo a passo completo em app/IMPLANTACAO.md, seção "Coolify". Resumo:
+#
+#   Repositório:  https://github.com/jseminio/crm_criterio (público), branch main
+#   Build pack:   Docker Compose · Base Directory: /  · Docker Compose Location: /docker-compose.coolify.yml
+#   Domínios:     frontend → https://crmcs.criterioconsultores.com.br:8080
+#                 (o ":8080" diz ao Coolify a porta do container; o público continua no 443)
+#                 backend  → SEM domínio (só a tela fala com a API, pela rede interna)
+#   Banco:        recurso PostgreSQL criado no painel do Coolify (NÃO sobe aqui); backup pelo painel.
+#
+# Variáveis no painel (Environment Variables do recurso):
+#   obrigatórias  CRM_DATABASE_URL         a "Postgres URL (internal)" do banco do painel
+#                                          (postgres://usuario:senha@host:5432/postgres; a API converte)
+#                 CRM_SEGREDO_SESSAO       openssl rand -hex 32 (64 caracteres; trocá-lo encerra as sessões)
+#                 CRM_ADMIN_EMAIL          a conta que nasce Administrador na primeira subida
+#                 CRM_ADMIN_SENHA_INICIAL  a senha dela ao nascer (8+); depois de trocada na tela, não manda mais
+#   opcionais     ANTHROPIC_API_KEY, CRM_AGENTE_MODELO,
+#                 CRM_M365_TENANT_ID, CRM_M365_CLIENT_ID, CRM_M365_CLIENT_SECRET, CRM_M365_REMETENTE,
+#                 CRM_QUESTIONARIO_URL, CRM_QUESTIONARIO_CHAVE
+#   manutenção    SKIP_MIGRATIONS=1 (pula as migrações), RUN_MIGRATIONS, STRICT_UPDATER (ver atualizador.sh)
+#
+# Rede: nenhuma declarada, de propósito. No Coolify v4 cada recurso compose ganha uma rede própria e o
+# proxy (Traefik) é ligado a ela; "backend" resolve só dentro dela. Não ligue "Connect to Predefined
+# Network": na rede compartilhada do Coolify, outro recurso com serviço "backend" pegaria o nome.
+#
+# Volumes: nenhum. A API não grava em disco (matrizes de proposta, backups importados e arquivos
+# gerados vivem no banco ou na memória); o dado está todo no PostgreSQL do painel.
+#
+# Um processo só da API: não escale o backend para mais de uma réplica (busca automática dos
+# questionários e bloqueio de tentativas de senha vivem dentro do processo).
+
+services:
+  backend:
+    build:
+      context: ./app/backend
+    restart: always
+    environment:
+      CRM_DATABASE_URL: ${CRM_DATABASE_URL:?copie a Postgres URL (internal) do banco criado no painel}
+      CRM_SEGREDO_SESSAO: ${CRM_SEGREDO_SESSAO:?gere com openssl rand -hex 32}
+      CRM_ADMIN_EMAIL: ${CRM_ADMIN_EMAIL:?e-mail da conta que nasce Administrador}
+      CRM_ADMIN_SENHA_INICIAL: ${CRM_ADMIN_SENHA_INICIAL:?senha inicial do administrador, 8 caracteres ou mais}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CRM_AGENTE_MODELO: ${CRM_AGENTE_MODELO:-}
+      CRM_M365_TENANT_ID: ${CRM_M365_TENANT_ID:-}
+      CRM_M365_CLIENT_ID: ${CRM_M365_CLIENT_ID:-}
+      CRM_M365_CLIENT_SECRET: ${CRM_M365_CLIENT_SECRET:-}
+      CRM_M365_REMETENTE: ${CRM_M365_REMETENTE:-}
+      CRM_QUESTIONARIO_URL: ${CRM_QUESTIONARIO_URL:-}
+      CRM_QUESTIONARIO_CHAVE: ${CRM_QUESTIONARIO_CHAVE:-}
+      SKIP_MIGRATIONS: ${SKIP_MIGRATIONS:-0}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      STRICT_UPDATER: ${STRICT_UPDATER:-true}
+      # Fixos do container (scripts/servir_producao.py). A API escuta na rede interna do recurso e só
+      # tem "expose": quem chega nela é o nginx da tela (e o proxy do Coolify, que não a roteia, porque
+      # o backend não tem domínio). Confia no X-Forwarded-For só de IP privado; "*" é recusado, porque
+      # deixaria o navegador escolher o IP e anularia o bloqueio de senha por IP.
+      CRM_HOST: 0.0.0.0
+      CRM_PORTA: "8000"
+      CRM_PROXY_CONFIAVEL: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      TZ: America/Sao_Paulo
+    expose:
+      - "8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+  frontend:
+    build:
+      context: ./app/frontend
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      TZ: America/Sao_Paulo
+    expose:
+      - "8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

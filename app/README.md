@@ -625,8 +625,11 @@ Atualizado em 05/10/2026.
 
 ## Como rodar
 
-**No servidor (produção):** siga `IMPLANTACAO.md`. A API sobe por `scripts/servir_producao.py`,
-que se recusa a subir sem login configurado (e-mail e senha ou Microsoft). O que vem abaixo é o desenvolvimento local.
+**No servidor (produção):** siga `IMPLANTACAO.md`; no servidor da Critério, pelo Coolify (seção 13:
+`docker-compose.coolify.yml` na raiz, atualizar é clicar em Deploy). A API sobe por `scripts/servir_producao.py`,
+que se recusa a subir sem login configurado (e-mail e senha ou Microsoft). Para ensaiar a produção no
+computador: `docker compose up -d --build` na raiz, com o `.env` da raiz (modelo em `.env.example`).
+O que vem abaixo é o desenvolvimento local.
 
 ```bash
 cd backend

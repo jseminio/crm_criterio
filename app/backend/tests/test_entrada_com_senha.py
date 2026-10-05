@@ -101,6 +101,25 @@ def test_hash_com_sal_e_conferencia():
     assert not confere("Admin@123", None) and not confere("Admin@123", "lixo") and not confere("x", "scrypt$1$2$3$!!$!!")
 
 
+def test_health_responde_sem_login_e_nao_aparece_no_mapa(cliente):
+    """O healthcheck do container não tem token: `/health` fica fora de `/api` e do login."""
+    r = cliente.get("/health")
+    assert (r.status_code, r.json()) == (200, {"status": "healthy"})
+    assert cliente.get("/api/listas").status_code == 401  # o resto continua fechado
+    assert cliente.get("/openapi.json").status_code == 404
+
+
+def test_health_nao_depende_do_banco(engine, base):
+    """Não consulta o banco: a fábrica que explode não muda a resposta."""
+    def fabrica_quebrada():
+        raise AssertionError("o /health não pode abrir sessão")
+
+    app = criar_app(fabrica_quebrada, entrada=None)
+    with TestClient(app) as c:
+        r = c.get("/health")
+    assert (r.status_code, r.json()) == (200, {"status": "healthy"})
+
+
 def test_entrada_publica_diz_o_modo(cliente):
     assert cliente.get("/api/acesso/entrada").json() == {"modo": "senha"}
 

@@ -15,6 +15,7 @@ vi.mock("../api/cliente", async () => {
     api: {
       catalogoDeAcesso: vi.fn(), perfis: vi.fn(), usuarios: vi.fn(), criarPerfil: vi.fn(), mudarPerfil: vi.fn(),
       liberarUsuario: vi.fn(), mudarUsuario: vi.fn(), historico: vi.fn(), editarContato: vi.fn(), excluirPessoa: vi.fn(),
+      redefinirSenha: vi.fn(),
     },
   };
 });
@@ -110,6 +111,76 @@ describe("Perfis e acesso", () => {
     const linha = (await screen.findByText("eduardo@grupocriterio.com.br")).closest("tr")!;
     await userEvent.click(within(linha).getByRole("button", { name: "tirar acesso" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Precisa sobrar pelo menos um Administrador ativo.");
+  });
+});
+
+describe("Perfis e acesso no login com senha (issue #89)", () => {
+  const ADMIN_EU: Eu = {
+    modo: "senha", email: "eduardo@grupocriterio.com.br", nome: "Eduardo Luiz", perfil: "Administrador", administrador: true, permissoes: [],
+  };
+  const comSenha = () => render(<ProvedorDeAcesso eu={ADMIN_EU}><PerfisEAcesso /></ProvedorDeAcesso>);
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(api.catalogoDeAcesso).mockResolvedValue(CATALOGO);
+    vi.mocked(api.perfis).mockResolvedValue([ADMIN, COMERCIAL]);
+    vi.mocked(api.usuarios).mockResolvedValue(PESSOAS);
+  });
+
+  it("cadastra com senha provisória, com o Administrador pré-selecionado", async () => {
+    vi.mocked(api.liberarUsuario).mockResolvedValue({ ...PESSOAS[0], id: 3, email: "ana@grupocriterio.com.br" });
+    comSenha();
+    expect(await screen.findByRole("columnheader", { name: "E-mail" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Conta Microsoft da pessoa")).toBeNull();
+    expect(screen.getByLabelText("Perfil da pessoa")).toHaveValue("1");
+    await userEvent.type(screen.getByLabelText("E-mail da pessoa"), "ana@grupocriterio.com.br");
+    const cadastrar = screen.getByRole("button", { name: "Cadastrar pessoa" });
+    expect(cadastrar).toBeDisabled(); // a senha provisória é obrigatória
+
+    await userEvent.type(screen.getByLabelText("Senha provisória"), "curta");
+    await userEvent.click(cadastrar);
+    expect(screen.getByRole("alert")).toHaveTextContent("Senha provisória: A senha precisa ter pelo menos 8 caracteres.");
+    expect(api.liberarUsuario).not.toHaveBeenCalled();
+
+    await userEvent.type(screen.getByLabelText("Senha provisória"), "-provisoria");
+    await userEvent.click(cadastrar);
+    expect(api.liberarUsuario).toHaveBeenCalledWith("ana@grupocriterio.com.br", 1, "curta-provisoria");
+    expect(await screen.findByRole("status")).toHaveTextContent("Passe a senha provisória para a pessoa");
+    expect(screen.getByLabelText("Senha provisória")).toHaveValue("");
+  });
+
+  it("o perfil continua escolhível no cadastro", async () => {
+    vi.mocked(api.liberarUsuario).mockResolvedValue({ ...PESSOAS[1], id: 3, email: "ana@grupocriterio.com.br" });
+    comSenha();
+    await userEvent.type(await screen.findByLabelText("E-mail da pessoa"), "ana@grupocriterio.com.br");
+    await userEvent.type(screen.getByLabelText("Senha provisória"), "provisoria-1");
+    fireEvent.change(screen.getByLabelText("Perfil da pessoa"), { target: { value: "2" } });
+    await userEvent.click(screen.getByRole("button", { name: "Cadastrar pessoa" }));
+    expect(api.liberarUsuario).toHaveBeenCalledWith("ana@grupocriterio.com.br", 2, "provisoria-1");
+  });
+
+  it("redefine a senha de uma pessoa", async () => {
+    vi.mocked(api.redefinirSenha).mockResolvedValue(undefined);
+    comSenha();
+    await userEvent.click(await screen.findByRole("button", { name: "Redefinir senha de karine@grupocriterio.com.br" }));
+    const campo = screen.getByLabelText("Nova senha provisória de karine@grupocriterio.com.br");
+    await userEvent.type(campo, "1234567");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar senha" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("pelo menos 8 caracteres");
+    expect(api.redefinirSenha).not.toHaveBeenCalled();
+
+    await userEvent.type(campo, "8{enter}");
+    expect(api.redefinirSenha).toHaveBeenCalledWith(2, "12345678");
+    expect(await screen.findByRole("status")).toHaveTextContent("Senha de karine@grupocriterio.com.br redefinida.");
+    expect(screen.queryByLabelText("Nova senha provisória de karine@grupocriterio.com.br")).toBeNull();
+  });
+
+  it("no modo Microsoft não há senha na tela", async () => {
+    render(<ProvedorDeAcesso eu={{ ...ADMIN_EU, modo: "microsoft" }}><PerfisEAcesso /></ProvedorDeAcesso>);
+    expect(await screen.findByRole("columnheader", { name: "Conta Microsoft" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Senha provisória")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Redefinir senha/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Liberar acesso" })).toBeInTheDocument();
   });
 });
 

@@ -9,7 +9,8 @@ Dúvida sobre o funcionamento do CRM: `app/README.md`.
 São decisões de Eduardo, registradas em `arquitetura.md` e `CLAUDE.md`:
 
 1. **Tudo no Brasil:** banco, arquivos e backup ficam em data center brasileiro (decisão de 19/09/2026).
-2. **Login Microsoft obrigatório.** Sem ele, a API não pede entrada. O script de produção
+2. **Login obrigatório, com e-mail e senha do próprio CRM** (decisão de 05/10/2026, #89; o login
+   Microsoft fica desligado). Sem login, a API não pede entrada. O script de produção
    (`servir_producao.py`) se recusa a subir sem a configuração.
 3. **Segredo só no `.env` do servidor** (permissão 600) ou num cofre. Nunca no GitHub, em e-mail,
    em chat ou em log.
@@ -68,24 +69,38 @@ Copie `app/backend/.env.example` para `app/backend/.env`, rode `chmod 600 .env` 
 | Variável | Para quê | Obrigatória |
 |---|---|---|
 | `CRM_DATABASE_URL` | `postgresql+psycopg://usuario:senha@servidor:5432/banco`. Tem precedência sobre `CRM_DB_*` | sim |
-| `CRM_ENTRA_TENANT_ID`, `CRM_ENTRA_CLIENT_ID` | login Microsoft (os mesmos do Mac; são IDs, não senha) | **sim: sem elas a API não sobe** |
-| `CRM_ADMINISTRADORES` | e-mails que entram como Administrador na primeira vez | sim |
+| `CRM_ADMIN_EMAIL` | liga o login com e-mail e senha; a conta nasce Administrador ao subir a API, se ainda não existir | **sim: sem login a API não sobe** |
+| `CRM_ADMIN_SENHA_INICIAL` | a senha dessa conta quando ela nasce (8 caracteres ou mais). O `.env` só semeia: depois de trocada na tela, mudar aqui não muda nada | **sim** |
+| `CRM_SEGREDO_SESSAO` | assina as sessões (12 horas). Gere **no servidor** com `openssl rand -hex 32`; precisa de 32 caracteres ou mais. Trocá-lo encerra todas as sessões | **sim** |
+| `CRM_ENTRA_TENANT_ID`, `CRM_ENTRA_CLIENT_ID`, `CRM_ADMINISTRADORES` | login Microsoft, **desligado**: com `CRM_ADMIN_EMAIL` presente, é ignorado | não |
 | `ANTHROPIC_API_KEY` | ata pela IA, agente SDR, análise da carteira | para essas funções |
 | `CRM_M365_*` (4) | envio de e-mail pelo Microsoft 365 | para aprovar abordagem por e-mail |
 | `CRM_QUESTIONARIO_URL`, `CRM_QUESTIONARIO_CHAVE` | busca dos questionários do site | para a busca |
 | `CRM_HOST`, `CRM_PORTA` | onde a API escuta (padrão `127.0.0.1` e `8000`) | não |
 
-## 5. Microsoft Entra (feito por quem administra o Microsoft 365)
+## 5. Primeiro acesso e as contas das pessoas
 
-O login hoje funciona para `http://localhost:5173/`. Para o servidor:
+Não há nada a configurar fora do servidor: o login com e-mail e senha é do próprio CRM.
 
-1. Entre em portal.azure.com › Microsoft Entra ID › Registros de aplicativo › o aplicativo do CRM
-   (o mesmo de `CRM_ENTRA_CLIENT_ID`).
-2. Abra **Autenticação** › plataforma **Aplicativo de página única (SPA)**.
-3. Acrescente o URI de redirecionamento `https://<endereço do CRM>/`, com a barra no fim. Faça o
-   mesmo para o endereço de teste.
+1. Ao subir (passo 8), a API cria a conta de `CRM_ADMIN_EMAIL` como **Administrador**, com
+   `CRM_ADMIN_SENHA_INICIAL`. Se a conta já existir (veio no backup do passo 7, por exemplo), a senha
+   dela **não** muda; se existir sem senha nenhuma (do tempo do login Microsoft), recebe a inicial.
+2. Quem administra entra com essa conta e, em **Configurações › Perfis e acesso**, cadastra cada
+   pessoa com uma senha provisória (sem perfil escolhido, ela nasce Administrador). A pessoa pode
+   trocar a própria senha depois; não é obrigatório.
+3. As contas que vieram do Mac (do tempo da Microsoft) **não têm senha**: quem administra define
+   uma para cada, na mesma tela.
+4. Passe cada senha provisória por canal seguro, nunca por e-mail ou chat aberto.
 
-Sem isso, a Microsoft recusa a entrada com o erro "redirect URI mismatch".
+Errar a senha 5 vezes seguidas em 15 minutos bloqueia aquele e-mail, só para aquele IP, por 15 minutos;
+20 erros de um IP com quaisquer e-mails bloqueiam o IP (redefinir a senha tira o bloqueio do e-mail).
+O IP vem do proxy (`X-Forwarded-For`), por isso o nginx do passo 8 precisa mandar esse cabeçalho.
+Trocar ou redefinir a senha encerra as sessões abertas com a senha anterior. Com login ligado, a API
+não publica `/docs` nem `/openapi.json`. Desativar a pessoa corta o acesso no pedido seguinte, mesmo com a sessão aberta.
+
+O login Microsoft fica no código, desligado. Para voltar a ele, tire `CRM_ADMIN_EMAIL` do `.env`,
+preencha o bloco da Microsoft e cadastre o endereço do CRM como URI de redirecionamento (SPA) no
+aplicativo do Entra; o passo a passo está no `README.md`, "Ligar a entrada pela conta Microsoft".
 
 ## 6. Criar as tabelas
 
@@ -185,8 +200,8 @@ A porta 8000 **não** deve ficar aberta para fora; só o proxy fala com ela.
 
 O mesmo código em outro banco (`criterio_crm_teste`), outro `.env` e outra porta (`CRM_PORTA=8001`).
 Use outra pasta do código, outra unidade do systemd e outro endereço (por exemplo, `teste.<endereço>`).
-O endereço de teste também precisa estar cadastrado no Entra (passo 5). É nele que se testa a
-restauração do backup e cada atualização antes da produção.
+Use outro `CRM_SEGREDO_SESSAO` no teste: assim uma sessão aberta no teste não vale na produção. É nele
+que se testa a restauração do backup e cada atualização antes da produção.
 
 ## 11. Atualizar quando sair versão nova na `main`
 
@@ -204,8 +219,12 @@ Faça primeiro no ambiente de teste.
 
 ## 12. Conferência final
 
-- [ ] Abrir o endereço pede a conta Microsoft. Sem entrar, `https://<endereço>/api/listas` responde 401.
-- [ ] Eduardo entra como Administrador e vê os mesmos números do Mac: oportunidades, contratos, MRR.
+- [ ] Abrir o endereço pede e-mail e senha. Sem entrar, `https://<endereço>/api/listas` responde 401,
+      e `https://<endereço>/api/acesso/entrada` responde `{"modo":"senha"}`.
+- [ ] A conta de `CRM_ADMIN_EMAIL` entra como Administrador e vê os mesmos números do Mac:
+      oportunidades, contratos, MRR. Uma senha errada responde "E-mail ou senha incorretos.".
+- [ ] Cada pessoa que vai usar o CRM tem senha (as contas vindas do Mac começam sem) e consegue entrar.
+- [ ] `app/backend/.env` com permissão 600 e `CRM_SEGREDO_SESSAO` gerado no servidor, diferente do teste.
 - [ ] A porta 8000 não responde de fora do servidor.
 - [ ] O backup diário aparece na pasta e na cópia em outro data center.
 - [ ] A restauração no ambiente de teste foi feita uma vez, com os totais conferidos.

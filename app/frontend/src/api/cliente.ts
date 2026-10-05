@@ -93,6 +93,7 @@ import type {
   GrupoNoFunilDoSucesso,
   NovaReuniaoDeResultado,
   ReuniaoDeResultado,
+  SessaoAberta,
 } from "./tipos";
 
 export class ErroDaApi extends Error {
@@ -119,6 +120,66 @@ export function definirEntrada(fornecedor: (() => Promise<string | null>) | null
 async function cabecalhoDeEntrada(): Promise<Record<string, string>> {
   const token = fornecedorDeToken ? await fornecedorDeToken() : null;
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/* ------------------------------------------- sessão do login com senha (issue #89) */
+
+/** O token do login com senha mora no `sessionStorage` (some ao fechar a aba), nunca no
+ * `localStorage`. Navegador que recusa o armazenamento (modo privado restrito) só perde a sessão. */
+const CHAVE_DA_SESSAO = "crm.sessao";
+
+export interface SessaoGuardada {
+  token: string;
+  expira_em: string;
+}
+
+/** Sessão vencida conta como ausente. `expira_em` que não se lê fica a cargo do servidor (401). */
+export function sessaoVencida(sessao: SessaoGuardada, agora = Date.now()): boolean {
+  const fim = Date.parse(sessao.expira_em);
+  return !Number.isNaN(fim) && fim <= agora;
+}
+
+export function lerSessao(): SessaoGuardada | null {
+  try {
+    const bruto = window.sessionStorage.getItem(CHAVE_DA_SESSAO);
+    if (!bruto) return null;
+    const sessao = JSON.parse(bruto) as Partial<SessaoGuardada>;
+    if (typeof sessao?.token !== "string" || !sessao.token || typeof sessao.expira_em !== "string") {
+      apagarSessao();
+      return null;
+    }
+    return { token: sessao.token, expira_em: sessao.expira_em };
+  } catch {
+    return null;
+  }
+}
+
+/** A sessão em uso nesta página. É ela que os pedidos levam; o `sessionStorage` só a traz de volta
+ * depois de recarregar. Trocar a senha troca o token (o servidor invalida os antigos), e o novo
+ * passa a valer no próximo pedido sem a pessoa sair. */
+let sessaoEmUso: SessaoGuardada | null = null;
+
+export function sessaoAtual(): SessaoGuardada | null {
+  return sessaoEmUso ?? lerSessao();
+}
+
+/** Guarda a sessão aberta pelo login ou renovada pela troca de senha. */
+export function guardarSessao(sessao: SessaoGuardada) {
+  sessaoEmUso = { token: sessao.token, expira_em: sessao.expira_em };
+  try {
+    window.sessionStorage.setItem(CHAVE_DA_SESSAO, JSON.stringify(sessaoEmUso));
+  } catch {
+    /* sem armazenamento: a sessão vale só enquanto a página estiver aberta */
+  }
+}
+
+export function apagarSessao() {
+  sessaoEmUso = null;
+  try {
+    window.sessionStorage.removeItem(CHAVE_DA_SESSAO);
+  } catch {
+    /* nada a apagar */
+  }
 }
 
 /** Com login, um link comum não leva o token: os downloads passam pelo `baixarArquivo`. */
@@ -225,7 +286,8 @@ export function explicarValidacao(detalhes: ErroDeValidacao[]): string {
     .join("; ");
 }
 
-async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T> {
+/** `avisar` desligado: o 401 é resposta do próprio pedido (senha errada no login), não sessão perdida. */
+async function pedir<T>(caminho: string, opcoes?: RequestInit, avisar = true): Promise<T> {
   let resposta: Response;
   try {
     resposta = await fetch(caminho, {
@@ -239,7 +301,7 @@ async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T> {
   }
 
   if (!resposta.ok) {
-    avisarSePerdeu(resposta.status);
+    if (avisar) avisarSePerdeu(resposta.status);
     let detalhe = `Erro ${resposta.status}`;
     try {
       const corpo = await resposta.json();
@@ -308,6 +370,13 @@ async function enviarArquivo<T = ResumoDeBackup>(caminho: string, arquivo: File,
 export const api = {
   entrada: () => pedir<ConfiguracaoDeEntrada>("/api/acesso/entrada"),
   eu: () => pedir<Eu>("/api/eu"),
+  login: (email: string, senha: string) =>
+    pedir<SessaoAberta>("/api/acesso/login", { method: "POST", body: JSON.stringify({ email, senha }) }, false),
+  /** 200 com a sessão nova (o servidor invalida os tokens antigos ao trocar a senha). */
+  trocarMinhaSenha: (senhaAtual: string, senhaNova: string) =>
+    pedir<SessaoAberta>("/api/acesso/senha", { method: "POST", body: JSON.stringify({ senha_atual: senhaAtual, senha_nova: senhaNova }) }),
+  redefinirSenha: (id: number, senha: string) =>
+    pedir<void>(`/api/acesso/usuarios/${id}/senha`, { method: "POST", body: JSON.stringify({ senha }) }),
   catalogoDeAcesso: () => pedir<MenuDoCatalogo[]>("/api/acesso/catalogo"),
   perfis: () => pedir<PerfilDeAcesso[]>("/api/acesso/perfis"),
   criarPerfil: (nome: string, permissoes: string[]) =>
@@ -315,8 +384,12 @@ export const api = {
   mudarPerfil: (id: number, mudanca: { nome?: string; permissoes?: string[] }) =>
     pedir<PerfilDeAcesso>(`/api/acesso/perfis/${id}`, { method: "PATCH", body: JSON.stringify(mudanca) }),
   usuarios: () => pedir<UsuarioDoCrm[]>("/api/acesso/usuarios"),
-  liberarUsuario: (email: string, perfilId: number) =>
-    pedir<UsuarioDoCrm>("/api/acesso/usuarios", { method: "POST", body: JSON.stringify({ email, perfil_id: perfilId }) }),
+  /** `senha`: a provisória, obrigatória no modo senha; no modo Microsoft não vai. */
+  liberarUsuario: (email: string, perfilId: number, senha?: string) =>
+    pedir<UsuarioDoCrm>("/api/acesso/usuarios", {
+      method: "POST",
+      body: JSON.stringify(senha === undefined ? { email, perfil_id: perfilId } : { email, perfil_id: perfilId, senha }),
+    }),
   mudarUsuario: (id: number, mudanca: { perfil_id?: number; ativo?: boolean }) =>
     pedir<UsuarioDoCrm>(`/api/acesso/usuarios/${id}`, { method: "PATCH", body: JSON.stringify(mudanca) }),
   historico: (filtros: { usuario?: string; tabela?: string; registro_id?: number; de?: string; ate?: string; limite?: number }) =>

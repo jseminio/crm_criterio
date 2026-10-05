@@ -1,17 +1,26 @@
 /** Configurações › Perfis e acesso (E1, amostra aprovada por Eduardo em 02/10/2026).
  *
- * Os perfis liberam funcionalidades dentro de cada menu, ou o menu inteiro de uma vez. As pessoas
- * entram pela conta Microsoft; aqui se libera cada uma e se escolhe o perfil. O Administrador tem tudo
- * e não se muda; precisa sobrar pelo menos um ativo (o servidor confere).
+ * Os perfis liberam funcionalidades dentro de cada menu, ou o menu inteiro de uma vez. Aqui se
+ * libera cada pessoa e se escolhe o perfil. O Administrador tem tudo e não se muda; precisa sobrar
+ * pelo menos um ativo (o servidor confere).
+ *
+ * No login com e-mail e senha (issue #89), quem administra cadastra a pessoa com uma senha
+ * provisória (o perfil já vem no Administrador) e pode redefinir a senha de qualquer uma. No modo
+ * Microsoft (desligado, código guardado), a pessoa entra pela conta Microsoft e não há senha aqui.
  */
 
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { MenuDoCatalogo, PerfilDeAcesso, UsuarioDoCrm } from "../api/tipos";
+import { usarAcesso } from "../entrada";
 import { data } from "../formato";
+import { CampoDeSenha, problemaDaSenha } from "./CampoDeSenha";
 import { Carregando, Erro } from "./estados";
 
 export function PerfisEAcesso() {
+  const comSenha = usarAcesso().eu.modo === "senha";
+  const [senhaDoNovo, definirSenhaDoNovo] = useState("");
+  const [redefinindo, definirRedefinindo] = useState<{ id: number; senha: string } | null>(null);
   const [catalogo, definirCatalogo] = useState<MenuDoCatalogo[] | null>(null);
   const [perfis, definirPerfis] = useState<PerfilDeAcesso[]>([]);
   const [usuarios, definirUsuarios] = useState<UsuarioDoCrm[]>([]);
@@ -36,7 +45,8 @@ export function PerfisEAcesso() {
           definirEscolhido(primeiro.id);
           definirMarcadas(new Set(primeiro.permissoes));
         }
-        if (perfilDoNovo === null) definirPerfilDoNovo((p.find((x) => !x.administrador) ?? p[0])?.id ?? null);
+        // Modo senha: quem é cadastrado já vem como Administrador (decisão do dono, issue #89).
+        if (perfilDoNovo === null) definirPerfilDoNovo((p.find((x) => (comSenha ? x.administrador : !x.administrador)) ?? p[0])?.id ?? null);
       })
       .catch((f) => definirErroAoAbrir(f instanceof ErroDaApi ? f.message : "Falha ao abrir os perfis."));
   };
@@ -165,7 +175,7 @@ export function PerfisEAcesso() {
       <div className="tabela-rolagem">
         <table className="tabela" aria-label="Pessoas com acesso">
           <thead>
-            <tr><th scope="col">Conta Microsoft</th><th scope="col">Perfil</th><th scope="col">Situação</th><th scope="col">Desde</th></tr>
+            <tr><th scope="col">{comSenha ? "E-mail" : "Conta Microsoft"}</th><th scope="col">Perfil</th><th scope="col">Situação</th><th scope="col">Desde</th></tr>
           </thead>
           <tbody>
             {usuarios.map((u) => (
@@ -188,6 +198,36 @@ export function PerfisEAcesso() {
                       u.ativo ? `${u.email} perdeu o acesso.` : `${u.email} voltou a ter acesso.`)}>
                     {u.ativo ? "tirar acesso" : "devolver acesso"}
                   </button>
+                  {comSenha && redefinindo?.id !== u.id && (
+                    <>
+                      {" · "}
+                      <button type="button" className="link-de-tabela" aria-label={`Redefinir senha de ${u.email}`}
+                        onClick={() => { definirErro(null); definirRecado(null); definirRedefinindo({ id: u.id, senha: "" }); }}>
+                        redefinir senha
+                      </button>
+                    </>
+                  )}
+                  {comSenha && redefinindo?.id === u.id && (
+                    <form className="redefinir-senha" noValidate aria-label={`Redefinir a senha de ${u.email}`}
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        const problema = problemaDaSenha(redefinindo.senha);
+                        if (problema) {
+                          definirRecado(null);
+                          definirErro(problema);
+                          return;
+                        }
+                        if (await tentar(() => api.redefinirSenha(u.id, redefinindo.senha),
+                          `Senha de ${u.email} redefinida. Passe a senha nova para a pessoa; ela pode trocá-la depois em “Trocar senha”.`)) {
+                          definirRedefinindo(null);
+                        }
+                      }}>
+                      <CampoDeSenha valor={redefinindo.senha} aoMudar={(senha) => definirRedefinindo({ id: u.id, senha })}
+                        autoComplete="new-password" rotuloAcessivel={`Nova senha provisória de ${u.email}`} dica="Nova senha provisória" exigido />
+                      <button type="submit" className="botao botao-secundario">Salvar senha</button>
+                      <button type="button" className="link-de-tabela" onClick={() => definirRedefinindo(null)}>cancelar</button>
+                    </form>
+                  )}
                 </td>
                 <td>{data(u.criado_em)}{u.liberado_por && <span className="celula-fonte">por {u.liberado_por}</span>}</td>
               </tr>
@@ -196,20 +236,40 @@ export function PerfisEAcesso() {
         </table>
       </div>
       <div className="perfis-novo">
-        <input className="entrada" value={emailNovo} placeholder="conta@grupocriterio.com.br" aria-label="Conta Microsoft da pessoa"
+        <input className="entrada" value={emailNovo} placeholder="conta@grupocriterio.com.br"
+          type={comSenha ? "email" : "text"} aria-label={comSenha ? "E-mail da pessoa" : "Conta Microsoft da pessoa"}
           onChange={(e) => definirEmailNovo(e.target.value)} />
+        {comSenha && (
+          <CampoDeSenha valor={senhaDoNovo} aoMudar={definirSenhaDoNovo} autoComplete="new-password"
+            rotuloAcessivel="Senha provisória" dica="Senha provisória (mín. 8)" exigido />
+        )}
         <select className="selecao" value={perfilDoNovo ?? ""} aria-label="Perfil da pessoa"
           onChange={(e) => definirPerfilDoNovo(Number(e.target.value))}>
           {perfis.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
         </select>
-        <button type="button" className="botao botao-secundario" disabled={!emailNovo.trim() || perfilDoNovo === null}
+        <button type="button" className="botao botao-secundario"
+          disabled={!emailNovo.trim() || perfilDoNovo === null || (comSenha && !senhaDoNovo)}
           onClick={async () => {
-            if (await tentar(() => api.liberarUsuario(emailNovo.trim(), perfilDoNovo!), `${emailNovo.trim()} liberado. Na primeira entrada, o nome vem da Microsoft.`)) {
+            const email = emailNovo.trim();
+            if (comSenha) {
+              const problema = problemaDaSenha(senhaDoNovo);
+              if (problema) {
+                definirRecado(null);
+                definirErro(`Senha provisória: ${problema}`);
+                return;
+              }
+            }
+            const liberou = comSenha
+              ? await tentar(() => api.liberarUsuario(email, perfilDoNovo!, senhaDoNovo),
+                `${email} pode entrar. Passe a senha provisória para a pessoa; ela pode trocá-la depois em “Trocar senha”.`)
+              : await tentar(() => api.liberarUsuario(email, perfilDoNovo!), `${email} liberado. Na primeira entrada, o nome vem da Microsoft.`);
+            if (liberou) {
               definirEmailNovo("");
+              definirSenhaDoNovo("");
               await recarregarListas();
             }
           }}>
-          Liberar acesso
+          {comSenha ? "Cadastrar pessoa" : "Liberar acesso"}
         </button>
       </div>
     </section>

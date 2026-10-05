@@ -1476,15 +1476,28 @@ export interface MudancaDePendencia {
 /* ------------------------------------------------------ acesso (E1, 02/10/2026) */
 
 export interface ConfiguracaoDeEntrada {
-  /** "microsoft": entra pela conta Microsoft; "local": sem login, só na máquina do CRM. */
-  modo: "microsoft" | "local";
-  tenant_id: string | null;
-  client_id: string | null;
-  escopo: string | null;
+  /** "senha": entra com e-mail e senha (issue #89); "microsoft": entra pela conta Microsoft
+   * (desligado, código guardado); "local": sem login, só na máquina do CRM. */
+  modo: "senha" | "microsoft" | "local";
+  /** Só no modo Microsoft; no modo senha a API não manda. */
+  tenant_id?: string | null;
+  client_id?: string | null;
+  escopo?: string | null;
+}
+
+/** Resposta do `POST /api/acesso/login` (modo senha). */
+export interface SessaoAberta {
+  token: string;
+  /** ISO 8601. */
+  expira_em: string;
+  email: string;
+  nome: string | null;
+  perfil: string;
+  administrador: boolean;
 }
 
 export interface Eu {
-  modo: "microsoft" | "local";
+  modo: "senha" | "microsoft" | "local";
   email: string | null;
   nome: string | null;
   perfil: string;

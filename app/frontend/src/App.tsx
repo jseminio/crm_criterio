@@ -13,6 +13,7 @@ import { SdrEAbordagens } from "./telas/SdrEAbordagens";
 import { FunilEQuestionarios } from "./telas/FunilEQuestionarios";
 import { SucessoDoCliente, type AbaDoSucesso } from "./telas/SucessoDoCliente";
 import { AjustesDaAreaTecnica } from "./componentes/AjustesDaAreaTecnica";
+import { TrocarSenha } from "./componentes/TrocarSenha";
 import { usarDados } from "./usarDados";
 import { VERSAO } from "./versao";
 
@@ -81,6 +82,7 @@ export default function App() {
               : pode(`${t.chave}.ver`),
   );
   const [escolhida, definirTela] = useState<Tela>("funil");
+  const [trocandoSenha, definirTrocandoSenha] = useState(false);
   // Atalho de outra tela para uma aba (a Agenda abre os contratos): a aba pedida e uma chave para reabrir.
   const [abaDoSucesso, definirAbaDoSucesso] = useState<{ aba: AbaDoSucesso; vez: number } | null>(null);
   const tela = visiveis.some((t) => t.chave === escolhida) ? escolhida : (visiveis[0]?.chave ?? escolhida);
@@ -112,11 +114,16 @@ export default function App() {
           ))}
         </div>
 
-        {eu.modo === "microsoft" ? (
+        {eu.modo !== "local" ? (
           <div className="quem-entrou">
             <strong>{eu.nome ?? eu.email}</strong>
             <span>Perfil: {eu.perfil}</span>
-            <button type="button" className="quem-entrou-sair" onClick={sair}>Sair</button>
+            <div className="quem-entrou-acoes">
+              {eu.modo === "senha" && (
+                <button type="button" className="quem-entrou-sair" onClick={() => definirTrocandoSenha(true)}>Trocar senha</button>
+              )}
+              <button type="button" className="quem-entrou-sair" onClick={sair}>Sair</button>
+            </div>
           </div>
         ) : (
           <p className="aviso-sem-login">
@@ -125,6 +132,7 @@ export default function App() {
           </p>
         )}
       </nav>
+      {trocandoSenha && <TrocarSenha aoFechar={() => definirTrocandoSenha(false)} />}
 
       <div className="conteudo">
         <header className="topo">

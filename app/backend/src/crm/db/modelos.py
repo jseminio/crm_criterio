@@ -1419,8 +1419,9 @@ class Perfil(CarimboMixin, Base):
 
 
 class Usuario(CarimboMixin, Base):
-    """Quem pode entrar no CRM: a conta Microsoft (o e-mail) e o perfil. A Microsoft confere quem é; o
-    CRM decide o que pode. Desativar tira o acesso sem apagar o histórico de quem a pessoa foi."""
+    """Quem pode entrar no CRM: o e-mail e o perfil. Quem confere que é a pessoa é a senha do CRM (desde
+    05/10/2026, #89) ou a conta Microsoft; o CRM decide o que pode. Desativar tira o acesso sem apagar
+    o histórico de quem a pessoa foi."""
 
     __tablename__ = "usuario"
 
@@ -1432,6 +1433,9 @@ class Usuario(CarimboMixin, Base):
     perfil_id: Mapped[int] = mapped_column(sa.ForeignKey("perfil.id"), nullable=False, index=True)
     ativo: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=True, server_default=sa.true())
     liberado_por: Mapped[str | None] = mapped_column(sa.String(200))
+    senha_hash: Mapped[str | None] = mapped_column(sa.String(200))
+    """Só o hash `scrypt` da senha (`crm.acesso.senha`), nunca a senha. Vazio em quem entrava pela
+    Microsoft e ainda não ganhou senha. Não sai em resposta da API nem no histórico de alterações."""
 
     perfil: Mapped[Perfil] = relationship()
 

@@ -73,7 +73,7 @@ export function EventosDeContrato({
   // categoria é "Outro" — nas demais, a categoria já diz o porquê.
   const pedeDescricao = tipo === "Aditivo" || tipo === "Correção" || categoriaOutro;
   // Alçada (02/10/2026): sem login não há alçada; quem aprova registra direto.
-  const alcada = eu.modo === "microsoft" && !pode("contratos.aprovar") ? motivoDaAlcada(contrato, tipo, campos) : null;
+  const alcada = eu.modo !== "local" && !pode("contratos.aprovar") ? motivoDaAlcada(contrato, tipo, campos) : null;
   const faltaDado =
     (pedeMotivo && (!campos.iniciativa || !campos.motivo_categoria)) ||
     (pedeDescricao && (campos.descricao ?? "").trim().length < 3) ||

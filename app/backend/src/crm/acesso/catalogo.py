@@ -63,8 +63,8 @@ def permissoes_do_comercial() -> list[str]:
     )
 
 
-PUBLICAS: tuple[str, ...] = ("/api/acesso/entrada",)
-"""Sem entrada nenhuma: a tela precisa saber como entrar antes de ter entrado."""
+PUBLICAS: tuple[str, ...] = ("/api/acesso/entrada", "/api/acesso/login")
+"""Sem entrada nenhuma: a tela precisa saber como entrar, e entrar, antes de ter entrado."""
 
 _TODOS = ()  # qualquer pessoa que entrou
 
@@ -77,6 +77,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     # acesso e histórico
     ("GET", r"/api/acesso/catalogo", ("configuracoes.perfis",)),
     ("GET|POST|PATCH", r"/api/acesso/(perfis|usuarios)(/\d+)?", ("configuracoes.perfis",)),
+    ("POST", r"/api/acesso/usuarios/\d+/senha", ("configuracoes.perfis",)),  # redefinir a senha de alguém
+    ("POST", r"/api/acesso/senha", _TODOS),  # trocar a própria senha
     ("GET", r"/api/historico", _TODOS),  # a rota confere: geral pede configuracoes.historico
     # agenda
     ("GET", r"/api/agenda", ("agenda.ver",)),

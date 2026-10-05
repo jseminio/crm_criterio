@@ -586,15 +586,18 @@ Atualizado em 05/10/2026.
 | | |
 |---|---|
 | O que roda | Banco PostgreSQL, carga de 2026 repetível, funil (com exclusão de oportunidade), contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", plano de MRR (Inteligência de Conversão), agente SDR, SDR de IA com base de conhecimento, backup lógico (manual e diário) e as telas abaixo |
-| Testes | **1.275** no backend e **532** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
+| Testes | **1.281** no backend e **532** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
 | Banco | PostgreSQL 18 local, 45 tabelas no modelo, migrações até `c6e2a9d4f1b7` (aderência da promessa e primeiro contato do lead, 04/10/2026). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 153 rotas, em `127.0.0.1:8000`. **Com a conta Microsoft configurada, toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Entrada | **Login pela conta Microsoft ativo** na máquina de Eduardo desde 03/10/2026 (app registrado no Microsoft Entra). Perfis, permissões e histórico de alterações valem para todos |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades, Questionários e Inteligência de Conversão), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens, SDR da IA e Base de conhecimento) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos e em uso; faltam a nuvem e o backup fora da máquina |
-| Fora do ar | **E1:** nuvem em região brasileira e backup fora da máquina com restauração testada. Comparação de provedores feita em 04/10/2026 (Magalu Cloud, AWS Lightsail e Azure, todos em São Paulo; a mais barata que atende é a Magalu, ~R$ 140/mês); Eduardo lembra de um servidor já contratado, a confirmar (nome, local do data center e o que inclui) antes de decidir. Enquanto isso, o CRM para quando o Mac desliga ou reinicia. **Etapa 2:** Clicksign, renovação, saldo de horas de conforto. O dashboard do cliente para as reuniões de resultado (fonte dos números e ferramenta a decidir). Buscar a transcrição direto no Granola, sem colar (depende de o plano do Granola ter API). **SDR de IA:** a conversa com o lead pelo WhatsApp ainda não existe (há um rascunho do envio pela API da Meta na branch `claude/great-wozniak-hxnd8u`, de 28/09) |
+| Fora do ar | **E1:** nuvem em região brasileira e backup fora da máquina com restauração testada. Comparação de provedores feita em 04/10/2026 (Magalu Cloud, AWS Lightsail e Azure, todos em São Paulo; a mais barata que atende é a Magalu, ~R$ 140/mês); Eduardo lembra de um servidor já contratado, a confirmar (nome, local do data center e o que inclui) antes de decidir. Enquanto isso, o CRM para quando o Mac desliga ou reinicia. O passo a passo para a equipe do servidor está em `IMPLANTACAO.md` (05/10/2026). **Etapa 2:** Clicksign, renovação, saldo de horas de conforto. O dashboard do cliente para as reuniões de resultado (fonte dos números e ferramenta a decidir). Buscar a transcrição direto no Granola, sem colar (depende de o plano do Granola ter API). **SDR de IA:** a conversa com o lead pelo WhatsApp ainda não existe (há um rascunho do envio pela API da Meta na branch `claude/great-wozniak-hxnd8u`, de 28/09) |
 
 ## Como rodar
+
+**No servidor (produção):** siga `IMPLANTACAO.md`. A API sobe por `scripts/servir_producao.py`,
+que se recusa a subir sem o login Microsoft configurado. O que vem abaixo é o desenvolvimento local.
 
 ```bash
 cd backend

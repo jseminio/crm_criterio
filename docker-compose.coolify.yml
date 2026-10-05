@@ -1,16 +1,17 @@
 # Critério CRM (crmcs) no servidor, pelo Coolify v4 — recurso "Docker Compose".
-# Passo a passo completo em app/IMPLANTACAO.md, seção "Coolify". Resumo:
+# Passo a passo completo em app/IMPLANTACAO.md, seção 13. Resumo:
 #
 #   Repositório:  https://github.com/jseminio/crm_criterio (público), branch main
 #   Build pack:   Docker Compose · Base Directory: /  · Docker Compose Location: /docker-compose.coolify.yml
-#   Domínios:     frontend → https://crmcs.criterioconsultores.com.br:8080
+#   Rede:         "Connect to Predefined Network" LIGADO (ver abaixo)
+#   Domínios:     crmcs-web → https://crmcs.criterioconsultores.com.br:8080
 #                 (o ":8080" diz ao Coolify a porta do container; o público continua no 443)
-#                 backend  → SEM domínio (só a tela fala com a API, pela rede interna)
+#                 crmcs-api → SEM domínio (só a tela fala com a API)
 #   Banco:        recurso PostgreSQL criado no painel do Coolify (NÃO sobe aqui); backup pelo painel.
 #
 # Variáveis no painel (Environment Variables do recurso):
 #   obrigatórias  CRM_DATABASE_URL         a "Postgres URL (internal)" do banco do painel
-#                                          (postgres://usuario:senha@host:5432/postgres; a API converte)
+#                                          (postgres://usuario:senha@<container>:5432/postgres; a API converte)
 #                 CRM_SEGREDO_SESSAO       openssl rand -hex 32 (64 caracteres; trocá-lo encerra as sessões)
 #                 CRM_ADMIN_EMAIL          a conta que nasce Administrador na primeira subida
 #                 CRM_ADMIN_SENHA_INICIAL  a senha dela ao nascer (8+); depois de trocada na tela, não manda mais
@@ -19,18 +20,20 @@
 #                 CRM_QUESTIONARIO_URL, CRM_QUESTIONARIO_CHAVE
 #   manutenção    SKIP_MIGRATIONS=1 (pula as migrações), RUN_MIGRATIONS, STRICT_UPDATER (ver atualizador.sh)
 #
-# Rede: nenhuma declarada, de propósito. No Coolify v4 cada recurso compose ganha uma rede própria e o
-# proxy (Traefik) é ligado a ela; "backend" resolve só dentro dela. Não ligue "Connect to Predefined
-# Network": na rede compartilhada do Coolify, outro recurso com serviço "backend" pegaria o nome.
+# Rede e nomes: o PostgreSQL criado no painel fica na rede "coolify" do servidor, e a URL interna usa o
+# nome do container dele; este recurso só o alcança com "Connect to Predefined Network" LIGADO. Essa
+# rede é compartilhada com os outros projetos do servidor, e nela o nome do serviço vira nome de DNS:
+# um "backend" ou "frontend" genérico colidiria com o de outro projeto, e o nginx poderia mandar /api
+# para a API errada. Por isso os nomes únicos, com o prefixo crmcs: crmcs-api e crmcs-web.
 #
 # Volumes: nenhum. A API não grava em disco (matrizes de proposta, backups importados e arquivos
 # gerados vivem no banco ou na memória); o dado está todo no PostgreSQL do painel.
 #
-# Um processo só da API: não escale o backend para mais de uma réplica (busca automática dos
+# Um processo só da API: não escale o crmcs-api para mais de uma réplica (busca automática dos
 # questionários e bloqueio de tentativas de senha vivem dentro do processo).
 
 services:
-  backend:
+  crmcs-api:
     build:
       context: ./app/backend
     restart: always
@@ -50,10 +53,10 @@ services:
       SKIP_MIGRATIONS: ${SKIP_MIGRATIONS:-0}
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
       STRICT_UPDATER: ${STRICT_UPDATER:-true}
-      # Fixos do container (scripts/servir_producao.py). A API escuta na rede interna do recurso e só
-      # tem "expose": quem chega nela é o nginx da tela (e o proxy do Coolify, que não a roteia, porque
-      # o backend não tem domínio). Confia no X-Forwarded-For só de IP privado; "*" é recusado, porque
-      # deixaria o navegador escolher o IP e anularia o bloqueio de senha por IP.
+      # Fixos do container (scripts/servir_producao.py). A API só tem "expose" e não tem domínio: o
+      # proxy do Coolify não a roteia para fora. Confia no X-Forwarded-For só de IP privado (o nginx da
+      # tela); "*" é recusado, porque deixaria o navegador escolher o IP e anularia o bloqueio de senha
+      # por IP.
       CRM_HOST: 0.0.0.0
       CRM_PORTA: "8000"
       CRM_PROXY_CONFIAVEL: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
@@ -74,12 +77,12 @@ services:
       retries: 3
       start_period: 90s
 
-  frontend:
+  crmcs-web:
     build:
       context: ./app/frontend
     restart: always
     depends_on:
-      backend:
+      crmcs-api:
         condition: service_healthy
     environment:
       TZ: America/Sao_Paulo

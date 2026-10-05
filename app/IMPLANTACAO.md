@@ -243,8 +243,8 @@ refeita, as migrações rodam sozinhas e a API e a tela voltam.
 
 ```
 navegador ─HTTPS─▶ proxy do Coolify (Traefik, certificado automático)
-                    └─▶ frontend :8080 (nginx sem root: a tela + /api/ repassado)
-                          └─▶ backend :8000 (servir_producao.py, 1 processo; só rede interna)
+                    └─▶ crmcs-web :8080 (nginx sem root: a tela + /api/ repassado)
+                          └─▶ crmcs-api :8000 (servir_producao.py, 1 processo; sem domínio)
                                 └─▶ PostgreSQL criado no painel do Coolify
 ```
 
@@ -261,8 +261,8 @@ computador, o `docker-compose.yml` da raiz sobe tudo, com um PostgreSQL próprio
    (convertem para o driver do projeto); não é preciso editar.
 2. **Recurso.** *+ New › Public Repository* → `https://github.com/jseminio/crm_criterio`, branch
    `main`, **Build Pack: Docker Compose**, **Base Directory: `/`**, **Docker Compose Location:
-   `/docker-compose.coolify.yml`**. Salve: o Coolify lê o compose e mostra os serviços `backend` e
-   `frontend`.
+   `/docker-compose.coolify.yml`**, e **ligue *Connect to Predefined Network*** (13.2). Salve: o
+   Coolify lê o compose e mostra os serviços `crmcs-api` e `crmcs-web`.
 3. **Variáveis** (*Environment Variables* do recurso). As obrigatórias aparecem marcadas; sem elas o
    deploy recusa com a frase do que falta:
 
@@ -281,11 +281,11 @@ computador, o `docker-compose.yml` da raiz sobe tudo, com um PostgreSQL próprio
 
    Marque as de segredo como *Secret* (não aparecem no log do deploy). `CRM_HOST`, `CRM_PORTA` e
    `CRM_PROXY_CONFIAVEL` já vêm fixas no compose: não as crie no painel.
-4. **Domínio.** No serviço **frontend**: `https://crmcs.criterioconsultores.com.br:8080`. O `:8080`
+4. **Domínio.** No serviço **`crmcs-web`**: `https://crmcs.criterioconsultores.com.br:8080`. O `:8080`
    diz ao Coolify a porta do container; o público continua entrando pelo 443, com certificado
-   automático. O serviço **backend fica sem domínio**. Antes, o DNS de
+   automático. O serviço **`crmcs-api` fica sem domínio**. Antes, o DNS de
    `crmcs.criterioconsultores.com.br` precisa apontar (registro A) para `179.198.104.21`.
-5. **Deploy.** Na primeira vez, o log do backend mostra, nesta ordem: `aguardando PostgreSQL` →
+5. **Deploy.** Na primeira vez, o log do `crmcs-api` mostra, nesta ordem: `aguardando PostgreSQL` →
    `[ATUALIZADOR] aplicando migrações` → `Uvicorn running`. Os dois serviços ficam *healthy*.
 6. **Conferência:** o passo 12. Entre com `CRM_ADMIN_EMAIL` e troque a senha inicial na tela.
 7. **Dados do Mac:** em vez do passo 7 por linha de comando, use a tela: **Configurações › Backup**,
@@ -295,10 +295,17 @@ computador, o `docker-compose.yml` da raiz sobe tudo, com um PostgreSQL próprio
 
 ### 13.2 Rede, porta e IP do cliente
 
-- Nenhuma rede declarada no compose, de propósito: o Coolify v4 dá a cada recurso compose uma rede
-  própria e liga o proxy a ela. **Não ligue *Connect to Predefined Network*:** na rede compartilhada,
-  outro recurso com um serviço chamado `backend` poderia pegar o nome.
-- O backend só tem `expose`, sem `ports` e sem domínio: ninguém de fora chega nele.
+- **Ligue *Connect to Predefined Network*.** O PostgreSQL criado no painel fica na rede `coolify` do
+  servidor, e a URL interna usa o nome do container dele: sem a opção, a API não acha o banco.
+- **Por que os nomes `crmcs-api` e `crmcs-web`:** a rede `coolify` é compartilhada com os outros
+  projetos do servidor (Comercial, N8N, pensheet e outros), e nela o nome do serviço vira nome de DNS.
+  Com um `backend` genérico, o nginx da tela poderia mandar `/api` para a API de outro projeto (ou o
+  contrário). O prefixo `crmcs` evita a colisão. Não renomeie para nomes genéricos.
+- O `crmcs-api` só tem `expose`, sem `ports` e sem domínio: ninguém de fora do servidor chega nele.
+  **Dentro** do servidor, os containers dos outros projetos na rede `coolify` alcançam
+  `crmcs-api:8000` direto. O login continua valendo para eles, mas, por estarem em IP privado, podem
+  escolher o IP que a API vê e escapar do bloqueio de tentativas por IP. Esse é o preço da rede
+  compartilhada: um container comprometido de outro projeto poderia tentar senhas sem esse freio.
 - IP do cliente: o Traefik anota o IP em `X-Forwarded-For`; o nginx da tela o aceita só de IP privado
   e o repassa; a API (`CRM_PROXY_CONFIAVEL` = faixas privadas) faz a mesma leitura, da direita para a
   esquerda. Um IP forjado pelo navegador no começo do cabeçalho não vale. O bloqueio de tentativas de
@@ -336,5 +343,5 @@ cada atualização antes da produção.
   de produção.
 - Não abrir a porta 8000 nem usar ngrok/túnel.
 - Não versionar `.env`, backup, planilha ou qualquer arquivo com dado de cliente.
-- Não rodar mais de um processo da API no mesmo banco (no Coolify: não escale o `backend`).
-- Não deixar o banco do Coolify público nem dar domínio ao serviço `backend`.
+- Não rodar mais de um processo da API no mesmo banco (no Coolify: não escale o `crmcs-api`).
+- Não deixar o banco do Coolify público nem dar domínio ao serviço `crmcs-api`.

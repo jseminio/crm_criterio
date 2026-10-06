@@ -34,6 +34,9 @@ class TestDocumentos:
         prompt = ensaio.ler_prompt((REPO / "sdr-ia-roteiro-spin.md").read_text())
         assert prompt.startswith("Você é a assistente virtual da Critério")
         assert "Nunca escreva as palavras preço, desconto" in prompt
+        # Ajustes do ensaio fiel de 06/10/2026: a IA esquecia de se apresentar e repetia a abertura.
+        assert "A primeira frase da sua primeira mensagem é sempre a apresentação" in prompt
+        assert "Faça essa\npergunta uma vez só" in prompt
 
     def test_documento_sem_prompt_ou_sem_perguntas_avisa(self):
         with pytest.raises(ValueError, match="prompt"):

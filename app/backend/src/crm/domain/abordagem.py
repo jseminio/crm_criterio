@@ -36,10 +36,18 @@ _PRECO = re.compile(
     re.IGNORECASE,
 )
 
+#: "Preço" que é do negócio do lead, não da Critério: ajustar, formar ou definir o próprio preço é
+#: decisão que o SPIN faz o lead enxergar (ensaio fiel de 06/10/2026, conversa SP1). Só estas
+#: expressões fechadas saem antes da busca; qualquer outro "preço" na mesma mensagem continua barrado.
+_PRECO_DO_LEAD = re.compile(
+    r"\b(?:ajustes?|forma[çc][ãa]o|pol[íi]tica)\s+de\s+pre[çc]os?\b|\bpre[çc]os?\s+de\s+venda\b",
+    re.IGNORECASE,
+)
+
 
 def fala_de_preco(texto: str | None) -> bool:
     """A mesma trava vale para a abordagem aprovada e para a mensagem do SDR de IA."""
-    return bool(_PRECO.search(texto or ""))
+    return bool(_PRECO.search(_PRECO_DO_LEAD.sub(" ", texto or "")))
 
 
 _COLCHETES = re.compile(r"\[[^\]]+\]")
@@ -109,9 +117,9 @@ def conferir(
         ),
         Conferencia(
             "sem_preco",
-            not _PRECO.search(texto),
+            not fala_de_preco(texto),
             "Sem preço na mensagem"
-            if not _PRECO.search(texto)
+            if not fala_de_preco(texto)
             else "A mensagem fala de preço: o preço vem depois do diagnóstico",
         ),
         Conferencia(

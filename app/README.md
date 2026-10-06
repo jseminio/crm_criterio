@@ -883,7 +883,13 @@ sem aprovação por mensagem. As travas ficam no servidor:
 - nada sai da IA ou da equipe para lead "não contatar" (409); o lead ainda
   pode escrever;
 - **mensagem da IA não fala de preço** (422; a mesma regra da abordagem,
-  `fala_de_preco`). Depois do transbordo, a equipe pode;
+  `fala_de_preco`). Depois do transbordo, a equipe pode. Desde 06/10/2026,
+  quatro expressões que falam do preço **do lead** passam: "ajuste de preço",
+  "formação de preço", "política de preço" e "preço de venda", no singular ou
+  no plural. O ensaio fiel mostrou a trava barrando uma boa pergunta de
+  implicação ("contratação, investimento, ajuste de preço?"). Qualquer outro
+  "preço", "R$", "desconto" etc. na mesma mensagem continua barrado, e
+  "reajuste de preço" também;
 - a IA não fala em conversa encerrada (409); uma conversa aberta por lead;
 - o horário de cada mensagem é o do servidor.
 

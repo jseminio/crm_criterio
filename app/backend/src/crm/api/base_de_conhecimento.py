@@ -167,7 +167,7 @@ def roteador_da_base(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
         return _resposta(f, date.today())
 
     @r.get("", response_model=BaseResposta)
-    def ler(sessao: Session = Depends(obter_sessao)) -> BaseResposta:
+    def ler(sessao: Session = Depends(obter_sessao, scope="function")) -> BaseResposta:
         hoje = date.today()
         fichas = sessao.scalars(sa.select(FichaDaBase).order_by(FichaDaBase.id)).all()
         ordem = {b: i for i, b in enumerate(BlocoDaBase)}
@@ -181,7 +181,7 @@ def roteador_da_base(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
         )
 
     @r.post("/fichas", response_model=FichaResposta, status_code=201)
-    def criar(corpo: FichaNova, sessao: Session = Depends(obter_sessao)) -> FichaResposta:
+    def criar(corpo: FichaNova, sessao: Session = Depends(obter_sessao, scope="function")) -> FichaResposta:
         dados = {k: _limpo(v) for k, v in corpo.model_dump().items()}
         if not dados["titulo"]:
             raise HTTPException(422, "Falta o título")
@@ -193,7 +193,7 @@ def roteador_da_base(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
         return _gravar(sessao, f)
 
     @r.patch("/fichas/{ficha_id}", response_model=FichaResposta)
-    def alterar(ficha_id: int, corpo: FichaAlterada, sessao: Session = Depends(obter_sessao)) -> FichaResposta:
+    def alterar(ficha_id: int, corpo: FichaAlterada, sessao: Session = Depends(obter_sessao, scope="function")) -> FichaResposta:
         f = _ficha(sessao, ficha_id)
         if f.situacao is SituacaoDaFicha.ARQUIVADA:
             raise HTTPException(409, "a ficha está arquivada: reabra antes de editar")
@@ -223,7 +223,7 @@ def roteador_da_base(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
         return _gravar(sessao, f)
 
     @r.post("/fichas/{ficha_id}/revisao", response_model=FichaResposta)
-    def enviar_para_revisao(ficha_id: int, sessao: Session = Depends(obter_sessao)) -> FichaResposta:
+    def enviar_para_revisao(ficha_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> FichaResposta:
         f = _ficha(sessao, ficha_id)
         if f.situacao is not SituacaoDaFicha.RASCUNHO:
             raise HTTPException(409, f"só rascunho vai para revisão (a ficha está {f.situacao.value})")
@@ -231,7 +231,7 @@ def roteador_da_base(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
         return _gravar(sessao, f)
 
     @r.post("/fichas/{ficha_id}/aprovar", response_model=FichaResposta)
-    def aprovar(ficha_id: int, corpo: Aprovacao, sessao: Session = Depends(obter_sessao)) -> FichaResposta:
+    def aprovar(ficha_id: int, corpo: Aprovacao, sessao: Session = Depends(obter_sessao, scope="function")) -> FichaResposta:
         f = _ficha(sessao, ficha_id)
         if f.situacao is SituacaoDaFicha.APROVADA:
             raise HTTPException(409, "a ficha já está aprovada")
@@ -249,7 +249,7 @@ def roteador_da_base(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
         return _gravar(sessao, f)
 
     @r.post("/fichas/{ficha_id}/arquivar", response_model=FichaResposta)
-    def arquivar(ficha_id: int, sessao: Session = Depends(obter_sessao)) -> FichaResposta:
+    def arquivar(ficha_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> FichaResposta:
         f = _ficha(sessao, ficha_id)
         if f.situacao is SituacaoDaFicha.ARQUIVADA:
             raise HTTPException(409, "a ficha já está arquivada")
@@ -258,7 +258,7 @@ def roteador_da_base(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
         return _gravar(sessao, f)
 
     @r.post("/fichas/{ficha_id}/reabrir", response_model=FichaResposta)
-    def reabrir(ficha_id: int, sessao: Session = Depends(obter_sessao)) -> FichaResposta:
+    def reabrir(ficha_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> FichaResposta:
         f = _ficha(sessao, ficha_id)
         if f.situacao is not SituacaoDaFicha.ARQUIVADA:
             raise HTTPException(409, "só ficha arquivada se reabre")
@@ -268,7 +268,7 @@ def roteador_da_base(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
         return _gravar(sessao, f)
 
     @r.post("/carga-inicial", response_model=CargaResposta)
-    def carga_inicial(sessao: Session = Depends(obter_sessao)) -> CargaResposta:
+    def carga_inicial(sessao: Session = Depends(obter_sessao, scope="function")) -> CargaResposta:
         """Só acrescenta. A ficha cujo código já está no banco — mesmo editada ou arquivada — fica
         como está."""
         existentes = set(sessao.scalars(sa.select(FichaDaBase.codigo).where(FichaDaBase.codigo.is_not(None))))

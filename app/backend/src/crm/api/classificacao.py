@@ -834,7 +834,7 @@ def roteador(
         }
 
     @r.get("/classificacao", response_model=ClassificacaoDaCarteira)
-    def classificacao(sessao: Session = Depends(obter_sessao)) -> ClassificacaoDaCarteira:
+    def classificacao(sessao: Session = Depends(obter_sessao, scope="function")) -> ClassificacaoDaCarteira:
         todas, linhas = _leituras(sessao)
         vistos = {c.grupo_id for c, _ in linhas}
         periodo = _periodo_aberto(sessao)
@@ -967,14 +967,14 @@ def roteador(
         )
 
     @r.get("/parametros", response_model=ParametrosResposta)
-    def parametros_atuais(sessao: Session = Depends(obter_sessao)) -> ParametrosResposta:
+    def parametros_atuais(sessao: Session = Depends(obter_sessao, scope="function")) -> ParametrosResposta:
         v = _versao_vigente(sessao)
         if v is None:
             raise HTTPException(409, "ainda não há parâmetros gravados no banco — rode a migração pendente (alembic upgrade head)")
         return _parametros_resposta(v)
 
     @r.post("/parametros", response_model=ParametrosResposta, status_code=201)
-    def editar_parametros(corpo: EdicaoDeParametros, sessao: Session = Depends(obter_sessao)) -> ParametrosResposta:
+    def editar_parametros(corpo: EdicaoDeParametros, sessao: Session = Depends(obter_sessao, scope="function")) -> ParametrosResposta:
         """Grava uma **versão nova**; a vigente até aqui não é tocada (mesmo princípio das notas).
 
         Pesos do Score e o mix de cada Porte precisam fechar 100% — senão a edição é recusada, com
@@ -1084,7 +1084,7 @@ def roteador(
         )
 
     @r.post("/grupos/{grupo_id}/notas", response_model=ResultadoDaEdicao, status_code=201)
-    def editar_notas(grupo_id: int, corpo: EdicaoDeNotas, sessao: Session = Depends(obter_sessao)) -> ResultadoDaEdicao:
+    def editar_notas(grupo_id: int, corpo: EdicaoDeNotas, sessao: Session = Depends(obter_sessao, scope="function")) -> ResultadoDaEdicao:
         """Grava uma **nova leitura** com as notas alteradas; a anterior não é tocada (snapshot imutável).
 
         Score, classe, alerta e eixo são recalculados. **A nota de rentabilidade não muda**: o CRM não guarda porte
@@ -1143,12 +1143,12 @@ def roteador(
         return grupo, anterior, contrato
 
     @r.get("/periodo", response_model=PeriodoResposta | None)
-    def periodo_aberto(sessao: Session = Depends(obter_sessao)) -> PeriodoResposta | None:
+    def periodo_aberto(sessao: Session = Depends(obter_sessao, scope="function")) -> PeriodoResposta | None:
         periodo = _periodo_aberto(sessao)
         return _periodo_resposta(sessao, periodo) if periodo else None
 
     @r.post("/periodo", response_model=PeriodoResposta, status_code=201)
-    def abrir_periodo(corpo: AbrirPeriodo, sessao: Session = Depends(obter_sessao)) -> PeriodoResposta:
+    def abrir_periodo(corpo: AbrirPeriodo, sessao: Session = Depends(obter_sessao, scope="function")) -> PeriodoResposta:
         if _periodo_aberto(sessao) is not None:
             raise HTTPException(409, "já há um período aberto: calcule a carteira dele antes de abrir outro")
         ano, mes = (int(x) for x in corpo.mes.split("-"))
@@ -1167,7 +1167,7 @@ def roteador(
         return _periodo_resposta(sessao, periodo)
 
     @r.patch("/periodo/janela", response_model=PeriodoResposta)
-    def editar_janela(corpo: EdicaoDaJanela, sessao: Session = Depends(obter_sessao)) -> PeriodoResposta:
+    def editar_janela(corpo: EdicaoDaJanela, sessao: Session = Depends(obter_sessao, scope="function")) -> PeriodoResposta:
         periodo = _exigir_periodo_aberto(sessao)
         _validar_janela(sessao, corpo.margem_minima, corpo.margem_alvo)
         periodo.margem_minima, periodo.margem_alvo = corpo.margem_minima, corpo.margem_alvo
@@ -1175,7 +1175,7 @@ def roteador(
         return _periodo_resposta(sessao, periodo)
 
     @r.put("/periodo/grupos/{grupo_id}/rascunho", response_model=RascunhoResposta)
-    def salvar_rascunho(grupo_id: int, corpo: RascunhoEntrada, sessao: Session = Depends(obter_sessao)) -> RascunhoResposta:
+    def salvar_rascunho(grupo_id: int, corpo: RascunhoEntrada, sessao: Session = Depends(obter_sessao, scope="function")) -> RascunhoResposta:
         """Grava o que vier, aba por aba, sem mexer no Score. Aba ausente continua como estava."""
         periodo = _exigir_periodo_aberto(sessao)
         _, anterior, _ = _grupo_da_carteira(sessao, grupo_id)
@@ -1210,7 +1210,7 @@ def roteador(
         return _rascunho_resposta(rascunho, novo=anterior is None)
 
     @r.post("/periodo/grupos/{grupo_id}/simulacao", response_model=SimulacaoResposta)
-    def simular(grupo_id: int, sessao: Session = Depends(obter_sessao)) -> SimulacaoResposta:
+    def simular(grupo_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> SimulacaoResposta:
         """"Calcular este cliente": o resultado de um grupo com o rascunho atual. **Não grava nada**;
         a carteira só muda no "Calcular carteira"."""
         periodo = _exigir_periodo_aberto(sessao)
@@ -1280,7 +1280,7 @@ def roteador(
         )
 
     @r.post("/periodo/calcular", response_model=ResultadoDoCalculo)
-    def calcular_carteira(corpo: CalcularCarteira, sessao: Session = Depends(obter_sessao)) -> ResultadoDoCalculo:
+    def calcular_carteira(corpo: CalcularCarteira, sessao: Session = Depends(obter_sessao, scope="function")) -> ResultadoDoCalculo:
         """Aplica os rascunhos de **todos** os grupos de uma vez e fecha o período. Recusa enquanto
         faltar qualquer aba de qualquer grupo (decisão de 29/09/2026). A receita da leitura nova é o
         valor em contrato; o cliente novo ganha a primeira leitura (decisões de 30/09/2026)."""
@@ -1347,7 +1347,7 @@ def roteador(
         return _sugestao_de_porte(regras_de_porte.Volumetria(**corpo.model_dump()))
 
     @r.post("/grupos/{grupo_id}/porte", response_model=PorteDoGrupo)
-    def editar_porte(grupo_id: int, corpo: EdicaoDePorte, sessao: Session = Depends(obter_sessao)) -> PorteDoGrupo:
+    def editar_porte(grupo_id: int, corpo: EdicaoDePorte, sessao: Session = Depends(obter_sessao, scope="function")) -> PorteDoGrupo:
         """Grava a volumetria e o porte confirmado **no grupo**, não numa nova revisão da
         classificação: porte não entra no Score, então não há por que duplicá-lo a cada revisão
         mensal (ver `crm.db.modelos.GrupoEconomico.porte`).
@@ -1372,7 +1372,7 @@ def roteador(
         return _porte(grupo)
 
     @r.get("/grupos/{grupo_id}/historico", response_model=list[LeituraDoHistorico])
-    def historico(grupo_id: int, sessao: Session = Depends(obter_sessao)) -> list[LeituraDoHistorico]:
+    def historico(grupo_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> list[LeituraDoHistorico]:
         linhas = sessao.scalars(
             sa.select(ClassificacaoDoGrupo).where(ClassificacaoDoGrupo.grupo_id == grupo_id)
             .order_by(ClassificacaoDoGrupo.referencia.desc(), ClassificacaoDoGrupo.revisao.desc())
@@ -1387,7 +1387,7 @@ def roteador(
         ]
 
     @r.get("/exportar")
-    def exportar(sessao: Session = Depends(obter_sessao)) -> Response:
+    def exportar(sessao: Session = Depends(obter_sessao, scope="function")) -> Response:
         """O histórico completo — todas as leituras de todos os grupos, não só o snapshot atual —
         na visão Grupo → Empresa do modelo `Classificacao_Grupo_COMPLETO.xlsx`, com fórmula viva
         para Score, Classe, Classe Efetiva, Alerta, $$$ e Eixo de Ação
@@ -1450,14 +1450,14 @@ def roteador(
                                custo_usd=a.custo_usd)
 
     @r.get("/analise", response_model=AnaliseResposta | None)
-    def analise(sessao: Session = Depends(obter_sessao)) -> AnaliseResposta | None:
+    def analise(sessao: Session = Depends(obter_sessao, scope="function")) -> AnaliseResposta | None:
         a = sessao.scalars(
             sa.select(AnaliseDaCarteira).order_by(AnaliseDaCarteira.gerada_em.desc()).limit(1)
         ).first()
         return _analise_resposta(a) if a else None
 
     @r.post("/analise", response_model=AnaliseResposta, status_code=201)
-    def gerar_analise(corpo: GerarAnalise, sessao: Session = Depends(obter_sessao)) -> AnaliseResposta:
+    def gerar_analise(corpo: GerarAnalise, sessao: Session = Depends(obter_sessao, scope="function")) -> AnaliseResposta:
         """Escreve uma leitura nova da carteira com a IA. Nunca decide nada — só descreve os números
         já calculados. Cada chamada custa uma fração de centavo (Sonnet, sem busca na web)."""
         atual = classificacao(sessao)
@@ -1496,14 +1496,14 @@ def roteador(
         )
 
     @r.get("/revisoes", response_model=list[RevisaoResposta])
-    def revisoes(sessao: Session = Depends(obter_sessao)) -> list[RevisaoResposta]:
+    def revisoes(sessao: Session = Depends(obter_sessao, scope="function")) -> list[RevisaoResposta]:
         linhas = sessao.scalars(
             sa.select(RevisaoDaCarteira).order_by(RevisaoDaCarteira.mes_de_referencia)
         ).all()
         return [_revisao_resposta(v) for v in linhas]
 
     @r.post("/revisoes", response_model=RevisaoResposta, status_code=201)
-    def registrar_revisao(corpo: RegistrarRevisao, sessao: Session = Depends(obter_sessao)) -> RevisaoResposta:
+    def registrar_revisao(corpo: RegistrarRevisao, sessao: Session = Depends(obter_sessao, scope="function")) -> RevisaoResposta:
         """Congela o ISC e o retrato de agora como a revisão do mês civil corrente.
 
         Uma por mês: já existindo uma para este mês, recusa (o mês certo a editar é a data dela,
@@ -1533,7 +1533,7 @@ def roteador(
 
     @r.patch("/revisoes/{revisao_id}/mes", response_model=RevisaoResposta)
     def editar_mes_da_revisao(
-        revisao_id: int, corpo: EditarMesDaRevisao, sessao: Session = Depends(obter_sessao)
+        revisao_id: int, corpo: EditarMesDaRevisao, sessao: Session = Depends(obter_sessao, scope="function")
     ) -> RevisaoResposta:
         """Corrige só o rótulo (o mês a que a revisão se refere) — os números congelados não mudam."""
         linha = sessao.get(RevisaoDaCarteira, revisao_id)

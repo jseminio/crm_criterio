@@ -395,7 +395,7 @@ def _gravar_evento(
 def _registrar(api: FastAPI) -> None:
     # ------------------------------------------------------------------ listas
     @api.get("/api/listas", response_model=e.Listas, tags=["referência"])
-    def listas(sessao: Session = Depends(obter_sessao)) -> e.Listas:
+    def listas(sessao: Session = Depends(obter_sessao, scope="function")) -> e.Listas:
         """As listas controladas, para a tela montar os seletores.
 
         `servicos` não é enum do domínio — é texto livre da planilha, então
@@ -457,7 +457,7 @@ def _registrar(api: FastAPI) -> None:
         ]
 
     @api.get("/api/servicos/pedidos", response_model=list[e.PedidoDeServicoNovo], tags=["listas"])
-    def pedidos_de_servico_novo(sessao: Session = Depends(obter_sessao)) -> list[e.PedidoDeServicoNovo]:
+    def pedidos_de_servico_novo(sessao: Session = Depends(obter_sessao, scope="function")) -> list[e.PedidoDeServicoNovo]:
         """Todo "Outro" registrado, o mais recente primeiro — para decidir o que
         entra no catálogo."""
         pedidos = [
@@ -478,7 +478,7 @@ def _registrar(api: FastAPI) -> None:
     # ------------------------------------------------------------------ grupos
     @api.get("/api/grupos", response_model=e.Pagina[e.GrupoResumo], tags=["grupos"])
     def listar_grupos(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         busca: str | None = None,
         incluir_fundidos: bool = False,
         limite: int = Query(default=50, le=500),
@@ -513,7 +513,7 @@ def _registrar(api: FastAPI) -> None:
 
     @api.patch("/api/grupos/{grupo_id}", response_model=e.GrupoResumo, tags=["grupos"])
     def editar_grupo(
-        grupo_id: int, corpo: e.GrupoEdicao, sessao: Session = Depends(obter_sessao),
+        grupo_id: int, corpo: e.GrupoEdicao, sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> e.GrupoResumo:
         """Corrige nome, responsável CS e observação. Só o que vier no corpo muda."""
         grupo = sessao.get(GrupoEconomico, grupo_id)
@@ -531,7 +531,7 @@ def _registrar(api: FastAPI) -> None:
     @api.get(
         "/api/grupos/sugestoes-de-fusao", response_model=list[e.SugestaoDeFusao], tags=["grupos"]
     )
-    def sugestoes_de_fusao(sessao: Session = Depends(obter_sessao)) -> list[e.SugestaoDeFusao]:
+    def sugestoes_de_fusao(sessao: Session = Depends(obter_sessao, scope="function")) -> list[e.SugestaoDeFusao]:
         """Blocos de grupos que parecem ser o mesmo cliente. **Não funde nada**:
         quem confirma é uma pessoa, pelo `POST /api/grupos/{id}/fundir`."""
         quantas = (
@@ -594,7 +594,7 @@ def _registrar(api: FastAPI) -> None:
 
     @api.get("/api/grupos/fusoes", response_model=list[e.FusaoFeita], tags=["grupos"])
     def listar_fusoes(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         incluir_desfeitas: bool = False,
         limite: int = Query(default=100, le=500),
     ) -> list[e.FusaoFeita]:
@@ -608,7 +608,7 @@ def _registrar(api: FastAPI) -> None:
         return [_fusao_feita(f, {i: g.nome for i, g in grupos.items()}, grupos) for f in fusoes]
 
     @api.post("/api/grupos/fusoes/{fusao_id}/desfazer", response_model=e.FusaoFeita, tags=["grupos"])
-    def desfazer(fusao_id: int, sessao: Session = Depends(obter_sessao)) -> e.FusaoFeita:
+    def desfazer(fusao_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> e.FusaoFeita:
         """Desfaz a fusão: devolve ao grupo absorvido o que foi movido e o reabre."""
         f = sessao.get(FusaoDeGrupos, fusao_id)
         if f is None:
@@ -622,7 +622,7 @@ def _registrar(api: FastAPI) -> None:
 
     @api.post("/api/grupos/{grupo_id}/fundir", response_model=e.GrupoResumo, tags=["grupos"])
     def fundir(
-        grupo_id: int, corpo: e.Fusao, sessao: Session = Depends(obter_sessao)
+        grupo_id: int, corpo: e.Fusao, sessao: Session = Depends(obter_sessao, scope="function")
     ) -> e.GrupoResumo:
         """Absorve outro grupo neste. O absorvido **não é apagado**."""
         principal = sessao.get(GrupoEconomico, grupo_id)
@@ -690,7 +690,7 @@ def _registrar(api: FastAPI) -> None:
         tags=["funil"],
     )
     def listar_oportunidades(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         situacao: list[Situacao] | None = Query(default=None),
         captador: list[str] | None = Query(default=None),
         tipo_canal: list[TipoCanal] | None = Query(default=None),
@@ -725,7 +725,7 @@ def _registrar(api: FastAPI) -> None:
     # Antes de `/api/oportunidades/{oportunidade_id}`: senão "exportar" seria lido como id.
     @api.get("/api/oportunidades/exportar", tags=["funil"])
     def exportar_oportunidades(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         situacao: list[Situacao] | None = Query(default=None),
         captador: list[str] | None = Query(default=None),
         tipo_canal: list[TipoCanal] | None = Query(default=None),
@@ -774,7 +774,7 @@ def _registrar(api: FastAPI) -> None:
         tags=["funil"],
     )
     def criar_oportunidade(
-        corpo: e.OportunidadeNova, sessao: Session = Depends(obter_sessao)
+        corpo: e.OportunidadeNova, sessao: Session = Depends(obter_sessao, scope="function")
     ) -> e.OportunidadeDetalhe:
         """A proposta nasce direto no CRM — sem passar pela planilha nem por
         um lead. Decisão de Eduardo em 22/09/2026 (E4).
@@ -857,7 +857,7 @@ def _registrar(api: FastAPI) -> None:
 
     @api.get("/api/funil", response_model=list[e.ColunaDoFunil], tags=["funil"])
     def funil(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         captador: list[str] | None = Query(default=None),
         tipo_canal: list[TipoCanal] | None = Query(default=None),
         temperatura: list[Temperatura] | None = Query(default=None),
@@ -899,7 +899,7 @@ def _registrar(api: FastAPI) -> None:
 
     @api.get("/api/indicadores", response_model=e.IndicadoresResposta, tags=["funil"])
     def indicadores(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         captador: list[str] | None = Query(default=None),
         tipo_canal: list[TipoCanal] | None = Query(default=None),
         temperatura: list[Temperatura] | None = Query(default=None),
@@ -961,7 +961,7 @@ def _registrar(api: FastAPI) -> None:
 
     @api.get("/api/mrr", response_model=e.MrrResposta, tags=["contratos"])
     def mrr(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         de: date | None = None,
         ate: date | None = None,
         hoje: date | None = None,
@@ -1021,7 +1021,7 @@ def _registrar(api: FastAPI) -> None:
 
     @api.get("/api/agenda", response_model=e.AgendaResposta, tags=["follow-up"])
     def agenda(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         captador: list[str] | None = Query(default=None),
         hoje: date | None = None,
     ) -> e.AgendaResposta:
@@ -1081,7 +1081,7 @@ def _registrar(api: FastAPI) -> None:
     )
     def recortes(
         dimensao: Literal["servico", "tipo_canal", "captador"],
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         captador: list[str] | None = Query(default=None),
         tipo_canal: list[TipoCanal] | None = Query(default=None),
         temperatura: list[Temperatura] | None = Query(default=None),
@@ -1102,7 +1102,7 @@ def _registrar(api: FastAPI) -> None:
         tags=["funil"],
     )
     def cenarios_de_ticket(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         captador: list[str] | None = Query(default=None),
         tipo_canal: list[TipoCanal] | None = Query(default=None),
         temperatura: list[Temperatura] | None = Query(default=None),
@@ -1124,7 +1124,7 @@ def _registrar(api: FastAPI) -> None:
         tags=["funil"],
     )
     def ver_oportunidade(
-        oportunidade_id: int, sessao: Session = Depends(obter_sessao)
+        oportunidade_id: int, sessao: Session = Depends(obter_sessao, scope="function")
     ) -> e.OportunidadeDetalhe:
         oportunidade = sessao.get(Oportunidade, oportunidade_id)
         if oportunidade is None:
@@ -1139,7 +1139,7 @@ def _registrar(api: FastAPI) -> None:
     def editar_oportunidade(
         oportunidade_id: int,
         corpo: e.OportunidadeEdicao,
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> e.OportunidadeDetalhe:
         """Altera só o que veio no corpo. Campo ausente não é campo vazio."""
         oportunidade = sessao.get(Oportunidade, oportunidade_id)
@@ -1296,7 +1296,7 @@ def _registrar(api: FastAPI) -> None:
         response_model=e.ExclusaoDaOportunidade,
         tags=["funil"],
     )
-    def ver_exclusao(oportunidade_id: int, sessao: Session = Depends(obter_sessao)) -> e.ExclusaoDaOportunidade:
+    def ver_exclusao(oportunidade_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> e.ExclusaoDaOportunidade:
         """O que a exclusão leva junto, para a tela confirmar antes (04/10/2026)."""
         oportunidade = sessao.get(Oportunidade, oportunidade_id)
         if oportunidade is None:
@@ -1305,7 +1305,7 @@ def _registrar(api: FastAPI) -> None:
 
     @api.post("/api/oportunidades/{oportunidade_id}/excluir", status_code=204, tags=["funil"])
     def excluir_oportunidade(
-        oportunidade_id: int, corpo: e.PedidoDeExclusao, sessao: Session = Depends(obter_sessao)
+        oportunidade_id: int, corpo: e.PedidoDeExclusao, sessao: Session = Depends(obter_sessao, scope="function")
     ) -> None:
         """Apaga a oportunidade com o motivo (`crm.db.excluir_oportunidade`). Irreversível: a tela
         mostra o que sai e pede o motivo antes."""
@@ -1326,7 +1326,7 @@ def _registrar(api: FastAPI) -> None:
     def converter_em_contrato(
         oportunidade_id: int,
         corpo: e.ConversaoEmContrato,
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> e.ContratoDetalhe:
         """Fecha o ciclo: a oportunidade aceita vira contrato — começo da
         Etapa 2 (23/09/2026). Só o registro; sem Clicksign, sem renovação
@@ -1369,7 +1369,7 @@ def _registrar(api: FastAPI) -> None:
 
     @api.get("/api/contratos", response_model=e.Pagina[e.ContratoResumo], tags=["contratos"])
     def listar_contratos(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         situacao: list[SituacaoContrato] | None = Query(default=None),
         grupo_id: int | None = None,
         limite: int = Query(default=100, le=1000),
@@ -1398,7 +1398,7 @@ def _registrar(api: FastAPI) -> None:
         "/api/contratos/{contrato_id}", response_model=e.ContratoDetalhe, tags=["contratos"]
     )
     def ver_contrato(
-        contrato_id: int, sessao: Session = Depends(obter_sessao)
+        contrato_id: int, sessao: Session = Depends(obter_sessao, scope="function")
     ) -> e.ContratoDetalhe:
         contrato = sessao.get(Contrato, contrato_id)
         if contrato is None:
@@ -1411,7 +1411,7 @@ def _registrar(api: FastAPI) -> None:
     def editar_contrato(
         contrato_id: int,
         corpo: e.ContratoEdicao,
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> e.ContratoDetalhe:
         contrato = sessao.get(Contrato, contrato_id)
         if contrato is None:
@@ -1469,7 +1469,7 @@ def _registrar(api: FastAPI) -> None:
         contrato_id: int,
         corpo: e.EventoDeContratoNovo,
         resposta: Response,
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> e.ContratoDetalhe:
         """Registra um aditivo, reajuste, expansão, contração, renovação ou
         encerramento. Valida, grava o evento com o antes e o depois e aplica o
@@ -1523,7 +1523,7 @@ def _registrar(api: FastAPI) -> None:
     # ------------------------------------------------------------- aprovações
     @api.get("/api/aprovacoes", response_model=list[e.AprovacaoResposta], tags=["contratos"])
     def listar_aprovacoes(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         situacao: SituacaoDaAprovacao = SituacaoDaAprovacao.AGUARDANDO,
         limite: int = Query(default=100, le=500),
     ) -> list[e.AprovacaoResposta]:
@@ -1544,7 +1544,7 @@ def _registrar(api: FastAPI) -> None:
         return p
 
     @api.post("/api/aprovacoes/{aprovacao_id}/aprovar", response_model=e.AprovacaoResposta, tags=["contratos"])
-    def aprovar(aprovacao_id: int, sessao: Session = Depends(obter_sessao)) -> e.AprovacaoResposta:
+    def aprovar(aprovacao_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> e.AprovacaoResposta:
         """Aplica o evento com a data pedida. Revalida contra o contrato de agora: se ele mudou (por
         exemplo, foi encerrado), recusa com o motivo e o pedido continua esperando."""
         p = _aguardando(sessao, aprovacao_id)
@@ -1566,7 +1566,7 @@ def _registrar(api: FastAPI) -> None:
         return _resposta_da_aprovacao(p)
 
     @api.post("/api/aprovacoes/{aprovacao_id}/recusar", response_model=e.AprovacaoResposta, tags=["contratos"])
-    def recusar(aprovacao_id: int, corpo: e.Recusa, sessao: Session = Depends(obter_sessao)) -> e.AprovacaoResposta:
+    def recusar(aprovacao_id: int, corpo: e.Recusa, sessao: Session = Depends(obter_sessao, scope="function")) -> e.AprovacaoResposta:
         """O contrato não muda; o pedido fica guardado com o porquê."""
         p = _aguardando(sessao, aprovacao_id)
         p.situacao = SituacaoDaAprovacao.RECUSADO
@@ -1604,7 +1604,7 @@ def _registrar(api: FastAPI) -> None:
 
     @api.get("/api/cargas", response_model=list[e.ExecucaoResumo], tags=["conferência"])
     def listar_cargas(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         limite: int = Query(default=50, le=200),
     ) -> list[e.ExecucaoResumo]:
         """As rodadas da carga, da mais recente para a mais antiga."""
@@ -1619,7 +1619,7 @@ def _registrar(api: FastAPI) -> None:
         ]
 
     @api.get("/api/cargas/{carga_id}", response_model=e.ExecucaoDetalhe, tags=["conferência"])
-    def ver_carga(carga_id: int, sessao: Session = Depends(obter_sessao)) -> e.ExecucaoDetalhe:
+    def ver_carga(carga_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> e.ExecucaoDetalhe:
         execucao = sessao.get(ExecucaoDeCarga, carga_id)
         if execucao is None:
             raise HTTPException(404, "carga não encontrada")
@@ -1647,7 +1647,7 @@ def _registrar(api: FastAPI) -> None:
     )
     def listar_ocorrencias(
         carga_id: int,
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         tipo: TipoDeOcorrencia | None = None,
         campo: str | None = None,
         limite: int = Query(default=200, le=1000),
@@ -1703,7 +1703,7 @@ def _registrar(api: FastAPI) -> None:
     # ------------------------------------------------------------------- leads
     @api.get("/api/leads", response_model=e.Pagina[e.LeadResumo], tags=["leads"])
     def listar_leads(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         situacao: list[SituacaoLead] | None = Query(default=None),
         tipo_canal: list[TipoCanal] | None = Query(default=None),
         apenas_abertos: bool = False,
@@ -1739,7 +1739,7 @@ def _registrar(api: FastAPI) -> None:
         )
 
     @api.post("/api/leads", response_model=e.LeadResumo, status_code=201, tags=["leads"])
-    def criar_lead(corpo: e.LeadNovo, sessao: Session = Depends(obter_sessao)) -> e.LeadResumo:
+    def criar_lead(corpo: e.LeadNovo, sessao: Session = Depends(obter_sessao, scope="function")) -> e.LeadResumo:
         """Cadastra um lead. É a porta de entrada que a planilha nunca teve."""
         problema = problema_na_descricao(corpo.interesse, corpo.interesse_descricao) or problema_no_tema(
             corpo.interesse, corpo.interesse_tema, exigir=True
@@ -1753,7 +1753,7 @@ def _registrar(api: FastAPI) -> None:
 
     @api.patch("/api/leads/{lead_id}", response_model=e.LeadResumo, tags=["leads"])
     def editar_lead(
-        lead_id: int, corpo: e.LeadEdicao, sessao: Session = Depends(obter_sessao)
+        lead_id: int, corpo: e.LeadEdicao, sessao: Session = Depends(obter_sessao, scope="function")
     ) -> e.LeadResumo:
         lead = sessao.get(Lead, lead_id)
         if lead is None:
@@ -1837,7 +1837,7 @@ def _registrar(api: FastAPI) -> None:
         tags=["leads"],
     )
     def converter_lead(
-        lead_id: int, corpo: e.ConversaoDeLead, sessao: Session = Depends(obter_sessao)
+        lead_id: int, corpo: e.ConversaoDeLead, sessao: Session = Depends(obter_sessao, scope="function")
     ) -> e.OportunidadeDetalhe:
         """Transforma o lead em oportunidade, carregando a origem consigo.
 

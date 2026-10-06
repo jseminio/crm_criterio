@@ -285,7 +285,7 @@ def roteador_de_abordagens(
 
     @rota.get("", response_model=e.Pagina[e.AbordagemResumo])
     def listar(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         mes: str | None = Query(default=None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
         situacao: list[SituacaoAbordagem] | None = Query(default=None),
     ) -> e.Pagina[e.AbordagemResumo]:
@@ -302,7 +302,7 @@ def roteador_de_abordagens(
     @rota.get("/resumo", response_model=e.ResumoDasAbordagens)
     def resumo(
         mes: str = Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> e.ResumoDasAbordagens:
         abordagens = sessao.scalars(sa.select(Abordagem).where(Abordagem.mes == mes)).all()
         ativas = [a for a in abordagens if a.situacao is not S.DESCARTADA]
@@ -324,7 +324,7 @@ def roteador_de_abordagens(
 
     @rota.post("", response_model=e.AbordagemDetalhe, status_code=201)
     def criar(
-        corpo: e.AbordagemNova, sessao: Session = Depends(obter_sessao)
+        corpo: e.AbordagemNova, sessao: Session = Depends(obter_sessao, scope="function")
     ) -> e.AbordagemDetalhe:
         try:
             abordagem = enfileirar(sessao, **corpo.model_dump())
@@ -338,14 +338,14 @@ def roteador_de_abordagens(
         return _detalhe(sessao, abordagem)
 
     @rota.get("/{abordagem_id}", response_model=e.AbordagemDetalhe)
-    def ver(abordagem_id: int, sessao: Session = Depends(obter_sessao)) -> e.AbordagemDetalhe:
+    def ver(abordagem_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> e.AbordagemDetalhe:
         return _detalhe(sessao, _buscar(sessao, abordagem_id))
 
     @rota.patch("/{abordagem_id}", response_model=e.AbordagemDetalhe)
     def editar(
         abordagem_id: int,
         corpo: e.AbordagemEdicao,
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> e.AbordagemDetalhe:
         abordagem = _buscar(sessao, abordagem_id)
         mudancas = corpo.model_dump(exclude_unset=True)
@@ -372,7 +372,7 @@ def roteador_de_abordagens(
     def preparar(
         abordagem_id: int,
         tarefas: BackgroundTasks,
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> e.AbordagemDetalhe:
         abordagem = _buscar(sessao, abordagem_id, travar=True)
         if abordagem.situacao not in (S.A_PREPARAR, S.ERRO):
@@ -390,7 +390,7 @@ def roteador_de_abordagens(
         abordagem_id: int,
         corpo: e.PedidoDeVersao,
         tarefas: BackgroundTasks,
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> e.AbordagemDetalhe:
         abordagem = _buscar(sessao, abordagem_id, travar=True)
         if abordagem.situacao is not S.AGUARDANDO_APROVACAO:
@@ -404,7 +404,7 @@ def roteador_de_abordagens(
     def aprovar(
         abordagem_id: int,
         corpo: e.Aprovacao,
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> e.AbordagemDetalhe:
         """A única rota que envia. E-mail sai na hora; WhatsApp fica aprovado
         e a pessoa envia pelo aplicativo com o link pronto."""
@@ -445,7 +445,7 @@ def roteador_de_abordagens(
 
     @rota.post("/{abordagem_id}/marcar-enviada", response_model=e.AbordagemDetalhe)
     def marcar_enviada(
-        abordagem_id: int, sessao: Session = Depends(obter_sessao)
+        abordagem_id: int, sessao: Session = Depends(obter_sessao, scope="function")
     ) -> e.AbordagemDetalhe:
         abordagem = _buscar(sessao, abordagem_id, travar=True)
         if abordagem.situacao is not S.APROVADA:
@@ -457,7 +457,7 @@ def roteador_de_abordagens(
 
     @rota.post("/{abordagem_id}/descartar", response_model=e.AbordagemDetalhe)
     def descartar(
-        abordagem_id: int, sessao: Session = Depends(obter_sessao)
+        abordagem_id: int, sessao: Session = Depends(obter_sessao, scope="function")
     ) -> e.AbordagemDetalhe:
         abordagem = _buscar(sessao, abordagem_id, travar=True)
         if abordagem.situacao in (S.ENVIADA, S.DESCARTADA):

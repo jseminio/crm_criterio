@@ -216,7 +216,7 @@ def roteador_do_acesso(
         return request.client.host if request.client else "?"
 
     @r.post("/api/acesso/login", response_model=Sessao)
-    def login(corpo: Login, request: Request, sessao: Session = Depends(obter_sessao)) -> Sessao:
+    def login(corpo: Login, request: Request, sessao: Session = Depends(obter_sessao, scope="function")) -> Sessao:
         """Pública. Erros: 401 e-mail ou senha errados (a mesma frase para os dois), 403 conta
         desativada (só depois da senha certa), 429 no bloqueio por tentativas (`Tentativas`)."""
         c = _modo_senha()
@@ -227,7 +227,7 @@ def roteador_do_acesso(
         return _sessao(u, token, expira)
 
     @r.post("/api/acesso/senha", response_model=Sessao)
-    def trocar_minha_senha(corpo: TrocaDeSenha, request: Request, sessao: Session = Depends(obter_sessao)) -> Sessao:
+    def trocar_minha_senha(corpo: TrocaDeSenha, request: Request, sessao: Session = Depends(obter_sessao, scope="function")) -> Sessao:
         """Quem entrou troca a própria senha. A troca derruba as sessões abertas com a senha antiga,
         inclusive a deste pedido: por isso devolve uma sessão nova, no formato do login, que a tela
         guarda no lugar da antiga. Senha atual errada conta como tentativa errada (e respeita o
@@ -265,11 +265,11 @@ def roteador_do_acesso(
                 for m, rot, fs in MENUS]
 
     @r.get("/api/acesso/perfis", response_model=list[PerfilResposta])
-    def perfis(sessao: Session = Depends(obter_sessao)) -> list[PerfilResposta]:
+    def perfis(sessao: Session = Depends(obter_sessao, scope="function")) -> list[PerfilResposta]:
         return [_resposta_do_perfil(sessao, p) for p in sessao.scalars(sa.select(Perfil).order_by(Perfil.administrador.desc(), Perfil.nome))]
 
     @r.post("/api/acesso/perfis", response_model=PerfilResposta)
-    def criar_perfil(corpo: PerfilNovo, sessao: Session = Depends(obter_sessao)) -> PerfilResposta:
+    def criar_perfil(corpo: PerfilNovo, sessao: Session = Depends(obter_sessao, scope="function")) -> PerfilResposta:
         nome = corpo.nome.strip()
         if sessao.scalar(sa.select(Perfil).where(sa.func.lower(Perfil.nome) == nome.lower())):
             raise HTTPException(422, f"já existe o perfil {nome}")
@@ -279,7 +279,7 @@ def roteador_do_acesso(
         return _resposta_do_perfil(sessao, p)
 
     @r.patch("/api/acesso/perfis/{perfil_id}", response_model=PerfilResposta)
-    def mudar_perfil(perfil_id: int, corpo: PerfilMudanca, sessao: Session = Depends(obter_sessao)) -> PerfilResposta:
+    def mudar_perfil(perfil_id: int, corpo: PerfilMudanca, sessao: Session = Depends(obter_sessao, scope="function")) -> PerfilResposta:
         p = sessao.get(Perfil, perfil_id)
         if p is None:
             raise HTTPException(404, "perfil não encontrado")
@@ -296,11 +296,11 @@ def roteador_do_acesso(
         return _resposta_do_perfil(sessao, p)
 
     @r.get("/api/acesso/usuarios", response_model=list[UsuarioResposta])
-    def usuarios(sessao: Session = Depends(obter_sessao)) -> list[UsuarioResposta]:
+    def usuarios(sessao: Session = Depends(obter_sessao, scope="function")) -> list[UsuarioResposta]:
         return [_resposta_do_usuario(u) for u in sessao.scalars(sa.select(Usuario).order_by(Usuario.ativo.desc(), Usuario.email))]
 
     @r.post("/api/acesso/usuarios", response_model=UsuarioResposta)
-    def liberar(corpo: UsuarioNovo, sessao: Session = Depends(obter_sessao)) -> UsuarioResposta:
+    def liberar(corpo: UsuarioNovo, sessao: Session = Depends(obter_sessao, scope="function")) -> UsuarioResposta:
         email = corpo.email.strip().lower()
         if corpo.perfil_id is not None and sessao.get(Perfil, corpo.perfil_id) is None:
             raise HTTPException(422, "perfil não encontrado")
@@ -317,7 +317,7 @@ def roteador_do_acesso(
         return _resposta_do_usuario(u)
 
     @r.post("/api/acesso/usuarios/{usuario_id}/senha", status_code=204)
-    def redefinir_senha(usuario_id: int, corpo: SenhaNova, sessao: Session = Depends(obter_sessao)) -> None:
+    def redefinir_senha(usuario_id: int, corpo: SenhaNova, sessao: Session = Depends(obter_sessao, scope="function")) -> None:
         """Quem administra define uma senha nova para alguém (esqueceu, ou veio do tempo da Microsoft).
         Derruba as sessões abertas da pessoa (o carimbo da senha muda) e tira o bloqueio por tentativas
         erradas desse e-mail, em todos os IPs. Só no modo e-mail e senha, como as outras rotas de senha."""
@@ -330,7 +330,7 @@ def roteador_do_acesso(
         tentativas.liberar(u.email)
 
     @r.patch("/api/acesso/usuarios/{usuario_id}", response_model=UsuarioResposta)
-    def mudar_usuario(usuario_id: int, corpo: UsuarioMudanca, sessao: Session = Depends(obter_sessao)) -> UsuarioResposta:
+    def mudar_usuario(usuario_id: int, corpo: UsuarioMudanca, sessao: Session = Depends(obter_sessao, scope="function")) -> UsuarioResposta:
         u = sessao.get(Usuario, usuario_id)
         if u is None:
             raise HTTPException(404, "pessoa não encontrada")
@@ -351,7 +351,7 @@ def roteador_do_acesso(
 
     @r.get("/api/historico", response_model=list[AlteracaoResposta])
     def historico(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         usuario: str | None = None,
         tabela: str | None = None,
         registro_id: int | None = None,

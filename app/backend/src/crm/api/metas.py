@@ -72,11 +72,11 @@ def roteador_de_metas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRoute
         return MetasResposta(**itens)
 
     @r.get("/api/metas", response_model=MetasResposta)
-    def ver(sessao: Session = Depends(obter_sessao)) -> MetasResposta:
+    def ver(sessao: Session = Depends(obter_sessao, scope="function")) -> MetasResposta:
         return _resposta(sessao)
 
     @r.put("/api/metas", response_model=MetasResposta)
-    def mudar(corpo: MetasEdicao, sessao: Session = Depends(obter_sessao)) -> MetasResposta:
+    def mudar(corpo: MetasEdicao, sessao: Session = Depends(obter_sessao, scope="function")) -> MetasResposta:
         """Só muda o indicador que veio. O alerta precisa ficar abaixo da meta; a conversão, até 100%."""
         for chave, nome in (("mrr", "MRR"), ("conversao", "taxa de conversão")):
             nova = getattr(corpo, chave)

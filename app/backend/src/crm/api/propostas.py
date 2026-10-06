@@ -279,7 +279,7 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         )
 
     @r.get("/api/oportunidades/{oportunidade_id}/proposta", response_model=AbaDaProposta)
-    def aba(oportunidade_id: int, sessao: Session = Depends(obter_sessao)) -> AbaDaProposta:
+    def aba(oportunidade_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> AbaDaProposta:
         o = _oportunidade(sessao, oportunidade_id)
         base = base_da_proposta(sessao, o)
         sugestao, sem = _sugestao(sessao, o)
@@ -336,7 +336,7 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         return v, liquido, bruto
 
     @r.post("/api/oportunidades/{oportunidade_id}/proposta", response_model=PropostaResumo)
-    def gerar(oportunidade_id: int, entrada: EntradaDaProposta, sessao: Session = Depends(obter_sessao)) -> PropostaResumo:
+    def gerar(oportunidade_id: int, entrada: EntradaDaProposta, sessao: Session = Depends(obter_sessao, scope="function")) -> PropostaResumo:
         """Reserva o número e grava os valores. Gerar de novo antes de enviar regrava a mesma proposta
         (mesmo número); depois de enviada, abre número novo. O arquivo sai em `GET /api/propostas/{id}/pptx`."""
         o = _oportunidade(sessao, oportunidade_id)
@@ -382,7 +382,7 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         return p
 
     @r.get("/api/propostas/{proposta_id}/pptx")
-    def baixar(proposta_id: int, sessao: Session = Depends(obter_sessao)) -> Response:
+    def baixar(proposta_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> Response:
         """Sempre com a matriz e os valores gravados: baixar de novo sai igual, mesmo se a matriz mudou."""
         p = _proposta(sessao, proposta_id)
         matriz = sessao.get(MatrizDeProposta, p.matriz_id)
@@ -393,7 +393,7 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         )
 
     @r.post("/api/propostas/{proposta_id}/enviada", response_model=PropostaResumo)
-    def marcar_enviada(proposta_id: int, envio: Envio, sessao: Session = Depends(obter_sessao)) -> PropostaResumo:
+    def marcar_enviada(proposta_id: int, envio: Envio, sessao: Session = Depends(obter_sessao, scope="function")) -> PropostaResumo:
         """Quem enviou e quando. A oportunidade em "Enviar proposta" passa a "Em avaliação pela empresa";
         na matriz Contábil, o total líquido vira o preço mensal da oportunidade, e o anual o acompanha
         (× 13 ou × 12, pelo serviço), com histórico."""
@@ -433,7 +433,7 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
     # ------------------------------------------------------------ Configurações › Propostas
 
     @r.get("/api/propostas/matrizes", response_model=Matrizes)
-    def matrizes(sessao: Session = Depends(obter_sessao)) -> Matrizes:
+    def matrizes(sessao: Session = Depends(obter_sessao, scope="function")) -> Matrizes:
         return Matrizes(
             em_uso=_em_uso(sessao),
             marcadores=[
@@ -446,7 +446,7 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
     @r.post("/api/propostas/matrizes/{tipo}", response_model=MatrizResumo)
     async def subir_matriz(
         tipo: Matriz, request: Request, nome_arquivo: str = Query(min_length=1, max_length=200),
-        enviada_por: str = Query(min_length=1, max_length=60), sessao: Session = Depends(obter_sessao),
+        enviada_por: str = Query(min_length=1, max_length=60), sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> MatrizResumo:
         """O corpo é o .pptx. Fica gravada mesmo com marcador faltando, para a tela mostrar o que
         corrigir; nesse caso não é usada para gerar."""
@@ -476,7 +476,7 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         return _matriz_resumo(m)
 
     @r.get("/api/propostas/matrizes/{matriz_id}/pptx")
-    def baixar_matriz(matriz_id: int, sessao: Session = Depends(obter_sessao)) -> Response:
+    def baixar_matriz(matriz_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> Response:
         m = sessao.get(MatrizDeProposta, matriz_id)
         if m is None:
             raise HTTPException(404, "matriz não encontrada")
@@ -497,13 +497,13 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         )
 
     @r.get("/api/propostas/configuracao", response_model=ConfiguracaoResposta)
-    def configuracao(sessao: Session = Depends(obter_sessao)) -> ConfiguracaoResposta:
+    def configuracao(sessao: Session = Depends(obter_sessao, scope="function")) -> ConfiguracaoResposta:
         c = _configuracao(sessao)
         sessao.commit()
         return _configuracao_resposta(sessao, c)
 
     @r.put("/api/propostas/configuracao", response_model=ConfiguracaoResposta)
-    def editar_configuracao(corpo: Configuracao, sessao: Session = Depends(obter_sessao)) -> ConfiguracaoResposta:
+    def editar_configuracao(corpo: Configuracao, sessao: Session = Depends(obter_sessao, scope="function")) -> ConfiguracaoResposta:
         revisores = [n.strip() for n in corpo.revisores if n.strip()]
         if not revisores or len({n.casefold() for n in revisores}) != len(revisores):
             raise HTTPException(422, "informe quem revisa e envia, sem repetir nomes")

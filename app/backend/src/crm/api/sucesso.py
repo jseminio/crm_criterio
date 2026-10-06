@@ -512,7 +512,7 @@ def roteador_do_sucesso(
         return jornada, atual
 
     @r.get("/funil", response_model=FunilDoSucesso)
-    def funil(hoje: date | None = None, sessao: Session = Depends(obter_sessao)) -> FunilDoSucesso:
+    def funil(hoje: date | None = None, sessao: Session = Depends(obter_sessao, scope="function")) -> FunilDoSucesso:
         """`hoje` existe para teste; sem ele vale a data do servidor."""
         dia = hoje or date.today()
         jornadas = {j.grupo_id: j for j in sessao.scalars(sa.select(JornadaDoCliente))}
@@ -534,7 +534,7 @@ def roteador_do_sucesso(
         )
 
     @r.patch("/grupos/{grupo_id}/itens", response_model=GrupoNoFunil)
-    def marcar(grupo_id: int, corpo: MarcarItem, sessao: Session = Depends(obter_sessao)) -> GrupoNoFunil:
+    def marcar(grupo_id: int, corpo: MarcarItem, sessao: Session = Depends(obter_sessao, scope="function")) -> GrupoNoFunil:
         """Marca ou desmarca um item do checklist da etapa em que o grupo está."""
         hoje = date.today()
         jornada, atual = _jornada(sessao, grupo_id, hoje)
@@ -550,7 +550,7 @@ def roteador_do_sucesso(
         return _um(sessao, grupo_id, hoje)
 
     @r.post("/grupos/{grupo_id}/concluir-etapa", response_model=GrupoNoFunil)
-    def concluir(grupo_id: int, sessao: Session = Depends(obter_sessao)) -> GrupoNoFunil:
+    def concluir(grupo_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> GrupoNoFunil:
         """Passa o grupo para a etapa seguinte, com o checklist da atual completo. Ao concluir o kickoff,
         o grupo entra em curso e as reuniões de resultado começam a contar a partir de hoje."""
         hoje = date.today()
@@ -569,7 +569,7 @@ def roteador_do_sucesso(
         return _um(sessao, grupo_id, hoje)
 
     @r.get("/grupos/{grupo_id}/reunioes", response_model=list[ReuniaoResposta])
-    def reunioes(grupo_id: int, sessao: Session = Depends(obter_sessao)) -> list[ReuniaoResposta]:
+    def reunioes(grupo_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> list[ReuniaoResposta]:
         """Da mais recente para a mais antiga, com os ajustes de cada uma. A transcrição não vem: só se
         ela existe (é longa, e quem consulta quer a ata)."""
         return [_resposta_da_reuniao(x) for x in sessao.scalars(
@@ -578,7 +578,7 @@ def roteador_do_sucesso(
         )]
 
     @r.post("/grupos/{grupo_id}/ata", response_model=RascunhoDaAtaResposta)
-    def montar_ata(grupo_id: int, corpo: PedidoDeAta, sessao: Session = Depends(obter_sessao)) -> RascunhoDaAtaResposta:
+    def montar_ata(grupo_id: int, corpo: PedidoDeAta, sessao: Session = Depends(obter_sessao, scope="function")) -> RascunhoDaAtaResposta:
         """Rascunho da ata pela IA a partir da transcrição do Granola. **Não grava nada**: a tela mostra
         para o gestor revisar, escolher os responsáveis e registrar a reunião."""
         tipo = regra.tipo(corpo.tipo)
@@ -610,7 +610,7 @@ def roteador_do_sucesso(
         )
 
     @r.post("/grupos/{grupo_id}/reunioes", response_model=GrupoNoFunil, status_code=201)
-    def registrar(grupo_id: int, corpo: NovaReuniao, sessao: Session = Depends(obter_sessao)) -> GrupoNoFunil:
+    def registrar(grupo_id: int, corpo: NovaReuniao, sessao: Session = Depends(obter_sessao, scope="function")) -> GrupoNoFunil:
         """Registra uma reunião já feita. Só para o grupo em curso; a data não pode ser futura."""
         hoje = date.today()
         if regra.tipo(corpo.tipo) is None:
@@ -694,11 +694,11 @@ def roteador_do_sucesso(
         )
 
     @r.get("/cadencia", response_model=CadenciaResposta)
-    def ver_cadencia(sessao: Session = Depends(obter_sessao)) -> CadenciaResposta:
+    def ver_cadencia(sessao: Session = Depends(obter_sessao, scope="function")) -> CadenciaResposta:
         return _cadencia_resposta(sessao)
 
     @r.put("/cadencia", response_model=CadenciaResposta)
-    def mudar_cadencia(corpo: CadenciaEdicao, sessao: Session = Depends(obter_sessao)) -> CadenciaResposta:
+    def mudar_cadencia(corpo: CadenciaEdicao, sessao: Session = Depends(obter_sessao, scope="function")) -> CadenciaResposta:
         """Só muda as classes que vieram. Cada classe precisa de ao menos uma reunião. A intenção vazia
         volta ao texto padrão."""
         validos = [t.chave for t in regra.TIPOS_DE_REUNIAO]
@@ -731,7 +731,7 @@ def roteador_do_sucesso(
         return _cadencia_resposta(sessao)
 
     @r.get("/carteira", response_model=CarteiraComReunioes)
-    def carteira(sessao: Session = Depends(obter_sessao)) -> CarteiraComReunioes:
+    def carteira(sessao: Session = Depends(obter_sessao, scope="function")) -> CarteiraComReunioes:
         """A bimestral interna da carteira: quando vence e as já feitas, da mais recente."""
         return CarteiraComReunioes(
             devida=_carteira(sessao, date.today()),
@@ -740,7 +740,7 @@ def roteador_do_sucesso(
         )
 
     @r.post("/carteira/reunioes", response_model=CarteiraComReunioes, status_code=201)
-    def registrar_da_carteira(corpo: NovaReuniaoDaCarteira, sessao: Session = Depends(obter_sessao)) -> CarteiraComReunioes:
+    def registrar_da_carteira(corpo: NovaReuniaoDaCarteira, sessao: Session = Depends(obter_sessao, scope="function")) -> CarteiraComReunioes:
         if corpo.data > date.today():
             raise HTTPException(422, "A data da reunião não pode ser futura: registre depois de feita")
         sessao.add(ReuniaoDaCarteira(

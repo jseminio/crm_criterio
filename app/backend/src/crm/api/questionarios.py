@@ -278,7 +278,7 @@ def roteador_de_questionarios(
         )
 
     @r.post("/api/questionarios/buscar", response_model=ResultadoDaBusca)
-    def buscar(sessao: Session = Depends(obter_sessao)) -> ResultadoDaBusca:
+    def buscar(sessao: Session = Depends(obter_sessao, scope="function")) -> ResultadoDaBusca:
         """A busca na hora ("Buscar agora"). A mesma que o CRM faz sozinho a cada 10 minutos."""
         try:
             novos, avisos = executar_busca(sessao, fonte(), buscar_endereco)
@@ -297,7 +297,7 @@ def roteador_de_questionarios(
         return EstadoDaBuscaResposta(**ESTADO_DA_BUSCA.retrato())
 
     @r.get("/api/questionarios", response_model=list[QuestionarioResumo])
-    def listar(sessao: Session = Depends(obter_sessao), limite: int = Query(default=30, le=200)) -> list[QuestionarioResumo]:
+    def listar(sessao: Session = Depends(obter_sessao, scope="function"), limite: int = Query(default=30, le=200)) -> list[QuestionarioResumo]:
         """Os mais recentes primeiro; os que precisam de alguém vêm antes de todos."""
         itens = sessao.scalars(
             sa.select(QuestionarioRecebido).order_by(
@@ -347,7 +347,7 @@ def roteador_de_questionarios(
 
     @r.get("/api/questionarios/painel", response_model=PainelDeQuestionarios)
     def painel(
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
         dias: int = Query(default=30, ge=0, le=3660),
         servico: str | None = None,
         porte: str | None = None,
@@ -387,7 +387,7 @@ def roteador_de_questionarios(
         return PainelDeQuestionarios(numeros=numeros, itens=itens)
 
     @r.get("/api/questionarios/{questionario_id}/respostas", response_model=list[SecaoDeRespostas])
-    def respostas(questionario_id: int, sessao: Session = Depends(obter_sessao)) -> list[SecaoDeRespostas]:
+    def respostas(questionario_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> list[SecaoDeRespostas]:
         """O que o cliente respondeu, por seção, só as perguntas respondidas e as seções do escopo pedido.
         É a resposta original: as correções da entrevista ficam na ficha da oportunidade."""
         q = _questionario(sessao, questionario_id)
@@ -404,7 +404,7 @@ def roteador_de_questionarios(
         return secoes
 
     @r.post("/api/questionarios/{questionario_id}/resolver", response_model=QuestionarioResumo)
-    def resolver(questionario_id: int, corpo: Resolucao, sessao: Session = Depends(obter_sessao)) -> QuestionarioResumo:
+    def resolver(questionario_id: int, corpo: Resolucao, sessao: Session = Depends(obter_sessao, scope="function")) -> QuestionarioResumo:
         q = _questionario(sessao, questionario_id)
         try:
             if corpo.acao == "anexar":
@@ -417,7 +417,7 @@ def roteador_de_questionarios(
         return _resumo(sessao, q)
 
     @r.get("/api/questionarios/{questionario_id}/pdf")
-    def pdf(questionario_id: int, sessao: Session = Depends(obter_sessao)) -> Response:
+    def pdf(questionario_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> Response:
         q = _questionario(sessao, questionario_id)
         if not q.pdf_base64:
             raise HTTPException(404, "este questionário chegou sem PDF")
@@ -431,7 +431,7 @@ def roteador_de_questionarios(
         )
 
     @r.get("/api/oportunidades/{oportunidade_id}/questionario", response_model=QuestionarioDaOportunidade | None)
-    def da_oportunidade(oportunidade_id: int, sessao: Session = Depends(obter_sessao)) -> QuestionarioDaOportunidade | None:
+    def da_oportunidade(oportunidade_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> QuestionarioDaOportunidade | None:
         """O questionário mais recente que criou ou foi anexado a esta oportunidade, se houver."""
         if sessao.get(Oportunidade, oportunidade_id) is None:
             raise HTTPException(404, "oportunidade não encontrada")

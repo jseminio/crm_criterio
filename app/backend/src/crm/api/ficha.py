@@ -272,11 +272,11 @@ def roteador_da_ficha(obter_sessao: Callable[[], Iterator[Session]]) -> APIRoute
         return nome
 
     @r.get("/api/oportunidades/{oportunidade_id}/ficha", response_model=FichaResposta)
-    def ver_ficha(oportunidade_id: int, sessao: Session = Depends(obter_sessao)) -> FichaResposta:
+    def ver_ficha(oportunidade_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> FichaResposta:
         return _resposta_da_ficha(sessao, _oportunidade(sessao, oportunidade_id))
 
     @r.put("/api/oportunidades/{oportunidade_id}/ficha/{chave}", response_model=FichaResposta)
-    def corrigir(oportunidade_id: int, chave: str, corpo: Correcao, sessao: Session = Depends(obter_sessao)) -> FichaResposta:
+    def corrigir(oportunidade_id: int, chave: str, corpo: Correcao, sessao: Session = Depends(obter_sessao, scope="function")) -> FichaResposta:
         """Grava a resposta como Entrevista, com quem e quando. A do questionário fica guardada."""
         o = _oportunidade(sessao, oportunidade_id)
         campo = regras_da_ficha.campo(chave)
@@ -289,12 +289,12 @@ def roteador_da_ficha(obter_sessao: Callable[[], Iterator[Session]]) -> APIRoute
         return _resposta_da_ficha(sessao, o)
 
     @r.get("/api/oportunidades/{oportunidade_id}/pendencias", response_model=PendenciasResposta)
-    def ver_pendencias(oportunidade_id: int, hoje: date | None = None, sessao: Session = Depends(obter_sessao)) -> PendenciasResposta:
+    def ver_pendencias(oportunidade_id: int, hoje: date | None = None, sessao: Session = Depends(obter_sessao, scope="function")) -> PendenciasResposta:
         """`hoje` existe para teste; sem ele vale a data do servidor."""
         return _resposta_das_pendencias(sessao, _oportunidade(sessao, oportunidade_id), hoje or date.today())
 
     @r.post("/api/oportunidades/{oportunidade_id}/pendencias", response_model=PendenciasResposta)
-    def nova_pendencia(oportunidade_id: int, corpo: NovaPendencia, sessao: Session = Depends(obter_sessao)) -> PendenciasResposta:
+    def nova_pendencia(oportunidade_id: int, corpo: NovaPendencia, sessao: Session = Depends(obter_sessao, scope="function")) -> PendenciasResposta:
         o = _oportunidade(sessao, oportunidade_id)
         por = _quem(sessao, corpo.por)
         if corpo.responsavel is not None:
@@ -308,7 +308,7 @@ def roteador_da_ficha(obter_sessao: Callable[[], Iterator[Session]]) -> APIRoute
 
     @r.patch("/api/oportunidades/{oportunidade_id}/pendencias/{chave}", response_model=PendenciasResposta)
     def mudar_pendencia(
-        oportunidade_id: int, chave: str, corpo: MudancaDePendencia, sessao: Session = Depends(obter_sessao),
+        oportunidade_id: int, chave: str, corpo: MudancaDePendencia, sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> PendenciasResposta:
         o = _oportunidade(sessao, oportunidade_id)
         por = _quem(sessao, corpo.por)

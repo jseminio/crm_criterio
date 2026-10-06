@@ -276,7 +276,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         so_com_lacunas: bool = False,
         limite: int = Query(default=50, ge=1, le=500),
         salto: int = Query(default=0, ge=0),
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> dict:
         """Empresas (cliente) ou grupos/empresas (prospect), com os contatos e as lacunas."""
         itens = [
@@ -305,7 +305,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         busca: str = "",
         limite: int = Query(default=50, ge=1, le=500),
         salto: int = Query(default=0, ge=0),
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> dict:
         """Pessoas de contato, de clientes ou de prospects, com as empresas delas.
 
@@ -335,7 +335,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         return {"total": len(itens), "itens": itens[salto:salto + limite]}
 
     @r.get("/pessoas/busca", response_model=list[Pessoa])
-    def buscar_pessoas(busca: str = "", sessao: Session = Depends(obter_sessao)) -> list[Pessoa]:
+    def buscar_pessoas(busca: str = "", sessao: Session = Depends(obter_sessao, scope="function")) -> list[Pessoa]:
         """Toda a base de contatos, clientes e prospects juntos, por nome, e-mail ou telefone —
         para vincular uma pessoa já cadastrada a uma empresa."""
         if len(busca.strip()) < 2:
@@ -363,7 +363,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
             setattr(p, campo, valor)
 
     @r.post("/pessoas", response_model=Pessoa, status_code=201)
-    def criar_pessoa(corpo: PessoaNova, sessao: Session = Depends(obter_sessao)) -> Pessoa:
+    def criar_pessoa(corpo: PessoaNova, sessao: Session = Depends(obter_sessao, scope="function")) -> Pessoa:
         if corpo.empresa_id is not None and sessao.get(Empresa, corpo.empresa_id) is None:
             raise HTTPException(404, "empresa não encontrada")
         p = PessoaContato(nome="x")
@@ -381,7 +381,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         return out
 
     @r.patch("/pessoas/{pessoa_id}", response_model=Pessoa)
-    def editar_pessoa(pessoa_id: int, corpo: PessoaEdicao, sessao: Session = Depends(obter_sessao)) -> Pessoa:
+    def editar_pessoa(pessoa_id: int, corpo: PessoaEdicao, sessao: Session = Depends(obter_sessao, scope="function")) -> Pessoa:
         p = sessao.get(PessoaContato, pessoa_id)
         if p is None:
             raise HTTPException(404, "contato não encontrado")
@@ -394,7 +394,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         return Pessoa.model_validate(p)
 
     @r.delete("/pessoas/{pessoa_id}", status_code=204)
-    def excluir_pessoa(pessoa_id: int, sessao: Session = Depends(obter_sessao)) -> None:
+    def excluir_pessoa(pessoa_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> None:
         """Apaga a pessoa da base e de todas as empresas em que está. Irreversível: a tela pede
         confirmação antes. Pedido de Karine em 30/09/2026."""
         p = sessao.get(PessoaContato, pessoa_id)
@@ -453,7 +453,7 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
             setattr(e, campo, valor)
 
     @r.patch("/api/empresas/{empresa_id}", response_model=Endereco)
-    def editar_empresa(empresa_id: int, corpo: EmpresaEdicao, sessao: Session = Depends(obter_sessao)) -> Endereco:
+    def editar_empresa(empresa_id: int, corpo: EmpresaEdicao, sessao: Session = Depends(obter_sessao, scope="function")) -> Endereco:
         e = sessao.get(Empresa, empresa_id)
         if e is None:
             raise HTTPException(404, "empresa não encontrada")
@@ -468,7 +468,7 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
         return Endereco.model_validate(e)
 
     @r.post("/api/empresas", status_code=201)
-    def criar_empresa_completa(corpo: EmpresaCompleta, sessao: Session = Depends(obter_sessao)) -> dict:
+    def criar_empresa_completa(corpo: EmpresaCompleta, sessao: Session = Depends(obter_sessao, scope="function")) -> dict:
         """Contatos > Nova empresa: dados cadastrais, endereço e os contatos já cadastrados que
         forem vinculados. Pedido de Karine em 30/09/2026."""
         pessoas: dict[int, bool] = {}
@@ -492,7 +492,7 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
 
     @r.get("/api/empresas/busca")
     def buscar_empresas(busca: str = "", limite: int = Query(default=30, ge=1, le=100),
-                        sessao: Session = Depends(obter_sessao)) -> list[dict]:
+                        sessao: Session = Depends(obter_sessao, scope="function")) -> list[dict]:
         """A base de empresas, para escolher a da oportunidade no Funil: por nome fantasia, razão
         social ou CNPJ (com ou sem pontuação). Em branco, as primeiras em ordem alfabética.
         Pedido de Karine em 01/10/2026."""
@@ -515,7 +515,7 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
         return saida
 
     @r.delete("/api/empresas/{empresa_id}", status_code=204)
-    def excluir_empresa(empresa_id: int, sessao: Session = Depends(obter_sessao)) -> None:
+    def excluir_empresa(empresa_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> None:
         """Apaga a empresa. Os contatos continuam na base (só o vínculo some) e o grupo fica.
         Empresa com contrato não sai: apagar quebraria o histórico, o MRR e a carteira.
         Pedido de Karine em 30/09/2026, com essa trava aprovada."""
@@ -538,7 +538,7 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
         return v
 
     @r.post("/api/empresas/{empresa_id}/contatos", status_code=201)
-    def vincular_contato(empresa_id: int, corpo: ContatoParaVincular, sessao: Session = Depends(obter_sessao)) -> dict:
+    def vincular_contato(empresa_id: int, corpo: ContatoParaVincular, sessao: Session = Depends(obter_sessao, scope="function")) -> dict:
         """Liga uma pessoa já cadastrada à empresa. A pessoa continua nas outras empresas dela."""
         if sessao.get(Empresa, empresa_id) is None:
             raise HTTPException(404, "empresa não encontrada")
@@ -554,7 +554,7 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
 
     @r.patch("/api/empresas/{empresa_id}/contatos/{pessoa_id}")
     def mudar_vinculo(empresa_id: int, pessoa_id: int, corpo: MudancaDeVinculo,
-                      sessao: Session = Depends(obter_sessao)) -> dict:
+                      sessao: Session = Depends(obter_sessao, scope="function")) -> dict:
         """Marca ou desmarca o contato como principal nesta empresa (pode haver mais de um)."""
         v = _vinculo(sessao, empresa_id, pessoa_id)
         v.principal = corpo.principal
@@ -562,13 +562,13 @@ def roteador_de_empresas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRo
         return {"empresa_id": empresa_id, "pessoa_id": pessoa_id, "principal": v.principal}
 
     @r.delete("/api/empresas/{empresa_id}/contatos/{pessoa_id}", status_code=204)
-    def desvincular_contato(empresa_id: int, pessoa_id: int, sessao: Session = Depends(obter_sessao)) -> None:
+    def desvincular_contato(empresa_id: int, pessoa_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> None:
         """Tira a pessoa desta empresa. A pessoa continua na base de contatos e nas outras empresas."""
         sessao.delete(_vinculo(sessao, empresa_id, pessoa_id))
         sessao.flush()
 
     @r.post("/api/grupos/{grupo_id}/empresas", status_code=201)
-    def criar_empresa(grupo_id: int, corpo: EmpresaNova, sessao: Session = Depends(obter_sessao)) -> dict:
+    def criar_empresa(grupo_id: int, corpo: EmpresaNova, sessao: Session = Depends(obter_sessao, scope="function")) -> dict:
         """Cria a empresa de um grupo (o prospect ainda não tem), para guardar o endereço."""
         g = sessao.get(GrupoEconomico, grupo_id)
         if g is None:

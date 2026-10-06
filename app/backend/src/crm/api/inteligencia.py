@@ -364,12 +364,12 @@ def roteador_de_inteligencia(obter_sessao: Callable[[], Iterator[Session]]) -> A
     r = APIRouter(tags=["inteligência de conversão"])
 
     @r.get("/api/inteligencia/plano", response_model=PlanoResposta)
-    def ver(sessao: Session = Depends(obter_sessao), hoje: date | None = None) -> PlanoResposta:
+    def ver(sessao: Session = Depends(obter_sessao, scope="function"), hoje: date | None = None) -> PlanoResposta:
         """O plano de MRR: meta, cenários, realizado mês a mês e o ajuste por motor. `hoje` existe para teste."""
         return montar_plano(sessao, hoje or date.today())
 
     @r.put("/api/inteligencia/plano", response_model=PlanoResposta)
-    def mudar(corpo: PremissasDoPlano, sessao: Session = Depends(obter_sessao), hoje: date | None = None) -> PlanoResposta:
+    def mudar(corpo: PremissasDoPlano, sessao: Session = Depends(obter_sessao, scope="function"), hoje: date | None = None) -> PlanoResposta:
         """Grava as premissas (todas de uma vez) e substitui os contratos previstos."""
         if corpo.fim <= corpo.inicio:
             raise HTTPException(422, "O fim do prazo precisa ser depois do início.")
@@ -407,7 +407,7 @@ def roteador_de_inteligencia(obter_sessao: Callable[[], Iterator[Session]]) -> A
         return montar_plano(sessao, hoje or date.today())
 
     @r.get("/api/inteligencia/cenarios-de-ticket", response_model=list[CenariosDoServico])
-    def cenarios_por_servico(sessao: Session = Depends(obter_sessao)) -> list[CenariosDoServico]:
+    def cenarios_por_servico(sessao: Session = Depends(obter_sessao, scope="function")) -> list[CenariosDoServico]:
         """Os cenários de ticket separados por serviço: o atípico de um serviço não é o de outro."""
         por_servico: dict[str, list[Oportunidade]] = {}
         for o in sessao.scalars(sa.select(Oportunidade)):
@@ -429,7 +429,7 @@ def roteador_de_inteligencia(obter_sessao: Callable[[], Iterator[Session]]) -> A
         return lista
 
     @r.get("/api/inteligencia/fases", response_model=FasesResposta)
-    def ver_fases(sessao: Session = Depends(obter_sessao), mes: date | None = None, hoje: date | None = None) -> FasesResposta:
+    def ver_fases(sessao: Session = Depends(obter_sessao, scope="function"), mes: date | None = None, hoje: date | None = None) -> FasesResposta:
         """As quatro fases do cliente no mês (padrão: o corrente): cadeia, gargalo, KPIs e ajuste."""
         dia = hoje or date.today()
         return montar_fases(sessao, mes or dia, dia)

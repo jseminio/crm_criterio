@@ -926,10 +926,10 @@ rotas são a porta por onde ela vai gravar; até lá o painel mostra só os lead
 cadastrados. As abordagens de contas âncora (tela Abordagens) **continuam**
 exigindo a aprovação de Eduardo: a decisão de 27/09 vale para o SDR de IA.
 
-As rotas do SDR confirmam a transação **antes** de responder. O `commit` de
-`obter_sessao` roda depois que a resposta sai; com chamadas em sequência
-(encerrar e logo dar nota), a segunda chegava antes da primeira estar gravada.
-O resto da API tem o mesmo comportamento e fica para outra demanda.
+Com chamadas em sequência (encerrar e logo dar nota), a segunda chegava antes
+da primeira estar gravada (409 "a conversa não terminou"). A correção vale para
+a API inteira desde 06/10/2026 — ver "O commit acontece antes da resposta", em
+Princípios.
 
 **3. O painel** (`GET /api/sdr/painel?mes=AAAA-MM&origem=`), calculado em
 `crm/domain/sdr.py`, sem banco:
@@ -1657,6 +1657,15 @@ base — e confiar na base é a condição para abandonar a planilha.
 
 **Aviso ≠ bloqueio.** Aceita sem data de aceite avisa e entra; situação
 desconhecida bloqueia. A distinção é do negócio, não do código.
+
+**O commit acontece antes da resposta (06/10/2026).** Toda rota declara a sessão
+com `Depends(obter_sessao, scope="function")`. Sem o `scope`, o FastAPI roda o
+código depois do `yield` de `obter_sessao` — o `commit` — só depois de a resposta
+sair: uma chamada logo depois da outra lia o estado anterior, e um commit que
+falhasse chegava ao cliente como 200/201. `tests/test_commit_antes_da_resposta.py`
+prova que commit recusado devolve 500 e reprova rota nova sem o `scope`. Exige
+FastAPI 0.121 ou mais. (Refeita a partir da branch `fix/commit-antes-da-resposta`,
+de 27/09, que ficou para trás da `main`.)
 
 **Cada linha do relatório diz de quem é (pedido de Eduardo, 30/09/2026).** A tela de Conferência
 mostra a oportunidade e o grupo de cada linha, achados pela `linha_planilha` que a carga grava na

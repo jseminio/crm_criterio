@@ -87,7 +87,7 @@ def roteador_de_ajustes(obter_sessao: Callable[[], Iterator[Session]]) -> APIRou
     @r.get("", response_model=list[AjusteResposta])
     def listar(
         situacao: Literal["pendentes", "feitos", "todos"] = "pendentes", grupo_id: int | None = None,
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> list[AjusteResposta]:
         """Pendentes pelo prazo (sem prazo por último); feitos do mais recente para o mais antigo."""
         consulta = (
@@ -109,11 +109,11 @@ def roteador_de_ajustes(obter_sessao: Callable[[], Iterator[Session]]) -> APIRou
         return [resposta_do_ajuste(a) for a in sessao.scalars(consulta)]
 
     @r.get("/responsaveis", response_model=list[ResponsavelResposta])
-    def responsaveis(sessao: Session = Depends(obter_sessao)) -> list[ResponsavelResposta]:
+    def responsaveis(sessao: Session = Depends(obter_sessao, scope="function")) -> list[ResponsavelResposta]:
         return [ResponsavelResposta(email=u.email, nome=u.nome, perfil=u.perfil.nome) for u in responsaveis_possiveis(sessao)]
 
     @r.post("/{ajuste_id}/feito", response_model=AjusteResposta)
-    def feito(ajuste_id: int, corpo: MarcarFeito, sessao: Session = Depends(obter_sessao)) -> AjusteResposta:
+    def feito(ajuste_id: int, corpo: MarcarFeito, sessao: Session = Depends(obter_sessao, scope="function")) -> AjusteResposta:
         a = _ajuste(sessao, ajuste_id)
         if a.feito_em is not None:
             raise HTTPException(422, "Este ajuste já está feito")
@@ -123,7 +123,7 @@ def roteador_de_ajustes(obter_sessao: Callable[[], Iterator[Session]]) -> APIRou
         return resposta_do_ajuste(a)
 
     @r.post("/{ajuste_id}/reabrir", response_model=AjusteResposta)
-    def reabrir(ajuste_id: int, sessao: Session = Depends(obter_sessao)) -> AjusteResposta:
+    def reabrir(ajuste_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> AjusteResposta:
         """Volta a pendente. A observação de quando foi feito fica, para o histórico."""
         a = _ajuste(sessao, ajuste_id)
         if a.feito_em is None:

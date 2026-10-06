@@ -42,18 +42,6 @@ __all__ = ["roteador"]
 _SO_DA_IA = ("intencao", "confianca", "termo_nao_reconhecido", "custo_usd")
 
 
-def _confirmar(sessao: Session) -> None:
-    """Confirma antes de responder.
-
-    O `commit` de `obter_sessao` roda depois que a resposta sai (é assim que o
-    FastAPI trata dependência com `yield`). A integração do canal dispara uma
-    chamada logo depois da outra — encerrar e, em seguida, dar nota — e a
-    segunda chegava antes da primeira estar gravada (409 "a conversa não
-    terminou"). Achado em 27/09/2026 ao alimentar o painel pelo próprio fluxo.
-    """
-    sessao.commit()
-
-
 def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
     r = APIRouter(prefix="/api/sdr", tags=["sdr"])
 
@@ -65,7 +53,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
 
     # --------------------------------------------------------- conversas
     @r.post("/conversas", response_model=e.ConversaResposta, status_code=201)
-    def abrir_conversa(corpo: e.ConversaNova, sessao: Session = Depends(obter_sessao)):
+    def abrir_conversa(corpo: e.ConversaNova, sessao: Session = Depends(obter_sessao, scope="function")):
         lead = sessao.get(Lead, corpo.lead_id)
         if lead is None:
             raise HTTPException(404, "lead não encontrado")
@@ -83,11 +71,10 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         conversa = ConversaDoSdr(lead_id=lead.id, canal=corpo.canal, iniciada_em=agora())
         sessao.add(conversa)
         sessao.flush()
-        _confirmar(sessao)
         return e.ConversaResposta.model_validate(conversa)
 
     @r.get("/leads/{lead_id}/conversas", response_model=list[e.ConversaResposta])
-    def conversas_do_lead(lead_id: int, sessao: Session = Depends(obter_sessao)):
+    def conversas_do_lead(lead_id: int, sessao: Session = Depends(obter_sessao, scope="function")):
         if sessao.get(Lead, lead_id) is None:
             raise HTTPException(404, "lead não encontrado")
         conversas = sessao.scalars(
@@ -102,7 +89,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         "/conversas/{conversa_id}/mensagens", response_model=e.MensagemResposta, status_code=201
     )
     def registrar_mensagem(
-        conversa_id: int, corpo: e.MensagemNova, sessao: Session = Depends(obter_sessao)
+        conversa_id: int, corpo: e.MensagemNova, sessao: Session = Depends(obter_sessao, scope="function")
     ):
         conversa = _conversa(sessao, conversa_id)
         lead = conversa.lead
@@ -140,11 +127,10 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         ):
             conversa.atendida_em = momento
         sessao.flush()
-        _confirmar(sessao)
         return e.MensagemResposta.model_validate(mensagem)
 
     @r.post("/conversas/{conversa_id}/encerrar", response_model=e.ConversaResposta)
-    def encerrar(conversa_id: int, corpo: e.Encerramento, sessao: Session = Depends(obter_sessao)):
+    def encerrar(conversa_id: int, corpo: e.Encerramento, sessao: Session = Depends(obter_sessao, scope="function")):
         conversa = _conversa(sessao, conversa_id)
         if conversa.desfecho is not None:
             raise HTTPException(409, "a conversa já foi encerrada")
@@ -185,11 +171,10 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         conversa.motivo_transbordo = corpo.motivo_transbordo
         conversa.destino_transbordo = corpo.destino_transbordo
         sessao.flush()
-        _confirmar(sessao)
         return e.ConversaResposta.model_validate(conversa)
 
     @r.post("/conversas/{conversa_id}/nota", response_model=e.ConversaResposta)
-    def dar_nota(conversa_id: int, corpo: e.NotaDaConversa, sessao: Session = Depends(obter_sessao)):
+    def dar_nota(conversa_id: int, corpo: e.NotaDaConversa, sessao: Session = Depends(obter_sessao, scope="function")):
         conversa = _conversa(sessao, conversa_id)
         if conversa.desfecho is None:
             raise HTTPException(409, "a nota vem depois que a conversa termina")
@@ -197,7 +182,6 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
             raise HTTPException(409, "esta conversa já tem nota")
         conversa.nota = corpo.nota
         sessao.flush()
-        _confirmar(sessao)
         return e.ConversaResposta.model_validate(conversa)
 
     # ----------------------------------------------------- custos e mídia
@@ -205,12 +189,12 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         return sessao.scalar(sa.select(ParametrosDoSdr).order_by(ParametrosDoSdr.id).limit(1))
 
     @r.get("/parametros", response_model=e.ParametrosDoSdrResposta)
-    def ler_parametros(sessao: Session = Depends(obter_sessao)):
+    def ler_parametros(sessao: Session = Depends(obter_sessao, scope="function")):
         atual = _parametros(sessao)
         return e.ParametrosDoSdrResposta.model_validate(atual) if atual else e.ParametrosDoSdrResposta()
 
     @r.put("/parametros", response_model=e.ParametrosDoSdrResposta)
-    def gravar_parametros(corpo: e.ParametrosDoSdrEdicao, sessao: Session = Depends(obter_sessao)):
+    def gravar_parametros(corpo: e.ParametrosDoSdrEdicao, sessao: Session = Depends(obter_sessao, scope="function")):
         atual = _parametros(sessao)
         if atual is None:
             atual = ParametrosDoSdr()
@@ -218,12 +202,11 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         for campo, valor in corpo.model_dump().items():
             setattr(atual, campo, valor)
         sessao.flush()
-        _confirmar(sessao)
         return e.ParametrosDoSdrResposta.model_validate(atual)
 
     @r.get("/midia", response_model=list[e.InvestimentoResposta])
     def listar_midia(
-        mes: str = Query(pattern=regras.MES.pattern), sessao: Session = Depends(obter_sessao)
+        mes: str = Query(pattern=regras.MES.pattern), sessao: Session = Depends(obter_sessao, scope="function")
     ):
         itens = sessao.scalars(
             sa.select(InvestimentoEmMidia)
@@ -233,7 +216,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         return [e.InvestimentoResposta.model_validate(i) for i in itens]
 
     @r.put("/midia", response_model=e.InvestimentoResposta)
-    def gravar_midia(corpo: e.InvestimentoEdicao, sessao: Session = Depends(obter_sessao)):
+    def gravar_midia(corpo: e.InvestimentoEdicao, sessao: Session = Depends(obter_sessao, scope="function")):
         canal = corpo.canal.strip()
         atual = sessao.scalar(
             sa.select(InvestimentoEmMidia).where(
@@ -246,7 +229,6 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         else:
             atual.valor = corpo.valor
         sessao.flush()
-        _confirmar(sessao)
         return e.InvestimentoResposta.model_validate(atual)
 
     # ------------------------------------------------------------- painel
@@ -281,7 +263,7 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         origem: str | None = Query(
             default=None, pattern=f"^({regras.ORIGEM_TRAFEGO_PAGO}|{regras.ORIGEM_FRIO})$"
         ),
-        sessao: Session = Depends(obter_sessao),
+        sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> dict:
         """Os números da coorte do mês e o resumo do mês anterior, para a variação."""
         anterior = regras.resumir(_calcular(sessao, regras.mes_anterior(mes), origem, None))

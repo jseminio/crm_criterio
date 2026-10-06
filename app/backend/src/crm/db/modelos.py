@@ -366,6 +366,12 @@ class Lead(CarimboMixin, Base):
     aderencia_sobre: Mapped[list | None] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"))
     """Sobre o quê a expectativa não bateu: valores de `TemaDaExpectativa`."""
     aderencia_esperava: Mapped[str | None] = mapped_column(sa.String(300))
+    # Questionário de volumetria na conversa do SDR de IA (06/10/2026). Respondido é o CRM que sabe:
+    # vem de `QuestionarioRecebido` (crm.domain.questionario_do_lead).
+    questionario_enviado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    """A primeira mensagem da IA com o link do questionário. O prazo de 2 dias úteis conta daqui."""
+    questionario_lembrado_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    questionario_agradecido_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 
     @property
     def primeiro_contato_pelo_sdr(self) -> datetime | None:

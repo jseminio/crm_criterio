@@ -39,6 +39,9 @@ class TestDocumentos:
         assert "Faça essa\npergunta uma vez só" in prompt
         # Decisão de 06/10/2026: a IA envia o link do questionário; o endereço vem da configuração.
         assert ensaio.MARCA_DO_LINK in prompt and "netlify" not in prompt
+        # Decisão de 06/10/2026: agradecer ou lembrar pelo que o CRM diz, uma vez cada.
+        assert "Se o questionário foi respondido é o CRM que diz" in prompt
+        assert "O lembrete sai uma vez só." in prompt
 
     def test_documento_sem_prompt_ou_sem_perguntas_avisa(self):
         with pytest.raises(ValueError, match="prompt"):

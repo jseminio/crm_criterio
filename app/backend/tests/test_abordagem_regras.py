@@ -8,6 +8,7 @@ import pytest
 
 from crm.domain.abordagem import (
     conferir,
+    fala_de_preco,
     link_whatsapp,
     normalizar_destino,
     pode_aprovar,
@@ -48,6 +49,36 @@ def test_mensagem_com_preco_nao_passa(trecho):
     resultado = _conferencias(mensagem=f"Olá, Ana. {trecho}.")
     assert not resultado["sem_preco"].ok
     assert "preço" in resultado["sem_preco"].texto
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "Que decisões ficam esperando por causa disso: contratação, investimento, ajuste de preço?",
+        "Os ajustes de preços da loja ficam parados?",
+        "Isso atrapalha a formação de preço dos seus produtos?",
+        "Vocês revisam a política de preços com que frequência?",
+        "Sem a margem, o preço de venda vira chute?",
+    ],
+)
+def test_preco_do_negocio_do_lead_nao_e_barrado(texto):
+    assert not fala_de_preco(texto)
+    assert _conferencias(mensagem=texto)["sem_preco"].ok
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "O nosso preço depende do volume.",
+        "O preço da proposta sai depois do diagnóstico.",
+        "Ajuste de preço à parte, o preço do serviço é fechado.",
+        "Ajuste de preço com desconto anual.",
+        "Formação de preço por R$ 2.000.",
+        "O reajuste de preço é anual.",
+    ],
+)
+def test_preco_da_criterio_continua_barrado_mesmo_ao_lado_de_preco_do_lead(texto):
+    assert fala_de_preco(texto)
 
 
 def test_colchete_para_preencher_trava():

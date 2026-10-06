@@ -1258,6 +1258,42 @@ td > .celula-fonte { display: block; }
 .entrada-com-erro { border: 2px solid var(--perda) !important; }
 .campo-erro { font-size: 12px; font-weight: 500; color: var(--perda); }
 
+/* ================================================================== celular
+   CRM responsivo (06/10/2026, amostra aprovada por Eduardo). Acima de 768px nada muda: estas regras
+   só valem no celular e no tablet pequeno. Larguras: 768px (celular deitado, tablet pequeno) e 480px
+   (celular em pé). Quem tocar no layout de uma tela confere aqui se ela tem regra de celular. */
+
+.botao-menu, .fechar-menu, .cortina-do-menu { display: none; }
+
+@media (max-width: 768px) {
+  /* Esqueleto: uma coluna; o menu vira gaveta por cima da tela. */
+  .aplicacao { grid-template-columns: minmax(0, 1fr); }
+  .lateral {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 51; width: min(300px, 86vw);
+    padding: var(--e5) var(--e4); gap: var(--e5); box-shadow: var(--sombra-painel);
+    transform: translateX(-100%); visibility: hidden; transition: transform .2s ease, visibility .2s;
+  }
+  .lateral-aberta { transform: none; visibility: visible; }
+  .cortina-do-menu { display: block; position: fixed; inset: 0; z-index: 50; background: rgba(11,14,23,.45); }
+  .menu-item { min-height: 48px; padding: 0 var(--e3); }
+  .fechar-menu {
+    display: block; appearance: none; background: transparent; color: var(--texto-sobre-marca);
+    border: 1px solid rgba(255,255,255,.3); border-radius: var(--raio-sm); min-height: 44px; cursor: pointer;
+  }
+  .quem-entrou-sair { min-height: 44px; }
+
+  .topo { align-items: center; gap: var(--e3); padding: var(--e3) var(--e4); flex-wrap: wrap; }
+  .topo h1 { font-size: 18px; line-height: 1.25; flex: 1; min-width: 0; }
+  .botao-menu {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    appearance: none; border: 0; border-radius: var(--raio-sm); width: 44px; height: 44px;
+    background: rgba(255,255,255,.1); color: var(--texto-sobre-marca); font-size: 20px; cursor: pointer;
+  }
+  .topo-detalhe { flex-basis: 100%; margin: 0; font-size: 12px; line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .area { padding: var(--e4); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

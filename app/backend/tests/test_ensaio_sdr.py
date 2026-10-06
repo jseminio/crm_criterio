@@ -37,6 +37,8 @@ class TestDocumentos:
         # Ajustes do ensaio fiel de 06/10/2026: a IA esquecia de se apresentar e repetia a abertura.
         assert "A primeira frase da sua primeira mensagem é sempre a apresentação" in prompt
         assert "Faça essa\npergunta uma vez só" in prompt
+        # Decisão de 06/10/2026: a IA envia o link do questionário; o endereço vem da configuração.
+        assert ensaio.MARCA_DO_LINK in prompt and "netlify" not in prompt
 
     def test_documento_sem_prompt_ou_sem_perguntas_avisa(self):
         with pytest.raises(ValueError, match="prompt"):
@@ -59,6 +61,13 @@ class TestContexto:
         assert "[P1] Regras de atuação · Título P1" in texto
         assert "O que você nunca diz: Faixa de valor." in texto and 'Como o lead pergunta: "Quanto custa?"' in texto
         assert "P2" not in texto and "R1" not in texto and "O9" not in texto
+
+    def test_a_marca_do_link_vira_o_endereco_configurado(self):
+        prompt = f"Envie o questionário: {ensaio.MARCA_DO_LINK}"
+        padrao, _ = ensaio.montar_contexto(prompt, [], HOJE)
+        assert "https://criterio-questionario-proposta.netlify.app/questionario" in padrao
+        proprio, _ = ensaio.montar_contexto(prompt, [], HOJE, "https://questionario.criterio.com.br")
+        assert "https://questionario.criterio.com.br" in proprio and ensaio.MARCA_DO_LINK not in proprio
 
     def test_alertas_da_trava_e_de_varias_perguntas(self):
         assert ensaio.alertas("Posso marcar uma conversa?") == []

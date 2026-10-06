@@ -16,6 +16,27 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## SDR de IA envia o link do questionário (06/10/2026)
+
+Decisão de Eduardo: quando o lead mostra interesse em proposta (pede proposta,
+pergunta o valor, pede formulário ou aceita o questionário), **a IA envia ela
+mesma o link do questionário de volumetria**, uma vez por conversa, e diz que a
+equipe monta a proposta a partir das respostas. A regra está no prompt (seção 7
+de `sdr-ia-roteiro-spin.md`).
+
+O endereço **não fica no prompt**: ele tem a marca `{link_do_questionario}`,
+que `crm.agente.ensaio_sdr.montar_contexto` troca pelo valor de
+`CRM_LINK_DO_QUESTIONARIO` no `.env` (`crm.agente.config`). Sem a variável, vale
+o site atual, `https://criterio-questionario-proposta.netlify.app/questionario`.
+**Quando o questionário for para o domínio da Critério, basta pôr o endereço
+novo nessa linha do `.env`**: prompt e código não mudam.
+
+Conferido com o modelo de produção: enviou o link nos 4 pedidos de proposta ou
+de valor do teste, não enviou nos 3 casos sem esse interesse (abertura,
+pergunta técnica, serviço), enviou uma vez só na conversa SP3 e não reenviou
+quando o lead disse que já tinha preenchido. As travas do servidor aceitam a
+mensagem com o link.
+
 ## Login com e-mail e senha no próprio CRM (#89, 05/10/2026)
 
 Decisão de Eduardo em 05/10/2026: no servidor, cada pessoa entra com **e-mail e senha do CRM**; o

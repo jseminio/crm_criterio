@@ -23,11 +23,13 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Protocol
 
+from crm.agente.config import LINK_DO_QUESTIONARIO_PADRAO
 from crm.domain.abordagem import fala_de_preco
 from crm.domain.base_de_conhecimento import FichaLida, vale_para_a_ia
 
 __all__ = [
     "BETA_FALLBACK",
+    "MARCA_DO_LINK",
     "CENARIOS",
     "Pergunta",
     "Resultado",
@@ -104,9 +106,17 @@ def ler_perguntas(conjunto: str) -> list[Pergunta]:
     return perguntas
 
 
-def montar_contexto(prompt: str, fichas: Iterable[FichaDoEnsaio], hoje: date) -> tuple[str, list[str]]:
+MARCA_DO_LINK = "{link_do_questionario}"
+"""Onde o prompt do roteiro SPIN põe o link do questionário; o endereço vem da configuração."""
+
+
+def montar_contexto(
+    prompt: str, fichas: Iterable[FichaDoEnsaio], hoje: date, link_do_questionario: str = LINK_DO_QUESTIONARIO_PADRAO,
+) -> tuple[str, list[str]]:
     """O texto de sistema do ensaio e os códigos das fichas usadas. Só entra ficha que vale para a
-    IA (aprovada, dentro da validade e fora do bloco Referências)."""
+    IA (aprovada, dentro da validade e fora do bloco Referências). A marca do link do questionário
+    vira o endereço configurado."""
+    prompt = prompt.replace(MARCA_DO_LINK, link_do_questionario)
     validas = [f for f in fichas if vale_para_a_ia(f, hoje)]
     blocos = []
     for f in validas:

@@ -79,6 +79,8 @@ CATALOGO: tuple[Variavel, ...] = (
     # --- Opcionais (vazias = a função fica desligada) ------------------------------------------
     Variavel("ANTHROPIC_API_KEY", "ata pela IA, agente SDR e análise da carteira", segredo=True),
     Variavel("CRM_AGENTE_MODELO", "modelo do agente SDR", padrao="claude-opus-5"),
+    Variavel("CRM_LINK_DO_QUESTIONARIO", "link do questionário que o SDR de IA envia ao lead",
+             padrao="https://criterio-questionario-proposta.netlify.app/questionario"),
     Variavel("CRM_M365_TENANT_ID", "envio de e-mail pelo Microsoft 365", grupo="m365"),
     Variavel("CRM_M365_CLIENT_ID", "envio de e-mail pelo Microsoft 365", grupo="m365"),
     Variavel("CRM_M365_CLIENT_SECRET", "envio de e-mail pelo Microsoft 365", segredo=True, grupo="m365"),

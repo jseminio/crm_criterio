@@ -15,7 +15,7 @@
 #                 CRM_SEGREDO_SESSAO       openssl rand -hex 32 (64 caracteres; trocá-lo encerra as sessões)
 #                 CRM_ADMIN_EMAIL          a conta que nasce Administrador na primeira subida
 #                 CRM_ADMIN_SENHA_INICIAL  a senha dela ao nascer (8+); depois de trocada na tela, não manda mais
-#   opcionais     ANTHROPIC_API_KEY, CRM_AGENTE_MODELO,
+#   opcionais     ANTHROPIC_API_KEY, CRM_AGENTE_MODELO, CRM_LINK_DO_QUESTIONARIO,
 #                 CRM_M365_TENANT_ID, CRM_M365_CLIENT_ID, CRM_M365_CLIENT_SECRET, CRM_M365_REMETENTE,
 #                 CRM_QUESTIONARIO_URL, CRM_QUESTIONARIO_CHAVE
 #   atualizador   RUN_ENV_CHECK, RUN_BACKUP, RUN_MIGRATIONS, RUN_MAINTENANCE, RUN_CHECKS, STRICT_UPDATER,
@@ -53,6 +53,7 @@ services:
       CRM_ADMIN_SENHA_INICIAL: ${CRM_ADMIN_SENHA_INICIAL:?falta a senha inicial do administrador (8 ou mais); configure em Coolify › crmcs › Environment Variables}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       CRM_AGENTE_MODELO: ${CRM_AGENTE_MODELO:-}
+      CRM_LINK_DO_QUESTIONARIO: ${CRM_LINK_DO_QUESTIONARIO:-}
       CRM_M365_TENANT_ID: ${CRM_M365_TENANT_ID:-}
       CRM_M365_CLIENT_ID: ${CRM_M365_CLIENT_ID:-}
       CRM_M365_CLIENT_SECRET: ${CRM_M365_CLIENT_SECRET:-}

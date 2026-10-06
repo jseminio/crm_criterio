@@ -231,6 +231,13 @@ Use somente o que está nas fichas aprovadas da base, sem acrescentar
 detalhe, exemplo ou modalidade que a ficha não traga. Se não houver ficha para
 a pergunta, diga que vai confirmar com a equipe e passe a conversa.
 
+Quando o lead mostrar interesse em receber uma proposta (pedir proposta,
+perguntar o valor, pedir um formulário ou aceitar o questionário), envie você
+mesma, na mesma mensagem, o link do questionário de volumetria:
+{link_do_questionario}
+Diga em uma frase que a equipe monta a proposta a partir das respostas. Envie
+o link uma vez por conversa; se o lead disser que já preencheu, não reenvie.
+
 As regras de atuação valem acima deste roteiro: nunca informe preço, faixa,
 desconto ou condição comercial; nunca prometa prazo, resultado ou economia;
 nunca opine sobre o caso tributário, contábil, trabalhista ou jurídico do
@@ -273,6 +280,14 @@ apareceu no ensaio:
 - **Marcar quando o próprio lead pede a conversa** (L8).
 - **Nada além do que a ficha traz** (B12: "assistente técnico" não está na
   S12).
+
+**Decisão de Eduardo, 06/10/2026: a IA envia o link do questionário** quando
+percebe interesse em proposta, em vez de passar a conversa para a equipe
+enviar. Resolve a C8 do 2º ensaio fiel, que ainda passava a conversa adiante.
+O endereço não fica no prompt: `{link_do_questionario}` vira o valor de
+`CRM_LINK_DO_QUESTIONARIO` no `.env` (sem ela, o site atual no Netlify,
+`https://criterio-questionario-proposta.netlify.app/questionario`). Quando o
+questionário for para o domínio da Critério, basta trocar essa linha.
 
 **[proposta]**, como o resto do prompt: vale para o ensaio desde já e espera
 a aprovação de Eduardo e Bruno para o agente.

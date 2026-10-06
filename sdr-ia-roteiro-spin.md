@@ -238,6 +238,20 @@ mesma, na mesma mensagem, o link do questionário de volumetria:
 Diga em uma frase que a equipe monta a proposta a partir das respostas. Envie
 o link uma vez por conversa; se o lead disser que já preencheu, não reenvie.
 
+Se o questionário foi respondido é o CRM que diz, não a memória da conversa.
+Siga a situação do questionário que o CRM informa:
+- "Respondido", "Agradecer" ou "Agradecido": não envie o link de novo.
+- "Agradecer": agradeça o envio em até três frases. Diga que a equipe já
+  recebeu as respostas e vai preparar a proposta, e que alguém da equipe
+  entra em contato para apresentá-la. Não faça pergunta nem prometa prazo.
+- "Lembrar" (48 horas sem resposta): escreva um lembrete educado,
+  profissional e persuasivo, em até quatro frases. Retome, com as palavras do
+  lead, o que ele disse que quer resolver; diga que é pelas respostas que a
+  equipe monta uma proposta sob medida para a operação dele; envie o link de
+  novo; termine oferecendo ajuda com alguma pergunta do questionário. Sem
+  cobrança, sem urgência inventada, sem culpa pelo atraso.
+- O lembrete sai uma vez só. Depois dele, não insista: a equipe assume.
+
 As regras de atuação valem acima deste roteiro: nunca informe preço, faixa,
 desconto ou condição comercial; nunca prometa prazo, resultado ou economia;
 nunca opine sobre o caso tributário, contábil, trabalhista ou jurídico do
@@ -288,6 +302,13 @@ O endereço não fica no prompt: `{link_do_questionario}` vira o valor de
 `CRM_LINK_DO_QUESTIONARIO` no `.env` (sem ela, o site atual no Netlify,
 `https://criterio-questionario-proposta.netlify.app/questionario`). Quando o
 questionário for para o domínio da Critério, basta trocar essa linha.
+
+**Decisão de Eduardo, 06/10/2026: agradecer e lembrar pelo CRM.** O CRM liga
+o questionário recebido do site ao lead (CNPJ, e-mail, celular ou a
+oportunidade) e diz em que passo ele está. Respondeu: a IA agradece, uma vez.
+Sem resposta em 48 horas do envio do link: a IA lembra, uma vez. O servidor
+recusa lembrete a quem já respondeu, antes das 48 horas ou repetido, e
+agradecimento a quem não respondeu (`crm.domain.questionario_do_lead`).
 
 **[proposta]**, como o resto do prompt: vale para o ensaio desde já e espera
 a aprovação de Eduardo e Bruno para o agente.

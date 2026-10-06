@@ -41,6 +41,7 @@ from crm.domain.listas import (
     TipoDeOcorrencia,
     SituacaoDaAprovacao,
 )
+from crm.domain.questionario_do_lead import MensagemDoQuestionario, PassoDoQuestionario
 
 __all__ = [
     "GrupoResumo",
@@ -58,6 +59,8 @@ __all__ = [
     "MensagemNova",
     "MensagemResposta",
     "Encerramento",
+    "QuestionarioDoLead",
+    "PendenciaDoQuestionario",
     "NotaDaConversa",
     "ParametrosDoSdrResposta",
     "ParametrosDoSdrEdicao",
@@ -1015,6 +1018,9 @@ class MensagemNova(BaseModel):
     termo_nao_reconhecido: str | None = Field(default=None, max_length=120)
     custo_usd: Decimal | None = Field(default=None, ge=0)
     tom: Tom | None = None
+    questionario: MensagemDoQuestionario | None = None
+    """Só na mensagem da IA: o lembrete ou o agradecimento do questionário (06/10/2026). Só
+    estas duas a IA pode mandar em conversa já encerrada."""
 
 
 class MensagemResposta(Base):
@@ -1041,6 +1047,30 @@ class ConversaResposta(Base):
     atendida_em: datetime | None = None
     nota: int | None = None
     mensagens: list[MensagemResposta] = []
+
+
+class QuestionarioDoLead(BaseModel):
+    """Em que passo está o questionário de um lead — a integração do canal entrega isto à IA."""
+
+    lead_id: int
+    passo: PassoDoQuestionario
+    enviado_em: datetime | None = None
+    respondido_em: datetime | None = None
+    lembrado_em: datetime | None = None
+    agradecido_em: datetime | None = None
+    lembrar_a_partir_de: datetime | None = None
+
+
+class PendenciaDoQuestionario(BaseModel):
+    """Um lead à espera de lembrete ou de agradecimento, na conversa mais recente dele."""
+
+    lead_id: int
+    nome: str
+    conversa_id: int
+    canal: CanalDeAbordagem
+    passo: PassoDoQuestionario
+    enviado_em: datetime
+    respondido_em: datetime | None = None
 
 
 class Encerramento(BaseModel):

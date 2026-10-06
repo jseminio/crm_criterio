@@ -16,6 +16,26 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## SDR de IA agradece o questionário ou lembra em 48 horas (06/10/2026)
+
+Decisão de Eduardo: depois de enviar o link, a IA **confere pelo CRM** se o lead respondeu. Respondeu:
+agradece, uma vez. Não respondeu em **48 horas** do envio: manda **um** lembrete, educado,
+profissional e persuasivo (o tom está na seção 7 de `sdr-ia-roteiro-spin.md`). Depois do lembrete
+ela não insiste.
+
+- **Envio:** a primeira mensagem da IA ou da equipe que leva o link (o atual ou o do Netlify) grava
+  `lead.questionario_enviado_em`. O prazo conta daí, em horas corridas.
+- **Respondido:** o questionário que a busca automática traz do site (`questionario_recebido`) é do
+  lead quando bate o CNPJ, o e-mail, o celular (com ou sem o 55) ou a oportunidade em que o lead virou.
+- **Quem chama:** a integração do canal consulta `GET /api/sdr/questionario/pendentes` (a quem
+  lembrar ou agradecer agora, com a conversa) e `GET /api/sdr/leads/{id}/questionario` (o passo, para
+  entregar à IA), e registra a mensagem com `"questionario": "Lembrete"` ou `"Agradecimento"`.
+- **Travas no servidor (409):** lembrete antes das 48 horas, repetido ou a quem já respondeu;
+  agradecimento a quem não respondeu ou repetido. A trava de preço e o "não contatar" continuam
+  valendo. Só estas duas mensagens a IA pode mandar em conversa já encerrada.
+- **Banco:** três colunas vazias em `lead` (migração `d2f8b4c6a1e3`). Regras em
+  `crm.domain.questionario_do_lead`.
+
 ## SDR de IA envia o link do questionário (06/10/2026)
 
 Decisão de Eduardo: quando o lead mostra interesse em proposta (pede proposta,

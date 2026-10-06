@@ -7,7 +7,13 @@ valer aqui, no servidor, em cada mensagem:
 
 - nada sai para lead marcado "não contatar" (409);
 - mensagem da IA não fala de preço (422);
-- conversa encerrada não recebe mensagem da IA (409).
+- conversa encerrada não recebe mensagem da IA (409), salvo o lembrete e o
+  agradecimento do questionário.
+
+Questionário de volumetria (06/10/2026): a mensagem com o link marca o envio;
+`GET /api/sdr/questionario/pendentes` diz a quem lembrar (48 horas sem
+resposta) ou agradecer (respondeu), e o servidor recusa lembrete ou
+agradecimento fora do passo (409). Regras em `crm.domain.questionario_do_lead`.
 
 O painel (`GET /api/sdr/painel`) só lê: é `crm.domain.sdr.calcular_painel`
 sobre os leads do mês.
@@ -16,6 +22,7 @@ sobre os leads do mês.
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import datetime
 from decimal import Decimal
 from typing import Callable, Iterator
 
@@ -23,6 +30,7 @@ import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
 
+from crm.agente.config import LINK_DO_QUESTIONARIO_PADRAO, ler_configuracao
 from crm.api import esquemas as e
 from crm.db import leads as regras_do_lead
 from crm.db.base import agora
@@ -32,14 +40,62 @@ from crm.db.modelos import (
     Lead,
     MensagemDoSdr,
     ParametrosDoSdr,
+    QuestionarioRecebido,
 )
+from crm.domain import questionario_do_lead as questionario
 from crm.domain import sdr as regras
 from crm.domain.listas import AutorDaMensagem, DesfechoDaConversa, SituacaoLead
 from crm.domain.servicos import problema_no_tema
 
 __all__ = ["roteador"]
 
-_SO_DA_IA = ("intencao", "confianca", "termo_nao_reconhecido", "custo_usd")
+_SO_DA_IA = ("intencao", "confianca", "termo_nao_reconhecido", "custo_usd", "questionario")
+
+
+def _links_do_questionario() -> tuple[str, ...]:
+    """O link configurado e o padrão: quem recebeu o link antigo também recebeu o questionário."""
+    return (ler_configuracao().link_do_questionario, LINK_DO_QUESTIONARIO_PADRAO)
+
+
+def _contato(lead: Lead) -> questionario.Contato:
+    return questionario.Contato(lead.cnpj, lead.email, lead.telefone, lead.convertido_em_id)
+
+
+def _respondido_em(lead: Lead, recebidos: list[QuestionarioRecebido]) -> datetime | None:
+    datas = [
+        q.recebido_em
+        for q in recebidos
+        if questionario.mesmo_contato(
+            _contato(lead),
+            questionario.Contato(q.cnpj, q.contato_email, q.contato_celular, q.oportunidade_id),
+        )
+    ]
+    return min(datas) if datas else None
+
+
+def _recebidos(sessao: Session) -> list[QuestionarioRecebido]:
+    return list(sessao.scalars(sa.select(QuestionarioRecebido)).all())
+
+
+def _situacao(lead: Lead, recebidos: list[QuestionarioRecebido], momento: datetime) -> e.QuestionarioDoLead:
+    respondido_em = _respondido_em(lead, recebidos)
+    passo = questionario.passo_do_questionario(
+        enviado_em=lead.questionario_enviado_em,
+        respondido_em=respondido_em,
+        lembrado_em=lead.questionario_lembrado_em,
+        agradecido_em=lead.questionario_agradecido_em,
+        agora=momento,
+    )
+    enviado = lead.questionario_enviado_em
+    return e.QuestionarioDoLead(
+        lead_id=lead.id,
+        passo=passo,
+        enviado_em=enviado,
+        respondido_em=respondido_em,
+        lembrado_em=lead.questionario_lembrado_em,
+        agradecido_em=lead.questionario_agradecido_em,
+        lembrar_a_partir_de=enviado + questionario.PRAZO_DO_LEMBRETE if enviado else None,
+    )
 
 
 def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
@@ -95,9 +151,16 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         lead = conversa.lead
         dados = corpo.model_dump(exclude_unset=True)
 
+        momento = agora()
         if corpo.autor is AutorDaMensagem.IA:
-            if conversa.desfecho is not None:
+            # Lembrete e agradecimento do questionário saem também depois do encerramento: o
+            # lead costuma pedir a proposta no fim da conversa (06/10/2026).
+            if conversa.desfecho is not None and corpo.questionario is None:
                 raise HTTPException(409, "a conversa está encerrada: a IA não fala mais nela")
+            if corpo.questionario is not None:
+                passo = _situacao(lead, _recebidos(sessao), momento).passo
+                if passo is not questionario.PASSO_DA_MENSAGEM[corpo.questionario]:
+                    raise HTTPException(409, questionario.por_que_nao(passo))
             problema = regras.problema_na_mensagem(corpo.texto)
             if problema:
                 raise HTTPException(422, problema)
@@ -113,9 +176,20 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         if corpo.autor is not AutorDaMensagem.LEAD and lead.nao_contatar:
             raise HTTPException(409, "o lead pediu para não ser contatado")
 
-        momento = agora()
+        dados.pop("questionario", None)
         mensagem = MensagemDoSdr(conversa_id=conversa.id, enviada_em=momento, **dados)
         sessao.add(mensagem)
+
+        if corpo.questionario is questionario.MensagemDoQuestionario.LEMBRETE:
+            lead.questionario_lembrado_em = momento
+        elif corpo.questionario is questionario.MensagemDoQuestionario.AGRADECIMENTO:
+            lead.questionario_agradecido_em = momento
+        if (
+            corpo.autor is not AutorDaMensagem.LEAD
+            and lead.questionario_enviado_em is None
+            and questionario.tem_o_link(corpo.texto, _links_do_questionario())
+        ):
+            lead.questionario_enviado_em = momento
 
         if corpo.autor is AutorDaMensagem.LEAD and lead.situacao is SituacaoLead.NOVO:
             lead.situacao = SituacaoLead.EM_CONTATO
@@ -128,6 +202,43 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
             conversa.atendida_em = momento
         sessao.flush()
         return e.MensagemResposta.model_validate(mensagem)
+
+    # ------------------------------------------------------ questionário
+    @r.get("/leads/{lead_id}/questionario", response_model=e.QuestionarioDoLead)
+    def questionario_do_lead(lead_id: int, sessao: Session = Depends(obter_sessao, scope="function")):
+        """Em que passo está o questionário do lead, pelo que o CRM sabe. A integração entrega isto à IA."""
+        lead = sessao.get(Lead, lead_id)
+        if lead is None:
+            raise HTTPException(404, "lead não encontrado")
+        return _situacao(lead, _recebidos(sessao), agora())
+
+    @r.get("/questionario/pendentes", response_model=list[e.PendenciaDoQuestionario])
+    def questionario_pendente(sessao: Session = Depends(obter_sessao, scope="function")):
+        """A quem a IA deve lembrar ou agradecer agora. Fica fora quem pediu para não ser contatado."""
+        leads = sessao.scalars(
+            sa.select(Lead)
+            .where(
+                Lead.questionario_enviado_em.is_not(None),
+                Lead.questionario_agradecido_em.is_(None),
+                Lead.nao_contatar.is_(False),
+            )
+            .options(selectinload(Lead.conversas))
+            .order_by(Lead.questionario_enviado_em)
+        ).all()
+        recebidos = _recebidos(sessao) if leads else []
+        momento = agora()
+        pendentes = []
+        for lead in leads:
+            situacao = _situacao(lead, recebidos, momento)
+            if situacao.passo not in questionario.PASSO_DA_MENSAGEM.values() or not lead.conversas:
+                continue
+            conversa = lead.conversas[-1]
+            pendentes.append(e.PendenciaDoQuestionario(
+                lead_id=lead.id, nome=lead.nome, conversa_id=conversa.id, canal=conversa.canal,
+                passo=situacao.passo, enviado_em=lead.questionario_enviado_em,
+                respondido_em=situacao.respondido_em,
+            ))
+        return pendentes
 
     @r.post("/conversas/{conversa_id}/encerrar", response_model=e.ConversaResposta)
     def encerrar(conversa_id: int, corpo: e.Encerramento, sessao: Session = Depends(obter_sessao, scope="function")):

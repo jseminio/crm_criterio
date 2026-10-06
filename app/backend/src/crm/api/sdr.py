@@ -11,8 +11,8 @@ valer aqui, no servidor, em cada mensagem:
   agradecimento do questionário.
 
 Questionário de volumetria (06/10/2026): a mensagem com o link marca o envio;
-`GET /api/sdr/questionario/pendentes` diz a quem lembrar (48 horas sem
-resposta) ou agradecer (respondeu), e o servidor recusa lembrete ou
+`GET /api/sdr/questionario/pendentes` diz a quem lembrar (2 dias úteis sem
+resposta, em horário comercial) ou agradecer (respondeu), e o servidor recusa lembrete ou
 agradecimento fora do passo (409). Regras em `crm.domain.questionario_do_lead`.
 
 O painel (`GET /api/sdr/painel`) só lê: é `crm.domain.sdr.calcular_painel`
@@ -94,7 +94,7 @@ def _situacao(lead: Lead, recebidos: list[QuestionarioRecebido], momento: dateti
         respondido_em=respondido_em,
         lembrado_em=lead.questionario_lembrado_em,
         agradecido_em=lead.questionario_agradecido_em,
-        lembrar_a_partir_de=enviado + questionario.PRAZO_DO_LEMBRETE if enviado else None,
+        lembrar_a_partir_de=questionario.lembrar_a_partir_de(enviado) if enviado else None,
     )
 
 

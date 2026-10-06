@@ -6,8 +6,8 @@ A IA envia o link quando o lead mostra interesse em proposta. Depois, quem diz s
 oportunidade em que o lead virou.
 
 - Respondeu: a IA agradece, uma vez.
-- Não respondeu em 48 horas: a IA lembra, uma vez, de forma educada, profissional e persuasiva.
-  Depois do lembrete ela não insiste: o lead segue com a equipe.
+- Não respondeu em 2 dias úteis: a IA lembra, uma vez, de forma educada, profissional e
+  persuasiva, em horário comercial. Depois do lembrete ela não insiste: o lead segue com a equipe.
 
 Lógica pura, sem banco: a rota lê as datas e pergunta aqui qual é o passo.
 """
@@ -16,12 +16,15 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from enum import Enum
 from typing import Iterable
 
 __all__ = [
-    "PRAZO_DO_LEMBRETE",
+    "DIAS_UTEIS_DO_LEMBRETE",
+    "HORARIO_COMERCIAL",
+    "lembrar_a_partir_de",
+    "em_horario_comercial",
     "PassoDoQuestionario",
     "MensagemDoQuestionario",
     "PASSO_DA_MENSAGEM",
@@ -32,8 +35,14 @@ __all__ = [
     "tem_o_link",
 ]
 
-PRAZO_DO_LEMBRETE = timedelta(hours=48)
-"""Do envio do link ao lembrete. Horas corridas (hipótese de 06/10/2026, a rever com o uso)."""
+DIAS_UTEIS_DO_LEMBRETE = 2
+"""Do envio do link ao lembrete: 2 dias úteis (decisão de Eduardo, 06/10/2026). Dia útil é de
+segunda a sexta; feriado conta como útil, como em `crm.api.questionarios.dias_uteis_entre`."""
+
+HORARIO_COMERCIAL = (time(9), time(18))
+"""O lembrete só sai de segunda a sexta, das 9h às 18h de Brasília (hipótese de 06/10/2026)."""
+
+_BRASILIA = timezone(timedelta(hours=-3))
 
 
 class PassoDoQuestionario(Enum):
@@ -66,6 +75,31 @@ def _utc(momento: datetime) -> datetime:
     return momento if momento.tzinfo else momento.replace(tzinfo=timezone.utc)
 
 
+def _util(momento: datetime) -> bool:
+    return momento.weekday() < 5
+
+
+def lembrar_a_partir_de(enviado_em: datetime) -> datetime:
+    """Quando o lembrete passa a valer: o mesmo horário, 2 dias úteis depois do envio. Link enviado
+    no sábado ou no domingo conta como enviado na segunda às 9h."""
+    base = _utc(enviado_em).astimezone(_BRASILIA)
+    if not _util(base):
+        while not _util(base):
+            base += timedelta(days=1)
+        base = datetime.combine(base.date(), HORARIO_COMERCIAL[0], _BRASILIA)
+    restantes = DIAS_UTEIS_DO_LEMBRETE
+    while restantes:
+        base += timedelta(days=1)
+        restantes -= _util(base)
+    return base.astimezone(timezone.utc)
+
+
+def em_horario_comercial(momento: datetime) -> bool:
+    local = _utc(momento).astimezone(_BRASILIA)
+    inicio, fim = HORARIO_COMERCIAL
+    return _util(local) and inicio <= local.time() < fim
+
+
 def passo_do_questionario(
     *,
     enviado_em: datetime | None,
@@ -75,7 +109,7 @@ def passo_do_questionario(
     agora: datetime,
 ) -> PassoDoQuestionario:
     """Em que passo está o questionário de um lead. Responder vence tudo: quem respondeu nunca
-    recebe lembrete, nem que as 48 horas tenham passado."""
+    recebe lembrete, nem que o prazo tenha passado."""
     if respondido_em is not None:
         if agradecido_em is not None:
             return PassoDoQuestionario.AGRADECIDO
@@ -86,14 +120,16 @@ def passo_do_questionario(
         return PassoDoQuestionario.NAO_ENVIADO
     if lembrado_em is not None:
         return PassoDoQuestionario.LEMBRADO
-    if _utc(agora) - _utc(enviado_em) >= PRAZO_DO_LEMBRETE:
+    if _utc(agora) >= lembrar_a_partir_de(enviado_em) and em_horario_comercial(agora):
         return PassoDoQuestionario.LEMBRAR
     return PassoDoQuestionario.AGUARDANDO
 
 
 _MOTIVO: dict[PassoDoQuestionario, str] = {
     PassoDoQuestionario.NAO_ENVIADO: "a IA ainda não enviou o link do questionário a este lead",
-    PassoDoQuestionario.AGUARDANDO: "ainda não passaram 48 horas desde o envio do link",
+    PassoDoQuestionario.AGUARDANDO: (
+        "ainda não passaram 2 dias úteis desde o envio do link, ou está fora do horário comercial"
+    ),
     PassoDoQuestionario.LEMBRAR: "o questionário ainda não foi respondido",
     PassoDoQuestionario.LEMBRADO: "o lembrete do questionário já foi enviado",
     PassoDoQuestionario.AGRADECER: "o lead já respondeu o questionário",

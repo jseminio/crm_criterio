@@ -1,4 +1,4 @@
-"""O questionário na conversa do SDR de IA: agradecer quem respondeu, lembrar em 48 horas — 06/10/2026."""
+"""O questionário na conversa do SDR de IA: agradecer quem respondeu, lembrar em 2 dias úteis — 06/10/2026."""
 
 from __future__ import annotations
 
@@ -16,12 +16,18 @@ from crm.domain.listas import SituacaoDoQuestionario
 from crm.domain.questionario_do_lead import (
     Contato,
     PassoDoQuestionario as P,
+    lembrar_a_partir_de,
     mesmo_contato,
     passo_do_questionario,
     tem_o_link,
 )
 
-AGORA = datetime(2026, 10, 6, 15, tzinfo=timezone.utc)
+BRASILIA = timezone(timedelta(hours=-3))
+AGORA = datetime(2026, 10, 6, 12, tzinfo=BRASILIA)  # terça-feira, meio-dia
+
+
+def br(dia: int, hora: int, minuto: int = 0) -> datetime:
+    return datetime(2026, 10, dia, hora, minuto, tzinfo=BRASILIA)
 
 
 def passo(enviado=None, respondido=None, lembrado=None, agradecido=None, agora=AGORA):
@@ -34,9 +40,24 @@ class TestPasso:
     def test_sem_envio_nao_ha_o_que_cobrar(self):
         assert passo() is P.NAO_ENVIADO
 
-    def test_lembra_so_depois_de_48_horas(self):
-        assert passo(enviado=AGORA - timedelta(hours=47, minutes=59)) is P.AGUARDANDO
-        assert passo(enviado=AGORA - timedelta(hours=48)) is P.LEMBRAR
+    @pytest.mark.parametrize("enviado, prazo", [
+        (br(1, 15), br(5, 15)),     # quinta → segunda, pulando o fim de semana
+        (br(2, 15), br(6, 15)),     # sexta → terça
+        (br(5, 10), br(7, 10)),     # segunda → quarta
+        (br(3, 20), br(7, 9)),      # sábado: conta da segunda às 9h
+        (br(4, 8), br(7, 9)),       # domingo, idem
+    ])
+    def test_prazo_de_2_dias_uteis(self, enviado, prazo):
+        assert lembrar_a_partir_de(enviado) == prazo
+
+    def test_lembra_so_depois_do_prazo(self):
+        assert passo(enviado=br(2, 12, 1)) is P.AGUARDANDO   # vence terça às 12h01
+        assert passo(enviado=br(2, 12)) is P.LEMBRAR
+
+    @pytest.mark.parametrize("agora", [br(6, 8, 59), br(6, 18), br(10, 11), br(11, 11)])
+    def test_lembra_so_em_horario_comercial(self, agora):
+        assert passo(enviado=br(1, 10), agora=agora) is P.AGUARDANDO
+        assert passo(enviado=br(1, 10), agora=br(6, 9)) is P.LEMBRAR
 
     def test_lembra_uma_vez_so(self):
         assert passo(enviado=AGORA - timedelta(days=5), lembrado=AGORA - timedelta(days=2)) is P.LEMBRADO
@@ -80,7 +101,11 @@ def fabrica(engine: sa.Engine) -> sessionmaker[Session]:
 
 
 @pytest.fixture
-def cliente(fabrica) -> TestClient:
+def cliente(fabrica, monkeypatch) -> TestClient:
+    """O relógio da rota fica parado numa terça ao meio-dia: o prazo não depende da hora do teste."""
+    import crm.api.sdr as rotas
+
+    monkeypatch.setattr(rotas, "agora", lambda: AGORA.astimezone(timezone.utc))
     with TestClient(criar_app(fabrica)) as aberto:
         yield aberto
 
@@ -98,10 +123,10 @@ def falar(cliente: TestClient, conversa: int, texto: str, autor: str = "IA", **c
     return cliente.post(f"/api/sdr/conversas/{conversa}/mensagens", json={"autor": autor, "texto": texto} | campos)
 
 
-def recuar_envio(fabrica, lead_id: int, horas: int) -> None:
+def recuar_envio(fabrica, lead_id: int, dias: int) -> None:
     with fabrica() as sessao:
         lead = sessao.get(Lead, lead_id)
-        lead.questionario_enviado_em = lead.questionario_enviado_em - timedelta(hours=horas)
+        lead.questionario_enviado_em = lead.questionario_enviado_em - timedelta(days=dias)
         sessao.commit()
 
 
@@ -127,15 +152,15 @@ class TestApi:
         assert atual["passo"] == "Aguardando resposta" and atual["enviado_em"] is not None
         assert atual["lembrar_a_partir_de"] is not None
 
-    def test_lembrete_antes_de_48_horas_e_recusado(self, cliente):
+    def test_lembrete_antes_do_prazo_e_recusado(self, cliente):
         lead_id, conversa = conversa_com_link(cliente)
         resposta = falar(cliente, conversa, "Conseguiu ver o questionário?", questionario="Lembrete")
-        assert resposta.status_code == 409 and "48 horas" in resposta.json()["detail"]
+        assert resposta.status_code == 409 and "2 dias úteis" in resposta.json()["detail"]
         assert cliente.get("/api/sdr/questionario/pendentes").json() == []
 
-    def test_depois_de_48_horas_lembra_uma_vez(self, cliente, fabrica):
+    def test_depois_do_prazo_lembra_uma_vez(self, cliente, fabrica):
         lead_id, conversa = conversa_com_link(cliente)
-        recuar_envio(fabrica, lead_id, 49)
+        recuar_envio(fabrica, lead_id, 4)
         (pendente,) = cliente.get("/api/sdr/questionario/pendentes").json()
         assert (pendente["lead_id"], pendente["conversa_id"], pendente["passo"]) == (lead_id, conversa, "Lembrar")
 
@@ -147,7 +172,7 @@ class TestApi:
 
     def test_respondeu_agradece_uma_vez_e_nunca_lembra(self, cliente, fabrica):
         lead_id, conversa = conversa_com_link(cliente, email="ana@hospital.com.br")
-        recuar_envio(fabrica, lead_id, 72)
+        recuar_envio(fabrica, lead_id, 4)
         responder(fabrica, email="ANA@hospital.com.br")
 
         (pendente,) = cliente.get("/api/sdr/questionario/pendentes").json()
@@ -173,7 +198,7 @@ class TestApi:
 
     def test_lembrete_continua_sem_preco(self, cliente, fabrica):
         lead_id, conversa = conversa_com_link(cliente)
-        recuar_envio(fabrica, lead_id, 49)
+        recuar_envio(fabrica, lead_id, 4)
         assert falar(cliente, conversa, "A proposta sai por R$ 5 mil", questionario="Lembrete").status_code == 422
 
     def test_so_a_ia_marca_a_mensagem_do_questionario(self, cliente):
@@ -182,7 +207,7 @@ class TestApi:
 
     def test_nao_contatar_some_da_lista(self, cliente, fabrica):
         lead_id, _ = conversa_com_link(cliente)
-        recuar_envio(fabrica, lead_id, 49)
+        recuar_envio(fabrica, lead_id, 4)
         with fabrica() as sessao:
             sessao.get(Lead, lead_id).nao_contatar = True
             sessao.commit()

@@ -1,7 +1,7 @@
 """questionário de volumetria na conversa do SDR de IA
 
 Pedido de Eduardo em 06/10/2026: a IA agradece quem respondeu o questionário e lembra, uma vez, quem
-não respondeu em 48 horas. Só acrescenta três colunas vazias em `lead`: quando a IA enviou o link,
+não respondeu em 2 dias úteis. Só acrescenta três colunas vazias em `lead`: quando a IA enviou o link,
 quando lembrou e quando agradeceu. Se o lead respondeu, o CRM já sabe por `questionario_recebido`.
 
 Revisão: d2f8b4c6a1e3

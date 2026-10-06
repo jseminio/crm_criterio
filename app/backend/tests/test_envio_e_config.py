@@ -82,3 +82,15 @@ def test_email_incompleto_fica_desligado(tmp_path, monkeypatch):
     config = ler_configuracao()
     assert config.email is None and config.chave is None
     assert config.modelo == "claude-sonnet-5"
+    # Sem a variável, o link do questionário é o do site atual.
+    assert config.link_do_questionario == "https://criterio-questionario-proposta.netlify.app/questionario"
+
+
+def test_link_do_questionario_vem_do_env(tmp_path, monkeypatch):
+    """Quando o questionário for para o domínio da Critério, basta mudar o `.env`."""
+    from crm.db import sessao as modulo
+
+    arquivo = tmp_path / ".env"
+    arquivo.write_text("CRM_LINK_DO_QUESTIONARIO= https://questionario.criterio.com.br \n", encoding="utf-8")
+    monkeypatch.setattr(modulo, "ARQUIVO_ENV", arquivo)
+    assert ler_configuracao().link_do_questionario == "https://questionario.criterio.com.br"

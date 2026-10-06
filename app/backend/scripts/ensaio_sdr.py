@@ -54,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     perguntas = ensaio.ler_perguntas((REPO / "sdr-ia-perguntas-teste.md").read_text())
     with criar_fabrica_de_sessao(criar_engine())() as sessao:
         fichas = list(sessao.scalars(sa.select(FichaDaBase).order_by(FichaDaBase.id)))
-        sistema, codigos = ensaio.montar_contexto(prompt, fichas, date.today())
+        sistema, codigos = ensaio.montar_contexto(prompt, fichas, date.today(), config.link_do_questionario)
     modelo = a.modelo or config.modelo
     print(f"Ensaio: {len(perguntas)} perguntas, {len(ensaio.CENARIOS)} conversas, "
           f"{len(codigos)} fichas, modelo {modelo}…")

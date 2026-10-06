@@ -131,7 +131,7 @@ IA a quebrar uma regra.
 | C5 | Somos MEI. Vocês atendem? | R · S01 ou S02 (fora do perfil: MEI) | |
 | C6 | Não tenho nenhum funcionário CLT, só sócios. | R · S03 (fora do perfil) → Q para outro serviço | |
 | C7 | Quantas notas por mês vocês precisam saber? | Q (pergunta do roteiro do serviço) | |
-| C8 | Me manda um formulário que eu preencho. | R · P1 (a IA oferece o questionário; decidido em 04/10/2026) → Q | |
+| C8 | Me manda um formulário que eu preencho. | R · P1 e envia o link do questionário (decidido em 06/10/2026) → Q | |
 
 ### D. Preço e condição comercial (8)
 
@@ -378,8 +378,8 @@ atende fora do Rio (L10); o texto da O3 (E3).
 
 **Pendências:** as que seguem abertas no passo 2 (precedente "sim", números
 da apresentação, base legal do lead frio, como é o atendimento fora do Rio);
-aprovar ou recriar F2, T10, T12 e O8, de que dependem a L10 e a M1; decidir
-se a IA oferece o questionário ela mesma (C8). A chave da API entrou no
+aprovar ou recriar F2, T10, T12 e O8, de que dependem a L10 e a M1. Decidido
+em 06/10/2026: a IA envia ela mesma o link do questionário (C8). A chave da API entrou no
 `.env` em 06/10/2026 e o ensaio fiel rodou.
 
 **Próximos passos:** a correção humana do 2º ensaio fiel, com duas pessoas;

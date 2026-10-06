@@ -16,6 +16,28 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Disparo do lembrete e do agradecimento do questionário (06/10/2026)
+
+O CRM mesmo envia o lembrete e o agradecimento do questionário (seção abaixo), sem chamar a IA: o
+texto é o do modelo aprovado pela Meta (`sdr-ia-modelos-whatsapp.md`), com o primeiro nome e o
+serviço de interesse do lead. **Desligado até `CRM_DISPARO_DO_QUESTIONARIO=true`.**
+
+- **Quando:** logo ao subir e depois a cada 10 minutos, só de segunda a sexta, das 9h às 18h de
+  Brasília (o agradecimento também espera o horário comercial).
+- **Por onde:** pelo canal da conversa. WhatsApp: o modelo pela Cloud API da Meta
+  (`CRM_WHATSAPP_TOKEN` e `CRM_WHATSAPP_NUMERO_ID`; versão em `CRM_WHATSAPP_VERSAO`, padrão
+  `v24.0`). E-mail: o mesmo texto, com o link no corpo, pelo Microsoft 365 (`CRM_M365_*`).
+- **Registro:** cada mensagem enviada entra na conversa como mensagem da IA e carimba o lead, logo
+  depois do envio. Falhou: nada é carimbado e a próxima rodada tenta de novo. Lead sem celular ou
+  sem e-mail, ou canal sem configuração, vira aviso e fica na lista.
+- **Acompanhar:** `GET /api/sdr/questionario/disparo` (última rodada: enviados, avisos, erros) e
+  `POST /api/sdr/questionario/disparar` (uma rodada agora; 409 se desligado).
+- **O que ainda não faz:** não recebe as respostas do lead no WhatsApp (falta o webhook da Meta);
+  por isso usa sempre o modelo, que vale dentro e fora da janela de 24 horas.
+- **Para ligar:** modelos aprovados no WhatsApp Manager com os nomes `criterio_lembrete_questionario`
+  e `criterio_agradecimento_questionario`; as variáveis no Coolify; Redeploy. O teste
+  `test_os_textos_sao_os_mandados_para_a_meta` garante que o texto do código é o do documento.
+
 ## SDR de IA agradece o questionário ou lembra em 2 dias úteis (06/10/2026)
 
 Decisão de Eduardo: depois de enviar o link, a IA **confere pelo CRM** se o lead respondeu. Respondeu:
@@ -29,7 +51,7 @@ ela não insiste.
   segunda às 9h. O lembrete só sai em horário comercial, das 9h às 18h de Brasília.
 - **Respondido:** o questionário que a busca automática traz do site (`questionario_recebido`) é do
   lead quando bate o CNPJ, o e-mail, o celular (com ou sem o 55) ou a oportunidade em que o lead virou.
-- **Quem chama:** a integração do canal consulta `GET /api/sdr/questionario/pendentes` (a quem
+- **Quem chama:** o disparo do próprio CRM (seção acima). Uma integração externa também pode consultar `GET /api/sdr/questionario/pendentes` (a quem
   lembrar ou agradecer agora, com a conversa) e `GET /api/sdr/leads/{id}/questionario` (o passo, para
   entregar à IA), e registra a mensagem com `"questionario": "Lembrete"` ou `"Agradecimento"`.
 - **Travas no servidor (409):** lembrete antes do prazo, fora do horário comercial, repetido ou a

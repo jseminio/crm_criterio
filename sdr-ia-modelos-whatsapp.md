@@ -107,8 +107,10 @@ vendedor e aceite o custo.
 - Eduardo aprova os textos e cadastra os modelos no WhatsApp Manager da conta da Critério.
 - Conferir no WhatsApp Manager o valor atual por mensagem de Utilidade e de Marketing no Brasil.
   Não registramos valor aqui para não fixar número que muda.
-- A integração do canal envia o modelo fora da janela de 24 horas e o texto livre da IA dentro
-  dela, e registra a mensagem no CRM com `"questionario": "Lembrete"` ou `"Agradecimento"`.
+- O disparo do CRM (README, "Disparo do lembrete e do agradecimento") já envia estes modelos, com
+  os nomes acima, e registra a mensagem na conversa. Liga com `CRM_DISPARO_DO_QUESTIONARIO=true`
+  depois da aprovação. Mudar um texto aqui exige mudar `crm.agente.disparo_do_questionario` (um
+  teste confere) e nova aprovação na Meta.
 
 ## Fontes (consultadas em 06/10/2026)
 

@@ -58,6 +58,8 @@ from crm.api.sdr import roteador as roteador_do_sdr
 from crm.api.ficha import pendencias_de, roteador_da_ficha
 from crm.api.propostas import roteador_de_propostas
 from crm.api.busca_automatica import laco_da_busca
+from crm.agente.disparo_do_questionario import Canais
+from crm.api.disparo_do_questionario import canais_reais, laco_do_disparo
 from crm.api.questionarios import fonte_real, roteador_de_questionarios
 from crm.questionario.endereco import BuscaDeEndereco, endereco_pelo_cnpj
 from crm.questionario.fonte import FonteDeQuestionarios
@@ -152,6 +154,8 @@ def criar_app(
     servicos_da_ata: Callable[[], ServicosDaAta] | None = None,
     busca_automatica: bool | None = None,
     tentativas: Tentativas | None = None,
+    canais_do_disparo: Callable[[], Canais | None] | None = None,
+    disparo_automatico: bool | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede; `tentativas`, para o
@@ -171,13 +175,20 @@ def criar_app(
         tarefa = asyncio.create_task(
             laco_da_busca(_fabrica, fonte_de_questionarios or fonte_real, endereco)
         ) if ligada else None
+        # Disparo do lembrete e do agradecimento do questionário (06/10/2026): o laço sobe no uso real e
+        # só envia com CRM_DISPARO_DO_QUESTIONARIO=true; no teste, só se pedir.
+        com_disparo = disparo_automatico if disparo_automatico is not None else fabrica is None
+        disparo = asyncio.create_task(
+            laco_do_disparo(_fabrica, canais_do_disparo or canais_reais)
+        ) if com_disparo else None
         try:
             yield
         finally:
-            if tarefa is not None:
-                tarefa.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await tarefa
+            for t in (tarefa, disparo):
+                if t is not None:
+                    t.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await t
 
     # Entrada: no uso real, lida do `.env`; no teste (que passa a própria `fabrica`), só se o teste mandar.
     # `.env` que pede o modo senha sem segredo para aqui mesmo (`EntradaMalConfigurada`): a API não sobe.
@@ -265,7 +276,7 @@ def criar_app(
     api.include_router(roteador_de_contatos(obter_sessao))
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
-    api.include_router(roteador_do_sdr(obter_sessao))
+    api.include_router(roteador_do_sdr(obter_sessao, canais_do_disparo or canais_reais))
     api.include_router(roteador_da_base(obter_sessao))
     # Endereço pelo CNPJ na importação do questionário: a BrasilAPI no uso real; no teste (que passa a
     # própria `fabrica`), só se o teste mandar uma busca — teste não sai para a rede.

@@ -85,6 +85,11 @@ CATALOGO: tuple[Variavel, ...] = (
     Variavel("CRM_M365_CLIENT_ID", "envio de e-mail pelo Microsoft 365", grupo="m365"),
     Variavel("CRM_M365_CLIENT_SECRET", "envio de e-mail pelo Microsoft 365", segredo=True, grupo="m365"),
     Variavel("CRM_M365_REMETENTE", "envio de e-mail pelo Microsoft 365", grupo="m365"),
+    Variavel("CRM_WHATSAPP_TOKEN", "envio do WhatsApp pela Cloud API da Meta", segredo=True, grupo="whatsapp"),
+    Variavel("CRM_WHATSAPP_NUMERO_ID", "envio do WhatsApp pela Cloud API da Meta", grupo="whatsapp"),
+    Variavel("CRM_WHATSAPP_VERSAO", "versão da Graph API da Meta", padrao="v24.0"),
+    Variavel("CRM_DISPARO_DO_QUESTIONARIO", "true liga o disparo do lembrete e do agradecimento do questionário",
+             padrao="false"),
     Variavel("CRM_QUESTIONARIO_URL", "busca dos questionários do site", grupo="questionario"),
     Variavel("CRM_QUESTIONARIO_CHAVE", "busca dos questionários do site", segredo=True, grupo="questionario"),
     # --- Atualizador e entrypoint (app/backend/*.sh) -------------------------------------------

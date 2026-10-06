@@ -61,6 +61,7 @@ __all__ = [
     "Encerramento",
     "QuestionarioDoLead",
     "PendenciaDoQuestionario",
+    "EstadoDoDisparoResposta",
     "NotaDaConversa",
     "ParametrosDoSdrResposta",
     "ParametrosDoSdrEdicao",
@@ -1071,6 +1072,21 @@ class PendenciaDoQuestionario(BaseModel):
     passo: PassoDoQuestionario
     enviado_em: datetime
     respondido_em: datetime | None = None
+
+
+class EstadoDoDisparoResposta(BaseModel):
+    """A última rodada do disparo do lembrete e do agradecimento do questionário."""
+
+    automatico: bool
+    """Falso quando o CRM roda sem o laço (no teste)."""
+    ligado: bool
+    """`CRM_DISPARO_DO_QUESTIONARIO=true` na última rodada."""
+    intervalo_minutos: int
+    ultima_em: datetime | None
+    enviados: int
+    avisos: list[str]
+    erros: list[str]
+    proxima_em: datetime | None
 
 
 class Encerramento(BaseModel):

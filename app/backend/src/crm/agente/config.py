@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from crm.agente.sdr import MODELO_PADRAO
 from crm.db.sessao import ler_ambiente
 
-__all__ = ["ConfiguracaoDoAgente", "ConfiguracaoDoEmail", "LINK_DO_QUESTIONARIO_PADRAO", "VARIAVEIS", "ler_configuracao"]
+__all__ = ["ConfiguracaoDoAgente", "ConfiguracaoDoEmail", "ConfiguracaoDoWhatsapp", "VERSAO_DO_WHATSAPP", "LINK_DO_QUESTIONARIO_PADRAO", "VARIAVEIS", "ler_configuracao"]
 
 VARIAVEIS = {
     "chave": "ANTHROPIC_API_KEY",
@@ -21,6 +21,10 @@ VARIAVEIS = {
     "segredo": "CRM_M365_CLIENT_SECRET",
     "remetente": "CRM_M365_REMETENTE",
     "questionario": "CRM_LINK_DO_QUESTIONARIO",
+    "whatsapp_token": "CRM_WHATSAPP_TOKEN",
+    "whatsapp_numero": "CRM_WHATSAPP_NUMERO_ID",
+    "whatsapp_versao": "CRM_WHATSAPP_VERSAO",
+    "disparo": "CRM_DISPARO_DO_QUESTIONARIO",
 }
 
 #: O questionário de volumetria que o SDR de IA envia ao lead (decisão de Eduardo, 06/10/2026). Vai
@@ -39,12 +43,30 @@ class ConfiguracaoDoEmail:
         return f"ConfiguracaoDoEmail(remetente={self.remetente!r})"
 
 
+#: Versão da Graph API da Meta. Cada versão vale cerca de dois anos; trocar é mudar `CRM_WHATSAPP_VERSAO`.
+VERSAO_DO_WHATSAPP = "v24.0"
+
+
+@dataclass(frozen=True)
+class ConfiguracaoDoWhatsapp:
+    token: str
+    numero_id: str
+    versao: str = VERSAO_DO_WHATSAPP
+
+    def __repr__(self) -> str:  # nunca mostrar o token, nem em log de erro
+        return f"ConfiguracaoDoWhatsapp(numero_id={self.numero_id!r}, versao={self.versao!r})"
+
+
 @dataclass(frozen=True)
 class ConfiguracaoDoAgente:
     chave: str | None
     modelo: str
     email: ConfiguracaoDoEmail | None
     link_do_questionario: str = LINK_DO_QUESTIONARIO_PADRAO
+    whatsapp: ConfiguracaoDoWhatsapp | None = None
+    disparo_ligado: bool = False
+    """O disparo automático do lembrete e do agradecimento do questionário. Desligado por padrão:
+    liga com `CRM_DISPARO_DO_QUESTIONARIO=true`, depois de os modelos da Meta estarem aprovados."""
 
     def __repr__(self) -> str:
         return f"ConfiguracaoDoAgente(modelo={self.modelo!r}, chave={'sim' if self.chave else 'não'})"
@@ -54,9 +76,15 @@ def ler_configuracao() -> ConfiguracaoDoAgente:
     valores = ler_ambiente()
     partes_do_email = [valores.get(VARIAVEIS[k]) for k in ("tenant", "cliente", "segredo", "remetente")]
     email = ConfiguracaoDoEmail(*partes_do_email) if all(partes_do_email) else None
+    token, numero = (valores.get(VARIAVEIS[k]) for k in ("whatsapp_token", "whatsapp_numero"))
+    whatsapp = ConfiguracaoDoWhatsapp(
+        token, numero, (valores.get(VARIAVEIS["whatsapp_versao"]) or "").strip() or VERSAO_DO_WHATSAPP
+    ) if token and numero else None
     return ConfiguracaoDoAgente(
         chave=valores.get(VARIAVEIS["chave"]),
         modelo=valores.get(VARIAVEIS["modelo"]) or MODELO_PADRAO,
         email=email,
         link_do_questionario=(valores.get(VARIAVEIS["questionario"]) or "").strip() or LINK_DO_QUESTIONARIO_PADRAO,
+        whatsapp=whatsapp,
+        disparo_ligado=(valores.get(VARIAVEIS["disparo"]) or "").strip().casefold() in ("true", "1", "sim"),
     )

@@ -90,7 +90,7 @@ def _contextualizacao(cliente: str, r: dict[str, Any], servicos: list[str]) -> s
     local = (r.get("filiais_localidades") or r.get("municipios_ufs") or "").strip()
     no_texto = [_SERVICOS_NO_TEXTO[s] for s in servicos if s in _SERVICOS_NO_TEXTO]
     servicos_txt = f"os serviços {_lista_em_texto(no_texto)}" if no_texto else "os serviços desta proposta"
-    verbo = (f"avalia terceirizar {servicos_txt}" if r.get("operacao") == "Interna"
+    verbo = (f"avalia contar com um parceiro para {servicos_txt}" if r.get("operacao") == "Interna"
              else f"busca um novo parceiro para {servicos_txt}")
     if atividade:
         frase = f"A {cliente} atua no segmento de {atividade}" + (f", com operação em {local}" if local else "") + f", e {verbo}."

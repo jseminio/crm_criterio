@@ -85,7 +85,8 @@ CONSULTORIA = DestinoDoTransbordo.CONSULTORIA_C2
 CATALOGO: tuple[Servico, ...] = (
     Servico(
         "BPO Contábil, Fiscal e Dep. Pessoal", C1,
-        "Empresa que quer terceirizar contabilidade, fiscal e folha juntos, com um fornecedor só.",
+        "Empresa que quer tirar a contabilidade, o fiscal e a folha de dentro de casa, com um fornecedor só, "
+        "e ganhar tempo para cuidar do negócio.",
         (_DOCS, _LANC, _CLT, _ADM, _CNPJ, _REGIME),
         ("MEI", "Porte abaixo do mínimo", "Quer só a folha: é Dep. Pessoal"),
         BPO,
@@ -94,7 +95,7 @@ CATALOGO: tuple[Servico, ...] = (
     ),
     Servico(
         "BPO Contábil e Fiscal", C1,
-        "Empresa que quer terceirizar contabilidade e fiscal, e mantém a folha em outro lugar.",
+        "Empresa que quer tirar a contabilidade e o fiscal de dentro de casa e mantém a folha em outro lugar.",
         (_DOCS, _LANC, _CNPJ, _TOMADORES, _REGIME),
         ("MEI", "Porte abaixo do mínimo"),
         BPO,
@@ -102,7 +103,7 @@ CATALOGO: tuple[Servico, ...] = (
     ),
     Servico(
         "Dep. Pessoal", C1,
-        "Empresa que quer terceirizar só a folha e as rotinas trabalhistas.",
+        "Empresa que quer tirar a folha e as rotinas trabalhistas de dentro de casa.",
         (_CLT, _ADM, _CNPJ, Pergunta("Sindicato ou convenção da categoria")),
         ("Nenhum empregado CLT",),
         BPO,
@@ -110,7 +111,8 @@ CATALOGO: tuple[Servico, ...] = (
     ),
     Servico(
         "BPO Financeiro", C1,
-        "Empresa que quer terceirizar contas a pagar, a receber e conciliação.",
+        "Empresa que quer tirar o contas a pagar, o contas a receber e a conciliação de dentro de casa e "
+        "ganhar tempo para decidir.",
         (
             Pergunta("Pagamentos por mês", "pagamentos_mes"),
             Pergunta("Contas bancárias", "contas_bancarias"),

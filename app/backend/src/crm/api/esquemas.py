@@ -339,6 +339,11 @@ class OportunidadeEdicao(BaseModel):
 
     situacao: Situacao | None = None
     temperatura: Temperatura | None = None
+    captador: str | None = Field(default=None, max_length=10)
+    tipo_canal: TipoCanal | None = None
+    canal: str | None = Field(default=None, max_length=120)
+    """Captador e origem (tipo de canal e canal) editáveis no painel — Karine, 07/10/2026. Como os
+    outros campos da carga, o que mudar aqui entra em `campos_do_crm` e a recarga não desfaz."""
     motivo_recusa: MotivoRecusa | None = None
     data_aceite: date | None = None
     proxima_acao: str | None = Field(default=None, max_length=200)

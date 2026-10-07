@@ -3,6 +3,10 @@
  * Fusão de 27/09/2026: a tela Oportunidades virou a visão "Grade" desta mesma tela, porque as duas
  * mostravam a mesma coisa em formatos diferentes. O botão Kanban/Grade fica na barra de filtros; o
  * filtro "Situação" só faz sentido na Grade (no Kanban, todas as situações já ficam visíveis juntas).
+ *
+ * Celular (06/10/2026, amostra aprovada): o Kanban mostra uma etapa por vez, escolhida nas abas do
+ * alto. Em tela de toque (celular ou tablet) o arrasto dá lugar ao botão "Mover ▸" de cada cartão,
+ * que leva ao mesmo `mover()`.
  */
 
 import { useState } from "react";
@@ -28,6 +32,8 @@ import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
 import { usarAcesso } from "../entrada";
+import { FolhaMoverPara } from "../componentes/FolhaMoverPara";
+import { usarTelaEstreita, usarToque } from "../usarTelaEstreita";
 
 type Visao = "kanban" | "grade";
 
@@ -37,20 +43,23 @@ function Cartao({
   emMovimento,
   aoComecarArrasto,
   aoTerminarArrasto,
+  aoMover,
 }: {
   oportunidade: OportunidadeResumo;
   aoAbrir: () => void;
   emMovimento: boolean;
   aoComecarArrasto: (id: number) => void;
   aoTerminarArrasto: () => void;
+  /** Só no celular: o botão "Mover ▸" no lugar do arrasto. */
+  aoMover?: () => void;
 }) {
   const quando = prazo(oportunidade.proxima_acao_em);
-  return (
+  const cartao = (
     <button
       type="button"
       className={`cartao ${emMovimento ? "cartao-movendo" : ""}`}
       onClick={aoAbrir}
-      draggable
+      draggable={!aoMover}
       onDragStart={(evento) => {
         evento.dataTransfer.effectAllowed = "move";
         // O valor em si não é lido em lugar nenhum — alguns navegadores só
@@ -81,6 +90,22 @@ function Cartao({
       )}
     </button>
   );
+  if (!aoMover) return cartao;
+  // Botão irmão, não filho: botão dentro de botão não é HTML válido.
+  return (
+    <div className="cartao-com-mover">
+      {cartao}
+      <button
+        type="button"
+        className="cartao-mover"
+        onClick={aoMover}
+        disabled={emMovimento}
+        aria-label={`Mover ${oportunidade.grupo_nome ?? oportunidade.nome} para outra etapa`}
+      >
+        Mover ▸
+      </button>
+    </div>
+  );
 }
 
 export function Funil({ listas }: { listas: Listas | null }) {
@@ -94,6 +119,12 @@ export function Funil({ listas }: { listas: Listas | null }) {
   const [colunaAlvo, definirColunaAlvo] = useState<string | null>(null);
   const [movendo, definirMovendo] = useState<number | null>(null);
   const [erroDeMovimento, definirErroDeMovimento] = useState<string | null>(null);
+  const estreita = usarTelaEstreita();
+  // Tela de toque (celular ou tablet): "Mover ▸" no lugar do arrasto, que o toque não faz direito.
+  const semArrasto = estreita || usarToque();
+  // Celular: a etapa à vista no Kanban (null = a primeira) e o cartão com a folha "Mover para…" aberta.
+  const [etapaVisivel, definirEtapaVisivel] = useState<string | null>(null);
+  const [movendoPelaFolha, definirMovendoPelaFolha] = useState<{ oportunidade: OportunidadeResumo; etapa: string } | null>(null);
   const [criando, definirCriando] = useState(false);
   const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
   const { ordenacao: ordenacaoDoKanban, alternar: alternarOrdenacaoDoKanban } = usarOrdenacao();
@@ -139,6 +170,9 @@ export function Funil({ listas }: { listas: Listas | null }) {
     ? (kanban.dados?.reduce((soma, coluna) => soma + coluna.quantas, 0) ?? 0)
     : (grade.dados?.total ?? 0);
   const filtrando = temFiltro(filtros) || (visao === "grade" && situacao !== "");
+  const etapaAVista = kanban.dados?.some((c) => c.situacao === etapaVisivel)
+    ? etapaVisivel
+    : (kanban.dados?.[0]?.situacao ?? null);
 
   function abrir(id: number, comSituacao?: string) {
     definirSituacaoDeAbertura(comSituacao);
@@ -300,9 +334,27 @@ export function Funil({ listas }: { listas: Listas | null }) {
         />
       )}
 
-      {!carregando && !erro && total > 0 && visao === "kanban" && (
-        <div className="kanban">
+      {!carregando && !erro && total > 0 && visao === "kanban" && estreita && (
+        <div className="etapas-do-kanban" role="tablist" aria-label="Etapas do funil">
           {kanban.dados?.map((coluna) => (
+            <button
+              key={coluna.situacao}
+              type="button"
+              role="tab"
+              className="etapa-do-kanban"
+              aria-selected={coluna.situacao === etapaAVista}
+              onClick={() => definirEtapaVisivel(coluna.situacao)}
+            >
+              {coluna.situacao}
+              <span className="etapa-do-kanban-quantas">{coluna.quantas}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!carregando && !erro && total > 0 && visao === "kanban" && (
+        <div className={`kanban ${estreita ? "kanban-uma-etapa" : ""}`}>
+          {kanban.dados?.filter((coluna) => !estreita || coluna.situacao === etapaAVista).map((coluna) => (
             <section
               className={`coluna ${colunaAlvo === coluna.situacao ? "coluna-alvo" : ""}`}
               key={coluna.situacao}
@@ -352,6 +404,7 @@ export function Funil({ listas }: { listas: Listas | null }) {
                       definirArrastando(null);
                       definirColunaAlvo(null);
                     }}
+                    aoMover={semArrasto ? () => definirMovendoPelaFolha({ oportunidade: o, etapa: coluna.situacao }) : undefined}
                   />
                 ))}
                 {coluna.quantas === 0 && (
@@ -416,6 +469,20 @@ export function Funil({ listas }: { listas: Listas | null }) {
             </tbody>
           </table>
         </>
+      )}
+
+      {movendoPelaFolha && (
+        <FolhaMoverPara
+          nome={movendoPelaFolha.oportunidade.grupo_nome ?? movendoPelaFolha.oportunidade.nome}
+          etapaAtual={movendoPelaFolha.etapa}
+          etapas={kanban.dados?.map((c) => c.situacao) ?? []}
+          aoFechar={() => definirMovendoPelaFolha(null)}
+          aoEscolher={(etapa) => {
+            const { oportunidade, etapa: atual } = movendoPelaFolha;
+            definirMovendoPelaFolha(null);
+            mover(oportunidade.id, atual, etapa);
+          }}
+        />
       )}
 
       {aberta !== null && (

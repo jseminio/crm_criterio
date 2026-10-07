@@ -1258,6 +1258,172 @@ td > .celula-fonte { display: block; }
 .entrada-com-erro { border: 2px solid var(--perda) !important; }
 .campo-erro { font-size: 12px; font-weight: 500; color: var(--perda); }
 
+/* ================================================================== celular
+   CRM responsivo (06/10/2026, amostra aprovada por Eduardo). Acima de 1024px nada muda. Larguras:
+   1024px (tablet: menu em gaveta, tabelas roláveis), 768px (celular deitado: listas em cartões,
+   formulários em uma coluna, kanban de uma etapa) e 480px (celular em pé: um filtro por linha).
+   Quem tocar no layout de uma tela confere aqui se ela tem regra de celular. */
+
+.botao-menu, .fechar-menu, .cortina-do-menu { display: none; }
+
+@media (max-width: 1024px) {
+  /* Esqueleto: uma coluna; o menu vira gaveta por cima da tela. */
+  .aplicacao { grid-template-columns: minmax(0, 1fr); }
+  .lateral {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 51; width: min(300px, 86vw);
+    padding: var(--e5) var(--e4); gap: var(--e5); box-shadow: var(--sombra-painel);
+    transform: translateX(-100%); visibility: hidden; transition: transform .2s ease, visibility .2s;
+  }
+  .lateral-aberta { transform: none; visibility: visible; }
+  .cortina-do-menu { display: block; position: fixed; inset: 0; z-index: 50; background: rgba(11,14,23,.45); }
+  .menu-item { min-height: 48px; padding: 0 var(--e3); }
+  .fechar-menu {
+    display: block; appearance: none; background: transparent; color: var(--texto-sobre-marca);
+    border: 1px solid rgba(255,255,255,.3); border-radius: var(--raio-sm); min-height: 44px; cursor: pointer;
+  }
+  .quem-entrou-sair { min-height: 44px; }
+
+  .topo { align-items: center; gap: var(--e3); padding: var(--e3) var(--e4); flex-wrap: wrap; }
+  .topo h1 { font-size: 18px; line-height: 1.25; flex: 1; min-width: 0; }
+  .botao-menu {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    appearance: none; border: 0; border-radius: var(--raio-sm); width: 44px; height: 44px;
+    background: rgba(255,255,255,.1); color: var(--texto-sobre-marca); font-size: 20px; cursor: pointer;
+  }
+  .topo-detalhe { flex-basis: 100%; margin: 0; font-size: 12px; line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .area { padding: var(--e4); }
+}
+
+/* Toque (celular e tablet, qualquer largura): alvo de pelo menos 44px. */
+@media (pointer: coarse) {
+  .botao, .entrada, .selecao { min-height: 44px; }
+  .botao-icone { min-width: 44px; min-height: 44px; }
+  .aba { min-height: 44px; }
+}
+
+@media (max-width: 1024px) {
+  /* Campos com 16px: abaixo disso o iPhone dá zoom na tela ao tocar no campo. */
+  .entrada, .selecao, textarea, input:not([type="checkbox"]):not([type="radio"]), select { font-size: 16px; }
+  .esqueleto-linhas { width: min(260px, 100%); }
+  /* Grade sem colunas declaradas ganha uma coluna implícita do tamanho do maior conteúdo — uma
+     fileira de abas ou uma tabela larga empurrava a tela inteira para fora. Aqui a coluna implícita
+     cabe na largura disponível (:where não pesa: quem declara grid-auto-columns continua valendo). */
+  .area :where(*) { grid-auto-columns: minmax(0, 1fr); }
+  /* Abas numa linha só, rolando de lado. flex-shrink 0: dentro de uma coluna flexível (painel), uma
+     caixa que rola encolhia até cortar as abas. A grade de avaliação (8 abas em fileiras) não rola. */
+  .abas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; }
+  .abas-avaliacao { overflow: visible; }
+  .aba { white-space: nowrap; flex: none; }
+
+  /* Alturas pela tela visível (dvh): no celular a barra do navegador come parte do 100vh. */
+  .coluna { max-height: calc(100dvh - 220px); }
+  .catalogo { max-height: calc(100dvh - 32px); }
+  .abordagem-painel { position: static; max-height: none; }
+
+  /* Painéis ocupam a tela; a ação principal fica presa no rodapé e os botões quebram linha. */
+  .painel-cabecalho { padding: var(--e4) var(--e4) var(--e3); }
+  .painel-corpo { padding: var(--e4); }
+  .painel-rodape { padding: var(--e3) var(--e4); flex-wrap: wrap; }
+  .painel-rodape .botao { flex: 1 1 auto; }
+
+  /* Tabelas: rolam de lado dentro de si (a tela não rola), com a primeira coluna presa. Os
+     cabeçalhos não quebram linha, para a coluna não espremer até virar uma palavra por linha. */
+  .tabela, .mini-tabela { display: block; overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+  .tabela th { white-space: nowrap; }
+  .tabela :where(th:first-child, td:first-child) { position: sticky; left: 0; z-index: 1; }
+  .tabela :where(td:first-child) { background: var(--surface-card); }
+  .tabela :where(th:first-child) { background: var(--surface-sunken); }
+}
+
+@media (max-width: 768px) {
+  .entrada-busca, .base-busca, .plano-ajuste { min-width: 0; width: 100%; }
+  .filtros > * { flex: 1 1 140px; min-width: 0; }
+  .filtros .entrada, .filtros .selecao { width: 100%; }
+
+  /* Grades de duas ou mais colunas passam a uma. */
+  .formulario-duplo, .sdr-dupla, .catalogo-temas, .proposta-grade-fixa { grid-template-columns: minmax(0, 1fr); }
+  .abas-avaliacao { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  /* Listas de uso diário (Leads, Contatos, Funil do Sucesso): cada linha vira um cartão, com o
+     rótulo da coluna ao lado do valor (data-rotulo). Nenhuma ação some: a célula de ações vem
+     inteira no pé do cartão; a ordenação vira uma fileira de botões "Ordenar por". */
+  .tabela-em-cartoes { display: block; overflow: visible; background: transparent; border: 0; border-radius: 0; }
+  .tabela-em-cartoes thead { display: block; }
+  .tabela-em-cartoes thead:not(:has(.th-ordenar)) { display: none; }
+  .tabela-em-cartoes thead tr { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e2); align-items: center; margin-bottom: var(--e3); }
+  .tabela-em-cartoes thead tr::before { content: "Ordenar por"; font-size: 12px; color: var(--texto-medio); width: 100%; }
+  .tabela-em-cartoes th { display: none; }
+  .tabela-em-cartoes th:has(.th-ordenar) { display: block; position: static; padding: 0; border: 0; background: none; }
+  .tabela-em-cartoes .th-ordenar { border: 1px solid var(--borda-forte); border-radius: 999px; background: var(--surface-card);
+    padding: var(--e1) var(--e3); min-height: 36px; font-size: 12px; }
+  .tabela-em-cartoes .th-ordenar-ativa { border-color: var(--surface-brand); }
+  .tabela-em-cartoes tbody { display: grid; gap: var(--e2); }
+  .tabela-em-cartoes tbody tr { display: grid; gap: 6px; background: var(--surface-card); border: 1px solid var(--borda);
+    border-radius: var(--raio-sm); padding: var(--e3); }
+  .tabela-em-cartoes td { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; gap: var(--e1);
+    position: static; padding: 0; border: 0; background: none; text-align: right; font-size: 13px; overflow-wrap: anywhere; }
+  .tabela-em-cartoes td::before { content: attr(data-rotulo); flex: none; max-width: 45%; text-align: left; margin-right: auto;
+    font-size: 12px; color: var(--texto-fraco); }
+  .tabela-em-cartoes td:empty { display: none; }
+  .tabela-em-cartoes .cartao-titulo { justify-content: flex-start; flex-wrap: wrap; text-align: left; font-weight: 600; font-size: 14px; }
+  .tabela-em-cartoes .cartao-acoes { justify-content: flex-start; flex-wrap: wrap; gap: var(--e2); margin-top: var(--e1); white-space: normal !important; }
+  .tabela-em-cartoes .cartao-acoes .botao { flex: 1 1 auto; }
+  .tabela-em-cartoes .cartao-titulo::before, .tabela-em-cartoes .cartao-acoes::before { content: none; }
+}
+
+/* Kanban no celular: uma etapa por vez (abas no alto) e "Mover ▸" no lugar do arrasto. Os
+   elementos só existem quando a tela é estreita (usarTelaEstreita), então não precisam de media. */
+.etapas-do-kanban { display: flex; gap: var(--e2); overflow-x: auto; scrollbar-width: none;
+  margin: 0 calc(-1 * var(--e4)) var(--e3); padding: 0 var(--e4) var(--e1); }
+.etapa-do-kanban { flex: none; appearance: none; border: 1px solid var(--borda); background: var(--surface-card);
+  border-radius: 999px; padding: var(--e2) var(--e3); min-height: 40px; font-weight: 500; font-size: 13px;
+  white-space: nowrap; cursor: pointer; color: var(--texto-forte); }
+.etapa-do-kanban[aria-selected="true"] { background: var(--surface-brand); border-color: var(--surface-brand); color: var(--branco); }
+.etapa-do-kanban-quantas { font-weight: 600; margin-left: var(--e1); font-variant-numeric: tabular-nums; }
+.kanban-uma-etapa { display: block; overflow: visible; }
+.kanban-uma-etapa .coluna { min-width: 0; max-width: none; max-height: none; background: transparent; }
+.kanban-uma-etapa .coluna-topo { padding: 0 0 var(--e2); border-bottom: 0; }
+.kanban-uma-etapa .coluna-cartoes { padding: 0; overflow: visible; }
+.cartao-com-mover { position: relative; }
+.cartao-com-mover .cartao { cursor: pointer; padding-right: 96px; }
+.cartao-mover { position: absolute; top: var(--e2); right: var(--e2); appearance: none; border: 1px solid var(--borda-forte);
+  background: var(--surface-card); border-radius: var(--raio-sm); min-height: 40px; padding: 0 var(--e3);
+  font-size: 12px; font-weight: 500; cursor: pointer; color: var(--texto-forte); }
+.cartao-mover:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Folha que sobe do pé da tela (Mover para…). z-index acima da cortina dos painéis (40). */
+.folha { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; background: var(--surface-card);
+  border-radius: var(--raio-lg) var(--raio-lg) 0 0; box-shadow: var(--sombra-painel);
+  padding: var(--e5) var(--e4) calc(var(--e5) + env(safe-area-inset-bottom)); max-height: 85dvh; overflow-y: auto; }
+.folha-titulo { font-size: 18px; }
+.folha-subtitulo { margin: 2px 0 var(--e3); font-size: 12px; color: var(--texto-medio); }
+.folha-opcoes { display: flex; flex-direction: column; }
+.folha-opcao { display: flex; justify-content: space-between; align-items: center; gap: var(--e3); appearance: none;
+  background: transparent; border: 0; border-top: 1px solid var(--borda); min-height: 52px; padding: 0 var(--e1);
+  text-align: left; font-weight: 500; cursor: pointer; color: var(--texto-forte); }
+.folha-opcao small { font-size: 12px; font-weight: 400; color: var(--texto-fraco); text-align: right; }
+.folha-opcao:disabled { color: var(--texto-fraco); cursor: default; }
+.folha-cancelar { width: 100%; margin-top: var(--e3); }
+
+/* Indicadores em duas colunas (até 720px): a janela explicativa, que abre no toque (o cartão
+   recebe foco), encosta na borda de dentro, para não sair da tela pela direita. */
+@media (max-width: 720px) {
+  .numeros > .ind:nth-child(n) .ind-janela { left: 0; right: auto; }
+  .numeros > .ind:nth-child(2n) .ind-janela { left: auto; right: 0; }
+}
+
+@media (max-width: 480px) {
+  /* Celular em pé: um filtro por linha, cada um na largura toda. */
+  .filtros > *, .carteira-filtro > * { flex-basis: 100%; min-width: 0; }
+  .carteira-filtro .selecao { width: 100%; }
+  .ia-analise-acao { flex-wrap: wrap; }
+  .retrato-semaforo { grid-column: 1 / -1; } /* os três sinais não cabem em meia largura */
+  .retrato-chip b { font-size: 18px; }
+  .numeros-tres { grid-template-columns: minmax(0, 1fr); }
+  .topo-detalhe { -webkit-line-clamp: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

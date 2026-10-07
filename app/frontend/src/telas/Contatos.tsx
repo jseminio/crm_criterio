@@ -139,7 +139,7 @@ export function Contatos({ listas }: { listas: Listas | null }) {
       )}
 
       {modo === "empresa" && !empresas.erro && (empresas.dados?.total ?? 0) > 0 && (
-        <table className="tabela" aria-label="Empresas">
+        <table className="tabela tabela-em-cartoes" aria-label="Empresas">
           <thead>
             <tr>
               <ThOrdenavel coluna="nome" ordenacao={ordenacaoDeEmpresas} aoAlternar={alternarOrdenacaoDeEmpresas}>
@@ -163,16 +163,16 @@ export function Contatos({ listas }: { listas: Listas | null }) {
               valor: (e) => (tipo === "cliente" ? (e.mensalidade ? Number(e.mensalidade) : null) : e.propostas),
             }).map((e) => (
               <tr key={`${e.grupo_id}-${e.empresa_id ?? "g"}`}>
-                <td>
+                <td className="cartao-titulo">
                   <button type="button" className="link-de-tabela" onClick={() => definirAberto(e)}>{e.razao_social ?? e.grupo_nome}</button>
                   {e.razao_social && e.razao_social !== e.grupo_nome && <span className="numero-nota"> · {e.grupo_nome}</span>}
                   {tipo === "cliente" && !e.recorrente && <span className="etiqueta etiqueta-neutra" style={{ marginLeft: 6 }}>Não recorrente</span>}
                 </td>
-                <td>{formatarCnpj(e.cnpj)}</td>
-                <td>{e.contatos.length ? e.contatos.map((p) => p.nome).join(", ") : "—"}</td>
-                <td><Lacunas itens={e.lacunas} /></td>
-                <td className="tabela-numero">{tipo === "cliente" ? (e.mensalidade ? dinheiro(e.mensalidade) : `${e.propostas} prop.`) : e.propostas}</td>
-                <td><button type="button" className="botao botao-secundario" onClick={() => definirAberto(e)}>Abrir</button></td>
+                <td data-rotulo="CNPJ">{formatarCnpj(e.cnpj)}</td>
+                <td data-rotulo="Contatos">{e.contatos.length ? e.contatos.map((p) => p.nome).join(", ") : "—"}</td>
+                <td data-rotulo="Lacunas"><Lacunas itens={e.lacunas} /></td>
+                <td className="tabela-numero" data-rotulo={tipo === "cliente" ? "Mensalidade" : "Propostas"}>{tipo === "cliente" ? (e.mensalidade ? dinheiro(e.mensalidade) : `${e.propostas} prop.`) : e.propostas}</td>
+                <td className="cartao-acoes"><button type="button" className="botao botao-secundario" onClick={() => definirAberto(e)}>Abrir</button></td>
               </tr>
             ))}
           </tbody>
@@ -180,7 +180,7 @@ export function Contatos({ listas }: { listas: Listas | null }) {
       )}
 
       {modo === "pessoa" && !pessoas.erro && (pessoas.dados?.total ?? 0) > 0 && (
-        <table className="tabela" aria-label="Pessoas">
+        <table className="tabela tabela-em-cartoes" aria-label="Pessoas">
           <thead>
             <tr>
               <ThOrdenavel coluna="nome" ordenacao={ordenacaoDePessoas} aoAlternar={alternarOrdenacaoDePessoas}>Pessoa</ThOrdenavel>
@@ -201,14 +201,14 @@ export function Contatos({ listas }: { listas: Listas | null }) {
               empresa: (p) => empresasDaPessoa(p),
             }).map((p) => (
               <tr key={p.id}>
-                <td>
+                <td className="cartao-titulo">
                   <button type="button" className="link-de-tabela" onClick={() => definirPessoaAberta(p)}><strong>{p.nome}</strong></button>
                   {p.nao_contatar && <span className="etiqueta etiqueta-perda" style={{ marginLeft: 6 }}>Não contatar</span>}
                 </td>
-                <td>{p.cargo ?? "—"}</td>
-                <td>{p.email ?? "—"}</td>
-                <td>{p.telefone ?? "—"}</td>
-                <td>{p.empresas && p.empresas.length > 0 ? empresasDaPessoa(p) : <span className="numero-nota">— Sem empresa</span>}</td>
+                <td data-rotulo="Cargo">{p.cargo ?? "—"}</td>
+                <td data-rotulo="E-mail">{p.email ?? "—"}</td>
+                <td data-rotulo="Telefone">{p.telefone ?? "—"}</td>
+                <td data-rotulo={tipo === "cliente" ? "Empresa" : "Prospect"}>{p.empresas && p.empresas.length > 0 ? empresasDaPessoa(p) : <span className="numero-nota">— Sem empresa</span>}</td>
               </tr>
             ))}
           </tbody>

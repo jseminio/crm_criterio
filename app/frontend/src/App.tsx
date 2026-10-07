@@ -1,6 +1,6 @@
 /** O CRM da Critério: navegação, cabeçalho e as quatro telas do E3. */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./tokens.css";
 import "./app.css";
 import { api } from "./api/cliente";
@@ -83,17 +83,32 @@ export default function App() {
   );
   const [escolhida, definirTela] = useState<Tela>("funil");
   const [trocandoSenha, definirTrocandoSenha] = useState(false);
+  // Celular (06/10/2026): o menu lateral vira gaveta, aberta pelo ☰ da faixa do título. No computador
+  // a gaveta não existe — o CSS mantém o menu fixo à esquerda e esconde o ☰.
+  const [menuAberto, definirMenuAberto] = useState(false);
   // Atalho de outra tela para uma aba (a Agenda abre os contratos): a aba pedida e uma chave para reabrir.
   const [abaDoSucesso, definirAbaDoSucesso] = useState<{ aba: AbaDoSucesso; vez: number } | null>(null);
   const tela = visiveis.some((t) => t.chave === escolhida) ? escolhida : (visiveis[0]?.chave ?? escolhida);
   const { dados: listas } = usarDados<Listas>(() => api.listas(), []);
   const atual = TELAS.find((t) => t.chave === tela)!;
 
+  useEffect(() => {
+    if (!menuAberto) return;
+    // Esc fecha: quem abriu com teclado precisa sair com teclado.
+    const aoTeclar = (evento: KeyboardEvent) => {
+      if (evento.key === "Escape") definirMenuAberto(false);
+    };
+    window.addEventListener("keydown", aoTeclar);
+    return () => window.removeEventListener("keydown", aoTeclar);
+  }, [menuAberto]);
+
   return (
     <div className="aplicacao">
-      <nav className="lateral" aria-label="Navegação principal">
+      {menuAberto && <div className="cortina-do-menu" onClick={() => definirMenuAberto(false)} aria-hidden="true" />}
+      <nav id="navegacao-principal" className={`lateral ${menuAberto ? "lateral-aberta" : ""}`} aria-label="Navegação principal">
         {/* Regra 8 do PAD-002: a logomarca aparece sozinha. Sem o arquivo
-            oficial, o nome é composto — nunca redesenhado. */}
+            oficial, o nome é composto — nunca redesenhado. O ✕ da gaveta fica
+            no rodapé do menu, longe da marca. */}
         <div className="marca">
           Critério
           <span className="marca-linha2">CRM</span>
@@ -107,7 +122,10 @@ export default function App() {
               type="button"
               className="menu-item"
               aria-current={tela === t.chave ? "page" : undefined}
-              onClick={() => definirTela(t.chave)}
+              onClick={() => {
+                definirTela(t.chave);
+                definirMenuAberto(false);
+              }}
             >
               {t.rotulo}
             </button>
@@ -120,7 +138,10 @@ export default function App() {
             <span>Perfil: {eu.perfil}</span>
             <div className="quem-entrou-acoes">
               {eu.modo === "senha" && (
-                <button type="button" className="quem-entrou-sair" onClick={() => definirTrocandoSenha(true)}>Trocar senha</button>
+                <button type="button" className="quem-entrou-sair" onClick={() => {
+                  definirTrocandoSenha(true);
+                  definirMenuAberto(false);
+                }}>Trocar senha</button>
               )}
               <button type="button" className="quem-entrou-sair" onClick={sair}>Sair</button>
             </div>
@@ -131,11 +152,24 @@ export default function App() {
             existir.
           </p>
         )}
+        <button type="button" className="fechar-menu" onClick={() => definirMenuAberto(false)}>
+          Fechar menu
+        </button>
       </nav>
       {trocandoSenha && <TrocarSenha aoFechar={() => definirTrocandoSenha(false)} />}
 
       <div className="conteudo">
         <header className="topo">
+          <button
+            type="button"
+            className="botao-menu"
+            aria-label="Abrir menu"
+            aria-expanded={menuAberto}
+            aria-controls="navegacao-principal"
+            onClick={() => definirMenuAberto(true)}
+          >
+            ☰
+          </button>
           <h1>{atual.titulo}</h1>
           <p className="topo-detalhe">{atual.descricao}</p>
         </header>

@@ -16,6 +16,29 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## CRM no celular e no tablet (06/10/2026)
+
+O CRM se adapta a qualquer celular e tablet, com todas as funcionalidades. Amostra aprovada por
+Eduardo em 06/10/2026. **Acima de 1024px nada muda.** As regras ficam num bloco só, no fim do
+`frontend/src/app.css` ("celular").
+
+- **Até 1024px (tablet e celular):** o menu lateral vira gaveta, aberta pelo ☰ da faixa do título;
+  fecha ao escolher a tela, pelo botão "Fechar menu", pelo Esc ou tocando fora. Tabelas rolam de
+  lado dentro de si, com a primeira coluna presa. Abas numa linha só, rolando de lado. Campos com
+  16px (o iPhone não dá zoom ao tocar no campo).
+- **Até 768px (celular):** Leads, Contatos (Empresas e Pessoas) e o Funil do Sucesso viram cartões,
+  com o rótulo da coluna em cada valor (`data-rotulo` na célula, classe `tabela-em-cartoes` na
+  tabela); a ordenação vira a fileira "Ordenar por"; as ações da linha vêm no pé do cartão.
+  Formulários em uma coluna. O Kanban mostra uma etapa por vez, escolhida nas abas do alto.
+- **Tela de toque, qualquer largura:** alvos de 44px e, no Kanban, o botão "Mover ▸" de cada
+  cartão no lugar do arrasto. Ele abre a folha "Mover para…" e chama o mesmo `mover()` do arrasto:
+  Aceita abre a ficha para a data do aceite; a etapa atual fica desabilitada.
+- **Código:** `usarTelaEstreita()` e `usarToque()` (`frontend/src/usarTelaEstreita.ts`) para o que o
+  CSS não resolve sozinho; sem `matchMedia` (testes) respondem "não", e a tela de computador segue
+  como padrão. Tela nova com tabela de uso diário no celular: classe `tabela-em-cartoes` e
+  `data-rotulo` em cada célula.
+- **Conferido** em 320, 375 e 820px, em todas as telas e abas, sem nada estourando a largura.
+
 ## Disparo do lembrete e do agradecimento do questionário (06/10/2026)
 
 O CRM mesmo envia o lembrete e o agradecimento do questionário (seção abaixo), sem chamar a IA: o

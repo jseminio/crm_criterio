@@ -1169,6 +1169,9 @@ def _registrar(api: FastAPI) -> None:
             mudancas.pop("nome", None)
         else:
             mudancas["nome"] = " ".join(mudancas["nome"].split())
+        for campo in ("captador", "canal"):
+            if campo in mudancas:
+                mudancas[campo] = (mudancas[campo] or "").strip() or None
         # Trocar a empresa leva o grupo junto; quem já virou contrato não troca
         # (o contrato ficaria noutra empresa). Karine, 01/10/2026.
         if "empresa_id" in mudancas:

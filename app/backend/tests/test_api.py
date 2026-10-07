@@ -246,6 +246,23 @@ class TestEdicao:
         oportunidade = sessao.get(Oportunidade, carteira["primeira"])
         assert {"preco_mensal", "servico"} <= set(oportunidade.campos_do_crm)
 
+    def test_edita_captador_e_origem(self, cliente: TestClient, carteira, sessao: Session):
+        """Captador, tipo de canal e canal editáveis no painel (Karine, 07/10/2026), com a mesma trava."""
+        resposta = cliente.patch(
+            f"/api/oportunidades/{carteira['primeira']}",
+            json={"captador": " BO ", "tipo_canal": "Parceiros", "canal": " Guto "},
+        )
+
+        assert resposta.status_code == 200
+        detalhe = cliente.get(f"/api/oportunidades/{carteira['primeira']}").json()
+        assert (detalhe["captador"], detalhe["tipo_canal"], detalhe["canal"]) == ("BO", "Parceiros", "Guto")
+        oportunidade = sessao.get(Oportunidade, carteira["primeira"])
+        assert {"captador", "tipo_canal", "canal"} <= set(oportunidade.campos_do_crm)
+
+        # Apagar o canal vale: vazio vira nulo.
+        cliente.patch(f"/api/oportunidades/{carteira['primeira']}", json={"canal": "  "})
+        assert cliente.get(f"/api/oportunidades/{carteira['primeira']}").json()["canal"] is None
+
     def test_oportunidade_inexistente_da_404(self, cliente: TestClient, carteira):
         assert cliente.patch("/api/oportunidades/9999", json={}).status_code == 404
 

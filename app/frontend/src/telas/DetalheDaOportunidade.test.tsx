@@ -189,6 +189,25 @@ describe("DetalheDaOportunidade", () => {
     expect(aoSalvar).toHaveBeenCalledOnce();
   });
 
+  it("captador, tipo de canal e canal são editáveis no painel (07/10/2026)", async () => {
+    vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
+    // O captador gravado (EL) não está na lista: continua aparecendo e selecionado.
+    const listas = { ...LISTAS, captadores: ["BO"], tipos_de_canal: ["Sócios", "Parceiros"] };
+    vi.mocked(api.oportunidade).mockResolvedValue(oportunidade());
+    render(<DetalheDaOportunidade id={1} listas={listas} aoFechar={() => {}} aoSalvar={vi.fn()} />);
+    await screen.findByLabelText("Situação");
+
+    expect(screen.getByLabelText("Captador")).toHaveValue("EL");
+    await userEvent.selectOptions(screen.getByLabelText("Captador"), "BO");
+    await userEvent.selectOptions(screen.getByLabelText("Tipo de canal"), "Parceiros");
+    await userEvent.type(screen.getByLabelText("Canal"), "Guto");
+    await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+
+    await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledOnce());
+    const [, mudancas] = vi.mocked(api.editarOportunidade).mock.calls[0];
+    expect([mudancas.captador, mudancas.tipo_canal, mudancas.canal]).toEqual(["BO", "Parceiros", "Guto"]);
+  });
+
   it("mostra o erro da API sem fechar o painel, e permite tentar salvar de novo", async () => {
     vi.mocked(api.editarOportunidade).mockRejectedValue(new Error("Falha ao salvar."));
     const aoSalvar = await abrir(oportunidade());

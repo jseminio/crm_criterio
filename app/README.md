@@ -2019,8 +2019,9 @@ aconteceria. É o padrão de propósito.
 
 ### Quando o CRM e a planilha discordam
 
-Com os dois rodando em paralelo, situação, temperatura, motivo de recusa e data
-do aceite são editáveis **nos dois lados**. A regra: **quem editou no CRM tem a
+Com os dois rodando em paralelo, situação, temperatura, motivo de recusa, data
+do aceite, captador, tipo de canal e canal são editáveis **nos dois lados** (os três
+últimos no painel desde 07/10/2026, pedido de Karine). A regra: **quem editou no CRM tem a
 última palavra sobre aquele campo.** Cada oportunidade lembra quais campos foram
 mudados na tela (`campos_do_crm`), e a recarga não os sobrescreve. Se a planilha
 discordar, a divergência vira uma pendência em **Conferência**, com os dois

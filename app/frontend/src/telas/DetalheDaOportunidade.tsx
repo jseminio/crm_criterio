@@ -8,7 +8,6 @@ import type {
 } from "../api/tipos";
 import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { DIRECIONADORES_DE_PORTE } from "../componentes/direcionadoresDePorte";
-import { Etiqueta } from "../componentes/Etiqueta";
 import { FichaDaOportunidade } from "../componentes/FichaDaOportunidade";
 import { ListaDoQueFalta } from "../componentes/ListaDoQueFalta";
 import { PropostaDaOportunidade } from "../componentes/PropostaDaOportunidade";
@@ -331,6 +330,9 @@ export function DetalheDaOportunidade({
           empresa_id: d.empresa_id?.toString() ?? "",
           situacao: situacaoInicial ?? d.situacao,
           temperatura: d.temperatura ?? "",
+          captador: d.captador ?? "",
+          tipo_canal: d.tipo_canal ?? "",
+          canal: d.canal ?? "",
           motivo_recusa: d.motivo_recusa ?? "",
           data_aceite: d.data_aceite ?? "",
           proxima_acao: d.proxima_acao ?? "",
@@ -830,8 +832,62 @@ export function DetalheDaOportunidade({
               </div>
             </div>
 
+            {/* Captador e origem editáveis aqui desde 07/10/2026 (Karine); antes só a planilha mudava. */}
+            <div className="formulario-duplo">
+              <div className="campo-bloco">
+                <label className="campo-rotulo" htmlFor="d-captador">
+                  Captador
+                </label>
+                <select
+                  id="d-captador"
+                  className="selecao"
+                  value={rascunho.captador}
+                  onChange={(e) => mudar("captador", e.target.value)}
+                >
+                  <option value="">Não informado</option>
+                  {/* O captador gravado pode não estar mais na lista: continua aparecendo. */}
+                  {[...(listas?.captadores ?? []), ...(rascunho.captador && !listas?.captadores.includes(rascunho.captador) ? [rascunho.captador] : [])].map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="campo-bloco">
+                <label className="campo-rotulo" htmlFor="d-tipo-canal">
+                  Tipo de canal
+                </label>
+                <select
+                  id="d-tipo-canal"
+                  className="selecao"
+                  value={rascunho.tipo_canal}
+                  onChange={(e) => mudar("tipo_canal", e.target.value)}
+                >
+                  <option value="">Não informado</option>
+                  {listas?.tipos_de_canal.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="campo-bloco">
+              <label className="campo-rotulo" htmlFor="d-canal">
+                Canal
+              </label>
+              <input
+                id="d-canal"
+                className="entrada"
+                placeholder="Nome de quem indicou"
+                value={rascunho.canal}
+                onChange={(e) => mudar("canal", e.target.value)}
+              />
+            </div>
+
             <p className="campo-ajuda" style={{ margin: 0 }}>
-              O que você mudar em situação, temperatura, motivo e data do aceite{" "}
+              O que você mudar em situação, temperatura, motivo, data do aceite, captador e origem{" "}
               <strong>a recarga da planilha não sobrescreve</strong>. Se a planilha
               discordar, a divergência aparece na tela Conferência para você decidir.
             </p>
@@ -850,21 +906,12 @@ export function DetalheDaOportunidade({
             </div>
           </div>
 
-          <div>
-            <h3 style={{ fontSize: 14, marginBottom: "var(--e2)" }}>Vem da planilha</h3>
-            <div className="recado">
-              Enquanto a planilha roda em paralelo, <strong>ela é a fonte destes campos</strong>.
-              Editá-los nos dois lugares criaria divergência.
-            </div>
-            <Par rotulo="Captador">{detalhe.captador ?? "—"}</Par>
-            <Par rotulo="Origem">
-              <Etiqueta texto={detalhe.tipo_canal} tipo="neutra" />{" "}
-              {detalhe.canal && <span>{detalhe.canal}</span>}
-            </Par>
-            {detalhe.linha_planilha && (
+          {detalhe.linha_planilha && (
+            <div>
+              <h3 style={{ fontSize: 14, marginBottom: "var(--e2)" }}>Vem da planilha</h3>
               <Par rotulo="Linha na planilha">{detalhe.linha_planilha}</Par>
-            )}
-          </div>
+            </div>
+          )}
           </>
           )}
 

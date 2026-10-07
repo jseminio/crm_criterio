@@ -1259,13 +1259,14 @@ td > .celula-fonte { display: block; }
 .campo-erro { font-size: 12px; font-weight: 500; color: var(--perda); }
 
 /* ================================================================== celular
-   CRM responsivo (06/10/2026, amostra aprovada por Eduardo). Acima de 768px nada muda: estas regras
-   só valem no celular e no tablet pequeno. Larguras: 768px (celular deitado, tablet pequeno) e 480px
-   (celular em pé). Quem tocar no layout de uma tela confere aqui se ela tem regra de celular. */
+   CRM responsivo (06/10/2026, amostra aprovada por Eduardo). Acima de 1024px nada muda. Larguras:
+   1024px (tablet: menu em gaveta, tabelas roláveis), 768px (celular deitado: listas em cartões,
+   formulários em uma coluna, kanban de uma etapa) e 480px (celular em pé: um filtro por linha).
+   Quem tocar no layout de uma tela confere aqui se ela tem regra de celular. */
 
 .botao-menu, .fechar-menu, .cortina-do-menu { display: none; }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   /* Esqueleto: uma coluna; o menu vira gaveta por cima da tela. */
   .aplicacao { grid-template-columns: minmax(0, 1fr); }
   .lateral {
@@ -1301,23 +1302,18 @@ td > .celula-fonte { display: block; }
   .aba { min-height: 44px; }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   /* Campos com 16px: abaixo disso o iPhone dá zoom na tela ao tocar no campo. */
   .entrada, .selecao, textarea, input:not([type="checkbox"]):not([type="radio"]), select { font-size: 16px; }
-  .entrada-busca, .base-busca, .plano-ajuste { min-width: 0; width: 100%; }
-  .filtros > * { flex: 1 1 140px; min-width: 0; }
-  .filtros .entrada, .filtros .selecao { width: 100%; }
   .esqueleto-linhas { width: min(260px, 100%); }
-
-  /* Grades de duas ou mais colunas passam a uma. */
-  .formulario-duplo, .sdr-dupla, .catalogo-temas, .proposta-grade-fixa { grid-template-columns: minmax(0, 1fr); }
-  .abas-avaliacao { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* Grade sem colunas declaradas ganha uma coluna implícita do tamanho do maior conteúdo — uma
      fileira de abas ou uma tabela larga empurrava a tela inteira para fora. Aqui a coluna implícita
      cabe na largura disponível (:where não pesa: quem declara grid-auto-columns continua valendo). */
   .area :where(*) { grid-auto-columns: minmax(0, 1fr); }
-  /* Abas numa linha só, rolando de lado. */
-  .abas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  /* Abas numa linha só, rolando de lado. flex-shrink 0: dentro de uma coluna flexível (painel), uma
+     caixa que rola encolhia até cortar as abas. A grade de avaliação (8 abas em fileiras) não rola. */
+  .abas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; }
+  .abas-avaliacao { overflow: visible; }
   .aba { white-space: nowrap; flex: none; }
 
   /* Alturas pela tela visível (dvh): no celular a barra do navegador come parte do 100vh. */
@@ -1338,6 +1334,16 @@ td > .celula-fonte { display: block; }
   .tabela :where(th:first-child, td:first-child) { position: sticky; left: 0; z-index: 1; }
   .tabela :where(td:first-child) { background: var(--surface-card); }
   .tabela :where(th:first-child) { background: var(--surface-sunken); }
+}
+
+@media (max-width: 768px) {
+  .entrada-busca, .base-busca, .plano-ajuste { min-width: 0; width: 100%; }
+  .filtros > * { flex: 1 1 140px; min-width: 0; }
+  .filtros .entrada, .filtros .selecao { width: 100%; }
+
+  /* Grades de duas ou mais colunas passam a uma. */
+  .formulario-duplo, .sdr-dupla, .catalogo-temas, .proposta-grade-fixa { grid-template-columns: minmax(0, 1fr); }
+  .abas-avaliacao { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   /* Listas de uso diário (Leads, Contatos, Funil do Sucesso): cada linha vira um cartão, com o
      rótulo da coluna ao lado do valor (data-rotulo). Nenhuma ação some: a célula de ações vem
@@ -1355,9 +1361,9 @@ td > .celula-fonte { display: block; }
   .tabela-em-cartoes tbody { display: grid; gap: var(--e2); }
   .tabela-em-cartoes tbody tr { display: grid; gap: 6px; background: var(--surface-card); border: 1px solid var(--borda);
     border-radius: var(--raio-sm); padding: var(--e3); }
-  .tabela-em-cartoes td { display: flex; justify-content: space-between; align-items: baseline; gap: var(--e3);
+  .tabela-em-cartoes td { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; gap: var(--e1);
     position: static; padding: 0; border: 0; background: none; text-align: right; font-size: 13px; overflow-wrap: anywhere; }
-  .tabela-em-cartoes td::before { content: attr(data-rotulo); flex: none; max-width: 45%; text-align: left;
+  .tabela-em-cartoes td::before { content: attr(data-rotulo); flex: none; max-width: 45%; text-align: left; margin-right: auto;
     font-size: 12px; color: var(--texto-fraco); }
   .tabela-em-cartoes td:empty { display: none; }
   .tabela-em-cartoes .cartao-titulo { justify-content: flex-start; flex-wrap: wrap; text-align: left; font-weight: 600; font-size: 14px; }
@@ -1400,9 +1406,20 @@ td > .celula-fonte { display: block; }
 .folha-opcao:disabled { color: var(--texto-fraco); cursor: default; }
 .folha-cancelar { width: 100%; margin-top: var(--e3); }
 
+/* Indicadores em duas colunas (até 720px): a janela explicativa, que abre no toque (o cartão
+   recebe foco), encosta na borda de dentro, para não sair da tela pela direita. */
+@media (max-width: 720px) {
+  .numeros > .ind:nth-child(n) .ind-janela { left: 0; right: auto; }
+  .numeros > .ind:nth-child(2n) .ind-janela { left: auto; right: 0; }
+}
+
 @media (max-width: 480px) {
   /* Celular em pé: um filtro por linha, cada um na largura toda. */
-  .filtros > * { flex-basis: 100%; }
+  .filtros > *, .carteira-filtro > * { flex-basis: 100%; min-width: 0; }
+  .carteira-filtro .selecao { width: 100%; }
+  .ia-analise-acao { flex-wrap: wrap; }
+  .retrato-semaforo { grid-column: 1 / -1; } /* os três sinais não cabem em meia largura */
+  .retrato-chip b { font-size: 18px; }
   .numeros-tres { grid-template-columns: minmax(0, 1fr); }
   .topo-detalhe { -webkit-line-clamp: 1; }
 }

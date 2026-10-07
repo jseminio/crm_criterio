@@ -5,7 +5,8 @@
  * filtro "Situação" só faz sentido na Grade (no Kanban, todas as situações já ficam visíveis juntas).
  *
  * Celular (06/10/2026, amostra aprovada): o Kanban mostra uma etapa por vez, escolhida nas abas do
- * alto, e o arrasto dá lugar ao botão "Mover ▸" de cada cartão, que leva ao mesmo `mover()`.
+ * alto. Em tela de toque (celular ou tablet) o arrasto dá lugar ao botão "Mover ▸" de cada cartão,
+ * que leva ao mesmo `mover()`.
  */
 
 import { useState } from "react";
@@ -32,7 +33,7 @@ import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
 import { usarAcesso } from "../entrada";
 import { FolhaMoverPara } from "../componentes/FolhaMoverPara";
-import { usarTelaEstreita } from "../usarTelaEstreita";
+import { usarTelaEstreita, usarToque } from "../usarTelaEstreita";
 
 type Visao = "kanban" | "grade";
 
@@ -119,6 +120,8 @@ export function Funil({ listas }: { listas: Listas | null }) {
   const [movendo, definirMovendo] = useState<number | null>(null);
   const [erroDeMovimento, definirErroDeMovimento] = useState<string | null>(null);
   const estreita = usarTelaEstreita();
+  // Tela de toque (celular ou tablet): "Mover ▸" no lugar do arrasto, que o toque não faz direito.
+  const semArrasto = estreita || usarToque();
   // Celular: a etapa à vista no Kanban (null = a primeira) e o cartão com a folha "Mover para…" aberta.
   const [etapaVisivel, definirEtapaVisivel] = useState<string | null>(null);
   const [movendoPelaFolha, definirMovendoPelaFolha] = useState<{ oportunidade: OportunidadeResumo; etapa: string } | null>(null);
@@ -401,7 +404,7 @@ export function Funil({ listas }: { listas: Listas | null }) {
                       definirArrastando(null);
                       definirColunaAlvo(null);
                     }}
-                    aoMover={estreita ? () => definirMovendoPelaFolha({ oportunidade: o, etapa: coluna.situacao }) : undefined}
+                    aoMover={semArrasto ? () => definirMovendoPelaFolha({ oportunidade: o, etapa: coluna.situacao }) : undefined}
                   />
                 ))}
                 {coluna.quantas === 0 && (

@@ -87,9 +87,11 @@ def test_o_laco_busca_ja_e_de_novo_depois_do_intervalo(engine):
 def test_o_crm_liga_a_busca_ao_subir_e_o_painel_mostra(engine):
     fonte = FonteFalsa([linha()])
     with TestClient(criar_app(_fabrica(engine), fonte_de_questionarios=lambda: fonte, busca_automatica=True)) as c:
-        for _ in range(50):  # a primeira busca roda em segundo plano, logo ao subir
-            if fonte.marcados:
-                break
+        # A primeira busca roda em segundo plano, logo ao subir: espera até 10 s, como o teste do laço
+        # (antes, 2,5 s; não basta em máquina carregada).
+        prazo = time.monotonic() + 10.0
+        while not (fonte.marcados and c.get("/api/questionarios/busca").json()["ultima_em"]):
+            assert time.monotonic() < prazo, "a busca não aconteceu dentro do limite"
             time.sleep(0.05)
         r = c.get("/api/questionarios/busca").json()
         assert (r["automatica"], r["intervalo_minutos"], r["novos"], r["erro"]) == (True, 10, 1, None)

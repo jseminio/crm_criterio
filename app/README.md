@@ -39,6 +39,36 @@ Eduardo em 06/10/2026. **Acima de 1024px nada muda.** As regras ficam num bloco 
   `data-rotulo` em cada célula.
 - **Conferido** em 320, 375 e 820px, em todas as telas e abas, sem nada estourando a largura.
 
+## Configurações › Integrações: chaves e testes pela tela (07/10/2026)
+
+Decisão de Eduardo: **nada de configuração manual no painel do servidor (Coolify)**. A chave de IA, o
+WhatsApp, o e-mail do Microsoft 365, o questionário e o disparo se cadastram, trocam e testam na aba
+**Configurações › Integrações** (amostra aprovada em 07/10/2026; permissão `configuracoes.integracoes`).
+
+- **Vale a tela.** Para cada campo: o que está salvo na tela; sem valor na tela, a variável de ambiente
+  antiga; depois o padrão (`crm.configuracao`). A tela mostra de onde vem cada valor. Trocar vale na
+  hora, sem reiniciar.
+- **Redeploy preenche a tela sozinho.** A tarefa `2026_10_07_configuracao_para_a_tela` do atualizador
+  copia, uma vez, o que está nas variáveis do Coolify para a tela. As variáveis podem ficar lá: a tela
+  vence. O que não estava no Coolify, a pessoa cola na tela.
+- **Segredo cifrado e mascarado.** Fernet, com a chave derivada de `CRM_SEGREDO_SESSAO` (na máquina
+  sem login, um arquivo `.chave_da_configuracao` ao lado do `.env`, fora do Git). O segredo nunca volta
+  para o navegador: só os 4 últimos caracteres. Trocar `CRM_SEGREDO_SESSAO` deixa as chaves salvas
+  ilegíveis; a tela avisa "cadastre de novo".
+- **Testes pela tela.** "Testar conexão" verifica sem gravar nem enviar nada (IA: uma chamada mínima;
+  WhatsApp: a Meta diz qual é o número; e-mail: o Microsoft 365 aceita as credenciais; questionário:
+  quantos estão esperando no site). "Enviar teste" manda uma mensagem real só para o número ou e-mail
+  digitado.
+- **Só no ambiente** fica o que a API precisa para subir: banco, segredo das sessões e conta do primeiro
+  administrador.
+- **Anthropic ou OpenAI, ou as duas** (pedido de Eduardo, 07/10/2026). No cartão de IA escolhe-se a
+  **principal** e, se quiser, a **reserva**, que entra quando a principal falha ou recusa. A OpenAI
+  entra pela API (não o ChatGPT), com um adaptador (`crm.agente.ia`) que traduz para a Responses API:
+  o agente SDR (com pesquisa na web), a ata e a análise da carteira funcionam com qualquer das duas.
+  Modelo padrão da OpenAI: `gpt-6.1-sol`. O custo de cada chamada sai pelo preço do modelo que de
+  fato respondeu (tabela da OpenAI consultada em 07/10/2026). O ensaio do SDR (`scripts/ensaio_sdr.py`)
+  segue só com a Anthropic.
+
 ## Disparo do lembrete e do agradecimento do questionário (06/10/2026)
 
 O CRM mesmo envia o lembrete e o agradecimento do questionário (seção abaixo), sem chamar a IA: o

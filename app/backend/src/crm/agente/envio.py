@@ -11,7 +11,7 @@ import httpx2 as httpx
 
 from crm.agente.config import ConfiguracaoDoEmail
 
-__all__ = ["EnvioFalhou", "enviar_email"]
+__all__ = ["EnvioFalhou", "enviar_email", "conferir_credenciais"]
 
 _TOKEN = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
 _ENVIO = "https://graph.microsoft.com/v1.0/users/{remetente}/sendMail"
@@ -44,7 +44,7 @@ def enviar_email(
         if token.status_code != 200:
             raise EnvioFalhou(
                 f"O Microsoft 365 recusou as credenciais do app (HTTP {token.status_code}). "
-                "Confira CRM_M365_* no .env."
+                "Confira o e-mail em Configurações › Integrações."
             )
         resposta = cliente.post(
             _ENVIO.format(remetente=config.remetente),
@@ -62,6 +62,31 @@ def enviar_email(
             raise EnvioFalhou(
                 f"O Microsoft 365 não enviou o e-mail (HTTP {resposta.status_code}). "
                 "Confira a permissão Mail.Send do app."
+            )
+    except httpx.HTTPError as falha:
+        raise EnvioFalhou(f"Não consegui falar com o Microsoft 365: {type(falha).__name__}.") from falha
+    finally:
+        if http is None:
+            cliente.close()
+
+
+def conferir_credenciais(config: ConfiguracaoDoEmail, *, http: httpx.Client | None = None) -> None:
+    """O teste da tela: pede o token ao Microsoft 365, sem enviar nada. Levanta `EnvioFalhou` se recusar."""
+    cliente = http or httpx.Client(timeout=30.0)
+    try:
+        token = cliente.post(
+            _TOKEN.format(tenant=config.tenant),
+            data={
+                "grant_type": "client_credentials",
+                "client_id": config.cliente,
+                "client_secret": config.segredo,
+                "scope": "https://graph.microsoft.com/.default",
+            },
+        )
+        if token.status_code != 200:
+            raise EnvioFalhou(
+                f"O Microsoft 365 recusou as credenciais do app (HTTP {token.status_code}). "
+                "Confira o e-mail em Configurações › Integrações."
             )
     except httpx.HTTPError as falha:
         raise EnvioFalhou(f"Não consegui falar com o Microsoft 365: {type(falha).__name__}.") from falha

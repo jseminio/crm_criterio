@@ -86,6 +86,8 @@ import type {
   Metas,
   AjusteTecnico,
   CadenciaDeReunioes,
+  Integracoes,
+  ResultadoDoTeste,
   EstadoDaBusca,
   FunilDoSucesso,
   RascunhoDaAta,
@@ -678,6 +680,14 @@ export const api = {
     pedir<FichaDaBase>(`/api/sdr/base/fichas/${id}/aprovar`, { method: "POST", body: JSON.stringify({ aprovador }) }),
   cargaInicialDaBase: () =>
     pedir<{ acrescentadas: number; ja_existiam: number }>("/api/sdr/base/carga-inicial", { method: "POST" }),
+  // Configurações › Integrações (07/10/2026)
+  integracoes: () => pedir<Integracoes>("/api/configuracoes/integracoes"),
+  salvarIntegracao: (chave: string, mudanca: { valores?: Record<string, string>; apagar?: string[] }) =>
+    pedir<Integracoes>(`/api/configuracoes/integracoes/${chave}`, { method: "PUT", body: JSON.stringify(mudanca) }),
+  testarIntegracao: (chave: string) =>
+    pedir<ResultadoDoTeste>(`/api/configuracoes/integracoes/${chave}/testar`, { method: "POST" }),
+  enviarTesteDeIntegracao: (chave: string, para: string) =>
+    pedir<ResultadoDoTeste>(`/api/configuracoes/integracoes/${chave}/enviar-teste`, { method: "POST", body: JSON.stringify({ para }) }),
   cadenciaDeReunioes: () => pedir<CadenciaDeReunioes>("/api/sucesso/cadencia"),
   mudarCadenciaDeReunioes: (mudanca: { cadencia?: Record<string, string[]>; intencao?: Record<string, string> }) =>
     pedir<CadenciaDeReunioes>("/api/sucesso/cadencia", { method: "PUT", body: JSON.stringify(mudanca) }),

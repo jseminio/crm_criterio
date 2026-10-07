@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+.chave_da_configuracao
 
 # Dependências e artefatos
 node_modules/

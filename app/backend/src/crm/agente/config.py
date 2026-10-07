@@ -1,7 +1,8 @@
-"""Configuração do agente SDR e do envio, lida do `.env` do backend.
+"""Configuração do agente SDR e do envio.
 
-Segredo só no `.env` (regra do projeto). Este módulo lê as variáveis e não
-guarda, não imprime e não devolve em mensagem de erro nenhum valor.
+Desde 07/10/2026 vale primeiro o que está na tela Configurações › Integrações (cifrado no banco,
+`crm.configuracao`); sem valor na tela, a variável de ambiente antiga (`.env` ou painel do servidor).
+Este módulo não guarda, não imprime e não devolve em mensagem de erro nenhum valor.
 """
 
 from __future__ import annotations
@@ -9,7 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from crm.agente.sdr import MODELO_PADRAO
-from crm.db.sessao import ler_ambiente
+from crm import configuracao
+from crm.configuracao import ambiente_efetivo
 
 __all__ = ["ConfiguracaoDoAgente", "ConfiguracaoDoEmail", "ConfiguracaoDoWhatsapp", "VERSAO_DO_WHATSAPP", "LINK_DO_QUESTIONARIO_PADRAO", "VARIAVEIS", "ler_configuracao"]
 
@@ -64,6 +66,11 @@ class ConfiguracaoDoAgente:
     email: ConfiguracaoDoEmail | None
     link_do_questionario: str = LINK_DO_QUESTIONARIO_PADRAO
     whatsapp: ConfiguracaoDoWhatsapp | None = None
+    openai_chave: str | None = None
+    openai_modelo: str = "gpt-6.1-sol"
+    ia_principal: str = "Anthropic"
+    """"Anthropic" ou "OpenAI" (tela de Integrações, 07/10/2026)."""
+    ia_reserva: str = "Nenhuma"
     disparo_ligado: bool = False
     """O disparo automático do lembrete e do agradecimento do questionário. Desligado por padrão:
     liga com `CRM_DISPARO_DO_QUESTIONARIO=true`, depois de os modelos da Meta estarem aprovados."""
@@ -73,7 +80,7 @@ class ConfiguracaoDoAgente:
 
 
 def ler_configuracao() -> ConfiguracaoDoAgente:
-    valores = ler_ambiente()
+    valores = ambiente_efetivo()  # a tela vale mais que a variável de ambiente (07/10/2026)
     partes_do_email = [valores.get(VARIAVEIS[k]) for k in ("tenant", "cliente", "segredo", "remetente")]
     email = ConfiguracaoDoEmail(*partes_do_email) if all(partes_do_email) else None
     token, numero = (valores.get(VARIAVEIS[k]) for k in ("whatsapp_token", "whatsapp_numero"))
@@ -87,4 +94,9 @@ def ler_configuracao() -> ConfiguracaoDoAgente:
         link_do_questionario=(valores.get(VARIAVEIS["questionario"]) or "").strip() or LINK_DO_QUESTIONARIO_PADRAO,
         whatsapp=whatsapp,
         disparo_ligado=(valores.get(VARIAVEIS["disparo"]) or "").strip().casefold() in ("true", "1", "sim"),
+        # Só existem na tela (07/10/2026): não há variável de ambiente para a OpenAI.
+        openai_chave=configuracao.valor("openai.chave") or None,
+        openai_modelo=configuracao.valor("openai.modelo"),
+        ia_principal=configuracao.valor("ia.principal"),
+        ia_reserva=configuracao.valor("ia.reserva"),
     )

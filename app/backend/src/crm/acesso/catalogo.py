@@ -47,6 +47,7 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     ("configuracoes", "Configurações", (
         ("propostas", "matrizes e numeração das propostas"), ("backup", "backup"),
         ("perfis", "perfis e acesso"), ("historico", "histórico de alterações"), ("metas", "metas dos indicadores"),
+        ("integracoes", "integrações: chaves, testes e envio de teste"),
     )),
 )
 PERMISSOES: frozenset[str] = frozenset(f"{m}.{f}" for m, _, fs in MENUS for f, _ in fs)
@@ -76,6 +77,7 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/servicos(/pedidos)?", _TODOS),
     # acesso e histórico
     ("GET", r"/api/acesso/catalogo", ("configuracoes.perfis",)),
+    ("GET|PUT|POST", r"/api/configuracoes/integracoes(/[a-z]+(/(testar|enviar-teste))?)?", ("configuracoes.integracoes",)),
     ("GET|POST|PATCH", r"/api/acesso/(perfis|usuarios)(/\d+)?", ("configuracoes.perfis",)),
     ("POST", r"/api/acesso/usuarios/\d+/senha", ("configuracoes.perfis",)),  # redefinir a senha de alguém
     ("POST", r"/api/acesso/senha", _TODOS),  # trocar a própria senha

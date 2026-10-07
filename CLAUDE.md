@@ -55,7 +55,10 @@ Checklist de todo PR estrutural:
 - [ ] **Dado** (corrigir, preencher, mover linhas em banco que já existe): uma `Tarefa` no fim de
       `app/backend/src/crm/manutencao/registro.py`, com id `AAAA_MM_DD_assunto`, sem commit próprio e
       com teste. Roda uma vez no Redeploy e fica registrada em `manutencao_aplicada`.
-- [ ] **Variável de ambiente nova:** no catálogo `app/backend/src/crm/config.py` com padrão seguro
+- [ ] **Configuração de integração nova** (chave, token, endereço, liga/desliga): campo na tela
+      Configurações › Integrações (`app/backend/src/crm/configuracao/catalogo.py`), com teste pela tela.
+      Eduardo não configura nada à mão no painel do servidor (07/10/2026).
+- [ ] **Variável de ambiente nova** (só o que a API precisa para subir): no catálogo `app/backend/src/crm/config.py` com padrão seguro
       (opcional, salvo se a API não tem como subir sem ela), no `app/backend/.env.example` e no
       `docker-compose.coolify.yml` como `${NOME:-padrão}` (ou `${NOME:?…}` se obrigatória).
       `tests/test_ambiente.py` derruba a suíte se faltar algum dos três.
@@ -65,7 +68,8 @@ Checklist de todo PR estrutural:
 
 ## Segurança e dados
 
-- Segredo só em `.env` ou cofre — nunca em código, JSON, nota ou log.
+- Segredo só na tela Configurações › Integrações (cifrado no banco, decisão de Eduardo em 07/10/2026)
+  ou no ambiente — nunca em código, JSON, nota ou log. Segredo salvo na tela nunca volta para o navegador.
 - **Dado de cliente não entra no repositório:** nem planilha, nem nota de
   entrevista, nem saída de script de conferência.
 - **A API não tem login** até o E1. Ela escuta só em `127.0.0.1`. O acesso

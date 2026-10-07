@@ -24,7 +24,7 @@ from crm.proposta import ficha as regras_da_ficha
 from crm.questionario import importacao
 from crm.questionario.endereco import BuscaDeEndereco
 from crm.questionario.fonte import (
-    VARIAVEIS, BuscaFalhou, FonteDaFuncao, FonteDeQuestionarios, FonteSupabase, e_funcao, ler_configuracao,
+    BuscaFalhou, FonteDaFuncao, FonteDeQuestionarios, FonteSupabase, e_funcao, ler_configuracao,
 )
 from crm.questionario.leitura import ROTULOS_COMPLEXIDADE, ROTULOS_RISCO, inteiro_ou_nada
 
@@ -154,8 +154,7 @@ def executar_busca(
     na próxima busca e só a marca é refeita. Usada pelo botão e pela busca automática."""
     if origem is None:
         raise BuscaNaoConfigurada(
-            f"Falta configurar a busca: preencha {VARIAVEIS['url']} e {VARIAVEIS['chave']} no backend/.env "
-            "e reinicie o CRM."
+            "Falta configurar a busca: preencha o endereço e a chave do questionário em Configurações › Integrações."
         )
     with _UMA_BUSCA_POR_VEZ:  # o botão e a busca automática nunca importam o mesmo questionário juntos
         return _buscar(sessao, origem, buscar_endereco)

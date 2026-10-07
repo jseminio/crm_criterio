@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from crm.agente.config import ler_configuracao
 from crm.agente.envio import EnvioFalhou, enviar_email
+from crm.agente.ia import montar_cliente
 from crm.agente.erros import mensagem_de_falha as _mensagem_de_falha
 from crm.agente.sdr import AgenteFalhou, AgenteSDR, ContextoDaConta, Uso
 from crm.api import esquemas as e
@@ -55,14 +56,9 @@ def servicos_reais() -> Servicos:
     config = ler_configuracao()
 
     def agente() -> AgenteSDR:
-        if not config.chave:
-            raise AgenteFalhou(
-                "A chave da API da Anthropic não está no .env (ANTHROPIC_API_KEY). "
-                "Coloque a chave e tente de novo; nada foi enviado."
-            )
-        import anthropic
-
-        return AgenteSDR(anthropic.Anthropic(api_key=config.chave), config.modelo)
+        # Anthropic ou OpenAI, com a reserva atrás, conforme a tela de Integrações (07/10/2026).
+        cliente, modelo = montar_cliente(config)
+        return AgenteSDR(cliente, modelo)
 
     envio = None
     if config.email is not None:
@@ -421,7 +417,7 @@ def roteador_de_abordagens(
             if envio is None:
                 raise HTTPException(
                     409,
-                    "o envio por e-mail não está configurado: preencha CRM_M365_* no .env",
+                    "o envio por e-mail não está configurado: cadastre em Configurações › Integrações",
                 )
             try:
                 envio(

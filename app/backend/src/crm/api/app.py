@@ -60,6 +60,8 @@ from crm.api.propostas import roteador_de_propostas
 from crm.api.busca_automatica import laco_da_busca
 from crm.agente.disparo_do_questionario import Canais
 from crm.api.disparo_do_questionario import canais_reais, laco_do_disparo
+from crm.api.integracoes import Testadores, roteador_de_integracoes
+from crm import configuracao
 from crm.api.questionarios import fonte_real, roteador_de_questionarios
 from crm.questionario.endereco import BuscaDeEndereco, endereco_pelo_cnpj
 from crm.questionario.fonte import FonteDeQuestionarios
@@ -156,6 +158,7 @@ def criar_app(
     tentativas: Tentativas | None = None,
     canais_do_disparo: Callable[[], Canais | None] | None = None,
     disparo_automatico: bool | None = None,
+    testadores: Testadores | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede; `tentativas`, para o
@@ -165,6 +168,8 @@ def criar_app(
     async def ciclo_de_vida(_: FastAPI):
         global _fabrica
         _fabrica = fabrica or criar_fabrica_de_sessao(criar_engine(url_do_banco()))
+        # Configuração pela tela (07/10/2026): o que está em Integrações vale mais que o ambiente.
+        configuracao.registrar_fabrica(_fabrica)
         # Modo e-mail e senha: a conta de `CRM_ADMIN_EMAIL` nasce aqui, antes do primeiro pedido.
         # Falta de senha inicial ou senha curta impede a subida, com a frase do que falta.
         if isinstance(config_de_entrada, ConfiguracaoDeSenha):
@@ -189,6 +194,7 @@ def criar_app(
                     t.cancel()
                     with contextlib.suppress(asyncio.CancelledError):
                         await t
+            configuracao.registrar_fabrica(None)
 
     # Entrada: no uso real, lida do `.env`; no teste (que passa a própria `fabrica`), só se o teste mandar.
     # `.env` que pede o modo senha sem segredo para aqui mesmo (`EntradaMalConfigurada`): a API não sobe.
@@ -282,6 +288,7 @@ def criar_app(
     # própria `fabrica`), só se o teste mandar uma busca — teste não sai para a rede.
     endereco = busca_de_endereco or (None if fabrica is not None else endereco_pelo_cnpj)
     api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real, endereco))
+    api.include_router(roteador_de_integracoes(obter_sessao, fonte_de_questionarios or fonte_real, testadores))
     api.include_router(roteador_de_propostas(obter_sessao))
     api.include_router(roteador_da_ficha(obter_sessao))
     api.include_router(roteador_de_metas(obter_sessao))

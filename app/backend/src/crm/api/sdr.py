@@ -206,7 +206,7 @@ def roteador(
         """Uma rodada agora, sem esperar os 10 minutos. Só com o disparo ligado e em horário comercial."""
         canais = canais_do_disparo()
         if canais is None:
-            raise HTTPException(409, "o disparo está desligado: ligue com CRM_DISPARO_DO_QUESTIONARIO=true")
+            raise HTTPException(409, "o disparo está desligado: ligue em Configurações › Integrações")
         resultado = disparar(sessao, canais, agora(), ler_configuracao().link_do_questionario)
         ESTADO_DO_DISPARO.registrar(ligado=True, resultado=resultado)
         return ESTADO_DO_DISPARO.retrato()

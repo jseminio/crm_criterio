@@ -18,7 +18,7 @@ def mensagem_de_falha(falha: Exception) -> str:
     except ImportError:  # pragma: no cover — o pacote é dependência
         return f"Falha inesperada no agente ({type(falha).__name__})."
     if isinstance(falha, anthropic.AuthenticationError):
-        return "A Anthropic recusou a chave da API. Confira ANTHROPIC_API_KEY no .env."
+        return "A Anthropic recusou a chave da API. Confira a chave em Configurações › Integrações."
     if isinstance(falha, anthropic.RateLimitError):
         return "O limite de uso da API foi atingido. Tente de novo em alguns minutos."
     if isinstance(falha, anthropic.APIConnectionError):

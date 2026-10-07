@@ -50,17 +50,30 @@ def test_falha_vai_para_o_painel_sem_derrubar(engine):
     assert "Falha inesperada na busca (RuntimeError)" in estado.retrato()["erro"]
 
 
+async def _esperar(condicao, limite: float = 10.0) -> None:
+    """Espera a condição valer, em vez de supor quanto tempo a busca leva. Com espera fixa (0,05 s) o
+    teste falhava em máquina carregada: a busca no banco ainda não tinha terminado (06/10/2026)."""
+    prazo = time.monotonic() + limite
+    while not condicao():
+        assert time.monotonic() < prazo, "a busca não aconteceu dentro do limite"
+        await asyncio.sleep(0.01)
+
+
 def test_o_laco_busca_ja_e_de_novo_depois_do_intervalo(engine):
     fonte, estado = FonteFalsa([linha()]), EstadoDaBusca()
 
     async def rodar():
-        tarefa = asyncio.create_task(laco_da_busca(_fabrica(engine), lambda: fonte, None, timedelta(seconds=0.2), estado))
-        await asyncio.sleep(0.05)
+        # Intervalo de 0,5 s: folga para ler o resultado de uma busca antes de a próxima o substituir.
+        tarefa = asyncio.create_task(laco_da_busca(_fabrica(engine), lambda: fonte, None, timedelta(seconds=0.5), estado))
+        # ultima_em só aparece quando a busca registra o resultado (proxima_em já nasce ao ligar).
+        await _esperar(lambda: estado.retrato()["ultima_em"] is not None)
         primeira = estado.retrato()
         assert primeira["automatica"] and primeira["novos"] == 1 and primeira["proxima_em"] is not None
+        assert fonte.marcados == ["q-1"]
         fonte.linhas.append(linha(id_="q-2", cnpj="98.765.432/0001-10"))
-        await asyncio.sleep(0.3)
-        assert estado.retrato()["novos"] == 1 and "q-2" in fonte.marcados
+        # Volta a buscar sozinha depois do intervalo e pega só o novo.
+        await _esperar(lambda: "q-2" in fonte.marcados and estado.retrato()["ultima_em"] != primeira["ultima_em"])
+        assert estado.retrato()["novos"] == 1
         tarefa.cancel()
         try:
             await tarefa

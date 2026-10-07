@@ -11,7 +11,7 @@ from crm import configuracao
 from crm.agente.config import ler_configuracao
 from crm.api.app import criar_app
 from crm.api.integracoes import Falhou
-from crm.api.integracoes import Testadores as Testes
+from crm.api.integracoes import Testadores as ConjuntoDeTestadores
 from crm.configuracao import cofre
 from crm.db.modelos import ConfiguracaoDoSistema
 from crm.manutencao.tarefas import configuracao_para_a_tela
@@ -90,7 +90,7 @@ class FalsoTeste:
     def __init__(self):
         self.envios: list[tuple[str, str]] = []
 
-    def testadores(self) -> Testes:
+    def testadores(self) -> ConjuntoDeTestadores:
         def ia(config):
             if config.chave != SEGREDO:
                 raise Falhou("A Anthropic recusou a chave da API.")
@@ -100,7 +100,7 @@ class FalsoTeste:
             self.envios.append(("whatsapp", para))
             return "enviado"
 
-        return Testes(ia=ia, whatsapp=lambda c: "ok", email=lambda c: "ok", enviar={"whatsapp": enviar})
+        return ConjuntoDeTestadores(ia=ia, whatsapp=lambda c: "ok", email=lambda c: "ok", enviar={"whatsapp": enviar})
 
 
 @pytest.fixture
@@ -178,3 +178,27 @@ class TestRotas:
     def test_ligar_o_disparo_pela_tela(self, cliente):
         cliente.put("/api/configuracoes/integracoes/disparo", json={"valores": {"disparo.ligado": "true"}})
         assert ler_configuracao().disparo_ligado is True
+
+
+class TestEscolhaDaIA:
+    def test_openai_principal_vem_da_tela(self, fabrica):
+        assert (ler_configuracao().ia_principal, ler_configuracao().ia_reserva) == ("Anthropic", "Nenhuma")
+        with fabrica() as s:
+            configuracao.gravar(s, "ia.principal", "OpenAI", "Eduardo")
+            configuracao.gravar(s, "ia.reserva", "Anthropic", "Eduardo")
+            configuracao.gravar(s, "openai.chave", "sk-openai-1234", "Eduardo")
+            s.commit()
+        config = ler_configuracao()
+        assert (config.ia_principal, config.ia_reserva, config.openai_chave) == ("OpenAI", "Anthropic", "sk-openai-1234")
+        assert config.openai_modelo == "gpt-6.1-sol"
+
+    def test_ia_configurada_e_a_que_esta_em_uso(self, cliente):
+        ia = _grupo(cliente.get("/api/configuracoes/integracoes").json(), "ia")
+        assert ia["configurado"] is False  # Anthropic é a principal e está sem chave
+        r = cliente.put("/api/configuracoes/integracoes/ia",
+                        json={"valores": {"ia.principal": "OpenAI", "openai.chave": "sk-openai-1234"}})
+        assert _grupo(r.json(), "ia")["configurado"] is True  # a chave da Anthropic não faz falta
+        r = cliente.put("/api/configuracoes/integracoes/ia", json={"valores": {"ia.reserva": "Anthropic"}})
+        assert _grupo(r.json(), "ia")["configurado"] is False  # reserva sem chave
+        assert cliente.put("/api/configuracoes/integracoes/ia",
+                           json={"valores": {"ia.principal": "ChatGPT"}}).status_code == 422

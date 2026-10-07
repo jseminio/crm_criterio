@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from crm.agente.ata import MODELO_PADRAO as MODELO_DA_ATA, ClienteDaApi, escrever_ata
 from crm.agente.config import ler_configuracao
+from crm.agente.ia import montar_cliente
 from crm.agente.erros import mensagem_de_falha
 from crm.agente.sdr import AgenteFalhou, Uso
 from crm.api.acesso import quem_fez
@@ -241,14 +242,8 @@ def servicos_da_ata_reais() -> ServicosDaAta:
     config = ler_configuracao()
 
     def cliente() -> ClienteDaApi:
-        if not config.chave:
-            raise AgenteFalhou(
-                "A chave da IA não está configurada: cadastre em Configurações › Integrações. "
-                "Coloque a chave e tente de novo; nada foi gerado."
-            )
-        import anthropic
-
-        return anthropic.Anthropic(api_key=config.chave)
+        # Anthropic ou OpenAI, com a reserva atrás, conforme a tela de Integrações (07/10/2026).
+        return montar_cliente(config)[0]
 
     return ServicosDaAta(cliente=cliente)
 

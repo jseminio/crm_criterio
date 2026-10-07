@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from crm.agente.sdr import MODELO_PADRAO
+from crm import configuracao
 from crm.configuracao import ambiente_efetivo
 
 __all__ = ["ConfiguracaoDoAgente", "ConfiguracaoDoEmail", "ConfiguracaoDoWhatsapp", "VERSAO_DO_WHATSAPP", "LINK_DO_QUESTIONARIO_PADRAO", "VARIAVEIS", "ler_configuracao"]
@@ -65,6 +66,11 @@ class ConfiguracaoDoAgente:
     email: ConfiguracaoDoEmail | None
     link_do_questionario: str = LINK_DO_QUESTIONARIO_PADRAO
     whatsapp: ConfiguracaoDoWhatsapp | None = None
+    openai_chave: str | None = None
+    openai_modelo: str = "gpt-6.1-sol"
+    ia_principal: str = "Anthropic"
+    """"Anthropic" ou "OpenAI" (tela de Integrações, 07/10/2026)."""
+    ia_reserva: str = "Nenhuma"
     disparo_ligado: bool = False
     """O disparo automático do lembrete e do agradecimento do questionário. Desligado por padrão:
     liga com `CRM_DISPARO_DO_QUESTIONARIO=true`, depois de os modelos da Meta estarem aprovados."""
@@ -88,4 +94,9 @@ def ler_configuracao() -> ConfiguracaoDoAgente:
         link_do_questionario=(valores.get(VARIAVEIS["questionario"]) or "").strip() or LINK_DO_QUESTIONARIO_PADRAO,
         whatsapp=whatsapp,
         disparo_ligado=(valores.get(VARIAVEIS["disparo"]) or "").strip().casefold() in ("true", "1", "sim"),
+        # Só existem na tela (07/10/2026): não há variável de ambiente para a OpenAI.
+        openai_chave=configuracao.valor("openai.chave") or None,
+        openai_modelo=configuracao.valor("openai.modelo"),
+        ia_principal=configuracao.valor("ia.principal"),
+        ia_reserva=configuracao.valor("ia.reserva"),
     )

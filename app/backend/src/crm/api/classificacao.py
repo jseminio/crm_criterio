@@ -26,6 +26,7 @@ from crm.agente.analise_da_carteira import (
     escrever_analise,
 )
 from crm.agente.config import ler_configuracao
+from crm.agente.ia import montar_cliente
 from crm.agente.erros import mensagem_de_falha
 from crm.agente.sdr import AgenteFalhou, Uso
 from crm.db.modelos import (
@@ -466,14 +467,8 @@ def servicos_de_analise_reais() -> ServicosDeAnalise:
     config = ler_configuracao()
 
     def cliente() -> ClienteDaApi:
-        if not config.chave:
-            raise AgenteFalhou(
-                "A chave da IA não está configurada: cadastre em Configurações › Integrações. "
-                "Coloque a chave e tente de novo; nada foi gerado."
-            )
-        import anthropic
-
-        return anthropic.Anthropic(api_key=config.chave)
+        # Anthropic ou OpenAI, com a reserva atrás, conforme a tela de Integrações (07/10/2026).
+        return montar_cliente(config)[0]
 
     return ServicosDeAnalise(cliente=cliente)
 

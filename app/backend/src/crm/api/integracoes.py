@@ -43,19 +43,24 @@ class Falhou(RuntimeError):
 
 
 def _testar_ia(config: ConfiguracaoDoAgente) -> str:
-    if not config.chave:
-        raise Falhou("Falta a chave da Anthropic.")
-    import anthropic
-
+    """Uma chamada mínima a cada IA em uso (a principal e a reserva), sem gravar nada."""
     from crm.agente.erros import mensagem_de_falha
+    from crm.agente.ia import cliente_de, em_uso
 
-    try:
-        anthropic.Anthropic(api_key=config.chave, max_retries=0, timeout=60.0).messages.create(
-            model=config.modelo, max_tokens=16, messages=[{"role": "user", "content": "Responda só: ok"}],
-        )
-    except Exception as falha:  # noqa: BLE001 — vira frase para a tela, sem detalhe da requisição
-        raise Falhou(mensagem_de_falha(falha)) from falha
-    return f"A Anthropic respondeu com o modelo {config.modelo}."
+    partes, falhou = [], False
+    for nome in em_uso(config):
+        try:
+            cliente = cliente_de(nome, config)
+            cliente.messages.create(model=cliente.modelo, max_tokens=16,
+                                    messages=[{"role": "user", "content": "Responda só: ok"}])
+            partes.append(f"{nome} respondeu com o modelo {cliente.modelo}")
+        except Exception as falha:  # noqa: BLE001 — vira frase para a tela, sem detalhe da requisição
+            falhou = True
+            partes.append(f"{nome}: {mensagem_de_falha(falha)}")
+    texto = ". ".join(partes) + "."
+    if falhou:
+        raise Falhou(texto)
+    return texto
 
 
 def _testar_whatsapp(config: ConfiguracaoDoAgente) -> str:
@@ -183,6 +188,17 @@ def _problema(campo: configuracao.Campo, valor: str) -> str | None:
     return None
 
 
+def _configurado(grupo: str, linhas: dict[str, configuracao.Linha]) -> bool:
+    """IA: basta a chave de quem está em uso (principal e reserva). O resto: todos os campos com valor."""
+    if grupo == "ia":
+        from crm.agente.ia import NENHUMA
+
+        em_uso = {linhas["ia.principal"].valor, linhas["ia.reserva"].valor} - {NENHUMA, None}
+        return all(linhas[f"{n.casefold()}.chave"].origem != "vazio" for n in em_uso)
+    return all(l.origem != "vazio" for l in linhas.values() if configuracao.CAMPOS[l.campo.chave] in
+               configuracao.catalogo.grupo(grupo).campos)
+
+
 def roteador_de_integracoes(
     obter_sessao: Callable[[], Iterator[Session]],
     fonte_de_questionarios: Callable[[], FonteDeQuestionarios | None],
@@ -206,7 +222,7 @@ def roteador_de_integracoes(
             ultima = max(datas, key=lambda d: d[0]) if datas else (None, None)
             grupos.append(GrupoResposta(
                 chave=g.chave, titulo=g.titulo, testavel=g.testavel, envia_teste=g.chave in t.enviar,
-                configurado=all(l.origem != "vazio" for l in do_grupo),
+                configurado=_configurado(g.chave, linhas),
                 campos=[CampoResposta(
                     chave=l.campo.chave, rotulo=l.campo.rotulo, segredo=l.campo.segredo, origem=l.origem,
                     valor=l.valor, final=l.final, ilegivel=l.ilegivel, padrao=l.campo.padrao,

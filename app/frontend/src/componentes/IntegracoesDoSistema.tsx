@@ -1,7 +1,8 @@
 /** Configurações › Integrações (amostra aprovada por Eduardo em 07/10/2026): chave de IA, WhatsApp,
  * e-mail, questionário e disparo se cadastram, trocam e testam aqui, sem nada no painel do servidor.
  * Vale o que está na tela; sem valor na tela, o que veio do servidor; depois o padrão. Segredo nunca
- * volta do servidor: aparecem só os 4 últimos caracteres. */
+ * volta do servidor: aparecem só os 4 últimos caracteres. A IA pode ser Anthropic ou OpenAI, com a
+ * outra de reserva (07/10/2026). */
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
@@ -153,6 +154,17 @@ function Campo({ campo, valor, aoMudar, vaiApagar, aoApagar }: {
         <span>{campo.rotulo}</span>
         <span className="campo-ajuda">{ajuda}</span>
       </label>
+    );
+  }
+  if (campo.opcoes.length > 0) {
+    return (
+      <div style={{ display: "grid", gap: "var(--e1)" }}>
+        <label htmlFor={id}>{campo.rotulo}</label>
+        <select id={id} className="selecao" style={{ maxWidth: "18rem" }} value={valor} onChange={(e) => aoMudar(e.target.value)}>
+          {campo.opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+        <span className="campo-ajuda">{ajuda}</span>
+      </div>
     );
   }
   return (

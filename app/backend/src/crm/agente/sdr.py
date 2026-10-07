@@ -42,6 +42,11 @@ PRECOS_POR_MILHAO: dict[str, tuple[Decimal, Decimal]] = {
     "claude-sonnet-5": (Decimal("2"), Decimal("10")),
     "claude-haiku-4-5": (Decimal("1"), Decimal("5")),
     "claude-fable-5-1": (Decimal("10"), Decimal("50")),
+    # OpenAI, contexto curto (tabela da OpenAI consultada em 07/10/2026). Cache lido sai a 0,1x da entrada
+    # aqui; no gpt-6.1-sol a OpenAI cobra 0,05x — a estimativa fica um pouco acima, do lado seguro.
+    "gpt-6-astra": (Decimal("10"), Decimal("50")),
+    "gpt-6.1-sol": (Decimal("2"), Decimal("10")),
+    "gpt-6-luna": (Decimal("0.10"), Decimal("0.50")),
 }
 #: US$ por busca na web (US$ 10 a cada mil). Estimativa.
 PRECO_BUSCA = Decimal("0.01")
@@ -157,36 +162,45 @@ class ContextoDaConta:
 @dataclass
 class Uso:
     modelo: str
+    """O modelo que respondeu por último (com reserva, pode mudar no meio)."""
     tokens_entrada: int = 0
     tokens_saida: int = 0
     buscas_web: int = 0
-    _entrada_ponderada: Decimal = Decimal(0)
+    _custo: Decimal = Decimal(0)
+    _sem_preco: bool = False
 
     def somar(self, usage: Any) -> None:
-        """Soma o `usage` de uma resposta. Cache escrito custa 1,25x e lido 0,1x."""
+        """Soma o `usage` de uma resposta, pelo preço do modelo que respondeu (o `usage.modelo` que a
+        camada de IA põe; sem ele, o `modelo` do uso). Cache escrito custa 1,25x e lido 0,1x."""
+        modelo = getattr(usage, "modelo", None) or self.modelo
+        self.modelo = modelo
         entrada = getattr(usage, "input_tokens", 0) or 0
         escrito = getattr(usage, "cache_creation_input_tokens", 0) or 0
         lido = getattr(usage, "cache_read_input_tokens", 0) or 0
-        self.tokens_entrada += entrada + escrito + lido
-        self.tokens_saida += getattr(usage, "output_tokens", 0) or 0
-        self._entrada_ponderada += (
-            Decimal(entrada) + Decimal(escrito) * Decimal("1.25") + Decimal(lido) * Decimal("0.1")
-        )
+        saida = getattr(usage, "output_tokens", 0) or 0
         servidor = getattr(usage, "server_tool_use", None)
-        self.buscas_web += getattr(servidor, "web_search_requests", 0) or 0
+        buscas = getattr(servidor, "web_search_requests", 0) or 0
+        self.tokens_entrada += entrada + escrito + lido
+        self.tokens_saida += saida
+        self.buscas_web += buscas
+        precos = PRECOS_POR_MILHAO.get(modelo)
+        if precos is None:
+            self._sem_preco = True
+            return
+        preco_entrada, preco_saida = precos
+        ponderada = Decimal(entrada) + Decimal(escrito) * Decimal("1.25") + Decimal(lido) * Decimal("0.1")
+        self._custo += (
+            ponderada * preco_entrada / Decimal(1_000_000)
+            + Decimal(saida) * preco_saida / Decimal(1_000_000)
+            + Decimal(buscas) * PRECO_BUSCA
+        )
 
     @property
     def custo_usd(self) -> Decimal | None:
-        precos = PRECOS_POR_MILHAO.get(self.modelo)
-        if precos is None:
+        """`None` se algum modelo usado não tem preço na tabela: estimativa pela metade engana."""
+        if self._sem_preco or (self._custo == 0 and self.modelo not in PRECOS_POR_MILHAO):
             return None
-        entrada, saida = precos
-        custo = (
-            self._entrada_ponderada * entrada / Decimal(1_000_000)
-            + Decimal(self.tokens_saida) * saida / Decimal(1_000_000)
-            + Decimal(self.buscas_web) * PRECO_BUSCA
-        )
-        return custo.quantize(Decimal("0.0001"))
+        return self._custo.quantize(Decimal("0.0001"))
 
 
 @dataclass

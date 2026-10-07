@@ -42,10 +42,19 @@ class Grupo:
 
 GRUPOS: tuple[Grupo, ...] = (
     Grupo("ia", "Inteligência artificial", (
+        Campo("ia.principal", "IA principal", padrao="Anthropic", opcoes=("Anthropic", "OpenAI"),
+              ajuda="Quem responde no agente SDR, na ata e na análise da carteira."),
+        Campo("ia.reserva", "IA de reserva", padrao="Nenhuma", opcoes=("Nenhuma", "Anthropic", "OpenAI"),
+              ajuda="Entra quando a principal falha ou recusa."),
         Campo("anthropic.chave", "Chave da API da Anthropic", segredo=True, variavel="ANTHROPIC_API_KEY",
               ajuda="Console da Anthropic › API keys.", exemplo="sk-ant-…"),
         Campo("anthropic.modelo", "Modelo da Anthropic", variavel="CRM_AGENTE_MODELO", padrao="claude-opus-5",
               exemplo="claude-opus-5"),
+        Campo("openai.chave", "Chave da API da OpenAI", segredo=True,
+              ajuda="platform.openai.com › API keys. É a API da OpenAI, não a assinatura do ChatGPT.",
+              exemplo="sk-…"),
+        Campo("openai.modelo", "Modelo da OpenAI", padrao="gpt-6.1-sol", exemplo="gpt-6.1-sol",
+              ajuda="gpt-6-astra (o mais capaz), gpt-6.1-sol (quase igual, mais barato), gpt-6-luna (o mais barato)."),
     )),
     Grupo("whatsapp", "WhatsApp (Meta)", (
         Campo("whatsapp.token", "Token permanente", segredo=True, variavel="CRM_WHATSAPP_TOKEN",

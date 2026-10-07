@@ -105,6 +105,28 @@ describe("Configurações › Integrações: chaves pela tela (07/10/2026)", () 
     expect(await whatsapp.findByRole("status")).toHaveTextContent("✓ A Meta aceitou o modelo.");
   });
 
+  it("escolhe a OpenAI como principal e a Anthropic como reserva", async () => {
+    vi.mocked(api.integracoes).mockResolvedValue({
+      grupos: [{
+        ...INTEGRACOES.grupos[0],
+        campos: [
+          campo("ia.principal", "IA principal", { origem: "padrão", valor: "Anthropic", opcoes: ["Anthropic", "OpenAI"] }),
+          campo("ia.reserva", "IA de reserva", { origem: "padrão", valor: "Nenhuma", opcoes: ["Nenhuma", "Anthropic", "OpenAI"] }),
+          campo("openai.chave", "Chave da API da OpenAI", { segredo: true }),
+        ],
+      }],
+    });
+    render(<IntegracoesDoSistema />);
+    const ia = await cartao("Inteligência artificial");
+    await userEvent.selectOptions(ia.getByLabelText("IA principal"), "OpenAI");
+    await userEvent.selectOptions(ia.getByLabelText("IA de reserva"), "Anthropic");
+    await userEvent.type(ia.getByLabelText("Chave da API da OpenAI"), "sk-proj-nova");
+    await userEvent.click(ia.getByRole("button", { name: "Salvar" }));
+    expect(api.salvarIntegracao).toHaveBeenCalledWith("ia", {
+      valores: { "ia.principal": "OpenAI", "ia.reserva": "Anthropic", "openai.chave": "sk-proj-nova" }, apagar: [],
+    });
+  });
+
   it("liga o disparo com uma caixa, sem botão de teste", async () => {
     render(<IntegracoesDoSistema />);
     const disparo = await cartao("Disparo do lembrete e do agradecimento");

@@ -7,6 +7,7 @@ aprovação envia** — uma vez, e só quando as conferências passam.
 from __future__ import annotations
 
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 import sqlalchemy as sa
@@ -41,8 +42,7 @@ class AgenteFalso:
         self.pedidos.append(
             {"contexto": contexto, "instrucao": instrucao, "anterior": rascunho_anterior}
         )
-        uso.tokens_entrada, uso.tokens_saida = 1000, 200
-        uso._entrada_ponderada = Decimal(1000)
+        uso.somar(SimpleNamespace(input_tokens=1000, output_tokens=200))
         if self.falha:
             raise self.falha
         return self.preparo

@@ -60,7 +60,7 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     chave: "configuracoes",
     rotulo: "Configurações",
     titulo: "Configurações",
-    descricao: "Perfis e acesso, metas, propostas, grupos, conferência da carga, histórico, backup e serviços pedidos.",
+    descricao: "Perfis e acesso, metas, propostas, integrações, grupos, conferência da carga, histórico, backup e serviços pedidos.",
   },
 ];
 

@@ -55,10 +55,10 @@ describe("abas de Configurações", () => {
     semMatrizes();
   });
 
-  it("mostra as oito abas na ordem aprovada e abre na primeira", async () => {
+  it("mostra as nove abas na ordem aprovada e abre na primeira", async () => {
     render(<Configuracoes />);
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
-      "Perfis e acesso", "Metas", "Propostas", "Grupos", "Conferência", "Histórico", "Backup", "Serviços pedidos",
+      "Perfis e acesso", "Metas", "Propostas", "Integrações", "Grupos", "Conferência", "Histórico", "Backup", "Serviços pedidos",
     ]);
     expect(screen.getByRole("tab", { name: "Perfis e acesso" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByText(/Baixar backup completo/)).toBeNull();

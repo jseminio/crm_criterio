@@ -1975,3 +1975,41 @@ export interface FasesDoMes {
   taxas: Record<string, { valor: string | null; origem: "premissa" | "historico" | "sem_dado" }>;
   aviso: string | null;
 }
+
+/** Configurações › Integrações (07/10/2026). Segredo nunca vem: só os 4 últimos em `final`. */
+export interface CampoDeIntegracao {
+  chave: string;
+  rotulo: string;
+  segredo: boolean;
+  /** "tela", "servidor" (variável de ambiente antiga), "padrão" ou "vazio". */
+  origem: string;
+  valor: string | null;
+  final: string | null;
+  ilegivel: boolean;
+  padrao: string;
+  ajuda: string;
+  exemplo: string;
+  opcoes: string[];
+}
+
+export interface GrupoDeIntegracao {
+  chave: string;
+  titulo: string;
+  testavel: boolean;
+  envia_teste: boolean;
+  configurado: boolean;
+  campos: CampoDeIntegracao[];
+  alterado_por: string | null;
+  alterado_em: string | null;
+}
+
+export interface Integracoes {
+  grupos: GrupoDeIntegracao[];
+}
+
+export interface ResultadoDoTeste {
+  ok: boolean;
+  mensagem: string;
+  segundos: number;
+  em: string;
+}

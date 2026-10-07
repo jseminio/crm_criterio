@@ -10,6 +10,7 @@
  */
 
 import { HistoricoDeAlteracoes } from "../componentes/HistoricoDeAlteracoes";
+import { IntegracoesDoSistema } from "../componentes/IntegracoesDoSistema";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
 import { CadenciaDeReunioes } from "../componentes/CadenciaDeReunioes";
 import { MetasDosIndicadores } from "../componentes/MetasDosIndicadores";
@@ -110,7 +111,7 @@ function Tabelas({ resumo }: { resumo: ResumoDeBackup }) {
   );
 }
 
-type Aba = "perfis" | "metas" | "propostas" | "grupos" | "conferencia" | "historico" | "backup" | "servicos";
+type Aba = "perfis" | "metas" | "propostas" | "integracoes" | "grupos" | "conferencia" | "historico" | "backup" | "servicos";
 
 /** As abas, na ordem aprovada por Eduardo em 02/10/2026, com a funcionalidade que libera cada uma.
  * "Serviços pedidos" é só leitura e aparece para quem vê Configurações. */
@@ -118,6 +119,8 @@ const ABAS: { chave: Aba; rotulo: string; permissao: string | null }[] = [
   { chave: "perfis", rotulo: "Perfis e acesso", permissao: "configuracoes.perfis" },
   { chave: "metas", rotulo: "Metas", permissao: "configuracoes.metas" },
   { chave: "propostas", rotulo: "Propostas", permissao: "configuracoes.propostas" },
+  // Chaves e integrações pela tela, sem nada no painel do servidor (aprovado por Eduardo em 07/10/2026).
+  { chave: "integracoes", rotulo: "Integrações", permissao: "configuracoes.integracoes" },
   // Grupos e Conferência saíram do menu e viraram abas (aprovado por Eduardo em 02/10/2026).
   { chave: "grupos", rotulo: "Grupos", permissao: "grupos.ver" },
   { chave: "conferencia", rotulo: "Conferência", permissao: "conferencia.ver" },
@@ -283,6 +286,7 @@ export function Configuracoes({ listas = null }: { listas?: Listas | null }) {
       </>
       )}
       {aba === "propostas" && <MatrizesDeProposta />}
+      {aba === "integracoes" && <IntegracoesDoSistema />}
       {aba === "grupos" && (
         <>
           <p className="campo-ajuda" style={{ margin: 0 }}>O cliente é o grupo. Junte os que a planilha separou.</p>

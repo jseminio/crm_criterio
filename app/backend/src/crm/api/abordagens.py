@@ -57,7 +57,7 @@ def servicos_reais() -> Servicos:
     def agente() -> AgenteSDR:
         if not config.chave:
             raise AgenteFalhou(
-                "A chave da API da Anthropic não está no .env (ANTHROPIC_API_KEY). "
+                "A chave da IA não está configurada: cadastre em Configurações › Integrações. "
                 "Coloque a chave e tente de novo; nada foi enviado."
             )
         import anthropic
@@ -421,7 +421,7 @@ def roteador_de_abordagens(
             if envio is None:
                 raise HTTPException(
                     409,
-                    "o envio por e-mail não está configurado: preencha CRM_M365_* no .env",
+                    "o envio por e-mail não está configurado: cadastre em Configurações › Integrações",
                 )
             try:
                 envio(

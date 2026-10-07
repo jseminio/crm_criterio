@@ -59,7 +59,7 @@ class TestWhatsapp:
     def test_token_recusado_explica_sem_mostrar_o_token(self):
         with pytest.raises(EnvioFalhou) as falha:
             enviar_modelo(CONFIG, para="55", modelo="m", parametros={}, http=_meta(401, {}))
-        assert "CRM_WHATSAPP_TOKEN" in str(falha.value) and "token-secreto" not in str(falha.value)
+        assert "Integrações" in str(falha.value) and "token-secreto" not in str(falha.value)
         assert "token-secreto" not in repr(CONFIG)
 
     def test_erro_da_meta_vem_com_o_motivo(self):
@@ -216,7 +216,7 @@ class TestDisparo:
         estado = EstadoDoDisparo()
         rodar_uma_vez(fabrica, lambda: None, estado)
         retrato = estado.retrato()
-        assert retrato["ligado"] is False and "CRM_DISPARO_DO_QUESTIONARIO" in retrato["avisos"][0]
+        assert retrato["ligado"] is False and "Integrações" in retrato["avisos"][0]
 
 
 class TestRotas:
@@ -230,4 +230,4 @@ class TestRotas:
     def test_desligado_recusa_o_disparo_manual(self, fabrica):
         with TestClient(criar_app(fabrica, canais_do_disparo=lambda: None)) as cliente:
             resposta = cliente.post("/api/sdr/questionario/disparar")
-        assert resposta.status_code == 409 and "CRM_DISPARO_DO_QUESTIONARIO" in resposta.json()["detail"]
+        assert resposta.status_code == 409 and "Integrações" in resposta.json()["detail"]

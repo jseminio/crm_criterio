@@ -243,7 +243,7 @@ def servicos_da_ata_reais() -> ServicosDaAta:
     def cliente() -> ClienteDaApi:
         if not config.chave:
             raise AgenteFalhou(
-                "A chave da API da Anthropic não está no .env (ANTHROPIC_API_KEY). "
+                "A chave da IA não está configurada: cadastre em Configurações › Integrações. "
                 "Coloque a chave e tente de novo; nada foi gerado."
             )
         import anthropic

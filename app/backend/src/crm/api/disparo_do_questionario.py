@@ -92,7 +92,7 @@ def rodar_uma_vez(
     """Uma rodada, sem nunca derrubar o CRM: qualquer falha vai para o estado, com o motivo."""
     atuais = canais()
     if atuais is None:
-        resultado = Resultado(avisos=["Disparo desligado: CRM_DISPARO_DO_QUESTIONARIO não está true."])
+        resultado = Resultado(avisos=["Disparo desligado: ligue em Configurações › Integrações."])
         estado.registrar(ligado=False, resultado=resultado)
         return resultado
     with fabrica() as sessao:

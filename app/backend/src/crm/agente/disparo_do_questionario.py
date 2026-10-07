@@ -129,7 +129,7 @@ def disparar(sessao: Session, canais: Canais, momento: datetime, link: str) -> R
             if conversa.canal is CanalDeAbordagem.WHATSAPP:
                 numero = normalizar_destino(CanalDeAbordagem.WHATSAPP, lead.telefone)
                 if canais.whatsapp is None:
-                    resultado.avisos.append(f"{_rotulo(lead)}: WhatsApp não configurado (CRM_WHATSAPP_*).")
+                    resultado.avisos.append(f"{_rotulo(lead)}: WhatsApp não configurado (Configurações › Integrações).")
                     continue
                 if len(numero) not in (12, 13):
                     resultado.avisos.append(f"{_rotulo(lead)}: sem celular válido no cadastro.")
@@ -137,7 +137,7 @@ def disparar(sessao: Session, canais: Canais, momento: datetime, link: str) -> R
                 canais.whatsapp(numero, modelo.nome, parametros(lead))
             else:
                 if canais.email is None:
-                    resultado.avisos.append(f"{_rotulo(lead)}: e-mail não configurado (CRM_M365_*).")
+                    resultado.avisos.append(f"{_rotulo(lead)}: e-mail não configurado (Configurações › Integrações).")
                     continue
                 if not (lead.email or "").strip():
                     resultado.avisos.append(f"{_rotulo(lead)}: sem e-mail no cadastro.")

@@ -1,7 +1,8 @@
-"""Configuração do agente SDR e do envio, lida do `.env` do backend.
+"""Configuração do agente SDR e do envio.
 
-Segredo só no `.env` (regra do projeto). Este módulo lê as variáveis e não
-guarda, não imprime e não devolve em mensagem de erro nenhum valor.
+Desde 07/10/2026 vale primeiro o que está na tela Configurações › Integrações (cifrado no banco,
+`crm.configuracao`); sem valor na tela, a variável de ambiente antiga (`.env` ou painel do servidor).
+Este módulo não guarda, não imprime e não devolve em mensagem de erro nenhum valor.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from crm.agente.sdr import MODELO_PADRAO
-from crm.db.sessao import ler_ambiente
+from crm.configuracao import ambiente_efetivo
 
 __all__ = ["ConfiguracaoDoAgente", "ConfiguracaoDoEmail", "ConfiguracaoDoWhatsapp", "VERSAO_DO_WHATSAPP", "LINK_DO_QUESTIONARIO_PADRAO", "VARIAVEIS", "ler_configuracao"]
 
@@ -73,7 +74,7 @@ class ConfiguracaoDoAgente:
 
 
 def ler_configuracao() -> ConfiguracaoDoAgente:
-    valores = ler_ambiente()
+    valores = ambiente_efetivo()  # a tela vale mais que a variável de ambiente (07/10/2026)
     partes_do_email = [valores.get(VARIAVEIS[k]) for k in ("tenant", "cliente", "segredo", "remetente")]
     email = ConfiguracaoDoEmail(*partes_do_email) if all(partes_do_email) else None
     token, numero = (valores.get(VARIAVEIS[k]) for k in ("whatsapp_token", "whatsapp_numero"))

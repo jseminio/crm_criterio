@@ -15,7 +15,7 @@ import httpx2 as httpx
 from crm.agente.config import ConfiguracaoDoWhatsapp
 from crm.agente.envio import EnvioFalhou
 
-__all__ = ["enviar_modelo"]
+__all__ = ["enviar_modelo", "conferir_numero"]
 
 _ENVIO = "https://graph.facebook.com/{versao}/{numero}/messages"
 
@@ -56,7 +56,7 @@ def enviar_modelo(
         )
         if resposta.status_code in (401, 403):
             raise EnvioFalhou(
-                f"A Meta recusou o token do WhatsApp (HTTP {resposta.status_code}). Confira CRM_WHATSAPP_TOKEN."
+                f"A Meta recusou o token do WhatsApp (HTTP {resposta.status_code}). Confira o token em Configurações › Integrações."
             )
         dados = _json(resposta)
         if resposta.status_code != 200:
@@ -78,3 +78,30 @@ def _json(resposta: httpx.Response) -> dict:
     except ValueError:
         return {}
     return dados if isinstance(dados, dict) else {}
+
+
+def conferir_numero(config: ConfiguracaoDoWhatsapp, *, http: httpx.Client | None = None) -> str:
+    """O teste da tela: pergunta à Meta qual é o número. Não envia nada. Devolve "número · nome"."""
+    cliente = http or httpx.Client(timeout=30.0)
+    try:
+        resposta = cliente.get(
+            f"https://graph.facebook.com/{config.versao}/{config.numero_id}",
+            params={"fields": "display_phone_number,verified_name"},
+            headers={"Authorization": f"Bearer {config.token}"},
+        )
+        if resposta.status_code in (401, 403):
+            raise EnvioFalhou(
+                f"A Meta recusou o token do WhatsApp (HTTP {resposta.status_code}). Confira o token em "
+                "Configurações › Integrações."
+            )
+        dados = _json(resposta)
+        if resposta.status_code != 200:
+            erro = dados.get("error") if isinstance(dados.get("error"), dict) else {}
+            raise EnvioFalhou(f"A Meta não reconheceu o número (HTTP {resposta.status_code}): "
+                              f"{erro.get('message') or 'confira o ID do número'}")
+        return " · ".join(str(v) for v in (dados.get("display_phone_number"), dados.get("verified_name")) if v)
+    except httpx.HTTPError as falha:
+        raise EnvioFalhou(f"Não consegui falar com a Meta: {type(falha).__name__}.") from falha
+    finally:
+        if http is None:
+            cliente.close()

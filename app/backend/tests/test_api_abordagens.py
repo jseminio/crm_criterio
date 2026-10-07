@@ -214,7 +214,7 @@ def test_email_sem_configuracao_nao_envia_nem_muda_situacao(cliente, ambiente):
     abordagem = _pronta(cliente)
     resposta = cliente.post(f"/api/abordagens/{abordagem['id']}/aprovar", json={})
     assert resposta.status_code == 409
-    assert "CRM_M365" in resposta.json()["detail"]
+    assert "Integrações" in resposta.json()["detail"]
     assert cliente.get(f"/api/abordagens/{abordagem['id']}").json()["situacao"] == (
         "Aguardando aprovação"
     )

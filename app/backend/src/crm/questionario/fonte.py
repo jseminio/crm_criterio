@@ -20,7 +20,7 @@ from typing import Any, Protocol
 
 import httpx2 as httpx
 
-from crm.db.sessao import ler_ambiente
+from crm.configuracao import ambiente_efetivo
 
 __all__ = [
     "VARIAVEIS", "BuscaFalhou", "ConfiguracaoDoQuestionario", "FonteDeQuestionarios", "FonteSupabase",
@@ -47,7 +47,7 @@ class ConfiguracaoDoQuestionario:
 
 
 def ler_configuracao() -> ConfiguracaoDoQuestionario | None:
-    valores = ler_ambiente()
+    valores = ambiente_efetivo()  # a tela vale mais que a variável de ambiente (07/10/2026)
     url, chave = valores.get(VARIAVEIS["url"]), valores.get(VARIAVEIS["chave"])
     return ConfiguracaoDoQuestionario(url.rstrip("/"), chave) if url and chave else None
 
@@ -122,8 +122,8 @@ class FonteDaFuncao:
     def _recusa(self, r: httpx.Response) -> None:
         if r.status_code in (401, 403):
             raise BuscaFalhou(
-                f"A função do site recusou a senha (HTTP {r.status_code}). Confira se {VARIAVEIS['chave']} no "
-                "backend/.env é a mesma senha guardada no Lovable (segredo CRM_QUESTIONARIO_SENHA)."
+                f"A função do site recusou a senha (HTTP {r.status_code}). Confira se a chave da busca em Configurações › Integrações "
+                "é a mesma senha guardada no Lovable (segredo CRM_QUESTIONARIO_SENHA)."
             )
 
     def novos(self) -> list[dict[str, Any]]:

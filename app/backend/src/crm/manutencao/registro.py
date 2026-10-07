@@ -1,6 +1,6 @@
 """O registro das tarefas de manutenção de dados, em ordem de aplicação (#93).
 
-**Vazio de propósito** até a primeira necessidade real. Para acrescentar uma tarefa:
+Para acrescentar uma tarefa:
 
 1. Crie `crm/manutencao/tarefas/<assunto>.py` (crie a pasta `tarefas/` com um `__init__.py` vazio na
    primeira vez) com uma função `executar(sessao) -> str | None`, que **não faz commit** (ver o
@@ -23,7 +23,11 @@ como registro (o `--listar` de `scripts/manutencao.py` mostra o que já rodou).
 from __future__ import annotations
 
 from crm.manutencao.executor import Tarefa
+from crm.manutencao.tarefas import configuracao_para_a_tela
 
 TAREFAS: list[Tarefa] = [
+    Tarefa("2026_10_07_configuracao_para_a_tela",
+           "Copia para a tela de Integrações as chaves e configurações das variáveis de ambiente",
+           configuracao_para_a_tela.executar),
     # Acrescente no fim. Ex.: Tarefa("2026_10_06_assunto", "o que faz", modulo.executar),
 ]

@@ -1750,3 +1750,18 @@ class ManutencaoAplicada(Base):
     aplicada_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=agora)
     resultado: Mapped[str | None] = mapped_column(sa.Text)
     """O que a tarefa disse que fez, numa linha (contagens; nunca dado de cliente)."""
+
+
+class ConfiguracaoDoSistema(Base):
+    """Um valor configurado pela tela Configurações › Integrações (07/10/2026). Vale mais que a
+    variável de ambiente de mesmo propósito (`crm.configuracao`). Segredo fica cifrado (`cofre`) e
+    nunca volta para a tela."""
+
+    __tablename__ = "configuracao_do_sistema"
+
+    chave: Mapped[str] = mapped_column(sa.String(80), primary_key=True)
+    """O nome do campo no catálogo (`crm.configuracao.catalogo`), como `whatsapp.token`."""
+    valor: Mapped[str | None] = mapped_column(sa.Text)
+    cifrado: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False, server_default=sa.false())
+    alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
+    alterado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=agora)

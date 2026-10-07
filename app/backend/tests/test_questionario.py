@@ -296,7 +296,7 @@ class TestBuscar:
         fabrica = sessionmaker(bind=engine, expire_on_commit=False, future=True)
         with TestClient(criar_app(fabrica, fonte_de_questionarios=lambda: None)) as c:
             r = c.post("/api/questionarios/buscar")
-        assert r.status_code == 409 and "CRM_QUESTIONARIO_URL" in r.json()["detail"]
+        assert r.status_code == 409 and "Integrações" in r.json()["detail"]
 
     def test_falha_do_supabase_vira_mensagem_clara(self, cliente, fonte):
         fonte.falhar_busca = True

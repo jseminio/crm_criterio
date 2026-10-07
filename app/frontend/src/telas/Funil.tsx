@@ -120,8 +120,11 @@ export function Funil({ listas }: { listas: Listas | null }) {
   const [movendo, definirMovendo] = useState<number | null>(null);
   const [erroDeMovimento, definirErroDeMovimento] = useState<string | null>(null);
   const estreita = usarTelaEstreita();
+  // Os dois hooks rodam sempre, na mesma ordem: com `estreita || usarToque()` o segundo pulava
+  // quando a tela estreitava, o React perdia a ordem e o Funil caía em branco (07/10/2026).
+  const toque = usarToque();
   // Tela de toque (celular ou tablet): "Mover ▸" no lugar do arrasto, que o toque não faz direito.
-  const semArrasto = estreita || usarToque();
+  const semArrasto = estreita || toque;
   // Celular: a etapa à vista no Kanban (null = a primeira) e o cartão com a folha "Mover para…" aberta.
   const [etapaVisivel, definirEtapaVisivel] = useState<string | null>(null);
   const [movendoPelaFolha, definirMovendoPelaFolha] = useState<{ oportunidade: OportunidadeResumo; etapa: string } | null>(null);

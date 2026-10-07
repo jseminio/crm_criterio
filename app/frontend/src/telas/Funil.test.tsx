@@ -7,7 +7,7 @@
  * `data_aceite`); soltar na própria coluna não faz nada.
  */
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
 import type { ColunaDoFunil, Indicadores, Listas, OportunidadeDetalhe } from "../api/tipos";
@@ -427,5 +427,39 @@ describe("kanban no celular", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Mover para" })).toBeNull();
     expect(api.editarOportunidade).not.toHaveBeenCalled();
+  });
+});
+
+/** A janela estreitando com o Funil aberto (07/10/2026): antes o hook do toque pulava, a ordem dos
+ * hooks mudava e o Funil caía em branco. */
+describe("janela que estreita com o Funil aberto", () => {
+  const matchMediaOriginal = window.matchMedia;
+  afterEach(() => {
+    window.matchMedia = matchMediaOriginal;
+  });
+
+  it("passa para a etapa por vez sem quebrar", async () => {
+    vi.clearAllMocks();
+    let estreita = false;
+    const ouvintes: (() => void)[] = [];
+    window.matchMedia = vi.fn().mockImplementation((consulta: string) => ({
+      get matches() {
+        return consulta.includes("max-width") ? estreita : false;
+      },
+      media: consulta,
+      addEventListener: (_: string, f: () => void) => ouvintes.push(f),
+      removeEventListener: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    vi.mocked(api.funil).mockResolvedValue([coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")])]);
+    vi.mocked(api.indicadores).mockResolvedValue(INDICADORES_VAZIOS);
+    render(<Funil listas={LISTAS} />);
+    await screen.findByText("Alfa BPO");
+    expect(screen.queryByRole("tab", { name: /Enviar proposta/ })).toBeNull();
+
+    estreita = true;
+    act(() => ouvintes.forEach((f) => f()));
+
+    expect(await screen.findByRole("tab", { name: /Enviar proposta/ })).toBeInTheDocument();
+    expect(screen.getByText("Alfa BPO")).toBeInTheDocument();
   });
 });

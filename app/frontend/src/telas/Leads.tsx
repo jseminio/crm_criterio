@@ -730,7 +730,7 @@ export function Leads({ listas }: { listas: Listas | null }) {
       )}
 
       {!carregando && !erro && (dados?.total ?? 0) > 0 && (
-        <table className="tabela">
+        <table className="tabela tabela-em-cartoes">
           <thead>
             <tr>
               <th scope="col">Contato</th>
@@ -748,22 +748,22 @@ export function Leads({ listas }: { listas: Listas | null }) {
               const quando = prazo(lead.proxima_acao_em);
               return (
                 <tr key={lead.id}>
-                  <td>{lead.nome}</td>
-                  <td>{lead.empresa_texto ?? "—"}</td>
-                  <td>
+                  <td className="cartao-titulo">{lead.nome}</td>
+                  <td data-rotulo="Empresa">{lead.empresa_texto ?? "—"}</td>
+                  <td data-rotulo="Situação">
                     <Etiqueta texto={lead.situacao} />{" "}
                     {lead.nao_contatar && (
                       <span className="etiqueta etiqueta-perda">Não contatar</span>
                     )}
                   </td>
-                  <td className="sdr-qualificacao">
+                  <td className="sdr-qualificacao" data-rotulo="Qualificação">
                     {lead.porte_estimado ? `Porte ${lead.porte_estimado}` : ""}
                     {lead.situacao === "Descartado" && lead.motivo_descarte}
                     {lead.reuniao_marcada_para && (
                       <span> · reunião {dataHora(lead.reuniao_marcada_para)}</span>
                     )}
                   </td>
-                  <td>
+                  <td data-rotulo="Origem">
                     <Etiqueta texto={lead.tipo_canal} tipo="neutra" />{" "}
                     {lead.canal && (
                       <span style={{ fontSize: 12, color: "var(--texto-medio)" }}>
@@ -771,8 +771,8 @@ export function Leads({ listas }: { listas: Listas | null }) {
                       </span>
                     )}
                   </td>
-                  <td>{lead.captador ?? "—"}</td>
-                  <td>
+                  <td data-rotulo="Captador">{lead.captador ?? "—"}</td>
+                  <td data-rotulo="Próxima ação">
                     {lead.proxima_acao ?? "—"}
                     {quando && (
                       <span
@@ -786,7 +786,7 @@ export function Leads({ listas }: { listas: Listas | null }) {
                       </span>
                     )}
                   </td>
-                  <td style={{ whiteSpace: "nowrap" }}>
+                  <td className="cartao-acoes" style={{ whiteSpace: "nowrap" }}>
                     <button
                       type="button"
                       className="botao botao-secundario"

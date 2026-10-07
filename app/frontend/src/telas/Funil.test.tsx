@@ -7,8 +7,8 @@
  * `data_aceite`); soltar na própria coluna não faz nada.
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
 import type { ColunaDoFunil, Indicadores, Listas, OportunidadeDetalhe } from "../api/tipos";
 import { Funil } from "./Funil";
@@ -353,5 +353,79 @@ describe("fusão Kanban/Grade (27/09/2026)", () => {
     expect(await screen.findByRole("button", { name: "▦ Kanban" })).toHaveAttribute("aria-pressed", "true");
     await waitFor(() => expect(api.funil).toHaveBeenCalledTimes(2));
     expect(screen.queryByRole("table")).toBeNull();
+  });
+});
+
+/** Celular (06/10/2026): uma etapa por vez e "Mover ▸" no lugar do arrasto, com as mesmas regras. */
+describe("kanban no celular", () => {
+  const matchMediaOriginal = window.matchMedia;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.matchMedia = vi.fn().mockImplementation((consulta: string) => ({
+      matches: true, media: consulta, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+  });
+  afterEach(() => {
+    window.matchMedia = matchMediaOriginal;
+  });
+
+  // No celular a etapa aparece na aba e no cabeçalho da coluna: espera pela aba.
+  async function abrirNoCelular(cols: ColunaDoFunil[]) {
+    vi.mocked(api.funil).mockResolvedValue(cols);
+    vi.mocked(api.indicadores).mockResolvedValue(INDICADORES_VAZIOS);
+    render(<Funil listas={LISTAS} />);
+    await screen.findByRole("tab", { name: new RegExp(cols[0].situacao) });
+  }
+
+  const colunas = () => [
+    coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")]),
+    coluna("On hold", [oportunidade(2, "Beta Serviços")]),
+    coluna("Aceita", []),
+  ];
+
+  it("mostra uma etapa por vez, escolhida nas abas", async () => {
+    await abrirNoCelular(colunas());
+    expect(screen.getByRole("tab", { name: /Enviar proposta/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Alfa BPO")).toBeInTheDocument();
+    expect(screen.queryByText("Beta Serviços")).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: /On hold/ }));
+    expect(screen.getByText("Beta Serviços")).toBeInTheDocument();
+    expect(screen.queryByText("Alfa BPO")).toBeNull();
+  });
+
+  it("o cartão não é arrastável e o 'Mover' grava a nova etapa como o arrasto", async () => {
+    vi.mocked(api.editarOportunidade).mockResolvedValue({} as OportunidadeDetalhe);
+    await abrirNoCelular(colunas());
+    expect(encontrarCartao("Alfa BPO")).toHaveAttribute("draggable", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Mover Alfa BPO para outra etapa" }));
+    const folha = screen.getByRole("dialog", { name: "Mover para" });
+    expect(within(folha).getByRole("button", { name: /Enviar proposta/ })).toBeDisabled();
+
+    fireEvent.click(within(folha).getByRole("button", { name: "On hold" }));
+    await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledWith(1, { situacao: "On hold" }));
+    expect(screen.queryByRole("dialog", { name: "Mover para" })).toBeNull();
+  });
+
+  it("mover para 'Aceita' abre a ficha em vez de gravar direto", async () => {
+    vi.mocked(api.oportunidade).mockResolvedValue({ id: 1, nome: "Alfa BPO", situacao: "Enviar proposta" } as OportunidadeDetalhe);
+    await abrirNoCelular(colunas());
+    fireEvent.click(screen.getByRole("button", { name: "Mover Alfa BPO para outra etapa" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Mover para" })).getByRole("button", { name: /Aceita/ }));
+    await waitFor(() => expect(api.oportunidade).toHaveBeenCalledWith(1));
+    expect(api.editarOportunidade).not.toHaveBeenCalled();
+  });
+
+  it("Cancelar e Esc fecham a folha sem mover nada", async () => {
+    await abrirNoCelular(colunas());
+    fireEvent.click(screen.getByRole("button", { name: "Mover Alfa BPO para outra etapa" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("dialog", { name: "Mover para" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mover Alfa BPO para outra etapa" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Mover para" })).toBeNull();
+    expect(api.editarOportunidade).not.toHaveBeenCalled();
   });
 });

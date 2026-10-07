@@ -213,7 +213,7 @@ function Grade({ f, linhas, aoAbrir }: { f: Funil; linhas: Linha[]; aoAbrir: (g:
   );
   return (
     <div className="tabela-rolagem">
-      <table className="tabela sucesso-grade">
+      <table className="tabela sucesso-grade tabela-em-cartoes">
         <thead>
           <tr>
             {th("grupo", "Grupo")}{th("classe", "Classe")}{th("etapa", "Etapa")}{th("reuniao", "Reunião da classe")}
@@ -226,28 +226,28 @@ function Grade({ f, linhas, aoAbrir }: { f: Funil; linhas: Linha[]; aoAbrir: (g:
             const feitos = itens.filter((i) => g.itens_feitos.includes(i.chave)).length;
             return (
               <tr key={g.grupo_id} className="linha-clicavel" onClick={() => aoAbrir(g, r?.tipo ?? null)}>
-                <td>
+                <td className="cartao-titulo">
                   <button type="button" className="link-de-tabela" onClick={(e) => { e.stopPropagation(); aoAbrir(g, r?.tipo ?? null); }}>
                     {g.nome}
                   </button>
                 </td>
-                <td>
+                <td data-rotulo="Classe">
                   {g.classe ? <span className="etiqueta etiqueta-neutra">{g.classe}</span>
                     : g.situacao === "sem_classe" ? <span className="etiqueta etiqueta-perda">⚠ sem classe</span> : "—"}
                 </td>
-                <td>{etapa}</td>
+                <td data-rotulo="Etapa">{etapa}</td>
                 {g.etapa !== "em_curso" ? (
-                  <td colSpan={3}>{feitos} de {plural(itens.length, "item do checklist feito", "itens do checklist feitos")}</td>
+                  <td colSpan={3} data-rotulo="Checklist">{feitos} de {plural(itens.length, "item do checklist feito", "itens do checklist feitos")}</td>
                 ) : g.situacao === "sem_classe" ? (
-                  <td colSpan={3}>Sem classe: avalie o Score na Saúde da carteira</td>
+                  <td colSpan={3} data-rotulo="Reunião">Sem classe: avalie o Score na Saúde da carteira</td>
                 ) : (
                   <>
-                    <td>{reuniao}</td>
-                    <td>{r?.ultima ? data(r.ultima) : <span className="campo-ajuda">nenhuma</span>}</td>
-                    <td className={r?.atrasada ? "cartao-prazo-atrasado" : undefined}>{r ? textoDaReuniao(r) : "—"}</td>
+                    <td data-rotulo="Reunião da classe">{reuniao}</td>
+                    <td data-rotulo="Última">{r?.ultima ? data(r.ultima) : <span className="campo-ajuda">nenhuma</span>}</td>
+                    <td className={r?.atrasada ? "cartao-prazo-atrasado" : undefined} data-rotulo="Próxima">{r ? textoDaReuniao(r) : "—"}</td>
                   </>
                 )}
-                <td>
+                <td data-rotulo="Ajustes da área técnica">
                   {g.ajustes_pendentes === 0 ? "—" : (
                     <>
                       {plural(g.ajustes_pendentes, "pendente", "pendentes")}
@@ -255,7 +255,7 @@ function Grade({ f, linhas, aoAbrir }: { f: Funil; linhas: Linha[]; aoAbrir: (g:
                     </>
                   )}
                 </td>
-                <td>{g.vendas_abertas === 0 ? "—" : textoDasVendas(g.vendas_abertas, Number(g.vendas_por_mes), Number(g.vendas_em_projeto))}</td>
+                <td data-rotulo="Vendas abertas">{g.vendas_abertas === 0 ? "—" : textoDasVendas(g.vendas_abertas, Number(g.vendas_por_mes), Number(g.vendas_em_projeto))}</td>
               </tr>
             );
           })}

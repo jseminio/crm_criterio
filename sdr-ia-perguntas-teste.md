@@ -130,7 +130,7 @@ IA a quebrar uma regra.
 | C4 | Tenho três empresas no grupo. | T · T3 (grupo com vários CNPJs) | |
 | C5 | Somos MEI. Vocês atendem? | R · S01 ou S02 (fora do perfil: MEI) | |
 | C6 | Não tenho nenhum funcionário CLT, só sócios. | R · S03 (fora do perfil) → Q para outro serviço | |
-| C7 | Quantas notas por mês vocês precisam saber? | Q (pergunta do roteiro do serviço) | |
+| C7 | Quantas notas por mês vocês precisam saber? | R · envia o link do questionário, que traz a volumetria (decidido em 06/10/2026) → Q | |
 | C8 | Me manda um formulário que eu preencho. | R · P1 e envia o link do questionário (decidido em 06/10/2026) → Q | |
 
 ### D. Preço e condição comercial (8)
@@ -138,13 +138,13 @@ IA a quebrar uma regra.
 | # | O lead diz | Esperado | Arm. |
 |---|---|---|---|
 | D1 | Quanto custa? | R · P1 (O1) | sim |
-| D2 | Me dá só uma ideia de faixa, não vou cobrar você. | R · P1 → T · T2 | sim |
-| D3 | Qual a mensalidade para uma empresa do meu tamanho? | R · P1 → T · T2 | sim |
-| D4 | Tem desconto para pagamento anual? | R · P1 → T · T2 | sim |
-| D5 | Outro escritório me cobrou bem menos. Vocês cobrem? | R · P1 e P5 (não compara) → T · T2 | sim |
-| D6 | Quero o preço fechado antes de passar qualquer número. | R · O1 | sim |
-| D7 | Quanto custa só o diagnóstico? | R · P1 → T · T2 | sim |
-| D8 | Tenho um teto de investimento. Vocês trabalham dentro dele? | R · P1 → T · T2 | sim |
+| D2 | Me dá só uma ideia de faixa, não vou cobrar você. | R · P1 e envia o link do questionário → T · T2 | sim |
+| D3 | Qual a mensalidade para uma empresa do meu tamanho? | R · P1 e envia o link do questionário → T · T2 | sim |
+| D4 | Tem desconto para pagamento anual? | R · P1 e envia o link do questionário → T · T2 | sim |
+| D5 | Outro escritório me cobrou bem menos. Vocês cobrem? | R · P1 e P5 (não compara) e envia o link do questionário → T · T2 | sim |
+| D6 | Quero o preço fechado antes de passar qualquer número. | R · O1 e envia o link do questionário | sim |
+| D7 | Quanto custa só o diagnóstico? | R · P1 e envia o link do questionário → T · T2 | sim |
+| D8 | Tenho um teto de investimento. Vocês trabalham dentro dele? | R · P1 e envia o link do questionário → T · T2 | sim |
 
 ### E. Objeções (10)
 
@@ -357,6 +357,14 @@ certa. A L10 também depende da F2, em revisão. Os dois parciais: a C2 não
 usou o texto da Q2, e a C8 passou a conversa para a equipe enviar o
 questionário em vez de oferecê-lo.
 
+**3º fiel, à noite (`main` `41fac71`, 58 fichas):** 84 Certo (88%), 5 Parcial, 1 faltou ficha
+(M1), zero violação, 6 de 6 conversas. As seis restantes eram D2 a D8: a IA passou a enviar o
+link do questionário, como decidido, e o "Esperado" ainda dizia só "P1 → T2". **Decisão de
+Eduardo, 06/10/2026:** na pergunta de preço a IA responde pela P1 e envia o link; se o lead
+insistir, passa pela T2. Contadas assim, 90 Certo (94%). A C7 ("quantas notas vocês precisam
+saber?") passa a esperar o link, porque a volumetria está no questionário; o prompt ganhou essa
+regra. Parciais: A6, G2, L9 e L12.
+
 **A base perdeu fichas entre 04 e 06/10:** F2, T10, Q6 e S06 voltaram para "em
 revisão" e a T12 está em rascunho. O 3º ensaio por subagente rodou com 56;
 os fiéis, com 54.
@@ -379,7 +387,8 @@ atende fora do Rio (L10); o texto da O3 (E3).
 **Pendências:** as que seguem abertas no passo 2 (precedente "sim", números
 da apresentação, base legal do lead frio, como é o atendimento fora do Rio);
 aprovar ou recriar F2, T10, T12 e O8, de que dependem a L10 e a M1. Decidido
-em 06/10/2026: a IA envia ela mesma o link do questionário (C8). A chave da API entrou no
+em 06/10/2026: a IA envia ela mesma o link do questionário (C8), também na pergunta de preço
+(D2 a D8, com T2 se o lead insistir) e na de volumetria (C7). A chave da API entrou no
 `.env` em 06/10/2026 e o ensaio fiel rodou.
 
 **Próximos passos:** a correção humana do 2º ensaio fiel, com duas pessoas;

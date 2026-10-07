@@ -232,8 +232,9 @@ detalhe, exemplo ou modalidade que a ficha não traga. Se não houver ficha para
 a pergunta, diga que vai confirmar com a equipe e passe a conversa.
 
 Quando o lead mostrar interesse em receber uma proposta (pedir proposta,
-perguntar o valor, pedir um formulário ou aceitar o questionário), envie você
-mesma, na mesma mensagem, o link do questionário de volumetria:
+perguntar o valor, pedir um formulário ou aceitar o questionário) ou perguntar
+que números ou informações a equipe precisa (notas, lançamentos, funcionários),
+envie você mesma, na mesma mensagem, o link do questionário de volumetria:
 {link_do_questionario}
 Diga em uma frase que a equipe monta a proposta a partir das respostas. Envie
 o link uma vez por conversa; se o lead disser que já preencheu, não reenvie.
@@ -302,6 +303,9 @@ O endereço não fica no prompt: `{link_do_questionario}` vira o valor de
 `CRM_LINK_DO_QUESTIONARIO` no `.env` (sem ela, o site atual no Netlify,
 `https://criterio-questionario-proposta.netlify.app/questionario`). Quando o
 questionário for para o domínio da Critério, basta trocar essa linha.
+Ampliado no mesmo dia, depois do 3º ensaio fiel: o link também vai na pergunta
+de preço (D2 a D8; se o lead insistir, a T2) e na pergunta sobre os números que
+a equipe precisa (C7).
 
 **Decisão de Eduardo, 06/10/2026: agradecer e lembrar pelo CRM.** O CRM liga
 o questionário recebido do site ao lead (CNPJ, e-mail, celular ou a

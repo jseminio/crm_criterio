@@ -61,6 +61,13 @@ WhatsApp, o e-mail do Microsoft 365, o questionário e o disparo se cadastram, t
   digitado.
 - **Só no ambiente** fica o que a API precisa para subir: banco, segredo das sessões e conta do primeiro
   administrador.
+- **Anthropic ou OpenAI, ou as duas** (pedido de Eduardo, 07/10/2026). No cartão de IA escolhe-se a
+  **principal** e, se quiser, a **reserva**, que entra quando a principal falha ou recusa. A OpenAI
+  entra pela API (não o ChatGPT), com um adaptador (`crm.agente.ia`) que traduz para a Responses API:
+  o agente SDR (com pesquisa na web), a ata e a análise da carteira funcionam com qualquer das duas.
+  Modelo padrão da OpenAI: `gpt-6.1-sol`. O custo de cada chamada sai pelo preço do modelo que de
+  fato respondeu (tabela da OpenAI consultada em 07/10/2026). O ensaio do SDR (`scripts/ensaio_sdr.py`)
+  segue só com a Anthropic.
 
 ## Disparo do lembrete e do agradecimento do questionário (06/10/2026)
 

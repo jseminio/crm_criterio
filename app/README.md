@@ -16,6 +16,25 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## MRR com 13 parcelas e KPIs da liderança (09/10/2026)
+
+Decisões de Eduardo:
+
+- **MRR = parcela × 13 ÷ 12** em todo serviço recorrente: contábil, fiscal, DP e **BPO Financeiro** (que
+  passou a 13 parcelas, para uma versão única). O contrato guarda a parcela; o MRR é sempre calculado, em
+  `crm.domain.mrr.em_bruto` (`mensalizar`), por onde passa todo MRR do CRM: MRR atual, movimento, NRR e
+  GRR, plano de MRR, Sucesso do Cliente. O catálogo põe 13 parcelas no BPO Financeiro.
+- **Ticket recorrente aceito** (Funil): só serviço recorrente (linha C1), em MRR. Consultoria e
+  legalização são pontuais e ficam de fora.
+- **KPIs da liderança**, no topo de Funil › Inteligência de Conversão, **só para o Administrador** (a rota
+  `GET /api/inteligencia/kpis-lideranca?mes=` confere). Os cinco da planilha "KPIs de mercado", mês a mês:
+  **20 MRR novo** (contratos recorrentes que começaram no mês, carteira inteira) · **19 ticket** por grupo
+  e por CNPJ, no mês e no ano · **18 upsell** recorrente (expansão e contrato novo de quem já era cliente)
+  e não recorrente (consultoria e legalização aceitas por cliente), sobre o MRR do fim do mês anterior,
+  meta 10% · **17 churn** de clientes sobre a base de 31/12 do ano anterior · **21 cobertura** de
+  relacionamento: clientes com a reunião da classe realizada na janela (A 1 mês, B 3, C 6). Cada KPI diz
+  o que falta registrar; "sem dado" nunca vira zero.
+
 ## CRM no celular e no tablet (06/10/2026)
 
 O CRM se adapta a qualquer celular e tablet, com todas as funcionalidades. Amostra aprovada por

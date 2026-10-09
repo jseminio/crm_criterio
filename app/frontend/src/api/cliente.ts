@@ -87,6 +87,7 @@ import type {
   AjusteTecnico,
   CadenciaDeReunioes,
   Integracoes,
+  KpisDaLideranca,
   ResultadoDoTeste,
   EstadoDaBusca,
   FunilDoSucesso,
@@ -680,6 +681,8 @@ export const api = {
     pedir<FichaDaBase>(`/api/sdr/base/fichas/${id}/aprovar`, { method: "POST", body: JSON.stringify({ aprovador }) }),
   cargaInicialDaBase: () =>
     pedir<{ acrescentadas: number; ja_existiam: number }>("/api/sdr/base/carga-inicial", { method: "POST" }),
+  // KPIs da liderança (09/10/2026), só o Administrador
+  kpisDaLideranca: (mes: string) => pedir<KpisDaLideranca>(`/api/inteligencia/kpis-lideranca?mes=${mes}`),
   // Configurações › Integrações (07/10/2026)
   integracoes: () => pedir<Integracoes>("/api/configuracoes/integracoes"),
   salvarIntegracao: (chave: string, mudanca: { valores?: Record<string, string>; apagar?: string[] }) =>

@@ -2013,3 +2013,30 @@ export interface ResultadoDoTeste {
   segundos: number;
   em: string;
 }
+
+/** KPIs da liderança (09/10/2026): os cinco da planilha, em MRR com 13 parcelas. Só Administrador. */
+export interface ItemDoKpi {
+  grupo: string;
+  detalhe: string;
+  valor: string;
+}
+
+export interface KpiDaLideranca {
+  chave: string;
+  titulo: string;
+  /** `null` = sem dado. */
+  valor: string | null;
+  unidade: string;
+  resumo: string;
+  falta: string[];
+  meta: string | null;
+  extras: Record<string, string | number | null>;
+  itens: ItemDoKpi[];
+}
+
+export interface KpisDaLideranca {
+  mes: string;
+  de: string;
+  ate: string;
+  kpis: KpiDaLideranca[];
+}

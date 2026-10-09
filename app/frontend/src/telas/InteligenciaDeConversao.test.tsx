@@ -8,7 +8,7 @@ import { InteligenciaDeConversao } from "./InteligenciaDeConversao";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { planoDeMrr: vi.fn(), mudarPlanoDeMrr: vi.fn(), cenariosPorServico: vi.fn(), fasesDoMes: vi.fn() } };
+  return { ...real, api: { planoDeMrr: vi.fn(), mudarPlanoDeMrr: vi.fn(), cenariosPorServico: vi.fn(), fasesDoMes: vi.fn(), kpisDaLideranca: vi.fn() } };
 });
 
 const cenario = (bpo: string) => ({ bpo_por_mes: bpo, ticket_contabil: "2903.28", com_contratos_previstos: true });
@@ -93,6 +93,16 @@ describe("Funil › Inteligência de Conversão", () => {
     vi.mocked(api.planoDeMrr).mockResolvedValue(PLANO);
     vi.mocked(api.cenariosPorServico).mockResolvedValue([]);
     vi.mocked(api.fasesDoMes).mockResolvedValue(FASES);
+    vi.mocked(api.kpisDaLideranca).mockResolvedValue({ mes: "2026-10", de: "2026-10-01", ate: "2026-10-09", kpis: [] });
+  });
+
+  it("os KPIs da liderança aparecem só para o Administrador (09/10/2026)", async () => {
+    const { unmount } = render(<InteligenciaDeConversao />);  // sem login: a máquina do CRM é Administrador
+    expect(await screen.findByRole("heading", { name: "KPIs da liderança" })).toBeInTheDocument();
+    unmount();
+    render(<ProvedorDeAcesso eu={COMERCIAL}><InteligenciaDeConversao /></ProvedorDeAcesso>);
+    await screen.findByText("Plano de MRR");
+    expect(screen.queryByRole("heading", { name: "KPIs da liderança" })).not.toBeInTheDocument();
   });
 
   it("mostra a meta líquida com a situação em palavra, o plano por motor e os três cenários", async () => {

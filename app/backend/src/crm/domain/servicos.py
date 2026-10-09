@@ -120,7 +120,7 @@ CATALOGO: tuple[Servico, ...] = (
         ),
         ("Movimento tão pequeno que não justifica rotina mensal",),
         BPO,
-        meses_no_ano=12,
+        meses_no_ano=13,  # BPO Financeiro também com 13 parcelas (decisão de Eduardo, 09/10/2026)
     ),
     Servico(
         "Endereço Fiscal", C1,

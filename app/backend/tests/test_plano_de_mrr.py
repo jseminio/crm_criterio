@@ -27,10 +27,20 @@ PIPELINE = (
 )
 
 
+# Premissas como Eduardo aprovou em 03/10/2026, pela parcela. Desde 09/10/2026 o padrão está em MRR com
+# 13 parcelas (× 13 ÷ 12); estas ficam para conferir a conta mostrada a ele naquele dia.
+ANTIGO = replace(
+    regras.PADRAO, meta_liquida=D("250000"), ponto_de_partida=D("26000"), mrr_de_partida=D("252341"),
+    bpo_ticket=D("7000"), plus_acrescimo=D("3000"), cfo_acrescimo=D("6000"),
+    alerta=regras.Cenario(D("2"), D("2903.28"), False), previsto=regras.Cenario(D("3"), D("2903.28"), True),
+    otimista=regras.Cenario(D("5"), D("5000"), True),
+)
+
+
 # ---------------------------------------------------------------- regras
 
 def test_os_tres_cenarios_de_03_10_batem_com_a_conta_mostrada_a_eduardo():
-    p = replace(regras.PADRAO, contratos_previstos=PIPELINE)
+    p = replace(ANTIGO, contratos_previstos=PIPELINE)
     alerta, previsto, otimista = (regras.projetar(p, n) for n in regras.CENARIOS)
     assert (alerta.liquido, alerta.percentual_da_meta) == (D("233636.22"), D("93.5"))
     assert (previsto.liquido, previsto.percentual_da_meta) == (D("325725.25"), D("130.3"))
@@ -38,8 +48,17 @@ def test_os_tres_cenarios_de_03_10_batem_com_a_conta_mostrada_a_eduardo():
     assert (previsto.bpo, previsto.contabil, previsto.escada) == (D("168000.00"), D("117888.56"), D("44640.00"))
 
 
+def test_premissas_em_13_parcelas_mantem_o_percentual_da_meta():
+    """09/10/2026: tudo em reais × 13 ÷ 12 — os cenários sobem 8,33% e o percentual da meta não muda."""
+    em_mrr = tuple(replace(c, valor=(c.valor * 13 / 12).quantize(D("0.01"))) for c in PIPELINE)
+    p = replace(regras.PADRAO, contratos_previstos=em_mrr)
+    assert regras.PADRAO.meta_liquida == D("270833.33")
+    assert [regras.projetar(p, n).percentual_da_meta for n in regras.CENARIOS] == [D("93.5"), D("130.3"), D("207.2")]
+    assert regras.projetar(p, "previsto").liquido == D("352868.95")
+
+
 def test_o_atipico_ocupa_duas_vagas_do_onboarding_contabil():
-    p = replace(regras.PADRAO, contratos_previstos=PIPELINE)
+    p = replace(ANTIGO, contratos_previstos=PIPELINE)
     nov, dez, jan = regras.projetar(p, "previsto").linhas[:3]
     assert nov.contabil == D("18000") + D("5500") + D("2903.28")  # 2 + 1 vagas ocupadas, sobra 1
     assert dez.contabil == D("16000") + 2 * D("2903.28")
@@ -48,7 +67,7 @@ def test_o_atipico_ocupa_duas_vagas_do_onboarding_contabil():
 
 
 def test_a_escada_sobe_a_cada_prazo_e_o_bpo_respeita_o_teto():
-    p = replace(regras.PADRAO, otimista=regras.Cenario(D("9"), D("5000"), False))
+    p = replace(ANTIGO, otimista=regras.Cenario(D("9"), D("5000"), False))
     linhas = regras.projetar(p, "otimista").linhas
     assert linhas[0].bpo == 5 * D("7000")  # 9 pedidos, teto 5
     assert [l.escada for l in linhas[:4]] == [0, 0, 0, D("12000.00")]  # 5 × 80% × R$ 3 mil no 4º mês
@@ -120,7 +139,7 @@ def test_quem_ve_o_funil_ve_o_plano_com_o_realizado_por_motor(cliente):
     r = cliente.get("/api/inteligencia/plano", headers=KARINE, params={"hoje": "2026-10-04"})
     assert r.status_code == 200, r.text
     plano = r.json()
-    assert D(plano["premissas"]["meta_liquida"]) == 250000
+    assert D(plano["premissas"]["meta_liquida"]) == D("270833.33")  # 250 mil × 13 ÷ 12 (09/10/2026)
     assert plano["premissas"]["alterado_em"] is None  # padrão, ninguém mudou
     assert [c["descricao"] for c in plano["premissas"]["contratos_previstos"]] == ["Atípico do pipeline (nov)"]
     set_, out = plano["realizado"]
@@ -128,7 +147,7 @@ def test_quem_ve_o_funil_ve_o_plano_com_o_realizado_por_motor(cliente):
     assert (D(out["novo_contabil"]), out["contratos_contabil"]) == (D("3250.00"), 1)
     assert D(plano["meta"]["realizado"]) == D("14083.33")  # 13.000 × 13 ÷ 12
     assert plano["meta"]["meses_restantes"] == 8  # nov a jun
-    assert D(plano["meta"]["previsto_ate_hoje"]) == 26000  # antes da projeção: o ponto de partida
+    assert D(plano["meta"]["previsto_ate_hoje"]) == D("28166.67")  # antes da projeção: o ponto de partida
     assert plano["meta"]["situacao"]["chave"] == "abaixo"
     motores = {m["motor"]: m for m in plano["motores"]}
     assert D(motores["bpo"]["realizado"]) == D("7583.33")
@@ -149,7 +168,7 @@ def test_so_o_administrador_muda_as_premissas_e_fica_registrado(cliente):
     assert novo["premissas"]["contratos_previstos"] == []
     assert novo["premissas"]["alterado_por"]
     previsto = next(c for c in novo["cenarios"] if c["nome"] == "previsto")
-    assert D(previsto["bpo"]) == 224000  # 4 × R$ 7 mil × 8 meses
+    assert D(previsto["bpo"]) == D("242666.56")  # 4 × R$ 7.583,33 × 8 meses
 
 
 def test_premissa_incoerente_e_recusada_com_o_motivo(cliente):

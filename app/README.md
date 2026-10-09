@@ -24,6 +24,10 @@ Decisões de Eduardo:
   passou a 13 parcelas, para uma versão única). O contrato guarda a parcela; o MRR é sempre calculado, em
   `crm.domain.mrr.em_bruto` (`mensalizar`), por onde passa todo MRR do CRM: MRR atual, movimento, NRR e
   GRR, plano de MRR, Sucesso do Cliente. O catálogo põe 13 parcelas no BPO Financeiro.
+- **Premissas do plano de MRR em 13 parcelas** (09/10/2026): os valores em reais (meta, ponto e MRR de
+  partida, tickets, acréscimos da escada e contratos previstos) × 13 ÷ 12. A meta foi de R$ 250 mil para
+  **R$ 270.833,33**, o mesmo esforço (decisão de Eduardo); o percentual da meta de cada cenário não muda.
+  A tarefa `2026_10_09_premissas_em_13_parcelas` converte as premissas já salvas no Redeploy, uma vez.
 - **Ticket recorrente aceito** (Funil): só serviço recorrente (linha C1), em MRR. Consultoria e
   legalização são pontuais e ficam de fora.
 - **KPIs da liderança**, no topo de Funil › Inteligência de Conversão, **só para o Administrador** (a rota

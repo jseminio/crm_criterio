@@ -31,7 +31,8 @@ from decimal import Decimal
 from statistics import median
 from typing import Iterable, Protocol
 
-from crm.domain.listas import Situacao, TipoCanal
+from crm.domain.listas import LinhaServico, Situacao, TipoCanal
+from crm.domain.mrr import mensalizar
 
 __all__ = [
     "Indicadores",
@@ -333,13 +334,17 @@ def calcular(
     )
 
     centavos = Decimal("0.01")
-    mensais = [o.preco_mensal for o in aceitas if o.preco_mensal is not None and o.preco_mensal > 0]
+    # Ticket recorrente (09/10/2026): só serviço recorrente (C1) — consultoria e legalização são
+    # trabalhos pontuais — e em MRR, a parcela × 13 ÷ 12, como todo MRR do CRM.
+    recorrentes = [o for o in aceitas if o.preco_mensal is not None and o.preco_mensal > 0
+                   and getattr(o, "linha_servico", LinhaServico.C1) is LinhaServico.C1]
+    mensais = [mensalizar(o.preco_mensal) for o in recorrentes]
     total_mensal = sum(mensais, ZERO)
     if mensais:
         maior = max(mensais)
         ticket = TicketRecorrente(
             quantas=len(mensais),
-            clientes=len({o.grupo_id for o in aceitas if o.preco_mensal is not None and o.preco_mensal > 0}),
+            clientes=len({o.grupo_id for o in recorrentes}),
             valor_mensal=total_mensal,
             ticket_medio=(total_mensal / len(mensais)).quantize(centavos),
             mediana=Decimal(median(mensais)).quantize(centavos),

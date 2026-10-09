@@ -1765,3 +1765,33 @@ class ConfiguracaoDoSistema(Base):
     cifrado: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False, server_default=sa.false())
     alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
     alterado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=agora)
+
+
+class EventoDoWhatsapp(Base):
+    """Um aviso do webhook da Meta: mensagem recebida ou status de mensagem enviada (09/10/2026).
+
+    Todo aviso com assinatura válida fica aqui, como chegou, inclusive o de número que não é de
+    nenhum lead. A mensagem de um lead conhecido também entra na conversa do SDR (`mensagem_id`).
+    Imutável: é o registro do que a Meta entregou. `externo_id` impede gravar duas vezes o mesmo
+    aviso, porque a Meta reenvia quando não recebe resposta a tempo.
+    """
+
+    __tablename__ = "evento_do_whatsapp"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    externo_id: Mapped[str] = mapped_column(sa.String(200), nullable=False, unique=True)
+    """O id da mensagem na Meta (`wamid…`); no status, o id seguido do status (`wamid…:read`)."""
+    recebido_em: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, default=agora, index=True
+    )
+    tipo: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    """"mensagem" (o lead escreveu) ou "status" (enviada, entregue, lida, falhou)."""
+    telefone: Mapped[str] = mapped_column(sa.String(20), nullable=False, index=True)
+    """Só dígitos, como a Meta manda: de quem escreveu ou para quem foi."""
+    situacao: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    """O que o CRM fez com o aviso: "na conversa", "sem lead", "lead já é oportunidade", "só
+    aviso" ou o status da Meta ("sent", "delivered", "read", "failed")."""
+    lead_id: Mapped[int | None] = mapped_column(sa.ForeignKey("lead.id"), index=True)
+    mensagem_id: Mapped[int | None] = mapped_column(sa.ForeignKey("mensagem_do_sdr.id"))
+    conteudo: Mapped[dict] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+    """O pedaço do aviso da Meta, sem alteração."""

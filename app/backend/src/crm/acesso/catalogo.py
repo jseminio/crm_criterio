@@ -64,8 +64,9 @@ def permissoes_do_comercial() -> list[str]:
     )
 
 
-PUBLICAS: tuple[str, ...] = ("/api/acesso/entrada", "/api/acesso/login")
-"""Sem entrada nenhuma: a tela precisa saber como entrar, e entrar, antes de ter entrado."""
+PUBLICAS: tuple[str, ...] = ("/api/acesso/entrada", "/api/acesso/login", "/api/whatsapp/webhook")
+"""Sem entrada nenhuma: a tela precisa saber como entrar, e entrar, antes de ter entrado. O webhook
+do WhatsApp é chamado pela Meta e se protege pela assinatura (`crm.api.webhook_whatsapp`)."""
 
 _TODOS = ()  # qualquer pessoa que entrou
 

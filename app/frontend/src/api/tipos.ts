@@ -1990,6 +1990,15 @@ export interface CampoDeIntegracao {
   ajuda: string;
   exemplo: string;
   opcoes: string[];
+  /** Subtítulo que aparece antes deste campo, dentro do cartão. */
+  secao?: string;
+}
+
+/** O webhook do WhatsApp (09/10/2026): a tela monta o endereço com o domínio em que está aberta. */
+export interface WebhookDaIntegracao {
+  caminho: string;
+  ultimo_aviso_em: string | null;
+  ultimo_aviso_situacao: string | null;
 }
 
 export interface GrupoDeIntegracao {
@@ -2001,6 +2010,7 @@ export interface GrupoDeIntegracao {
   campos: CampoDeIntegracao[];
   alterado_por: string | null;
   alterado_em: string | null;
+  webhook?: WebhookDaIntegracao | null;
 }
 
 export interface Integracoes {

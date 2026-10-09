@@ -34,7 +34,10 @@ const INTEGRACOES: Integracoes = {
       campos: [
         campo("whatsapp.token", "Token permanente", { segredo: true }),
         campo("whatsapp.numero_id", "ID do número de telefone", { origem: "servidor", valor: "5555" }),
+        campo("whatsapp.verificacao", "Token de verificação", { segredo: true, secao: "Receber respostas (webhook)" }),
+        campo("whatsapp.chave_do_app", "Chave secreta do app", { segredo: true, origem: "tela", final: "7f3c" }),
       ],
+      webhook: { caminho: "/api/whatsapp/webhook", ultimo_aviso_em: "2026-10-09T17:32:00Z", ultimo_aviso_situacao: "na conversa" },
     },
     {
       chave: "disparo", titulo: "Disparo do lembrete e do agradecimento", testavel: false, envia_teste: false,
@@ -134,5 +137,20 @@ describe("Configurações › Integrações: chaves pela tela (07/10/2026)", () 
     await userEvent.click(disparo.getByRole("checkbox"));
     await userEvent.click(disparo.getByRole("button", { name: "Salvar" }));
     expect(api.salvarIntegracao).toHaveBeenCalledWith("disparo", { valores: { "disparo.ligado": "true" }, apagar: [] });
+  });
+  it("mostra o webhook do WhatsApp: subtítulo, endereço para copiar e último aviso (09/10/2026)", async () => {
+    const escrever = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: escrever }, configurable: true });
+    render(<IntegracoesDoSistema />);
+    const whatsapp = await cartao("WhatsApp (Meta)");
+    expect(whatsapp.getByRole("heading", { name: "Receber respostas (webhook)" })).toBeInTheDocument();
+    expect(whatsapp.getByLabelText("Token de verificação")).toHaveValue("");
+    expect(whatsapp.getByText("7f3c")).toBeInTheDocument();
+    const endereco = `${window.location.origin}/api/whatsapp/webhook`;
+    expect(whatsapp.getByLabelText("Endereço para a Meta")).toHaveValue(endereco);
+    expect(whatsapp.getByText(/Último aviso recebido: .*\(na conversa\)/)).toBeInTheDocument();
+    await userEvent.click(whatsapp.getByRole("button", { name: "Copiar" }));
+    expect(escrever).toHaveBeenCalledWith(endereco);
+    expect(await whatsapp.findByRole("button", { name: "✓ Copiado" })).toBeInTheDocument();
   });
 });

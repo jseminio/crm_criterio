@@ -2,11 +2,12 @@
  * e-mail, questionário e disparo se cadastram, trocam e testam aqui, sem nada no painel do servidor.
  * Vale o que está na tela; sem valor na tela, o que veio do servidor; depois o padrão. Segredo nunca
  * volta do servidor: aparecem só os 4 últimos caracteres. A IA pode ser Anthropic ou OpenAI, com a
- * outra de reserva (07/10/2026). */
+ * outra de reserva (07/10/2026). O WhatsApp recebe as respostas do lead pelo webhook da Meta: token de
+ * verificação, chave secreta do app e o endereço para colar na Meta (amostra aprovada em 09/10/2026). */
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { CampoDeIntegracao, GrupoDeIntegracao, Integracoes, ResultadoDoTeste } from "../api/tipos";
+import type { CampoDeIntegracao, GrupoDeIntegracao, Integracoes, ResultadoDoTeste, WebhookDaIntegracao } from "../api/tipos";
 import { dataHora } from "../formato";
 import { usarDados } from "../usarDados";
 import { Etiqueta } from "./Etiqueta";
@@ -97,10 +98,14 @@ function CartaoDeIntegracao({ grupo, aoSalvar }: { grupo: GrupoDeIntegracao; aoS
       </div>
       <div style={{ display: "grid", gap: "var(--e3)", marginTop: "var(--e3)" }}>
         {grupo.campos.map((c) => (
-          <Campo key={c.chave} campo={c} valor={valorDe(c)} aoMudar={(v) => mudar(c.chave, v)}
-            vaiApagar={apagar.includes(c.chave)}
-            aoApagar={() => { definirFeito(null); definirApagar([...apagar, c.chave]); }} />
+          <div key={c.chave} style={{ display: "contents" }}>
+            {c.secao && <h4 className="numero-rotulo" style={{ margin: "var(--e2) 0 0" }}>{c.secao}</h4>}
+            <Campo campo={c} valor={valorDe(c)} aoMudar={(v) => mudar(c.chave, v)}
+              vaiApagar={apagar.includes(c.chave)}
+              aoApagar={() => { definirFeito(null); definirApagar([...apagar, c.chave]); }} />
+          </div>
         ))}
+        {grupo.webhook && <EnderecoDoWebhook webhook={grupo.webhook} />}
       </div>
       <div className="perfis-acoes">
         <button type="button" className="botao botao-primario" disabled={!mudou || salvando} onClick={() => void salvar()}>
@@ -139,6 +144,36 @@ function CartaoDeIntegracao({ grupo, aoSalvar }: { grupo: GrupoDeIntegracao; aoS
       {falha && <p className="estado estado-erro estado-texto" role="alert">✗ {falha}</p>}
       {feito && <p className="recado" role="status">✓ {feito}</p>}
     </section>
+  );
+}
+
+function EnderecoDoWebhook({ webhook }: { webhook: WebhookDaIntegracao }) {
+  const [copiado, definirCopiado] = useState(false);
+  const endereco = `${window.location.origin}${webhook.caminho}`;
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(endereco);
+      definirCopiado(true);
+    } catch {
+      definirCopiado(false);
+    }
+  };
+  return (
+    <div style={{ display: "grid", gap: "var(--e1)" }}>
+      <label htmlFor="webhook-endereco">Endereço para a Meta</label>
+      <div style={{ display: "flex", gap: "var(--e2)", flexWrap: "wrap" }}>
+        <input id="webhook-endereco" className="entrada" style={{ flex: 1, minWidth: "16rem" }} readOnly value={endereco} />
+        <button type="button" className="botao" onClick={() => void copiar()}>{copiado ? "✓ Copiado" : "Copiar"}</button>
+      </div>
+      <span className="campo-ajuda">
+        Meta for Developers › WhatsApp › Configuração: cole este endereço e o token de verificação, e assine o campo messages.
+      </span>
+      <span className="campo-ajuda">
+        {webhook.ultimo_aviso_em
+          ? `Último aviso recebido: ${dataHora(webhook.ultimo_aviso_em)} (${webhook.ultimo_aviso_situacao ?? "sem situação"})`
+          : "Nenhum aviso recebido ainda."}
+      </span>
+    </div>
   );
 }
 

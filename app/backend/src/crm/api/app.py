@@ -61,6 +61,7 @@ from crm.api.busca_automatica import laco_da_busca
 from crm.agente.disparo_do_questionario import Canais
 from crm.api.disparo_do_questionario import canais_reais, laco_do_disparo
 from crm.api.integracoes import Testadores, roteador_de_integracoes
+from crm.api.webhook_whatsapp import roteador_do_webhook_do_whatsapp
 from crm import configuracao
 from crm.api.questionarios import fonte_real, roteador_de_questionarios
 from crm.questionario.endereco import BuscaDeEndereco, endereco_pelo_cnpj
@@ -289,6 +290,7 @@ def criar_app(
     endereco = busca_de_endereco or (None if fabrica is not None else endereco_pelo_cnpj)
     api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real, endereco))
     api.include_router(roteador_de_integracoes(obter_sessao, fonte_de_questionarios or fonte_real, testadores))
+    api.include_router(roteador_do_webhook_do_whatsapp(obter_sessao))
     api.include_router(roteador_de_propostas(obter_sessao))
     api.include_router(roteador_da_ficha(obter_sessao))
     api.include_router(roteador_de_metas(obter_sessao))

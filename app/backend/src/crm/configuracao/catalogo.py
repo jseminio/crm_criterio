@@ -30,6 +30,10 @@ class Campo:
     exemplo: str = ""
     opcoes: tuple[str, ...] = ()
     """Valores aceitos, quando a tela mostra uma lista."""
+    secao: str = ""
+    """Subtítulo que a tela mostra antes deste campo, dentro do cartão."""
+    opcional: bool = False
+    """Não conta para o cartão aparecer como "Configurado"."""
 
 
 @dataclass(frozen=True)
@@ -63,6 +67,12 @@ GRUPOS: tuple[Grupo, ...] = (
               ajuda="Gerenciador do WhatsApp › Números de telefone.", exemplo="123456789012345"),
         Campo("whatsapp.versao", "Versão da API da Meta", variavel="CRM_WHATSAPP_VERSAO", padrao="v24.0",
               exemplo="v24.0"),
+        # Webhook (09/10/2026): receber as respostas do lead. Só existem na tela.
+        Campo("whatsapp.verificacao", "Token de verificação", segredo=True, opcional=True,
+              secao="Receber respostas (webhook)",
+              ajuda="Você inventa (no mínimo 16 caracteres) e cola o mesmo na Meta, junto com o endereço."),
+        Campo("whatsapp.chave_do_app", "Chave secreta do app", segredo=True, opcional=True,
+              ajuda="Meta for Developers › seu app › Configurações do app › Básico › Chave secreta do app."),
     )),
     Grupo("email", "E-mail (Microsoft 365)", (
         Campo("m365.tenant", "ID do diretório (tenant)", variavel="CRM_M365_TENANT_ID"),

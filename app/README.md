@@ -69,6 +69,33 @@ WhatsApp, o e-mail do Microsoft 365, o questionário e o disparo se cadastram, t
   fato respondeu (tabela da OpenAI consultada em 07/10/2026). O ensaio do SDR (`scripts/ensaio_sdr.py`)
   segue só com a Anthropic.
 
+## Webhook do WhatsApp: o CRM recebe as respostas do lead (09/10/2026)
+
+Decisão de Eduardo em 09/10/2026: **o webhook mora no servidor, e o servidor passa a ser o oficial
+para as conversas do WhatsApp.** A Meta só entrega num endereço público com HTTPS, e o CRM da máquina
+escuta só em `localhost`. Avaliação feita antes: Cloud API oficial, sem Evolution API (o modo Baileys
+arrisca o número da empresa) e sem MCP do WhatsApp (é ferramenta pessoal, não canal).
+
+- **Endereço:** `https://<servidor>/api/whatsapp/webhook`, fora do login (quem chama é a Meta). A
+  tela mostra o endereço pronto para copiar em Configurações › Integrações › WhatsApp.
+- **Proteção:** o `GET` de verificação só devolve o desafio a quem manda o **token de verificação**;
+  o `POST` só é lido com a assinatura `X-Hub-Signature-256` feita com a **chave secreta do app**. Os
+  dois se cadastram na tela, cifrados, e sem eles a rota recusa tudo (403).
+- **O que grava:** todo aviso, uma vez só, em `evento_do_whatsapp` (a Meta reenvia), com o
+  pedaço do aviso como chegou. Mensagem de lead conhecido (pelo celular, com ou sem o nono dígito)
+  entra na conversa aberta do SDR, ou numa nova pelo WhatsApp, com autor "Lead"; lead "Novo" passa a
+  "Em contato". Áudio, imagem e documento entram como "[áudio recebido]" etc., sem baixar o arquivo.
+  Número desconhecido fica como evento "sem lead" e **não vira lead sozinho**. Lead que já virou
+  oportunidade: só o evento. Status de mensagem enviada (enviada, entregue, lida, falhou): só o evento.
+- **A IA não responde.** O webhook só registra. Ligar a resposta da IA é outra demanda, depois dos
+  ensaios pendentes do SDR.
+- **Para ligar, tudo pela tela e pela Meta, nada no servidor:** (1) Redeploy, que aplica a migração
+  `f7a3c2e9d1b4`; (2) na tela, cadastre o token de verificação (você inventa, 16+ caracteres) e a
+  chave secreta do app (Meta for Developers › app › Configurações do app › Básico); (3) na Meta,
+  WhatsApp › Configuração › Webhook: cole o endereço e o mesmo token, confirme e assine o campo
+  `messages`; (4) a tela passa a mostrar "Último aviso recebido".
+- **Código:** `crm.agente.webhook_whatsapp` (regras) e `crm.api.webhook_whatsapp` (rota).
+
 ## Disparo do lembrete e do agradecimento do questionário (06/10/2026)
 
 O CRM mesmo envia o lembrete e o agradecimento do questionário (seção abaixo), sem chamar a IA: o
@@ -85,8 +112,8 @@ serviço de interesse do lead. **Desligado até `CRM_DISPARO_DO_QUESTIONARIO=tru
   sem e-mail, ou canal sem configuração, vira aviso e fica na lista.
 - **Acompanhar:** `GET /api/sdr/questionario/disparo` (última rodada: enviados, avisos, erros) e
   `POST /api/sdr/questionario/disparar` (uma rodada agora; 409 se desligado).
-- **O que ainda não faz:** não recebe as respostas do lead no WhatsApp (falta o webhook da Meta);
-  por isso usa sempre o modelo, que vale dentro e fora da janela de 24 horas.
+- **O que ainda não faz:** desde 09/10/2026 o webhook recebe as respostas do lead (seção acima), mas
+  o disparo ainda não consulta a janela de 24 horas: usa sempre o modelo, que vale dentro e fora dela.
 - **Para ligar:** modelos aprovados no WhatsApp Manager com os nomes `criterio_lembrete_questionario`
   e `criterio_agradecimento_questionario`; as variáveis no Coolify; Redeploy. O teste
   `test_os_textos_sao_os_mandados_para_a_meta` garante que o texto do código é o do documento.
@@ -1022,10 +1049,9 @@ destino) ou **Parou no meio**. Os dois primeiros mudam a situação do lead.
 A primeira mensagem da equipe depois do transbordo marca o fim da espera.
 A nota (CSAT, 1 a 5) vem depois de encerrar, uma vez só.
 
-⚠️ **A integração que conversa com o lead ainda não existe.** O WhatsApp está
-em preparação (modelo aprovado pela Meta, base legal para lead frio). Estas
-rotas são a porta por onde ela vai gravar; até lá o painel mostra só os leads
-cadastrados. As abordagens de contas âncora (tela Abordagens) **continuam**
+⚠️ **A IA ainda não conversa com o lead.** Desde 09/10/2026 o webhook do
+WhatsApp grava as mensagens que o lead manda (seção "Webhook do WhatsApp"), mas
+a resposta da IA continua desligada até os ensaios. As abordagens de contas âncora (tela Abordagens) **continuam**
 exigindo a aprovação de Eduardo: a decisão de 27/09 vale para o SDR de IA.
 
 Com chamadas em sequência (encerrar e logo dar nota), a segunda chegava antes

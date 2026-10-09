@@ -63,13 +63,20 @@ def _testar_ia(config: ConfiguracaoDoAgente) -> str:
     return texto
 
 
+def _falta_no_webhook() -> str:
+    """O que falta para receber as respostas do lead (09/10/2026); vazio quando não falta nada."""
+    faltam = [r for c, r in (("whatsapp.verificacao", "o token de verificação"),
+                             ("whatsapp.chave_do_app", "a chave secreta do app")) if not configuracao.valor(c)]
+    return f" Para receber as respostas do lead, falta {' e '.join(faltam)}." if faltam else ""
+
+
 def _testar_whatsapp(config: ConfiguracaoDoAgente) -> str:
     if config.whatsapp is None:
-        raise Falhou("Faltam o token e o ID do número.")
+        raise Falhou("Faltam o token e o ID do número." + _falta_no_webhook())
     try:
-        return f"A Meta reconheceu o número {conferir_numero(config.whatsapp)}."
+        return f"A Meta reconheceu o número {conferir_numero(config.whatsapp)}." + _falta_no_webhook()
     except EnvioFalhou as falha:
-        raise Falhou(str(falha)) from falha
+        raise Falhou(str(falha) + _falta_no_webhook()) from falha
 
 
 def _testar_email(config: ConfiguracaoDoAgente) -> str:
@@ -137,6 +144,17 @@ class CampoResposta(BaseModel):
     ajuda: str
     exemplo: str
     opcoes: list[str]
+    secao: str = ""
+    """Subtítulo que a tela mostra antes deste campo."""
+
+
+class WebhookResposta(BaseModel):
+    """O que a tela mostra sobre o webhook do WhatsApp (09/10/2026)."""
+
+    caminho: str
+    """A tela monta o endereço completo com o domínio em que está aberta."""
+    ultimo_aviso_em: datetime | None
+    ultimo_aviso_situacao: str | None
 
 
 class GrupoResposta(BaseModel):
@@ -149,6 +167,7 @@ class GrupoResposta(BaseModel):
     campos: list[CampoResposta]
     alterado_por: str | None
     alterado_em: datetime | None
+    webhook: WebhookResposta | None = None
 
 
 class IntegracoesResposta(BaseModel):
@@ -174,6 +193,7 @@ class PedidoDeEnvio(BaseModel):
 
 
 _VERSAO = re.compile(r"^v\d{1,3}\.\d$")
+_CHAVE_DO_APP = re.compile(r"^[0-9a-fA-F]{32}$")
 
 
 def _problema(campo: configuracao.Campo, valor: str) -> str | None:
@@ -185,6 +205,10 @@ def _problema(campo: configuracao.Campo, valor: str) -> str | None:
         return f"{campo.rotulo}: o endereço começa com https://"
     if campo.chave == "m365.remetente" and "@" not in valor:
         return "Caixa remetente: digite um e-mail"
+    if campo.chave == "whatsapp.verificacao" and (len(valor) < 16 or any(c.isspace() for c in valor)):
+        return "Token de verificação: no mínimo 16 caracteres, sem espaço"
+    if campo.chave == "whatsapp.chave_do_app" and not _CHAVE_DO_APP.match(valor):
+        return "Chave secreta do app: cole os 32 caracteres que a Meta mostra"
     return None
 
 
@@ -195,8 +219,22 @@ def _configurado(grupo: str, linhas: dict[str, configuracao.Linha]) -> bool:
 
         em_uso = {linhas["ia.principal"].valor, linhas["ia.reserva"].valor} - {NENHUMA, None}
         return all(linhas[f"{n.casefold()}.chave"].origem != "vazio" for n in em_uso)
-    return all(l.origem != "vazio" for l in linhas.values() if configuracao.CAMPOS[l.campo.chave] in
-               configuracao.catalogo.grupo(grupo).campos)
+    return all(l.origem != "vazio" for l in linhas.values() if not l.campo.opcional and
+               configuracao.CAMPOS[l.campo.chave] in configuracao.catalogo.grupo(grupo).campos)
+
+
+def _webhook(sessao: Session) -> WebhookResposta:
+    import sqlalchemy as sa
+
+    from crm.api.webhook_whatsapp import CAMINHO
+    from crm.db.modelos import EventoDoWhatsapp
+
+    ultimo = sessao.execute(
+        sa.select(EventoDoWhatsapp.recebido_em, EventoDoWhatsapp.situacao)
+        .order_by(EventoDoWhatsapp.recebido_em.desc(), EventoDoWhatsapp.id.desc()).limit(1)
+    ).first()
+    return WebhookResposta(caminho=CAMINHO, ultimo_aviso_em=ultimo[0] if ultimo else None,
+                           ultimo_aviso_situacao=ultimo[1] if ultimo else None)
 
 
 def roteador_de_integracoes(
@@ -227,8 +265,10 @@ def roteador_de_integracoes(
                     chave=l.campo.chave, rotulo=l.campo.rotulo, segredo=l.campo.segredo, origem=l.origem,
                     valor=l.valor, final=l.final, ilegivel=l.ilegivel, padrao=l.campo.padrao,
                     ajuda=l.campo.ajuda, exemplo=l.campo.exemplo, opcoes=list(l.campo.opcoes),
+                    secao=l.campo.secao,
                 ) for l in do_grupo],
                 alterado_em=ultima[0], alterado_por=ultima[1],
+                webhook=_webhook(sessao) if g.chave == "whatsapp" else None,
             ))
         return IntegracoesResposta(grupos=grupos)
 

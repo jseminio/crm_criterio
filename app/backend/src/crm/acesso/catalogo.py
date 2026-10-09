@@ -101,6 +101,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/mrr", ("funil.ver", "contratos.ver", "carteira.ver")),
     ("GET", r"/api/inteligencia/(plano|cenarios-de-ticket|fases)", ("funil.ver",)),
     ("PUT", r"/api/inteligencia/plano", ("configuracoes.metas",)),  # só o Administrador (03/10/2026)
+    # KPIs da liderança (09/10/2026): só o Administrador — a rota confere; aqui, o mesmo nível das metas
+    ("GET", r"/api/inteligencia/kpis-lideranca", ("configuracoes.metas",)),
     ("POST", r"/api/oportunidades", ("funil.editar",)),
     ("GET", r"/api/oportunidades/\d+(/(ficha|pendencias|proposta|questionario))?", ("funil.ver", "agenda.ver")),
     ("PATCH", r"/api/oportunidades/\d+", ("funil.editar",)),

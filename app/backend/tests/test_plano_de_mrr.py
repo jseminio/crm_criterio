@@ -124,14 +124,14 @@ def test_quem_ve_o_funil_ve_o_plano_com_o_realizado_por_motor(cliente):
     assert plano["premissas"]["alterado_em"] is None  # padrão, ninguém mudou
     assert [c["descricao"] for c in plano["premissas"]["contratos_previstos"]] == ["Atípico do pipeline (nov)"]
     set_, out = plano["realizado"]
-    assert (D(set_["novo_bpo"]), D(set_["escada"]), set_["contratos_bpo"]) == (7000, 3000, 1)
-    assert (D(out["novo_contabil"]), out["contratos_contabil"]) == (3000, 1)
-    assert D(plano["meta"]["realizado"]) == 13000
+    assert (D(set_["novo_bpo"]), D(set_["escada"]), set_["contratos_bpo"]) == (D("7583.33"), D("3250.00"), 1)  # MRR com 13 parcelas (09/10/2026)
+    assert (D(out["novo_contabil"]), out["contratos_contabil"]) == (D("3250.00"), 1)
+    assert D(plano["meta"]["realizado"]) == D("14083.33")  # 13.000 × 13 ÷ 12
     assert plano["meta"]["meses_restantes"] == 8  # nov a jun
     assert D(plano["meta"]["previsto_ate_hoje"]) == 26000  # antes da projeção: o ponto de partida
     assert plano["meta"]["situacao"]["chave"] == "abaixo"
     motores = {m["motor"]: m for m in plano["motores"]}
-    assert D(motores["bpo"]["realizado"]) == 7000
+    assert D(motores["bpo"]["realizado"]) == D("7583.33")
     assert "contratos/mês" in motores["bpo"]["ajuste"]
     assert [c["nome"] for c in plano["cenarios"]] == ["alerta", "previsto", "otimista"]
 

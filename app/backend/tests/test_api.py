@@ -330,8 +330,9 @@ class TestParcelasDaOportunidadeNova:
                   "quantidade_parcelas": 12},
         ).json()
 
-        assert corpo["quantidade_parcelas"] == 12
-        assert Decimal(corpo["preco_anual"]) == Decimal("60000.00")
+        # BPO Financeiro: 13 parcelas pelo catálogo (09/10/2026), mesmo pedindo 12
+        assert corpo["quantidade_parcelas"] == 13
+        assert Decimal(corpo["preco_anual"]) == Decimal("65000.00")
 
     def test_recorrente_ignora_o_anual_digitado(self, cliente: TestClient):
         corpo = cliente.post(
@@ -375,7 +376,7 @@ class TestAnualPeloServico:
 
     def test_contabil_e_dp_cobram_13_e_financeiro_12(self, cliente: TestClient):
         for servico, meses in (("BPO Contábil, Fiscal e Dep. Pessoal", 13), ("BPO Contábil e Fiscal", 13),
-                               ("Dep. Pessoal", 13), ("BPO Financeiro", 12)):
+                               ("Dep. Pessoal", 13), ("BPO Financeiro", 13)):
             corpo = cliente.post(
                 "/api/oportunidades",
                 json={"nome": "Delta", "servico": servico, "preco_mensal": "14250",
@@ -395,7 +396,7 @@ class TestAnualPeloServico:
         meses = {s["nome"]: s["meses_no_ano"] for s in cliente.get("/api/servicos").json()}
 
         assert meses["BPO Contábil e Fiscal"] == 13
-        assert meses["BPO Financeiro"] == 12
+        assert meses["BPO Financeiro"] == 13  # 13 parcelas desde 09/10/2026
         assert meses["Endereço Fiscal"] is None
 
     def test_editar_o_mensal_recalcula_o_anual_e_ignora_o_digitado(self, cliente: TestClient):
@@ -410,7 +411,7 @@ class TestAnualPeloServico:
         assert Decimal(corpo["preco_anual"]) == Decimal("26000")
 
         corpo = cliente.patch(f"/api/oportunidades/{o['id']}", json={"servico": "BPO Financeiro"}).json()
-        assert Decimal(corpo["preco_anual"]) == Decimal("24000")
+        assert Decimal(corpo["preco_anual"]) == Decimal("26000")  # também 13 parcelas
 
     def test_salvar_outro_campo_nao_mexe_no_anual_antigo(self, cliente: TestClient, engine: sa.Engine):
         o = cliente.post(
@@ -1363,8 +1364,9 @@ class TestMrr:
     def test_contrato_novo_no_periodo_entra_como_novo(self, cliente, carteira):
         self._ativo(cliente, carteira)
         c = cliente.get("/api/mrr", params={"hoje": "2026-09-25"}).json()
-        assert c["atual"]["valor"] == "8000.00"
-        assert (c["movimento"]["mrr_inicio"], c["movimento"]["novo"], c["movimento"]["mrr_fim"]) == ("0.00", "8000.00", "8000.00")
+        # MRR = parcela × 13 ÷ 12 (09/10/2026): 8.000 → 8.666,67
+        assert c["atual"]["valor"] == "8666.67"
+        assert (c["movimento"]["mrr_inicio"], c["movimento"]["novo"], c["movimento"]["mrr_fim"]) == ("0.00", "8666.67", "8666.67")
 
     def test_reajuste_e_churn_aparecem_no_movimento(self, cliente, carteira):
         cid = self._ativo(cliente, carteira, inicio="2026-03-01")
@@ -1372,7 +1374,8 @@ class TestMrr:
         cliente.post(f"/api/contratos/{cid}/eventos", json={"tipo": "Encerramento", "iniciativa": "Cliente",
                                                             "motivo_categoria": "Preço", "data_do_evento": "2026-09-15"})
         m = cliente.get("/api/mrr", params={"hoje": "2026-09-25", "de": "2026-09-01"}).json()["movimento"]
-        assert (m["mrr_inicio"], m["reajuste"], m["churn_cliente"], m["mrr_fim"]) == ("8000.00", "800.00", "8800.00", "0.00")
+        # Em MRR (× 13 ÷ 12, ao centavo): 8.000 → 8.666,67 e 8.800 → 9.533,33
+        assert (m["mrr_inicio"], m["reajuste"], m["churn_cliente"], m["mrr_fim"]) == ("8666.67", "866.66", "9533.33", "0.00")
         assert m["nrr"] == "0.0"
 
     def test_periodo_no_futuro_ou_invertido_e_422(self, cliente):
@@ -1389,12 +1392,12 @@ class TestMrrComCarteiraAnterior:
         sessao.add(Contrato(grupo_id=g.id, anterior_ao_crm=True, situacao=S.ATIVO, preco_mensal=Decimal("3000.00")))
         sessao.commit()
         c = cliente.get("/api/mrr", params={"hoje": "2026-09-25"}).json()
-        assert c["atual"]["valor"] == "3000.00" and c["contratos_da_carteira_anterior"] == 1
+        assert c["atual"]["valor"] == "3250.00" and c["contratos_da_carteira_anterior"] == 1  # 3.000 × 13 ÷ 12
         assert c["cobertura_completa"] is True and "Inclui a carteira anterior" in c["aviso"]
-        assert (c["movimento"]["mrr_inicio"], c["movimento"]["novo"]) == ("3000.00", "0.00")
+        assert (c["movimento"]["mrr_inicio"], c["movimento"]["novo"]) == ("3250.00", "0.00")
         # Com a carteira inteira, compara com o KPI oficial (meta R$ 400 mil, alerta < R$ 200 mil).
         assert (c["meta"], c["alerta"], c["contra_a_meta"], c["falta_para_a_meta"]) == (
-            "400000", "200000", "abaixo_do_alerta", "397000.00")
+            "400000", "200000", "abaixo_do_alerta", "396750.00")
 
     def test_sem_a_carteira_anterior_nao_compara_com_a_meta(self, cliente):
         c = cliente.get("/api/mrr", params={"hoje": "2026-09-25"}).json()
@@ -1426,10 +1429,10 @@ class TestCorrecaoDeCarga:
         ev = r.json()["eventos"][0]
         assert (ev["tipo"], ev["preco_mensal_anterior"], ev["preco_mensal_novo"]) == ("Correção", "4500.00", "1200.00")
         depois = cliente.get("/api/mrr", params={"hoje": "2026-09-25", "de": "2026-09-01"}).json()
-        assert depois["atual"]["valor"] == "1200.00"
+        assert depois["atual"]["valor"] == "1300.00"  # 1.200 × 13 ÷ 12
         m = depois["movimento"]
         assert (m["contracao"], m["expansao"], m["reajuste"]) == ("0.00", "0.00", "0.00")
-        assert (m["mrr_inicio"], m["mrr_fim"]) == ("1200.00", "1200.00")
+        assert (m["mrr_inicio"], m["mrr_fim"]) == ("1300.00", "1300.00")
 
     def test_correcao_sem_motivo_e_recusada(self, cliente, sessao, carteira):
         from crm.db.modelos import Contrato
@@ -1454,8 +1457,8 @@ class TestTicketDaCarteira:
         ])
         sessao.commit()
         a = cliente.get("/api/mrr", params={"hoje": "2026-09-25"}).json()["atual"]
-        assert (a["grupos"], a["contratos"], a["valor"]) == (2, 3, "9000.00")
-        assert (a["ticket_por_grupo"], a["mediana_por_grupo"]) == ("4500.00", "4500.00")
+        assert (a["grupos"], a["contratos"], a["valor"]) == (2, 3, "9750.00")  # 9.000 × 13 ÷ 12
+        assert (a["ticket_por_grupo"], a["mediana_por_grupo"]) == ("4875.00", "4875.00")
 
     def test_sem_contrato_o_ticket_e_nulo(self, cliente):
         a = cliente.get("/api/mrr", params={"hoje": "2026-09-25"}).json()["atual"]

@@ -27,10 +27,11 @@ def test_liquido_vira_bruto_pelo_imposto_ao_centavo():
     ev = NS(tipo=TipoDeEventoDeContrato.REAJUSTE, data_do_evento=HOJE, preco_mensal_anterior=D("8000"),
             preco_mensal_novo=D("8900"), iniciativa=None, id=1)
     (liq,), (bru,), (sem,) = (mrr.em_bruto([_contrato(D("8900"), b, eventos=[ev])], D("0.11")) for b in ("liquido", "bruto", None))
-    assert liq.preco_mensal == D("10000.00")  # 8.900 ÷ 0,89, sem arredondar a R$ 50
-    assert (liq.eventos[0].preco_mensal_anterior, liq.eventos[0].preco_mensal_novo) == (D("8988.76"), D("10000.00"))
-    assert bru.preco_mensal == sem.preco_mensal == D("8900")
-    assert bru.eventos[0].preco_mensal_novo == D("8900")
+    # 8.900 ÷ 0,89 = 10.000, sem arredondar a R$ 50; em MRR, × 13 ÷ 12 (13 parcelas, 09/10/2026)
+    assert liq.preco_mensal == D("10833.33")
+    assert (liq.eventos[0].preco_mensal_anterior, liq.eventos[0].preco_mensal_novo) == (D("9737.82"), D("10833.33"))
+    assert bru.preco_mensal == sem.preco_mensal == D("9641.67")  # 8.900 × 13 ÷ 12
+    assert bru.eventos[0].preco_mensal_novo == D("9641.67")
 
 
 def test_imposto_fora_da_faixa_e_recusado():
@@ -71,8 +72,8 @@ def cliente(engine, ids):
 
 def test_mrr_soma_em_bruto_e_conta_os_convertidos(cliente):
     m = cliente.get("/api/mrr", params={"hoje": HOJE.isoformat()}).json()
-    # 8.900 líquido → 10.000 bruto; 5.000 bruto; 1.000 sem base, como está
-    assert m["atual"]["valor"] == "16000.00"
+    # 8.900 líquido → 10.000 bruto; 5.000 bruto; 1.000 sem base: 16.000, e × 13 ÷ 12 em MRR
+    assert m["atual"]["valor"] == "17333.33"
     assert (m["imposto"], m["contratos_liquidos"], m["contratos_sem_base"]) == ("0.11", 1, 1)
 
 

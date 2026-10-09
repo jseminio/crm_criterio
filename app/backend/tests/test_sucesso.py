@@ -172,7 +172,7 @@ def test_entram_os_grupos_com_contrato_valendo_na_etapa_certa(cliente, ids):
     # Anterior ao CRM sem reunião registrada: conta do início do funil, 02/10/2026 (opção A).
     assert antigo["em_curso_desde"] == "2026-10-02"
     assert [(r["tipo"], r["proxima"], r["atrasada"]) for r in antigo["reunioes"]] == [("mensal", "2026-11-02", False)]
-    assert antigo["mrr_bruto"] == "6000.00"  # os dois contratos ativos
+    assert antigo["mrr_bruto"] == "6500.00"  # os dois contratos ativos: 6.000 × 13 ÷ 12
     assert (por_nome["Sem classe"]["situacao"], por_nome["Sem classe"]["reunioes"]) == ("sem_classe", [])
     assert len(f["checklist"]["kickoff"]) == 5 and f["cadencia"] == {"A": ["mensal"], "B": ["trimestral"], "C": ["semestral"]}
     assert [t["chave"] for t in f["tipos"]] == ["mensal", "trimestral", "semestral"]

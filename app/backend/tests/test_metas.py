@@ -52,7 +52,7 @@ def test_sem_nada_gravado_valem_os_padroes_do_kpi_oficial(cliente):
     assert (m["mrr"]["meta"], m["mrr"]["alerta"]) == ("400000", "200000")
     assert (m["conversao"]["meta"], m["conversao"]["alerta"]) == ("50", "30")
     mrr = cliente.get("/api/mrr", headers=ADMIN, params={"hoje": "2026-10-02"}).json()
-    assert (mrr["contra_a_meta"], mrr["falta_para_a_meta"]) == ("entre", "150000.00")
+    assert (mrr["contra_a_meta"], mrr["falta_para_a_meta"]) == ("entre", "129166.67")
     tx = cliente.get("/api/indicadores", headers=ADMIN).json()["taxa_de_conversao"]
     assert (tx["percentual"], tx["atingiu_a_meta"], tx["meta"]) == ("50.0", True, "50")
 

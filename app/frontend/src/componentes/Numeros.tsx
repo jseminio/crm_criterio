@@ -156,8 +156,8 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
             <p className="numero-nota">
               O maior contrato ({dinheiro(ticket.maior_valor)}) pesa{" "}
               {percentual(ticket.participacao_do_maior)} do total — por isso a mediana vem junto.
-              Só aceitas com preço mensal; consultoria de valor único fica de fora. Não é o
-              ticket médio da carteira.
+              Só serviços recorrentes, em MRR (a parcela × 13 ÷ 12); consultoria e legalização são
+              pontuais e ficam de fora. Não é o ticket médio da carteira.
             </p>
           </>
         ) : (

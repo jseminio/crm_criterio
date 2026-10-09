@@ -26,6 +26,11 @@ Regras (decisão de Eduardo em 26/09/2026: a vigência começa na assinatura):
 MRR em qualquer data = MRR atual − o movimento líquido desde essa data. Só vale para datas
 até hoje.
 
+**13 parcelas por ano** (decisão de Eduardo em 09/10/2026): todo serviço recorrente — contábil, fiscal,
+DP e BPO Financeiro — fatura 13 parcelas no ano. O MRR é a parcela mensal × 13 ÷ 12 (`PARCELAS_NO_ANO`),
+no preço e nos eventos, em `em_bruto`, por onde passa todo cálculo de MRR do CRM. O contrato guarda a
+parcela; o MRR é sempre calculado.
+
 **Sempre em bruto** (02/10/2026, aprovado por Eduardo): o contrato marcado como líquido entra com o
 imposto, `líquido ÷ (1 − imposto)`, ao centavo, no preço e nos eventos (`em_bruto`). Aqui não se
 arredonda a R$ 50 como na proposta: o arredondamento é para o cliente ler, não para somar.
@@ -61,6 +66,15 @@ def contra_a_meta(valor: Decimal, meta: Decimal = META_DE_MRR, alerta: Decimal =
 
 ZERO = Decimal("0.00")
 CENTAVOS = Decimal("0.01")
+PARCELAS_NO_ANO = 13
+"""Parcelas que um serviço recorrente fatura no ano (09/10/2026). MRR = parcela × 13 ÷ 12."""
+
+
+def mensalizar(parcela: Decimal | None) -> Decimal | None:
+    """A parcela mensal do contrato em MRR: × 13 ÷ 12, ao centavo."""
+    if parcela is None:
+        return None
+    return (Decimal(parcela) * PARCELAS_NO_ANO / 12).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
 T = TipoDeEventoDeContrato
 
 
@@ -104,15 +118,16 @@ class _ContratoEmBruto:
 
 
 def em_bruto(contratos: Iterable[_Contrato], imposto: Decimal) -> list[_ContratoEmBruto]:
-    """Os contratos com os valores em bruto: o marcado `base_do_valor == "liquido"` tem preço e
-    eventos divididos por (1 − imposto); os demais ficam como estão."""
+    """Os contratos com os valores em bruto e em MRR: o marcado `base_do_valor == "liquido"` tem preço e
+    eventos divididos por (1 − imposto); depois, todo valor vira MRR (× 13 ÷ 12, `mensalizar`)."""
     if not Decimal(0) <= imposto < 1:
         raise ValueError("o imposto precisa estar entre 0 e 100%")
 
     def converter(v: Decimal | None, liquido: bool) -> Decimal | None:
-        if v is None or not liquido:
-            return v
-        return (Decimal(v) / (1 - imposto)).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
+        if v is None:
+            return None
+        bruto = (Decimal(v) / (1 - imposto)).quantize(CENTAVOS, rounding=ROUND_HALF_UP) if liquido else Decimal(v)
+        return mensalizar(bruto)
 
     lista = []
     for c in contratos:

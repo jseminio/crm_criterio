@@ -7,7 +7,7 @@ from datetime import date
 from decimal import Decimal
 
 from crm.domain.indicadores import calcular
-from crm.domain.listas import Situacao, TipoCanal
+from crm.domain.listas import LinhaServico, Situacao, TipoCanal
 
 
 @dataclass
@@ -247,19 +247,27 @@ class TestTicketRecorrente:
             Op(situacao=Situacao.ENVIAR_PROPOSTA, preco_mensal=D("50000")),  # em aberto: fora
         ]).ticket_recorrente
         assert (t.quantas, t.clientes) == (3, 3)
-        assert t.valor_mensal == D("12000")
-        assert t.ticket_medio == D("4000.00") and t.mediana == D("2000.00")
+        # Em MRR, a parcela × 13 ÷ 12 (09/10/2026): 1.083,33 + 2.166,67 + 9.750,00
+        assert t.valor_mensal == D("13000.00")
+        assert t.ticket_medio == D("4333.33") and t.mediana == D("2166.67")
 
     def test_mostra_o_peso_do_maior_contrato(self):
         t = calcular([self._aceita("40000", 1), self._aceita("2000", 2), self._aceita("2000", 3)]).ticket_recorrente
-        assert t.maior_valor == D("40000") and t.participacao_do_maior == D("90.9")
+        assert t.maior_valor == D("43333.33") and t.participacao_do_maior == D("90.9")
 
     def test_conta_clientes_distintos(self):
         t = calcular([self._aceita("1000", 7), self._aceita("3000", 7), self._aceita("2000", 8)]).ticket_recorrente
         assert (t.quantas, t.clientes) == (3, 2)
 
     def test_mediana_de_quantidade_par(self):
-        assert calcular([self._aceita("1000", 1), self._aceita("2000", 2)]).ticket_recorrente.mediana == D("1500.00")
+        assert calcular([self._aceita("1000", 1), self._aceita("2000", 2)]).ticket_recorrente.mediana == D("1625.00")
+
+    def test_consultoria_e_legalizacao_ficam_fora(self):
+        """Trabalho pontual não é ticket recorrente, mesmo com preço mensal (09/10/2026)."""
+        recorrente, pontual = self._aceita("3000", 1), self._aceita("15000", 2)
+        object.__setattr__(pontual, "linha_servico", LinhaServico.C2)
+        t = calcular([recorrente, pontual]).ticket_recorrente
+        assert (t.quantas, t.clientes, t.valor_mensal) == (1, 1, D("3250.00"))
 
     def test_sem_nenhuma_nao_e_calculavel_nem_zero(self):
         t = calcular([self._aceita(None, 1)]).ticket_recorrente

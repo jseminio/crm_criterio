@@ -13,6 +13,7 @@ import type {
   CenariosDoServico, ChaveDaSituacao, ContratoPrevistoDoPlano, NomeDoCenario, PlanoDeMrr, PremissasDoPlano, SituacaoDoPlano,
 } from "../api/tipos";
 import { CampoDeValor } from "../componentes/CampoDeValor";
+import { KpisDaLideranca } from "../componentes/KpisDaLideranca";
 import { Carregando, Erro } from "../componentes/estados";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { QuatroFases } from "../componentes/QuatroFases";
@@ -567,7 +568,7 @@ function EditarPremissas({ plano, aoFechar, aoSalvar }: { plano: PlanoDeMrr; aoF
 // ---------------------------------------------------------------- tela
 
 export function InteligenciaDeConversao() {
-  const { pode } = usarAcesso();
+  const { pode, eu } = usarAcesso();
   const { dados, carregando, erro, recarregar } = usarDados<PlanoDeMrr>(() => api.planoDeMrr(), []);
   const [salvo, definirSalvo] = useState<PlanoDeMrr | null>(null);
   const [editando, definirEditando] = useState(false);
@@ -580,6 +581,8 @@ export function InteligenciaDeConversao() {
 
   return (
     <div className="plano">
+      {/* KPIs da liderança (09/10/2026): só o Administrador. */}
+      {eu.administrador && <KpisDaLideranca />}
       <div className="plano-cabecalho">
         <div>
           <h2 className="plano-titulo">Plano de MRR</h2>

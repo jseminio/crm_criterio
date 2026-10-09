@@ -107,25 +107,26 @@ class Premissas:
 
 
 PADRAO = Premissas(
-    meta_liquida=D("250000"),
+    # Em MRR com 13 parcelas (09/10/2026): os valores em reais de 03/10 × 13 ÷ 12, ao centavo.
+    meta_liquida=D("270833.33"),
     inicio=date(2026, 9, 1),
     fim=date(2027, 6, 30),
     inicio_da_projecao=date(2026, 11, 1),
-    ponto_de_partida=D("26000"),
-    mrr_de_partida=D("252341"),
+    ponto_de_partida=D("28166.67"),
+    mrr_de_partida=D("273369.42"),
     churn_anual_pct=D("12"),
-    bpo_ticket=D("7000"),
+    bpo_ticket=D("7583.33"),
     bpo_teto=D("5"),
     contabil_vagas=D("4"),
     atipico_vagas=D("2"),
     escada_prazo_meses=3,
-    plus_acrescimo=D("3000"),
+    plus_acrescimo=D("3250"),
     plus_pct=D("80"),
-    cfo_acrescimo=D("6000"),
+    cfo_acrescimo=D("6500"),
     cfo_pct=D("30"),
-    alerta=Cenario(D("2"), D("2903.28"), False),
-    previsto=Cenario(D("3"), D("2903.28"), True),
-    otimista=Cenario(D("5"), D("5000"), True),
+    alerta=Cenario(D("2"), D("3145.22"), False),
+    previsto=Cenario(D("3"), D("3145.22"), True),
+    otimista=Cenario(D("5"), D("5416.67"), True),
 )
 """As premissas de Eduardo em 03/10/2026. Valem enquanto o Administrador não mudar na tela."""
 

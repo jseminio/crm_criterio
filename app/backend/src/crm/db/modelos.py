@@ -420,6 +420,10 @@ class Oportunidade(CarimboMixin, Base):
 
     data_colocacao: Mapped[date | None] = mapped_column(sa.Date, index=True)
     data_aceite: Mapped[date | None] = mapped_column(sa.Date)
+    data_envio_proposta: Mapped[date | None] = mapped_column(sa.Date)
+    """Quando a proposta foi enviada (10/10/2026). Preenchida ao marcar a proposta gerada como enviada, ou na ficha;
+    pedida ao mover de "Enviar proposta" para "Em avaliação". Nas linhas da planilha de 2026, é a data de originação
+    (decisão de Eduardo: lá a originação já era o envio). Conta o follow-up e separa o ciclo de vendas em dois."""
 
     motivo_recusa: Mapped[MotivoRecusa | None] = mapped_column(coluna_lista(MotivoRecusa))
     motivo_recusa_original: Mapped[str | None] = mapped_column(sa.String(200))

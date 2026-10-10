@@ -52,6 +52,9 @@ export function FolhaMoverPara({
                 <span>{etapa}</span>
                 {atual && <small>etapa atual</small>}
                 {!atual && etapa === "Aceita" && <small>abre a ficha para a data do aceite</small>}
+                {!atual && etapa === "Em avaliação pela empresa" && etapaAtual === "Enviar proposta" && (
+                  <small>abre a ficha para a data de envio</small>
+                )}
               </button>
             );
           })}

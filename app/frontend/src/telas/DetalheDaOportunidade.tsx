@@ -15,6 +15,7 @@ import { QuestionarioDaOportunidade } from "../componentes/QuestionarioDaOportun
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro } from "../componentes/estados";
 import { dataHora, dinheiro } from "../formato";
+import { hojeIso } from "../formato";
 import { CampoDeData } from "../componentes/CampoDeData";
 import { BuscaDeEmpresa } from "../componentes/BuscaDeEmpresa";
 import { usarAcesso } from "../entrada";
@@ -343,6 +344,9 @@ export function DetalheDaOportunidade({
           servico_tema: d.servico_tema ?? "",
           tipo_servico: d.tipo_servico ?? "",
           data_colocacao: d.data_colocacao ?? "",
+          // Vindo do kanban (Enviar proposta → Em avaliação), sugere hoje como data de envio (10/10/2026).
+          data_envio_proposta: d.data_envio_proposta
+            ?? (situacaoInicial === "Em avaliação pela empresa" && d.situacao === "Enviar proposta" ? hojeIso() : ""),
           preco_mensal: d.preco_mensal ?? "",
           preco_anual: d.preco_anual ?? "",
           complexidade: d.complexidade?.toString() ?? "",
@@ -427,6 +431,8 @@ export function DetalheDaOportunidade({
       Number(anualExibido || 0) !== Number(detalhe.preco_anual || 0));
 
   const exigeDataDeAceite = rascunho.situacao === "Aceita" && !rascunho.data_aceite;
+  const exigeDataDeEnvio =
+    detalhe?.situacao === "Enviar proposta" && rascunho.situacao === "Em avaliação pela empresa" && !rascunho.data_envio_proposta;
 
   const converterEmContrato = async () => {
     definirConvertendoEmContrato(true);
@@ -487,7 +493,7 @@ export function DetalheDaOportunidade({
         type="button"
         className={`botao ${aba === "proposta" ? "botao-secundario" : "botao-primario"}`}
         onClick={salvar}
-        disabled={salvando || exigeDataDeAceite || !pode("funil.editar")}
+        disabled={salvando || exigeDataDeAceite || exigeDataDeEnvio || !pode("funil.editar")}
       >
         {salvando ? "Salvando…" : "Salvar alterações"}
       </button>
@@ -735,6 +741,25 @@ export function DetalheDaOportunidade({
                 value={rascunho.data_colocacao}
                 aoMudar={(v) => mudar("data_colocacao", v)}
               />
+            </div>
+
+            <div className="campo-bloco">
+              <label className="campo-rotulo" htmlFor="d-envio">
+                Data de envio da proposta
+              </label>
+              <CampoDeData
+                id="d-envio"
+                value={rascunho.data_envio_proposta}
+                aoMudar={(v) => mudar("data_envio_proposta", v)}
+                aria-describedby={exigeDataDeEnvio ? "d-envio-aviso" : undefined}
+              />
+              {exigeDataDeEnvio ? (
+                <span id="d-envio-aviso" style={{ fontSize: 12, color: "var(--perda)" }}>
+                  Para mover para Em avaliação, informe quando a proposta foi enviada.
+                </span>
+              ) : (
+                <span className="campo-ajuda">O follow-up da Agenda conta a partir dela. Preenchida sozinha ao marcar a proposta gerada como enviada.</span>
+              )}
             </div>
 
             <p className="campo-ajuda" style={{ margin: 0 }}>

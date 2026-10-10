@@ -24,7 +24,8 @@ from __future__ import annotations
 
 from crm.manutencao.executor import Tarefa
 from crm.manutencao.tarefas import (
-    configuracao_para_a_tela, meta_de_mrr_em_13_parcelas, premissas_em_13_parcelas, saida_dos_encerramentos_antigos,
+    configuracao_para_a_tela, data_de_envio_da_proposta, meta_de_mrr_em_13_parcelas, premissas_em_13_parcelas,
+    saida_dos_encerramentos_antigos,
 )
 
 TAREFAS: list[Tarefa] = [
@@ -40,5 +41,8 @@ TAREFAS: list[Tarefa] = [
     Tarefa("2026_10_10_saida_dos_encerramentos_antigos",
            "Preenche a saída efetiva dos encerramentos antigos com a data do evento (nada muda no MRR)",
            saida_dos_encerramentos_antigos.executar),
+    Tarefa("2026_10_10_data_de_envio_da_proposta",
+           "Preenche a data de envio da proposta: originação na planilha de 2026, envio da proposta gerada no CRM",
+           data_de_envio_da_proposta.executar),
     # Acrescente no fim. Ex.: Tarefa("2026_10_06_assunto", "o que faz", modulo.executar),
 ]

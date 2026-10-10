@@ -42,6 +42,8 @@ export interface OportunidadeResumo {
   captador: string | null;
   tipo_canal: TipoCanal | null;
   data_colocacao: string | null;
+  /** Quando a proposta foi enviada (10/10/2026). */
+  data_envio_proposta?: string | null;
   preco_mensal: string | null;
   preco_anual: string | null;
   /** Só em serviço recorrente: o anual é mensal × parcelas. */
@@ -207,6 +209,11 @@ export interface CicloMedioDeVendas {
   dias: string | null;
   amostra: number;
   aceitas_sem_as_duas_datas: number;
+  /** Originação → envio da proposta e envio → aceite (10/10/2026). */
+  dias_ate_o_envio?: string | null;
+  amostra_ate_o_envio?: number;
+  dias_do_envio_ao_aceite?: string | null;
+  amostra_do_envio_ao_aceite?: number;
   calculavel: boolean;
 }
 
@@ -2145,6 +2152,7 @@ export interface ItemDaComposicao {
   tipo_canal: string | null;
   data_colocacao: string | null;
   data_aceite: string | null;
+  data_envio_proposta?: string | null;
   proxima_acao: string | null;
   /** Conta no numerador (aceita, com próxima ação, da rede dos sócios); nas somas, sempre. */
   entra: boolean;

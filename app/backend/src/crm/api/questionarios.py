@@ -320,6 +320,8 @@ def roteador_de_questionarios(
             sa.select(Proposta).where(Proposta.oportunidade_id == o.id).order_by(Proposta.gerada_em.desc())
         ).all() if o else []
         enviadas = [x.enviada_em for x in propostas if x.enviada_em is not None]
+        if o is not None and o.data_envio_proposta is not None:  # enviada fora do gerador (10/10/2026)
+            enviadas.append(o.data_envio_proposta)
         ultima = propostas[0] if propostas else None
         motivo = None
         dias = None

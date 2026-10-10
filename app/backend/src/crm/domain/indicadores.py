@@ -166,6 +166,12 @@ class CicloMedioDeVendas:
     dias: Decimal | None
     amostra: int
     aceitas_sem_as_duas_datas: int
+    dias_ate_o_envio: Decimal | None = None
+    """Originação → envio da proposta, nas aceitas com as duas datas (10/10/2026): preparar e enviar."""
+    amostra_ate_o_envio: int = 0
+    dias_do_envio_ao_aceite: Decimal | None = None
+    """Envio → aceite, nas aceitas com as duas datas: a decisão do cliente."""
+    amostra_do_envio_ao_aceite: int = 0
 
     @property
     def calculavel(self) -> bool:
@@ -293,6 +299,20 @@ def e_recorrente(o) -> bool:
             and getattr(o, "linha_servico", LinhaServico.C1) is LinhaServico.C1)
 
 
+def _media(dias: list[int]) -> Decimal | None:
+    return (Decimal(sum(dias)) / Decimal(len(dias))).quantize(Decimal("0.1")) if dias else None
+
+
+def _partes_do_ciclo(aceitas: list) -> dict:
+    """O ciclo em duas partes (10/10/2026): originação → envio e envio → aceite, cada uma com a sua amostra."""
+    ate_envio = [(o.data_envio_proposta - o.data_colocacao).days for o in aceitas
+                 if getattr(o, "data_envio_proposta", None) and o.data_colocacao]
+    do_envio = [(o.data_aceite - o.data_envio_proposta).days for o in aceitas
+                if getattr(o, "data_envio_proposta", None) and o.data_aceite]
+    return {"dias_ate_o_envio": _media(ate_envio), "amostra_ate_o_envio": len(ate_envio),
+            "dias_do_envio_ao_aceite": _media(do_envio), "amostra_do_envio_ao_aceite": len(do_envio)}
+
+
 def _tem_proxima_acao(o: _Oportunidade) -> bool:
     return o.proxima_acao is not None and o.proxima_acao.strip() != ""
 
@@ -402,6 +422,7 @@ def calcular(
         ),
         amostra=len(dias_por_aceita),
         aceitas_sem_as_duas_datas=len(aceitas) - len(dias_por_aceita),
+        **_partes_do_ciclo(aceitas),
     )
 
     if decididas:

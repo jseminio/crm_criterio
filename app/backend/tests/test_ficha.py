@@ -182,3 +182,9 @@ class TestPendencias:
         assert next(i for i in p if i["balde"] == "hoje")["proxima_acao"].startswith("Pendência da proposta: Volumetria")
         # feita sai da agenda; filtro por captador também a tira (o dono é o responsável)
         assert not [i for i in cliente.get("/api/agenda", params={"captador": "EL"}).json()["itens"] if i["tipo"] == "pendencia"]
+        # Depois do envio da proposta, a Agenda não cobra o que faltava para montá-la (Eduardo, 10/10/2026).
+        r = cliente.patch(f"/api/oportunidades/{oid}", json={"situacao": "Em avaliação pela empresa",
+                                                              "data_envio_proposta": HOJE.isoformat()})
+        assert r.status_code == 200, r.text
+        agenda = cliente.get("/api/agenda", params={"hoje": HOJE.isoformat()}).json()
+        assert not [i for i in agenda["itens"] if i["tipo"] == "pendencia"]

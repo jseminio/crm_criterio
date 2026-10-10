@@ -407,6 +407,8 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
             raise HTTPException(409, f"esta proposta já foi marcada como enviada em {p.enviada_em:%d/%m/%Y} por {p.enviada_por}")
         p.enviada_em, p.enviada_por = envio.em, envio.por
         o = sessao.get(Oportunidade, p.oportunidade_id)
+        if o.data_envio_proposta is None:  # a primeira proposta enviada é o envio (10/10/2026)
+            o.data_envio_proposta = envio.em
         editados = set()
         if o.situacao is Situacao.ENVIAR_PROPOSTA:
             o.situacao = Situacao.EM_AVALIACAO

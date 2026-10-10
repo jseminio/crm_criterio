@@ -154,12 +154,24 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
         composicao={lista("ciclo_medio", "Ciclo médio de vendas", ciclo.amostra + ciclo.aceitas_sem_as_duas_datas)}
         tom="violeta"
         destaque={ciclo.calculavel ? `${dias(ciclo.dias)} dias` : undefined}
-        apoio={ciclo.calculavel ? `amostra de ${ciclo.amostra} proposta${ciclo.amostra === 1 ? "" : "s"}` : undefined}
+        apoio={ciclo.calculavel
+          ? (ciclo.dias_ate_o_envio && ciclo.dias_do_envio_ao_aceite
+            ? `${dias(ciclo.dias_ate_o_envio)} até o envio · ${dias(ciclo.dias_do_envio_ao_aceite)} até o aceite`
+            : `amostra de ${ciclo.amostra} proposta${ciclo.amostra === 1 ? "" : "s"}`)
+          : undefined}
         pendente={!ciclo.calculavel}
       >
         {ciclo.calculavel ? (
           <>
             <p>Originação até aceite · {ciclo.amostra} proposta{ciclo.amostra === 1 ? "" : "s"}</p>
+            <p>
+              Originação → envio: <strong>{ciclo.dias_ate_o_envio ? `${dias(ciclo.dias_ate_o_envio)} dias` : "sem dado"}</strong>
+              {ciclo.amostra_ate_o_envio ? ` (${ciclo.amostra_ate_o_envio})` : ""}
+              <br />
+              Envio → aceite: <strong>{ciclo.dias_do_envio_ao_aceite ? `${dias(ciclo.dias_do_envio_ao_aceite)} dias` : "sem dado"}</strong>
+              {ciclo.amostra_do_envio_ao_aceite ? ` (${ciclo.amostra_do_envio_ao_aceite})` : ""}
+            </p>
+            <p className="numero-nota">Separa o tempo de preparar e enviar a proposta do tempo de decisão do cliente.</p>
             {ciclo.aceitas_sem_as_duas_datas > 0 && (
               <p className="numero-nota">
                 {ciclo.aceitas_sem_as_duas_datas} aceita

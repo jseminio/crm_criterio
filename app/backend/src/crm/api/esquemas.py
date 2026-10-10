@@ -1139,3 +1139,30 @@ class InvestimentoEdicao(BaseModel):
     canal: str = Field(min_length=1, max_length=120)
     valor: Decimal = Field(ge=0)
 
+
+
+class ItemDaComposicaoResposta(Base):
+    """Uma oportunidade na lista de um número do funil (10/10/2026)."""
+
+    id: int
+    nome: str
+    grupo: str
+    servico: str | None = None
+    situacao: str
+    captador: str | None = None
+    tipo_canal: str | None = None
+    data_colocacao: date | None = None
+    data_aceite: date | None = None
+    proxima_acao: str | None = None
+    entra: bool
+    """Conta no numerador (aceita, com próxima ação, da rede dos sócios); nas somas, sempre."""
+    parte: str
+    valor: Decimal | None = None
+    """Preço mensal, MRR (ticket) ou dias (ciclo médio), conforme o indicador."""
+    anual: Decimal | None = None
+    falta: list[str] = []
+
+
+class ComposicaoDoFunilResposta(Base):
+    indicador: str
+    itens: list[ItemDaComposicaoResposta]

@@ -27,7 +27,7 @@ from typing import Iterable, Protocol
 
 from crm.domain.listas import Situacao
 
-__all__ = ["CenariosDeTicket", "LinhaDeRecorte", "DIMENSOES", "recortar", "cenarios_de_ticket"]
+__all__ = ["CenariosDeTicket", "LinhaDeRecorte", "DIMENSOES", "recortar", "cenarios_de_ticket", "valor_do_recorte"]
 
 ZERO = Decimal("0.00")
 CENTAVOS = Decimal("0.01")
@@ -78,6 +78,11 @@ def _valor(o, dimensao: str) -> str:
     v = getattr(o, dimensao)
     v = getattr(v, "value", v)
     return v if v else SEM_VALOR
+
+
+def valor_do_recorte(o, dimensao: str) -> str:
+    """Em que linha do recorte a oportunidade cai (para a composição de uma linha)."""
+    return _valor(o, dimensao)
 
 
 def _mensal(o) -> Decimal | None:

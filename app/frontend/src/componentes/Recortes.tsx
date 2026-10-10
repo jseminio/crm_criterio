@@ -13,6 +13,8 @@ import { Carregando, Erro } from "./estados";
 import { paraConsulta, type EstadoDosFiltros } from "./Filtros";
 import { dinheiro, percentual } from "../formato";
 import { usarDados } from "../usarDados";
+import { BotaoDeComposicao } from "./Indicador";
+import { ComposicaoDoFunil } from "./ComposicaoDoFunil";
 
 const DIMENSOES: { valor: DimensaoDeRecorte; rotulo: string }[] = [
   { valor: "servico", rotulo: "Serviço" },
@@ -72,7 +74,14 @@ export function Recortes({ filtros }: { filtros: EstadoDosFiltros }) {
               mediana: (l) => (l.mediana ? Number(l.mediana) : null),
             }).map((l) => (
               <tr key={l.chave}>
-                <td>{l.chave}</td>
+                <td>
+                  {l.chave}
+                  <BotaoDeComposicao rotulo="ver" composicao={{
+                    titulo: `${DIMENSOES.find((d) => d.valor === dimensao)!.rotulo}: ${l.chave}`,
+                    subtitulo: "Propostas desta linha, com os filtros da tela", quantos: l.propostas,
+                    conteudo: () => <ComposicaoDoFunil indicador="propostas" filtros={paraConsulta(filtros)} recorte={{ dimensao, chave: l.chave }} />,
+                  }} />
+                </td>
                 <td className="tabela-numero">{l.propostas}</td>
                 <td className="tabela-numero">{l.aceitas}</td>
                 <td className="tabela-numero">{l.conversao ? percentual(l.conversao) : "—"}</td>

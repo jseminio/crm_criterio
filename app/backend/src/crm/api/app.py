@@ -1118,6 +1118,45 @@ def _registrar(api: FastAPI) -> None:
         itens = _filtradas(sessao, captador, tipo_canal, temperatura, busca, data_tipo, data_de, data_ate, servico)
         return [e.LinhaDeRecorteResposta.model_validate(l) for l in regras_de_recortes.recortar(itens, dimensao)]
 
+    @api.get("/api/indicadores/composicao", response_model=e.ComposicaoDoFunilResposta, tags=["funil"])
+    def composicao_do_funil(
+        indicador: Literal[regras_de_indicadores.INDICADORES_COM_COMPOSICAO],  # type: ignore[valid-type]
+        sessao: Session = Depends(obter_sessao, scope="function"),
+        captador: list[str] | None = Query(default=None),
+        tipo_canal: list[TipoCanal] | None = Query(default=None),
+        temperatura: list[Temperatura] | None = Query(default=None),
+        busca: str | None = None,
+        data_tipo: Literal["colocacao", "aceite"] | None = None,
+        data_de: date | None = None,
+        data_ate: date | None = None,
+        servico: list[str] | None = Query(default=None),
+        recorte: Literal["servico", "tipo_canal", "captador"] | None = None,
+        chave: str | None = None,
+    ) -> e.ComposicaoDoFunilResposta:
+        """A lista de oportunidades que compõe um número do funil (10/10/2026), com os mesmos filtros e da
+        mesma conta (`crm.domain.indicadores.composicao`). Com `recorte` e `chave`, só a linha do recorte."""
+        consulta = _consulta_de_oportunidades(
+            None, captador, tipo_canal, temperatura, None, busca, data_tipo, data_de, data_ate, servico,
+        )
+        linhas = sessao.execute(consulta).all()
+        nomes = {o.id: nome for o, nome in linhas}
+        oportunidades = [o for o, _ in linhas]
+        if recorte is not None:
+            oportunidades = [o for o in oportunidades if regras_de_recortes.valor_do_recorte(o, recorte) == chave]
+        itens = regras_de_indicadores.composicao(oportunidades, indicador)
+        return e.ComposicaoDoFunilResposta(indicador=indicador, itens=[
+            e.ItemDaComposicaoResposta(
+                id=i.oportunidade.id, nome=i.oportunidade.nome, grupo=nomes[i.oportunidade.id],
+                servico=i.oportunidade.servico, situacao=i.oportunidade.situacao.value,
+                captador=i.oportunidade.captador,
+                tipo_canal=i.oportunidade.tipo_canal.value if i.oportunidade.tipo_canal else None,
+                data_colocacao=i.oportunidade.data_colocacao, data_aceite=i.oportunidade.data_aceite,
+                proxima_acao=i.oportunidade.proxima_acao,
+                entra=i.entra, parte=i.parte, valor=i.valor, anual=i.anual, falta=list(i.falta),
+            )
+            for i in itens
+        ])
+
     @api.get(
         "/api/indicadores/cenarios-de-ticket",
         response_model=e.CenariosDeTicketResposta | None,

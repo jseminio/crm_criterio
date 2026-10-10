@@ -42,7 +42,10 @@ __all__ = [
     "Cobertura",
     "DependenciaDeCanal",
     "TicketRecorrente",
+    "INDICADORES_COM_COMPOSICAO",
+    "ItemDaComposicao",
     "calcular",
+    "composicao",
 ]
 
 ZERO = Decimal("0.00")
@@ -259,6 +262,99 @@ class Indicadores:
     ticket_recorrente: TicketRecorrente
 
 
+@dataclass(frozen=True)
+class _Conjuntos:
+    """Os conjuntos de que saem os números do funil. `calcular` e `composicao` usam estes mesmos, e por
+    isso a lista que a tela abre é sempre a conta do número (10/10/2026)."""
+
+    em_aberto: list
+    decididas: list
+    aceitas: list
+    recorrentes: list
+    """Ticket recorrente (09/10/2026): aceitas de serviço recorrente (C1) com preço mensal — consultoria e
+    legalização são trabalhos pontuais."""
+
+
+def _conjuntos(todas: list[_Oportunidade]) -> _Conjuntos:
+    aceitas = [o for o in todas if o.situacao.ganha]
+    return _Conjuntos(
+        em_aberto=[o for o in todas if not o.situacao.decidida],
+        decididas=[o for o in todas if o.situacao.decidida],
+        aceitas=aceitas,
+        recorrentes=[o for o in aceitas if o.preco_mensal is not None and o.preco_mensal > 0
+                     and getattr(o, "linha_servico", LinhaServico.C1) is LinhaServico.C1],
+    )
+
+
+def _tem_proxima_acao(o: _Oportunidade) -> bool:
+    return o.proxima_acao is not None and o.proxima_acao.strip() != ""
+
+
+def _falta_na_volumetria(o: _Oportunidade) -> tuple[str, ...]:
+    return tuple(campo for campo in _DIRECIONADORES_DA_VOLUMETRIA if getattr(o, campo) is None)
+
+
+INDICADORES_COM_COMPOSICAO = (
+    "em_aberto", "aceitas", "ticket_recorrente", "ciclo_medio", "taxa_de_conversao",
+    "cobertura_proxima_acao", "cobertura_volumetria", "dependencia_de_canal", "propostas",
+)
+"""Os números do funil que abrem "Ver composição". `propostas` é a lista inteira (a linha de um recorte)."""
+
+
+@dataclass(frozen=True)
+class ItemDaComposicao:
+    """Uma oportunidade na lista de um número do funil.
+
+    `entra`: se ela conta no numerador (aceita na conversão, com próxima ação na cobertura, da rede dos
+    sócios na dependência); nas listas que só somam, é sempre verdadeiro. `parte` diz isso em palavra.
+    `valor`: o que a linha soma — preço mensal (Em aberto, Aceitas), MRR (ticket, × 13 ÷ 12) ou dias
+    (ciclo médio). `falta`: os direcionadores da volumetria que estão vazios."""
+
+    oportunidade: _Oportunidade
+    entra: bool
+    parte: str
+    valor: Decimal | None = None
+    anual: Decimal | None = None
+    falta: tuple[str, ...] = ()
+
+
+def composicao(oportunidades: Iterable[_Oportunidade], indicador: str) -> list[ItemDaComposicao]:
+    """A lista que compõe um número do funil, dos mesmos conjuntos de `calcular`."""
+    if indicador not in INDICADORES_COM_COMPOSICAO:
+        raise ValueError(f"indicador sem composição: {indicador}")
+    todas = list(oportunidades)
+    c = _conjuntos(todas)
+    I = ItemDaComposicao
+    if indicador in ("em_aberto", "aceitas"):
+        return [I(o, True, o.situacao.value, o.preco_mensal, o.preco_anual) for o in getattr(c, indicador)]
+    if indicador == "propostas":
+        return [I(o, o.situacao.ganha, o.situacao.value, o.preco_mensal, o.preco_anual) for o in todas]
+    if indicador == "ticket_recorrente":
+        return [I(o, True, o.situacao.value, mensalizar(o.preco_mensal)) for o in c.recorrentes]
+    if indicador == "ciclo_medio":
+        itens = []
+        for o in c.aceitas:
+            if o.data_aceite is not None and o.data_colocacao is not None:
+                itens.append(I(o, True, "na média", Decimal((o.data_aceite - o.data_colocacao).days)))
+            else:
+                itens.append(I(o, False, "fora: falta a data de colocação ou de aceite"))
+        return itens
+    if indicador == "taxa_de_conversao":
+        return [I(o, o.situacao.ganha, o.situacao.value, o.preco_mensal, o.preco_anual) for o in c.decididas]
+    if indicador == "cobertura_proxima_acao":
+        return [I(o, _tem_proxima_acao(o), "com próxima ação" if _tem_proxima_acao(o) else "sem próxima ação")
+                for o in c.em_aberto]
+    if indicador == "cobertura_volumetria":
+        itens = []
+        for o in todas:
+            falta = _falta_na_volumetria(o)
+            itens.append(I(o, not falta, "completa" if not falta else f"faltam {len(falta)} de 9", falta=falta))
+        return itens
+    # dependencia_de_canal
+    return [I(o, o.tipo_canal is CANAL_DA_REDE_DE_SOCIOS,
+              o.tipo_canal.value if o.tipo_canal is not None else "(canal não informado)") for o in todas]
+
+
 def _somar(oportunidades: list[_Oportunidade]) -> Recorte:
     return Recorte(
         quantas=len(oportunidades),
@@ -280,9 +376,8 @@ def calcular(
     situações à mão: se a lista de situações mudar, esta conta muda junto.
     """
     todas = list(oportunidades)
-    em_aberto = [o for o in todas if not o.situacao.decidida]
-    decididas = [o for o in todas if o.situacao.decidida]
-    aceitas = [o for o in todas if o.situacao.ganha]
+    c = _conjuntos(todas)
+    em_aberto, decididas, aceitas = c.em_aberto, c.decididas, c.aceitas
     com_data = sum(1 for o in aceitas if o.data_aceite is not None)
 
     dias_por_aceita = [
@@ -313,14 +408,8 @@ def calcular(
         meta=meta_de_conversao, alerta=alerta_de_conversao,
     )
 
-    com_proxima_acao = sum(
-        1 for o in em_aberto if o.proxima_acao is not None and o.proxima_acao.strip() != ""
-    )
-    com_volumetria_completa = sum(
-        1
-        for o in todas
-        if all(getattr(o, campo) is not None for campo in _DIRECIONADORES_DA_VOLUMETRIA)
-    )
+    com_proxima_acao = sum(1 for o in em_aberto if _tem_proxima_acao(o))
+    com_volumetria_completa = sum(1 for o in todas if not _falta_na_volumetria(o))
     cobertura = Cobertura(
         em_aberto_com_proxima_acao=com_proxima_acao,
         em_aberto_total=len(em_aberto),
@@ -336,8 +425,7 @@ def calcular(
     centavos = Decimal("0.01")
     # Ticket recorrente (09/10/2026): só serviço recorrente (C1) — consultoria e legalização são
     # trabalhos pontuais — e em MRR, a parcela × 13 ÷ 12, como todo MRR do CRM.
-    recorrentes = [o for o in aceitas if o.preco_mensal is not None and o.preco_mensal > 0
-                   and getattr(o, "linha_servico", LinhaServico.C1) is LinhaServico.C1]
+    recorrentes = c.recorrentes
     mensais = [mensalizar(o.preco_mensal) for o in recorrentes]
     total_mensal = sum(mensais, ZERO)
     if mensais:

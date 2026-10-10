@@ -40,6 +40,12 @@ resultado (ver "SDR de IA", abaixo).
   composição" com cada contrato ou evento, cliente, data e valor (`GET /api/mrr/movimento?de=`).
 - **Meta de MRR em 13 parcelas**: R$ 400 mil → **R$ 433.333,33**; alerta R$ 200 mil → **R$ 216.666,67**. A tarefa
   `2026_10_10_meta_de_mrr_em_13_parcelas` converte no Redeploy só a meta que ainda está nos valores de origem.
+- **Entrega 2 — Funil › Oportunidades** (10/10/2026): os 7 cards (Em aberto, Aceitas, Ticket recorrente, Ciclo
+  médio, Conversão, Cobertura, Dependência de canal) e cada linha dos Recortes têm "Ver composição": as
+  oportunidades da conta, com os filtros da tela, e um resumo que repete o número do card. Quem fica fora da
+  conta (recusada na conversão, sem data no ciclo, sem próxima ação) aparece dito em palavra. Rota:
+  `GET /api/indicadores/composicao?indicador=…` (mais os filtros; `recorte` e `chave` para uma linha dos
+  Recortes). `calcular` e `composicao` usam os mesmos conjuntos (`_conjuntos`).
 - **Churn**: registra-se em Gestão de contratos › contrato › Registrar evento › **Encerramento** (data, quem
   decidiu, motivo). O cliente só conta como perdido quando o último contrato dele é encerrado.
 

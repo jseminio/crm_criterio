@@ -97,7 +97,7 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("POST|PATCH|DELETE", r"/api/empresas/\d+/contatos(/\d+)?", ("contatos.editar",)),
     # funil: oportunidades, leads, propostas, questionários, números
     ("GET", r"/api/oportunidades/exportar", ("funil.exportar",)),
-    ("GET", r"/api/(oportunidades|funil|indicadores(/recortes|/cenarios-de-ticket)?)", ("funil.ver",)),
+    ("GET", r"/api/(oportunidades|funil|indicadores(/recortes|/cenarios-de-ticket|/composicao)?)", ("funil.ver",)),
     ("GET", r"/api/mrr(/carteira|/movimento)?", ("funil.ver", "contratos.ver", "carteira.ver")),
     # Recebimentos (10/10/2026): importar é só do Administrador — a rota confere; aqui, o nível das metas
     ("POST", r"/api/recebimentos/(previa|importar)", ("configuracoes.metas",)),

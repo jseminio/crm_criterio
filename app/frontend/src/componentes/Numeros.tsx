@@ -12,6 +12,8 @@
 import { api } from "../api/cliente";
 import { Indicador, type Tom } from "./Indicador";
 import { MrrDaCarteira } from "./MrrDaCarteira";
+import { ComposicaoDoFunil } from "./ComposicaoDoFunil";
+import type { IndicadorDoFunil } from "../api/tipos";
 import type { Indicadores, TaxaDeConversao } from "../api/tipos";
 import { Carregando, Erro } from "./estados";
 import { paraConsulta, type EstadoDosFiltros } from "./Filtros";
@@ -70,11 +72,19 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
     ticket_recorrente: ticket,
   } = dados;
 
+  const consulta = paraConsulta(filtros);
+  /** "Ver composição" de cada card: a lista de oportunidades da mesma conta, com os filtros da tela. */
+  const lista = (indicador: IndicadorDoFunil, titulo: string, quantos?: number) => ({
+    titulo, subtitulo: "Oportunidades que compõem o número", quantos,
+    conteudo: () => <ComposicaoDoFunil indicador={indicador} filtros={consulta} />,
+  });
+
   return (
     <div className="numeros" aria-label="Números do funil">
       <MrrDaCarteira />
       <Cartao
         rotulo="Em aberto"
+        composicao={lista("em_aberto", "Em aberto", aberto.quantas)}
         tom="azul"
         destaque={`${aberto.quantas} proposta${aberto.quantas === 1 ? "" : "s"}`}
         apoio={`${dinheiroCurto(aberto.valor_anual)} ao ano`}
@@ -89,6 +99,7 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
       <Cartao
         rotulo="Aceitas em 2026"
+        composicao={lista("aceitas", "Aceitas em 2026", aceitas.quantas)}
         tom="verde"
         destaque={`${aceitas.quantas} proposta${aceitas.quantas === 1 ? "" : "s"}`}
         apoio={`${dinheiroCurto(aceitas.valor_anual)} ao ano`}
@@ -109,6 +120,7 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
       <Cartao
         rotulo="Ticket recorrente aceito"
+        composicao={lista("ticket_recorrente", "Ticket recorrente aceito", ticket.quantas)}
         tom="dourado"
         destaque={ticket.calculavel ? dinheiro(ticket.ticket_medio) : undefined}
         apoio={ticket.calculavel ? `por mês · mediana ${dinheiro(ticket.mediana)}` : undefined}
@@ -139,6 +151,7 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
       <Cartao
         rotulo="Ciclo médio de vendas"
+        composicao={lista("ciclo_medio", "Ciclo médio de vendas", ciclo.amostra + ciclo.aceitas_sem_as_duas_datas)}
         tom="violeta"
         destaque={ciclo.calculavel ? `${dias(ciclo.dias)} dias` : undefined}
         apoio={ciclo.calculavel ? `amostra de ${ciclo.amostra} proposta${ciclo.amostra === 1 ? "" : "s"}` : undefined}
@@ -164,6 +177,7 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
       <Cartao
         rotulo="Taxa de conversão"
+        composicao={lista("taxa_de_conversao", "Taxa de conversão", dados.taxa_de_conversao.decididas)}
         tom={tomDaConversao(dados.taxa_de_conversao)}
         apoio={dados.taxa_de_conversao.calculavel ? `${dados.taxa_de_conversao.aceitas} de ${dados.taxa_de_conversao.decididas} decididas` : undefined}
         etiqueta={<EtiquetaDeConversao tx={dados.taxa_de_conversao} />}
@@ -195,6 +209,17 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
       <Cartao
         rotulo="Cobertura do processo"
+        composicao={{
+          titulo: "Cobertura do processo", subtitulo: "Oportunidades que compõem os dois percentuais", quantos: cobertura.total,
+          conteudo: () => (
+            <>
+              <h3 className="numero-rotulo">Em aberto com próxima ação</h3>
+              <ComposicaoDoFunil indicador="cobertura_proxima_acao" filtros={consulta} />
+              <h3 className="numero-rotulo">Ficha de volumetria completa</h3>
+              <ComposicaoDoFunil indicador="cobertura_volumetria" filtros={consulta} />
+            </>
+          ),
+        }}
         tom="rosa"
         destaque={cobertura.percentual_com_proxima_acao !== null ? percentual(cobertura.percentual_com_proxima_acao) : undefined}
         apoio={cobertura.percentual_com_proxima_acao !== null ? "com próxima ação" : undefined}
@@ -221,6 +246,7 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
       <Cartao
         rotulo="Dependência de canal"
+        composicao={lista("dependencia_de_canal", "Dependência de canal", dependencia.total)}
         tom="marinho"
         apoio={dependencia.percentual !== null ? "da rede dos sócios" : undefined}
         destaque={

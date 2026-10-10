@@ -37,6 +37,7 @@ from crm.api import sucesso
 from crm.api.classificacao import parametros_vigentes
 from crm.db.modelos import Contrato, GrupoEconomico, Oportunidade
 from crm.domain import mrr as regras_de_mrr
+from crm.domain.eventos_de_contrato import saida_vigente
 from crm.domain import sucesso as regras_do_sucesso
 from crm.domain.listas import LinhaServico, Situacao, SituacaoContrato, TipoDeEventoDeContrato
 
@@ -95,8 +96,8 @@ def _reais(v: Decimal) -> str:
 
 
 def _encerramento(c) -> date | None:
-    datas = [e.data_do_evento for e in c.eventos if e.tipo is TipoDeEventoDeContrato.ENCERRAMENTO]
-    return min(datas) if datas else None
+    """A saída efetiva do encerramento que vale (10/10/2026): o cliente conta como perdido na saída, não no anúncio."""
+    return saida_vigente(c)
 
 
 def _valendo_em(c, dia: date) -> bool:

@@ -22,8 +22,17 @@ const TIPOS: { valor: Tipo; ajuda: string }[] = [
   { valor: "Aditivo", ajuda: "Qualquer alteração contratual. Descreva o que mudou; escopo e preço são opcionais." },
   { valor: "Renovação", ajuda: "Estende a vigência: informe a nova data de fim." },
   { valor: "Correção", ajuda: "Corrige um valor lançado errado, com o motivo. Não conta como expansão nem contração no MRR." },
-  { valor: "Encerramento", ajuda: "Encerra o contrato. O motivo é obrigatório e alimenta a análise de saída." },
+  { valor: "Encerramento", ajuda: "O cliente anunciou a saída. Até a saída efetiva o contrato segue ativo, faturando e no MRR; na saída o MRR cai, o churn conta e ele paga a 13ª proporcional." },
+  { valor: "Desistência da saída", ajuda: "O cliente em aviso de saída decidiu ficar: desfaz o encerramento anunciado." },
 ];
+
+/** Prazo do aviso: 30 ou 60 dias da data do anúncio, ou outra data negociada (10/10/2026). */
+function maisDias(iso: string, dias: number): string {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + dias);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+const hojeIso = () => maisDias(new Date().toISOString().slice(0, 10), 0);
 
 const PRECOS: Tipo[] = ["Reajuste", "Expansão", "Contração", "Aditivo", "Correção"];
 
@@ -53,7 +62,12 @@ export function EventosDeContrato({
   iniciativas?: string[];
 }) {
   const assinado = contrato.situacao === "Ativo" || contrato.situacao === "Suspenso";
-  const [tipo, definirTipo] = useState<Tipo>("Reajuste");
+  const emAviso = assinado && !!contrato.saida_em;
+  // Em aviso de saída, só Correção, novo Encerramento (troca a saída) ou a Desistência.
+  const tiposPossiveis = TIPOS.filter((t) =>
+    emAviso ? ["Encerramento", "Desistência da saída", "Correção"].includes(t.valor) : t.valor !== "Desistência da saída");
+  const [tipo, definirTipo] = useState<Tipo>(emAviso ? "Desistência da saída" : "Reajuste");
+  const [prazo, definirPrazo] = useState<"30" | "60" | "outra">("30");
   const [campos, definirCampos] = useState<Record<string, string>>({});
   const [confirmando, definirConfirmando] = useState(false);
   const [salvando, definirSalvando] = useState(false);
@@ -74,8 +88,10 @@ export function EventosDeContrato({
   const pedeDescricao = tipo === "Aditivo" || tipo === "Correção" || categoriaOutro;
   // Alçada (02/10/2026): sem login não há alçada; quem aprova registra direto.
   const alcada = eu.modo !== "local" && !pode("contratos.aprovar") ? motivoDaAlcada(contrato, tipo, campos) : null;
+  const anuncio = campos.data_do_evento || hojeIso();
+  const saida = prazo === "outra" ? campos.data_da_saida ?? "" : maisDias(anuncio, Number(prazo));
   const faltaDado =
-    (pedeMotivo && (!campos.iniciativa || !campos.motivo_categoria)) ||
+    (pedeMotivo && (!campos.iniciativa || !campos.motivo_categoria || !saida || saida < anuncio)) ||
     (pedeDescricao && (campos.descricao ?? "").trim().length < 3) ||
     (tipo === "Renovação" && !campos.data_fim_nova) ||
     (["Reajuste", "Expansão", "Contração", "Correção"].includes(tipo) && !campos.preco_mensal_novo && !campos.preco_anual_novo);
@@ -88,6 +104,7 @@ export function EventosDeContrato({
       for (const k of ["descricao", "motivo_categoria", "iniciativa", "escopo_novo", "preco_mensal_novo", "preco_anual_novo", "data_fim_nova"]) {
         if (campos[k]) corpo[k] = campos[k];
       }
+      if (tipo === "Encerramento") corpo.data_da_saida = saida;
       const atualizado = await api.registrarEventoDeContrato(contrato.id, corpo);
       definirCampos({});
       definirConfirmando(false);
@@ -112,7 +129,8 @@ export function EventosDeContrato({
           {contrato.eventos.map((ev) => (
             <li key={ev.id} className="evento">
               <div>
-                <strong>{ev.tipo}</strong> · {data(ev.data_do_evento)}
+                <strong>{ev.tipo}</strong> · {ev.tipo === "Encerramento" ? "anunciado em " : ""}{data(ev.data_do_evento)}
+                {ev.tipo === "Encerramento" && ev.data_da_saida && <> · <strong>saída efetiva {data(ev.data_da_saida)}</strong></>}
                 <span className="numero-nota"> · registrado em {dataHora(ev.registrado_em)}</span>
               </div>
               <div className="numero-nota"><Efeito e={ev} /></div>
@@ -147,15 +165,49 @@ export function EventosDeContrato({
           <div className="campo-bloco">
             <label className="campo-rotulo" htmlFor="ev-tipo">Registrar evento</label>
             <select id="ev-tipo" className="selecao" value={tipo} onChange={(e) => { definirTipo(e.target.value as Tipo); definirConfirmando(false); }}>
-              {TIPOS.map((t) => <option key={t.valor} value={t.valor}>{t.valor}</option>)}
+              {tiposPossiveis.map((t) => <option key={t.valor} value={t.valor}>{t.valor}</option>)}
             </select>
             <p className="campo-ajuda">{ajuda}</p>
           </div>
 
+          {emAviso && (
+            <div className="recado" role="note">
+              <strong>Em aviso de saída</strong> · sai em {data(contrato.saida_em)}. Até lá segue ativo e faturando; na saída,
+              passa a Encerrado sozinho.
+            </div>
+          )}
+
           <div className="campo-bloco">
-            <label className="campo-rotulo" htmlFor="ev-data">Data do evento (vazio = hoje)</label>
+            <label className="campo-rotulo" htmlFor="ev-data">
+              {pedeMotivo ? "Data do anúncio (o cliente avisou; vazio = hoje)" : "Data do evento (vazio = hoje)"}
+            </label>
             <CampoDeData id="ev-data" value={campos.data_do_evento ?? ""} aoMudar={(v) => mudar("data_do_evento", v)} />
           </div>
+
+          {pedeMotivo && (
+            <div className="campo-bloco">
+              <span className="campo-rotulo" id="ev-prazo">Prazo até a saída efetiva</span>
+              <div className="opcoes-em-linha" role="radiogroup" aria-labelledby="ev-prazo">
+                {(["30", "60", "outra"] as const).map((p) => (
+                  <label key={p} className="opcao-em-linha">
+                    <input type="radio" name="ev-prazo" checked={prazo === p} onChange={() => { definirPrazo(p); definirConfirmando(false); }} />
+                    {p === "outra" ? "Outra data" : `${p} dias`}
+                  </label>
+                ))}
+              </div>
+              {prazo === "outra" ? (
+                <>
+                  <label className="campo-rotulo" htmlFor="ev-saida">Data da saída efetiva (último dia da Critério)</label>
+                  <CampoDeData id="ev-saida" value={campos.data_da_saida ?? ""} aoMudar={(v) => mudar("data_da_saida", v)} />
+                </>
+              ) : null}
+              <p className="campo-ajuda">
+                {saida && saida >= anuncio
+                  ? <>Saída efetiva em <strong>{data(saida)}</strong>. Até lá o contrato segue ativo, faturando e no MRR; na saída o MRR cai, o churn conta e o cliente paga a 13ª proporcional.</>
+                  : "A saída efetiva não pode ser antes do anúncio."}
+              </p>
+            </div>
+          )}
 
           {PRECOS.includes(tipo) && (
             <div className="formulario-duplo">
@@ -226,7 +278,9 @@ export function EventosDeContrato({
               ) : (
                 <div className="recado">
                   <strong>Isto não se edita nem se apaga depois.</strong> Se errar, registre outro evento.
-                  {tipo === "Encerramento" && " O contrato passa a Encerrado e não recebe mais eventos."}
+                  {tipo === "Encerramento" && (saida <= hojeIso()
+                    ? " A saída já chegou: o contrato passa a Encerrado e não recebe mais eventos."
+                    : ` O contrato fica em aviso de saída até ${data(saida)} e então passa a Encerrado.`)}
                 </div>
               )}
               <button type="button" className="botao botao-primario" disabled={salvando} onClick={registrar}>

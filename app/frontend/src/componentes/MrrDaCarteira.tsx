@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { api } from "../api/cliente";
 import type { GrupoDaCarteira, MrrDaCarteira as Carteira, SituacaoDoRecebido } from "../api/tipos";
-import { dataHora, dinheiro, dinheiroCurto } from "../formato";
+import { data, dataHora, dinheiro, dinheiroCurto } from "../formato";
 import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
 import { Indicador } from "./Indicador";
@@ -62,6 +62,12 @@ export function MrrDaCarteira() {
           <br />
           Recebido em {mes}:{" "}
           {dados.mes_importado ? `${dinheiroCurto(dados.recebido)} de ${dinheiroCurto(dados.esperado)}` : "sem registro"}
+          {dados.em_aviso_contratos > 0 && (
+            <>
+              <br />
+              {dinheiroCurto(dados.em_aviso)} em aviso de saída ({dados.em_aviso_contratos} contrato{dados.em_aviso_contratos === 1 ? "" : "s"})
+            </>
+          )}
         </>
       }
       composicao={{
@@ -86,6 +92,9 @@ export function ExplicacaoDoMrr({ dados }: { dados: Carteira }) {
       <p>Meta {dinheiro(dados.meta)} · alerta {dinheiro(dados.alerta)} (Configurações › Metas).</p>
       {Number(dados.suspenso) > 0 && <p>{dinheiro(dados.suspenso)} em contratos suspensos ficam à parte.</p>}
       {dados.sem_preco_mensal > 0 && <p>{dados.sem_preco_mensal} contrato(s) sem preço mensal ficaram fora da soma.</p>}
+      {dados.em_aviso_contratos > 0 && (
+        <p>{dinheiro(dados.em_aviso)} em aviso de saída: o cliente anunciou a saída; segue no MRR até a saída efetiva.</p>
+      )}
     </>
   );
 }
@@ -199,7 +208,10 @@ function LinhaDoGrupo({ g, aberto, aoAlternar, importado }: {
       </tr>
       {aberto && g.itens.map((c) => (
         <tr key={c.id} className="composicao-sub">
-          <td>{c.escopo ?? "Contrato"} {c.empresa ? `· ${c.empresa}` : ""} <span className="numero-nota">({PARTE[c.parte]})</span></td>
+          <td>
+            {c.escopo ?? "Contrato"} {c.empresa ? `· ${c.empresa}` : ""} <span className="numero-nota">({PARTE[c.parte]})</span>
+            {c.saida_em && <span className="etiqueta etiqueta-espera" style={{ marginLeft: "var(--e1)" }}>sai em {data(c.saida_em)}</span>}
+          </td>
           <td />
           <td className="tabela-numero">{c.mrr !== null ? dinheiro(c.mrr) : "—"}</td>
           <td className="tabela-numero">{Number(c.esperado) > 0 ? dinheiro(c.esperado) : "—"}</td>

@@ -63,6 +63,7 @@ from crm.api.disparo_do_questionario import canais_reais, laco_do_disparo
 from crm.api.integracoes import Testadores, roteador_de_integracoes
 from crm.api.kpis_lideranca import roteador_de_kpis
 from crm.api.recebimentos import roteador_de_recebimentos
+from crm.db.saidas import efetivar_saidas, laco_das_saidas
 from crm import configuracao
 from crm.api.questionarios import fonte_real, roteador_de_questionarios
 from crm.questionario.endereco import BuscaDeEndereco, endereco_pelo_cnpj
@@ -160,6 +161,7 @@ def criar_app(
     tentativas: Tentativas | None = None,
     canais_do_disparo: Callable[[], Canais | None] | None = None,
     disparo_automatico: bool | None = None,
+    saidas_automaticas: bool | None = None,
     testadores: Testadores | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
@@ -188,10 +190,13 @@ def criar_app(
         disparo = asyncio.create_task(
             laco_do_disparo(_fabrica, canais_do_disparo or canais_reais)
         ) if com_disparo else None
+        # Saída efetiva de contrato em aviso (10/10/2026): passa a Encerrado no dia anunciado, sem ninguém voltar ao CRM.
+        com_saidas = saidas_automaticas if saidas_automaticas is not None else fabrica is None
+        saidas = asyncio.create_task(laco_das_saidas(_fabrica)) if com_saidas else None
         try:
             yield
         finally:
-            for t in (tarefa, disparo):
+            for t in (tarefa, disparo, saidas):
                 if t is not None:
                     t.cancel()
                     with contextlib.suppress(asyncio.CancelledError):
@@ -405,7 +410,8 @@ def _gravar_evento(
         escopo_anterior=contrato.escopo,
         escopo_novo=efeito.get("escopo"),
         data_fim_anterior=contrato.data_fim,
-        data_fim_nova=efeito.get("data_fim") if pedido.tipo is not TipoDeEventoDeContrato.ENCERRAMENTO else pedido.data_do_evento,
+        data_fim_nova=efeito.get("data_fim"),
+        data_da_saida=(pedido.data_da_saida or pedido.data_do_evento) if pedido.tipo is TipoDeEventoDeContrato.ENCERRAMENTO else None,
     )
     sessao.add(evento)
     for campo, valor in efeito.items():
@@ -1001,6 +1007,7 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(422, "só há MRR até hoje")
         if inicio > fim:
             raise HTTPException(422, "o início do período não pode ser depois do fim")
+        efetivar_saidas(sessao, dia)
         registrados = list(sessao.scalars(sa.select(Contrato)))
         da_carteira = sum(1 for c in registrados if c.anterior_ao_crm)
         # Sempre em bruto (02/10/2026): o líquido entra com o imposto dos Parâmetros de cálculo.
@@ -1439,6 +1446,7 @@ def _registrar(api: FastAPI) -> None:
         limite: int = Query(default=100, le=1000),
         salto: int = 0,
     ) -> e.Pagina[e.ContratoResumo]:
+        efetivar_saidas(sessao, date.today())
         consulta = sa.select(Contrato, GrupoEconomico.nome).join(
             GrupoEconomico, Contrato.grupo_id == GrupoEconomico.id
         )
@@ -1557,7 +1565,10 @@ def _registrar(api: FastAPI) -> None:
             preco_mensal_novo=corpo.preco_mensal_novo,
             preco_anual_novo=corpo.preco_anual_novo,
             data_fim_nova=corpo.data_fim_nova,
+            data_da_saida=corpo.data_da_saida,
         )
+        if corpo.data_da_saida is not None and corpo.tipo is not TipoDeEventoDeContrato.ENCERRAMENTO:
+            raise HTTPException(422, "a data da saída efetiva só vale no Encerramento")
         if (corpo.motivo_categoria is not None or corpo.iniciativa is not None) and corpo.tipo is not TipoDeEventoDeContrato.ENCERRAMENTO:
             raise HTTPException(422, "a categoria do motivo e a iniciativa só valem no Encerramento")
         try:

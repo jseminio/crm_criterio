@@ -232,6 +232,11 @@ class TipoDeEventoDeContrato(Enum):
     CONTRACAO = "Contração"
     RENOVACAO = "Renovação"
     ENCERRAMENTO = "Encerramento"
+    """Desde 10/10/2026 tem duas datas: `data_do_evento` é o **anúncio** (o cliente avisou) e `data_da_saida`
+    a **saída efetiva** (30 ou 60 dias depois, pela cláusula de multa e pela transição ao novo contador). Até a
+    saída o contrato segue Ativo e faturando; o MRR cai e o churn conta na saída."""
+    DESISTENCIA = "Desistência da saída"
+    """O cliente em aviso de saída decidiu ficar (10/10/2026): desfaz o encerramento anunciado."""
     CORRECAO = "Correção"
     """Corrige um valor **lançado errado** (por exemplo, na carga inicial). Guarda o antes e o
     depois e o motivo, mas **não é um movimento comercial**: não conta como expansão, contração

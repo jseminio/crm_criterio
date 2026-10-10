@@ -375,6 +375,11 @@ export function Contratos({ listas }: { listas: Listas | null }) {
                 <td>{contrato.escopo ?? "—"}</td>
                 <td>
                   <Etiqueta texto={contrato.situacao} />
+                  {contrato.situacao === "Ativo" && contrato.saida_em && (
+                    <span className="etiqueta etiqueta-espera" style={{ marginLeft: "var(--e1)" }}>
+                      Em aviso de saída · sai em {data(contrato.saida_em)}
+                    </span>
+                  )}
                 </td>
                 <td>
                   {dinheiro(contrato.preco_mensal)}

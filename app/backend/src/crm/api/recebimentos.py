@@ -27,6 +27,7 @@ from crm.api.classificacao import parametros_vigentes
 from crm.api.metas import metas_vigentes
 from crm.db.base import agora
 from crm.db.modelos import Contrato, Empresa, GrupoEconomico, ImportacaoDeRecebimentos, Recebimento
+from crm.db.saidas import efetivar_saidas
 from crm.domain import mrr as regras
 from crm.domain import recebimentos as regra
 
@@ -57,7 +58,9 @@ class ContratoDoGrupo(BaseModel):
     """"somado", "suspenso", "sem_preco" ou "encerrado" (fora do MRR de hoje, mas faturava na competência)."""
     mrr: Decimal | None
     esperado: Decimal
-    """A parcela em bruto que o caixa espera na competência (zero se não faturava nela)."""
+    """A parcela em bruto que o caixa espera na competência (zero se não faturava nela), com a 13ª quando cabe."""
+    saida_em: date | None = None
+    """Saída efetiva anunciada (aviso de saída, 10/10/2026)."""
 
 
 class GrupoDaCarteira(BaseModel):
@@ -79,6 +82,9 @@ class CarteiraResposta(BaseModel):
     grupos: int
     suspenso: Decimal
     sem_preco_mensal: int
+    em_aviso: Decimal = Decimal("0")
+    """MRR de contratos em aviso de saída: ainda somam, mas saem na data anunciada (10/10/2026)."""
+    em_aviso_contratos: int = 0
     meta: Decimal
     alerta: Decimal
     esperado: Decimal
@@ -154,7 +160,7 @@ def _contratos(sessao: Session) -> list[Contrato]:
     return list(sessao.scalars(sa.select(Contrato).options(selectinload(Contrato.eventos), selectinload(Contrato.empresa))))
 
 
-def carteira(sessao: Session, competencia: date) -> CarteiraResposta:
+def carteira(sessao: Session, competencia: date, hoje: date | None = None) -> CarteiraResposta:
     registrados = _contratos(sessao)
     por_id = {c.id: c for c in registrados}
     imposto = parametros_vigentes(sessao)[1].imposto
@@ -167,12 +173,14 @@ def carteira(sessao: Session, competencia: date) -> CarteiraResposta:
     esperado_do_grupo: dict[int, Decimal] = defaultdict(lambda: ZERO)
     mrr_do_grupo: dict[int, Decimal] = defaultdict(lambda: ZERO)
     partes = {i.contrato_id: i for i in regras.itens_do_mrr(em_mrr)}
+    em_aviso, em_aviso_contratos = ZERO, 0
     for p in parcelas.values():
         esperado = ZERO
-        if regras.ativo_em(p, fim):
-            preco = regras.preco_em(p, fim)
+        saida = regras.saida_vigente(p)
+        if regras.fatura_entre(p, competencia, fim):
+            preco = regras.preco_em(p, min(fim, saida) if saida else fim)
             if preco and preco > 0:
-                esperado = regra.esperado_no_mes(preco, competencia)
+                esperado = regra.esperado_no_mes(preco, competencia, p.data_inicio, saida)
         item = partes.get(p.id)
         if item is None and esperado <= 0:
             continue
@@ -180,10 +188,15 @@ def carteira(sessao: Session, competencia: date) -> CarteiraResposta:
         if item is not None and item.parte == "somado":
             mrr_do_grupo[c.grupo_id] += item.valor
         esperado_do_grupo[c.grupo_id] += esperado
+        aviso = saida if (item is not None and item.parte == "somado" and saida and saida > (hoje or date.today())) else None
+        if aviso:
+            em_aviso += item.valor
+            em_aviso_contratos += 1
         itens[c.grupo_id].append(ContratoDoGrupo(
             id=c.id, escopo=c.escopo,
             empresa=(c.empresa.nome_fantasia or c.empresa.razao_social) if c.empresa else None,
             parte=item.parte if item else "encerrado", mrr=item.valor if item else None, esperado=esperado,
+            saida_em=aviso,
         ))
 
     recebidos = list(sessao.scalars(
@@ -217,6 +230,7 @@ def carteira(sessao: Session, competencia: date) -> CarteiraResposta:
     return CarteiraResposta(
         competencia=competencia.strftime("%Y-%m"), mrr=atual.valor, contratos=atual.contratos, grupos=atual.grupos,
         suspenso=atual.suspenso_valor, sem_preco_mensal=atual.sem_preco_mensal, meta=meta, alerta=alerta,
+        em_aviso=em_aviso, em_aviso_contratos=em_aviso_contratos,
         esperado=sum((g.esperado for g in com_esperado), ZERO),
         recebido=sum((g.recebido for g in com_esperado), ZERO),
         recebido_fora=sum((g.recebido for g in linhas if g.esperado <= 0), ZERO),
@@ -312,7 +326,9 @@ def roteador_de_recebimentos(obter_sessao: Callable[[], Iterator[Session]]) -> A
         sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> CarteiraResposta:
         """O MRR da carteira por grupo e, na competência (padrão: o mês corrente), o esperado e o recebido."""
-        return carteira(sessao, _mes(competencia, hoje or date.today()))
+        dia = hoje or date.today()
+        efetivar_saidas(sessao, dia)
+        return carteira(sessao, _mes(competencia, dia), dia)
 
     @r.get("/api/mrr/movimento", response_model=MovimentoResposta)
     def ver_movimento(
@@ -323,6 +339,7 @@ def roteador_de_recebimentos(obter_sessao: Callable[[], Iterator[Session]]) -> A
     ) -> MovimentoResposta:
         """Cada contrato ou evento que compõe as linhas do movimento do MRR no período (a mesma conta)."""
         fim = ate or (hoje or date.today())
+        efetivar_saidas(sessao, hoje or date.today())
         if de > fim:
             raise HTTPException(422, "o início do período não pode ser depois do fim")
         registrados = _contratos(sessao)

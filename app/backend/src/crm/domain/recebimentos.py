@@ -5,8 +5,10 @@ Administrador importa pela tela, uma linha por recebimento: CNPJ ou grupo, compe
 Aqui ficam a leitura da planilha, a parcela esperada do mês e a situação de cada cliente.
 
 **Esperado do mês** = a parcela em bruto dos contratos que faturavam na competência, **sem** o 13 ÷ 12:
-o caixa recebe a parcela, não o MRR. Em dezembro a parcela conta em dobro (a 13ª), `MES_DA_13A_PARCELA`
-— hipótese a confirmar com o financeiro (em que mês a 13ª é cobrada).
+o caixa recebe a parcela, não o MRR. A **13ª** (confirmado por Eduardo em 10/10/2026) é cobrada em dezembro, em
+avos: parcela × avos ÷ 12, um avo por mês do ano com 15 dias ou mais de serviço, contados da assinatura (quem
+entrou no ano não paga o ano inteiro). Na **saída** o cliente paga a 13ª proporcional na fatura do mês da saída,
+junto com a última parcela; o mês da saída tem parcela.
 
 **Situação**, sempre em palavra (PAD-002: nunca só a cor):
 - **Em dia**: recebeu o esperado ou mais;
@@ -24,12 +26,12 @@ import io
 import re
 import unicodedata
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 __all__ = [
     "MES_DA_13A_PARCELA", "EM_DIA", "PARCIAL", "EM_ABERTO", "SEM_REGISTRO", "LinhaLida", "LinhaReconhecida",
-    "Problema", "Leitura", "esperado_no_mes", "ler_planilha", "normalizar", "situacao",
+    "Problema", "Leitura", "avos", "decima_terceira", "esperado_no_mes", "ler_planilha", "normalizar", "situacao",
 ]
 
 MES_DA_13A_PARCELA = 12
@@ -41,9 +43,37 @@ MESES = {"jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6, "jul": 7, "
          "nov": 11, "dez": 12}
 
 
-def esperado_no_mes(parcela: Decimal, competencia: date) -> Decimal:
-    """A parcela em bruto que o caixa espera na competência: em dobro no mês da 13ª."""
-    return parcela * 2 if competencia.month == MES_DA_13A_PARCELA else parcela
+def avos(ano: int, inicio: date | None, fim: date | None) -> int:
+    """Quantos meses de `ano` tiveram 15 dias ou mais de serviço entre `inicio` (vazio = antes do ano) e `fim`
+    (vazio = depois do ano) — a regra do 13º salário."""
+    de = max(inicio or date(ano, 1, 1), date(ano, 1, 1))
+    ate = min(fim or date(ano, 12, 31), date(ano, 12, 31))
+    conta = 0
+    for mes in range(1, 13):
+        primeiro = date(ano, mes, 1)
+        ultimo = (date(ano + (mes == 12), mes % 12 + 1, 1)) - timedelta(days=1)
+        dias = (min(ate, ultimo) - max(de, primeiro)).days + 1
+        if dias >= 15:
+            conta += 1
+    return conta
+
+
+def decima_terceira(parcela: Decimal, competencia: date, inicio: date | None, saida: date | None) -> Decimal:
+    """A 13ª que o caixa espera na competência: a proporcional no mês da saída; senão, em dezembro, os avos do
+    ano desde a assinatura. Zero nos outros meses."""
+    ano = competencia.year
+    if saida is not None and (saida.year, saida.month) == (ano, competencia.month):
+        n = avos(ano, inicio, saida)
+    elif competencia.month == MES_DA_13A_PARCELA and (saida is None or saida > date(ano, 12, 31)):
+        n = avos(ano, inicio, None)
+    else:
+        return Decimal("0.00")
+    return (parcela * n / 12).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
+
+
+def esperado_no_mes(parcela: Decimal, competencia: date, inicio: date | None = None, saida: date | None = None) -> Decimal:
+    """A parcela em bruto que o caixa espera na competência, mais a 13ª quando cabe (`decima_terceira`)."""
+    return parcela + decima_terceira(parcela, competencia, inicio, saida)
 
 
 def situacao(esperado: Decimal, recebido: Decimal, mes_importado: bool) -> str:

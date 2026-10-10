@@ -126,7 +126,7 @@ describe("painel", () => {
       { lead_id: 2, lead: "Padaria Pão", contato: "Rui", origem: "Tráfego pago · Meta Ads", criado_em: "2026-09-11T12:00:00Z",
         categoria: "Fora do perfil", entra: false, valor: null },
     ]);
-    render(<Sdr />);
+    render(<Sdr listas={null} />);
     expect(await screen.findByText(/Leads do mês que a IA qualificou/)).toHaveAttribute("role", "tooltip");
     await userEvent.click(screen.getByRole("button", { name: "Ver composição: Leads qualificados pela IA" }));
     const painelLateral = await screen.findByRole("dialog", { name: "Leads qualificados pela IA" });

@@ -51,7 +51,7 @@ describe("Questionários", () => {
   });
 
   it("cada número do topo explica a conta e abre os questionários que o compõem (10/10/2026)", async () => {
-    render(<Questionarios />);
+    render(<Questionarios listas={null} />);
     expect(await screen.findByText(/Questionários de grupo que já tinha oportunidade aberta/)).toHaveAttribute("role", "tooltip");
     fireEvent.click(screen.getByRole("button", { name: "Ver composição: Precisam de você" }));
     const painel = await screen.findByRole("dialog", { name: "Precisam de você" });

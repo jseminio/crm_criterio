@@ -192,7 +192,7 @@ describe("arrasto no kanban", () => {
   });
 
   it("soltar em 'Aceita' abre o painel em vez de gravar direto", async () => {
-    vi.mocked(api.oportunidade).mockResolvedValue(DETALHE_ALFA);
+    vi.mocked(api.oportunidade).mockResolvedValue(DETALHE_ALFA as never);
     await abrir([
       coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")]),
       coluna("Aceita", []),

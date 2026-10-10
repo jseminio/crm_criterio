@@ -14,6 +14,7 @@ vi.mock("../api/cliente", async () => {
 
 const carteira = (o: Partial<Carteira> = {}): Carteira => ({
   competencia: "2026-10", mrr: "279099.19", contratos: 62, grupos: 34, suspenso: "0.00", sem_preco_mensal: 0,
+  em_aviso: "0.00", em_aviso_contratos: 0,
   meta: "433333.33", alerta: "216666.67", esperado: "257629.97", recebido: "0.00", recebido_fora: "0.00",
   mes_importado: false, importado_em: null, importado_por: null, grupos_registrados: 0,
   itens: [

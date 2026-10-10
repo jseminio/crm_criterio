@@ -234,7 +234,7 @@ class TestRelatorio:
     def test_o_resumo_lista_as_mudancas(self, sessao: Session):
         importar(sessao, [proposta()])
 
-        resumo = importar(sessao, [proposta(situacao=Situacao.RECUSADA,
+        resumo = importar(sessao, [proposta(situacao=Situacao.PERDIDA,
                                             motivo_recusa=MotivoRecusa.PRECO)]).resumo()
 
         assert "Mudanças (2)" in resumo

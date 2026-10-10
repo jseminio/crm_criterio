@@ -6,7 +6,7 @@ import { inicioDoPeriodo, Receita } from "./Receita";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { mrr: vi.fn() } };
+  return { ...real, api: { mrr: vi.fn(), itensDoMovimento: vi.fn().mockResolvedValue({ de: "", ate: "", itens: [] }) } };
 });
 
 const AVISO = "Só entram os contratos registrados no CRM. A carteira anterior ainda não foi carregada.";

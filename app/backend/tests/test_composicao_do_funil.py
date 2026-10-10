@@ -36,7 +36,7 @@ def cliente(engine):
                **VOLUMETRIA),
             op("Alfa DP", alfa, Situacao.ON_HOLD, captador="BO", tipo_canal=TipoCanal.PARCEIROS, servico="DP",
                preco_mensal=D("1200"), data_colocacao=date(2026, 3, 5)),
-            op("Alfa Consultoria", alfa, Situacao.RECUSADA, captador="BO", tipo_canal=TipoCanal.PARCEIROS,
+            op("Alfa Consultoria", alfa, Situacao.PERDIDA, captador="BO", tipo_canal=TipoCanal.PARCEIROS,
                servico="Consultoria", preco_anual=D("30000"), data_colocacao=date(2026, 5, 1)),
             op("Beta BPO", beta, Situacao.ACEITA, captador="EL", tipo_canal=TipoCanal.SOCIOS, servico="BPO Financeiro",
                linha_servico=LinhaServico.C1, preco_mensal=D("8000"), data_aceite=date(2026, 6, 1),

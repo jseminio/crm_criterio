@@ -9,6 +9,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { data, hojeIso } from "../formato";
 import { api } from "../api/cliente";
 import type { ColunaDoFunil, Indicadores, Listas, OportunidadeDetalhe } from "../api/tipos";
 import { Funil } from "./Funil";
@@ -37,7 +38,7 @@ vi.mock("../api/cliente", async () => {
 });
 
 const LISTAS: Listas = {
-  situacoes: ["Enviar proposta", "On hold", "Aceita"],
+  situacoes: ["Enviar proposta", "Em avaliação pela empresa", "On hold", "Aceita"],
   situacoes_de_lead: [],
   temperaturas: ["Frio", "Morno", "Quente"],
   tipos_de_canal: [],
@@ -122,6 +123,53 @@ function encontrarColuna(situacao: string) {
   return screen.getByText(situacao).closest(".coluna")!;
 }
 
+const DETALHE_ALFA = {
+    id: 1,
+    nome: "Alfa BPO",
+    grupo_id: 1,
+    grupo_nome: "Alfa BPO",
+    situacao: "Enviar proposta",
+    temperatura: null,
+    servico: null,
+    tipo_servico: null,
+    captador: null,
+    tipo_canal: null,
+    data_colocacao: null,
+    preco_mensal: null,
+    preco_anual: null,
+    proxima_acao: null,
+    proxima_acao_em: null,
+    canal: null,
+    linha_servico: null,
+    data_aceite: null,
+    motivo_recusa: null,
+    motivo_recusa_original: null,
+    valor_mensalizado: null,
+    observacao: null,
+    origem: "Carga 2026",
+    linha_planilha: null,
+    complexidade: null,
+    risco_tecnico: null,
+    documentos_fiscais_mes: null,
+    lancamentos_contabeis_mes: null,
+    pagamentos_mes: null,
+    contas_bancarias: null,
+    conciliacoes_cartao_mes: null,
+    empregados_clt: null,
+    admissoes_desligamentos_mes: null,
+    cnpjs_no_escopo: null,
+    tomadores_de_servico: null,
+    servicos_contratados_alem_do_primeiro: 0,
+    tem_consolidacao_de_grupo: false,
+    e_auditada: false,
+    porte: null,
+    porte_definido_por: null,
+    porte_definido_em: null,
+    origem_da_volumetria: {},
+    historico_de_preco: [],
+    sugestao_de_porte: { calculavel: false, pontuacao: null, porte: null, horas_base: null, direcionadores_aplicados: 0 },
+  } as const;
+
 describe("arrasto no kanban", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -144,52 +192,7 @@ describe("arrasto no kanban", () => {
   });
 
   it("soltar em 'Aceita' abre o painel em vez de gravar direto", async () => {
-    vi.mocked(api.oportunidade).mockResolvedValue({
-      id: 1,
-      nome: "Alfa BPO",
-      grupo_id: 1,
-      grupo_nome: "Alfa BPO",
-      situacao: "Enviar proposta",
-      temperatura: null,
-      servico: null,
-      tipo_servico: null,
-      captador: null,
-      tipo_canal: null,
-      data_colocacao: null,
-      preco_mensal: null,
-      preco_anual: null,
-      proxima_acao: null,
-      proxima_acao_em: null,
-      canal: null,
-      linha_servico: null,
-      data_aceite: null,
-      motivo_recusa: null,
-      motivo_recusa_original: null,
-      valor_mensalizado: null,
-      observacao: null,
-      origem: "Carga 2026",
-      linha_planilha: null,
-      complexidade: null,
-      risco_tecnico: null,
-      documentos_fiscais_mes: null,
-      lancamentos_contabeis_mes: null,
-      pagamentos_mes: null,
-      contas_bancarias: null,
-      conciliacoes_cartao_mes: null,
-      empregados_clt: null,
-      admissoes_desligamentos_mes: null,
-      cnpjs_no_escopo: null,
-      tomadores_de_servico: null,
-      servicos_contratados_alem_do_primeiro: 0,
-      tem_consolidacao_de_grupo: false,
-      e_auditada: false,
-      porte: null,
-      porte_definido_por: null,
-      porte_definido_em: null,
-      origem_da_volumetria: {},
-      historico_de_preco: [],
-      sugestao_de_porte: { calculavel: false, pontuacao: null, porte: null, horas_base: null, direcionadores_aplicados: 0 },
-    });
+    vi.mocked(api.oportunidade).mockResolvedValue(DETALHE_ALFA);
     await abrir([
       coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")]),
       coluna("Aceita", []),
@@ -204,6 +207,21 @@ describe("arrasto no kanban", () => {
     // desabilita salvar sem a data, sem duplicar a regra aqui.
     await waitFor(() => expect(screen.getByLabelText("Situação")).toHaveValue("Aceita"));
     expect(screen.getByRole("button", { name: /salvar alterações/i })).toBeDisabled();
+    expect(api.editarOportunidade).not.toHaveBeenCalled();
+  });
+
+  it("soltar em 'Em avaliação' vindo de 'Enviar proposta' abre a ficha com a data de envio de hoje", async () => {
+    vi.mocked(api.oportunidade).mockResolvedValue(DETALHE_ALFA as never);
+    await abrir([
+      coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")]),
+      coluna("Em avaliação pela empresa", []),
+    ]);
+    const dt = dataTransfer();
+    fireEvent.dragStart(encontrarCartao("Alfa BPO"), { dataTransfer: dt });
+    fireEvent.dragOver(encontrarColuna("Em avaliação pela empresa"), { dataTransfer: dt });
+    fireEvent.drop(encontrarColuna("Em avaliação pela empresa"), { dataTransfer: dt });
+    await waitFor(() => expect(screen.getByLabelText("Situação")).toHaveValue("Em avaliação pela empresa"));
+    expect(screen.getByLabelText("Data de envio da proposta")).toHaveValue(data(hojeIso()));
     expect(api.editarOportunidade).not.toHaveBeenCalled();
   });
 

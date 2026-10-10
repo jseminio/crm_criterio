@@ -6,8 +6,7 @@
 
 const TOM_POR_SITUACAO: Record<string, string> = {
   Aceita: "ganho",
-  Recusada: "perda",
-  Perdido: "perda",
+  Perdida: "perda",
   "On hold": "espera",
   "Em avaliação pela empresa": "andamento",
   "Enviar proposta": "andamento",

@@ -55,6 +55,20 @@ resultado (ver "SDR de IA", abaixo).
 - **Recortes e cenários de ticket alinhados ao card de ticket** (decisão de Eduardo, 10/10/2026): só serviço
   recorrente (C1) e em MRR (parcela × 13 ÷ 12). A estatística dos cenários roda sobre a parcela e cada valor sai em
   MRR, para o arredondamento não mudar quem é atípico. Regra única: `indicadores.e_recorrente`.
+- **Data de envio da proposta** (decisões de Eduardo, 10/10/2026): campo da oportunidade, preenchido sozinho ao
+  marcar a proposta gerada como enviada e editável na ficha. Mover de "Enviar proposta" para "Em avaliação" pede a
+  data (o kanban abre a ficha com hoje sugerido). Não pode ser futura nem antes da originação. O follow-up da Agenda
+  conta do envio; o ciclo médio ganha duas partes (originação → envio e envio → aceite); "do questionário à
+  proposta" usa o envio. Na planilha de 2026 a originação já era o envio: a tarefa
+  `2026_10_10_data_de_envio_da_proposta` copia a originação (menos em quem ainda está em "Enviar proposta").
+  Migração `c3e7a1d5b9f2`. **A Agenda não cobra pendência de proposta depois do envio.**
+- **Perdida e motivos** (decisões de Eduardo, 10/10/2026): "Recusada" e "Perdido" viram a etapa única **Perdida**
+  (a tarefa `2026_10_10_perdida_e_motivos` leva as linhas antigas). Marcar como Perdida **exige o motivo** ("Outro"
+  pede a descrição, `motivo_recusa_detalhe`, migração `d9f1b3c7e5a2`); o kanban abre a ficha para isso. As listas de
+  motivos de perda e de churn estão **aprovadas** (alguns nomes ficaram mais claros: "Sem retorno do cliente",
+  "Momento / adiou a decisão", "Escopo não atende", "Expectativa diferente da promessa"). Card **Motivos de perda**
+  em Oportunidades (com composição; as antigas sem motivo aparecem como "Sem motivo informado") e **Motivos de churn**
+  em Gestão de contratos (as saídas do período por motivo). Aceita e Perdida não se excluem: contam na conversão.
 - **Churn**: registra-se em Gestão de contratos › contrato › Registrar evento › **Encerramento** (anúncio, saída
   efetiva, quem decidiu, motivo). O cliente só conta como perdido quando o último contrato dele sai.
 - **Aviso de saída** (decisões de Eduardo, 10/10/2026): o Encerramento tem a **data do anúncio** e a **saída

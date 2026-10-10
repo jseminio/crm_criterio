@@ -65,7 +65,7 @@ export function ConfirmacaoDeExclusao({
           Fica: o grupo, as empresas, os contatos e as reuniões.
           {desliga.length > 0 && <> Continuam, sem apontar para ela: {lista(desliga)}.</>}
         </p>
-        {exclusao.sai_da_conversao && <p>Ela está como Perdido: sai da taxa de conversão.</p>}
+        {exclusao.sai_da_conversao && <p>Ela sai da taxa de conversão.</p>}
         <p>Fica registrado no Histórico de alterações quem excluiu, quando e o motivo. Não dá para desfazer pela tela.</p>
         <label className="campo-rotulo" htmlFor="motivo-da-exclusao">Motivo (obrigatório)</label>
         <textarea

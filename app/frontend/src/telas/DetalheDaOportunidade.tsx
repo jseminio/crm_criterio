@@ -15,6 +15,7 @@ import { QuestionarioDaOportunidade } from "../componentes/QuestionarioDaOportun
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro } from "../componentes/estados";
 import { dataHora, dinheiro } from "../formato";
+import { hojeIso } from "../formato";
 import { CampoDeData } from "../componentes/CampoDeData";
 import { BuscaDeEmpresa } from "../componentes/BuscaDeEmpresa";
 import { usarAcesso } from "../entrada";
@@ -334,6 +335,7 @@ export function DetalheDaOportunidade({
           tipo_canal: d.tipo_canal ?? "",
           canal: d.canal ?? "",
           motivo_recusa: d.motivo_recusa ?? "",
+          motivo_recusa_detalhe: d.motivo_recusa_detalhe ?? "",
           data_aceite: d.data_aceite ?? "",
           proxima_acao: d.proxima_acao ?? "",
           proxima_acao_em: d.proxima_acao_em ?? "",
@@ -343,6 +345,9 @@ export function DetalheDaOportunidade({
           servico_tema: d.servico_tema ?? "",
           tipo_servico: d.tipo_servico ?? "",
           data_colocacao: d.data_colocacao ?? "",
+          // Vindo do kanban (Enviar proposta → Em avaliação), sugere hoje como data de envio (10/10/2026).
+          data_envio_proposta: d.data_envio_proposta
+            ?? (situacaoInicial === "Em avaliação pela empresa" && d.situacao === "Enviar proposta" ? hojeIso() : ""),
           preco_mensal: d.preco_mensal ?? "",
           preco_anual: d.preco_anual ?? "",
           complexidade: d.complexidade?.toString() ?? "",
@@ -427,6 +432,12 @@ export function DetalheDaOportunidade({
       Number(anualExibido || 0) !== Number(detalhe.preco_anual || 0));
 
   const exigeDataDeAceite = rascunho.situacao === "Aceita" && !rascunho.data_aceite;
+  // Perdida pede o motivo (10/10/2026); as antigas sem motivo não travam quem só edita outro campo.
+  const exigeMotivoDaPerda =
+    rascunho.situacao === "Perdida" && detalhe?.situacao !== "Perdida" &&
+    (!rascunho.motivo_recusa || (rascunho.motivo_recusa === "Outro" && rascunho.motivo_recusa_detalhe.trim().length < 3));
+  const exigeDataDeEnvio =
+    detalhe?.situacao === "Enviar proposta" && rascunho.situacao === "Em avaliação pela empresa" && !rascunho.data_envio_proposta;
 
   const converterEmContrato = async () => {
     definirConvertendoEmContrato(true);
@@ -487,7 +498,7 @@ export function DetalheDaOportunidade({
         type="button"
         className={`botao ${aba === "proposta" ? "botao-secundario" : "botao-primario"}`}
         onClick={salvar}
-        disabled={salvando || exigeDataDeAceite || !pode("funil.editar")}
+        disabled={salvando || exigeDataDeAceite || exigeDataDeEnvio || exigeMotivoDaPerda || !pode("funil.editar")}
       >
         {salvando ? "Salvando…" : "Salvar alterações"}
       </button>
@@ -737,6 +748,25 @@ export function DetalheDaOportunidade({
               />
             </div>
 
+            <div className="campo-bloco">
+              <label className="campo-rotulo" htmlFor="d-envio">
+                Data de envio da proposta
+              </label>
+              <CampoDeData
+                id="d-envio"
+                value={rascunho.data_envio_proposta}
+                aoMudar={(v) => mudar("data_envio_proposta", v)}
+                aria-describedby={exigeDataDeEnvio ? "d-envio-aviso" : undefined}
+              />
+              {exigeDataDeEnvio ? (
+                <span id="d-envio-aviso" style={{ fontSize: 12, color: "var(--perda)" }}>
+                  Para mover para Em avaliação, informe quando a proposta foi enviada.
+                </span>
+              ) : (
+                <span className="campo-ajuda">O follow-up da Agenda conta a partir dela. Preenchida sozinha ao marcar a proposta gerada como enviada.</span>
+              )}
+            </div>
+
             <p className="campo-ajuda" style={{ margin: 0 }}>
               Serviço, preço e data de originação agora são editáveis aqui — desde
               22/09/2026 (E4), a proposta pode nascer e ser ajustada direto no CRM.{" "}
@@ -781,10 +811,10 @@ export function DetalheDaOportunidade({
               </div>
             </div>
 
-            {(rascunho.situacao === "Recusada" || rascunho.situacao === "Perdido") && (
+            {rascunho.situacao === "Perdida" && (
               <div className="campo-bloco">
                 <label className="campo-rotulo" htmlFor="d-motivo">
-                  Motivo
+                  Motivo da perda
                 </label>
                 <select
                   id="d-motivo"
@@ -792,13 +822,23 @@ export function DetalheDaOportunidade({
                   value={rascunho.motivo_recusa}
                   onChange={(e) => mudar("motivo_recusa", e.target.value)}
                 >
-                  <option value="">Não informado</option>
+                  <option value="">{detalhe.situacao === "Perdida" ? "Sem motivo informado" : "Escolha o motivo"}</option>
                   {listas?.motivos_de_recusa.map((m) => (
                     <option key={m} value={m}>
                       {m}
                     </option>
                   ))}
                 </select>
+                {rascunho.motivo_recusa === "Outro" && (
+                  <input id="d-motivo-detalhe" className="entrada" maxLength={300} aria-label="Descreva o motivo"
+                    placeholder="Descreva o motivo" value={rascunho.motivo_recusa_detalhe}
+                    onChange={(e) => mudar("motivo_recusa_detalhe", e.target.value)} />
+                )}
+                {exigeMotivoDaPerda && (
+                  <span style={{ fontSize: 12, color: "var(--perda)" }}>
+                    Para marcar como perdida, escolha o motivo{rascunho.motivo_recusa === "Outro" ? " e descreva" : ""}.
+                  </span>
+                )}
                 {detalhe.motivo_recusa_original && (
                   <span style={{ fontSize: 12, color: "var(--texto-medio)" }}>
                     Texto original da planilha: “{detalhe.motivo_recusa_original}”

@@ -73,6 +73,10 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
   } = dados;
 
   const consulta = paraConsulta(filtros);
+  // O primeiro motivo de verdade vai em destaque; "Sem motivo informado" só se for o único.
+  const todosOsMotivos = dados.motivos_de_perda ?? [];
+  const totalPerdidas = todosOsMotivos.reduce((t, [, n]) => t + n, 0);
+  const perdas = todosOsMotivos;
   /** "Ver composição" de cada card: a lista de oportunidades da mesma conta, com os filtros da tela. */
   const lista = (indicador: IndicadorDoFunil, titulo: string, quantos?: number) => ({
     titulo, subtitulo: "Oportunidades que compõem o número", quantos,
@@ -154,12 +158,24 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
         composicao={lista("ciclo_medio", "Ciclo médio de vendas", ciclo.amostra + ciclo.aceitas_sem_as_duas_datas)}
         tom="violeta"
         destaque={ciclo.calculavel ? `${dias(ciclo.dias)} dias` : undefined}
-        apoio={ciclo.calculavel ? `amostra de ${ciclo.amostra} proposta${ciclo.amostra === 1 ? "" : "s"}` : undefined}
+        apoio={ciclo.calculavel
+          ? (ciclo.dias_ate_o_envio && ciclo.dias_do_envio_ao_aceite
+            ? `${dias(ciclo.dias_ate_o_envio)} até o envio · ${dias(ciclo.dias_do_envio_ao_aceite)} até o aceite`
+            : `amostra de ${ciclo.amostra} proposta${ciclo.amostra === 1 ? "" : "s"}`)
+          : undefined}
         pendente={!ciclo.calculavel}
       >
         {ciclo.calculavel ? (
           <>
             <p>Originação até aceite · {ciclo.amostra} proposta{ciclo.amostra === 1 ? "" : "s"}</p>
+            <p>
+              Originação → envio: <strong>{ciclo.dias_ate_o_envio ? `${dias(ciclo.dias_ate_o_envio)} dias` : "sem dado"}</strong>
+              {ciclo.amostra_ate_o_envio ? ` (${ciclo.amostra_ate_o_envio})` : ""}
+              <br />
+              Envio → aceite: <strong>{ciclo.dias_do_envio_ao_aceite ? `${dias(ciclo.dias_do_envio_ao_aceite)} dias` : "sem dado"}</strong>
+              {ciclo.amostra_do_envio_ao_aceite ? ` (${ciclo.amostra_do_envio_ao_aceite})` : ""}
+            </p>
+            <p className="numero-nota">Separa o tempo de preparar e enviar a proposta do tempo de decisão do cliente.</p>
             {ciclo.aceitas_sem_as_duas_datas > 0 && (
               <p className="numero-nota">
                 {ciclo.aceitas_sem_as_duas_datas} aceita
@@ -261,6 +277,27 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
           </p>
         ) : (
           <p className="numero-estado">Nenhuma oportunidade neste recorte.</p>
+        )}
+      </Cartao>
+
+      <Cartao
+        rotulo="Motivos de perda"
+        tom="vermelho"
+        destaque={perdas.length ? perdas[0][0] : undefined}
+        apoio={perdas.length ? `${perdas[0][1]} de ${totalPerdidas} perdida${totalPerdidas === 1 ? "" : "s"}` : undefined}
+        pendente={!perdas.length}
+        composicao={totalPerdidas ? lista("motivos_de_perda", "Motivos de perda", totalPerdidas) : undefined}
+      >
+        {perdas.length ? (
+          <>
+            {perdas.map(([motivo, n]) => <p key={motivo}>{motivo}: <strong>{n}</strong></p>)}
+            <p className="numero-nota">
+              Perdidas por motivo, com os filtros da tela. Desde 10/10/2026 o motivo é obrigatório ao marcar como perdida;
+              "Sem motivo informado" são as antigas, para preencher aos poucos.
+            </p>
+          </>
+        ) : (
+          <p className="numero-estado">Nenhuma oportunidade perdida neste recorte.</p>
         )}
       </Cartao>
     </div>

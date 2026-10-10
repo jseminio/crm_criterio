@@ -108,6 +108,9 @@ class ItemDoMovimentoResposta(BaseModel):
     escopo: str | None
     valor: Decimal
     data: date | None
+    motivo: str | None = None
+    """No churn: o motivo do encerramento (lista aprovada em 10/10/2026)."""
+    iniciativa: str | None = None
 
 
 class MovimentoResposta(BaseModel):
@@ -346,12 +349,15 @@ def roteador_de_recebimentos(obter_sessao: Callable[[], Iterator[Session]]) -> A
         por_id = {c.id: c for c in registrados}
         contratos = regras.em_bruto(registrados, parametros_vigentes(sessao)[1].imposto)
         itens = regras.itens_do_movimento(contratos, de, fim)
+        eventos = {ev.id: ev for c in registrados for ev in c.eventos}
         nomes = dict(sessao.execute(sa.select(GrupoEconomico.id, GrupoEconomico.nome)
                                     .where(GrupoEconomico.id.in_({i.grupo_id for i in itens} or {0}))).all())
         return MovimentoResposta(de=de, ate=fim, itens=[
             ItemDoMovimentoResposta(
                 categoria=i.categoria, grupo_id=i.grupo_id, grupo=nomes.get(i.grupo_id, f"Grupo {i.grupo_id}"),
                 contrato_id=i.contrato_id, escopo=por_id[i.contrato_id].escopo, valor=i.valor, data=i.data,
+                motivo=(ev.motivo_categoria.value if (ev := eventos.get(i.evento_id)) and ev.motivo_categoria else None),
+                iniciativa=(ev.iniciativa.value if ev and ev.iniciativa else None),
             )
             for i in sorted(itens, key=lambda i: (regras.CATEGORIAS_DO_MOVIMENTO.index(i.categoria), -i.valor))
         ])

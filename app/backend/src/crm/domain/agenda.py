@@ -106,7 +106,9 @@ def montar(
                 proxima_acao_em=o.proxima_acao_em,
                 balde=balde,
                 dias_de_atraso=(hoje - o.proxima_acao_em).days if balde == "atrasada" else 0,
-                dias_desde_o_envio=(hoje - o.data_colocacao).days if o.data_colocacao else None,
+                # Do envio da proposta (10/10/2026); sem ela, da originação, como antes.
+                dias_desde_o_envio=(hoje - (getattr(o, "data_envio_proposta", None) or o.data_colocacao)).days
+                if (getattr(o, "data_envio_proposta", None) or o.data_colocacao) else None,
             )
         )
     for l in leads:

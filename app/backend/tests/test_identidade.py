@@ -22,7 +22,7 @@ class Falsa:
     captador: str | None = "MO"
     canal: str | None = None
     tipo_canal: str | None = None
-    situacao: str | None = "Recusada"
+    situacao: str | None = "Perdida"
     temperatura: str | None = None
     data_aceite: date | None = None
     motivo_recusa: str | None = None

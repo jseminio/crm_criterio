@@ -90,3 +90,8 @@ export function defasagem(valor: string | null | undefined): string {
   const texto = Math.abs(n).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   return n >= 0 ? `+${texto}% acima` : `−${texto}% abaixo`;
 }
+
+/** A data de hoje como "AAAA-MM-DD", no fuso de quem usa (sem deslocar perto da meia-noite). */
+export function hojeIso(hoje = new Date()): string {
+  return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
+}

@@ -247,6 +247,7 @@ class OportunidadeResumo(Base):
     captador: str | None = None
     tipo_canal: TipoCanal | None = None
     data_colocacao: date | None = None
+    data_envio_proposta: date | None = None
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
     quantidade_parcelas: int | None = None
@@ -287,6 +288,7 @@ class OportunidadeDetalhe(OportunidadeResumo):
     servico_tema: str | None = None
     data_aceite: date | None = None
     motivo_recusa: MotivoRecusa | None = None
+    motivo_recusa_detalhe: str | None = None
     motivo_recusa_original: str | None = None
     valor_mensalizado: Decimal | None = None
     observacao: str | None = None
@@ -345,6 +347,8 @@ class OportunidadeEdicao(BaseModel):
     """Captador e origem (tipo de canal e canal) editáveis no painel — Karine, 07/10/2026. Como os
     outros campos da carga, o que mudar aqui entra em `campos_do_crm` e a recarga não desfaz."""
     motivo_recusa: MotivoRecusa | None = None
+    motivo_recusa_detalhe: str | None = Field(default=None, max_length=300)
+    """Obrigatória quando o motivo da perda é “Outro” (10/10/2026)."""
     data_aceite: date | None = None
     proxima_acao: str | None = Field(default=None, max_length=200)
     proxima_acao_em: date | None = None
@@ -354,6 +358,8 @@ class OportunidadeEdicao(BaseModel):
     servico_descricao: str | None = Field(default=None, max_length=2000)
     servico_tema: str | None = Field(default=None, max_length=80)
     data_colocacao: date | None = None
+    data_envio_proposta: date | None = None
+    """Pedida ao mover de Enviar proposta para Em avaliação (10/10/2026)."""
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
 
@@ -690,6 +696,12 @@ class CicloMedioDeVendasResposta(Base):
 
     dias: Decimal | None
     amostra: int
+    dias_ate_o_envio: Decimal | None = None
+    """Originação → envio da proposta (10/10/2026): o tempo de preparar e enviar."""
+    amostra_ate_o_envio: int = 0
+    dias_do_envio_ao_aceite: Decimal | None = None
+    """Envio → aceite: o tempo de decisão do cliente."""
+    amostra_do_envio_ao_aceite: int = 0
     aceitas_sem_as_duas_datas: int
     calculavel: bool
 
@@ -786,6 +798,8 @@ class IndicadoresResposta(Base):
     cobertura: CoberturaResposta
     dependencia_de_canal: DependenciaDeCanalResposta
     ticket_recorrente: TicketRecorrenteResposta
+    motivos_de_perda: list[tuple[str, int]] = []
+    """Perdidas por motivo (10/10/2026), do mais frequente ao menos; "Sem motivo informado" por último."""
 
 
 class ExecucaoResumo(Base):
@@ -1159,6 +1173,7 @@ class ItemDaComposicaoResposta(Base):
     tipo_canal: str | None = None
     data_colocacao: date | None = None
     data_aceite: date | None = None
+    data_envio_proposta: date | None = None
     proxima_acao: str | None = None
     entra: bool
     """Conta no numerador (aceita, com próxima ação, da rede dos sócios); nas somas, sempre."""

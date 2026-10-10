@@ -111,7 +111,7 @@ class Recorte:
 class TaxaDeConversao:
     """Aceitas ÷ decididas — decisão de Eduardo em 22/09/2026.
 
-    O denominador conta só o que já tem desfecho: Aceita, Recusada ou Perdido
+    O denominador conta só o que já tem desfecho: Aceita ou Perdida (antes de 10/10/2026, Recusada ou Perdido)
     (`Situacao.decidida`). Oportunidade em aberto não entra — ela ainda pode
     fechar, e contá-la já penalizaria o time por um resultado que não
     aconteceu ainda. É a leitura padrão de funil de vendas: não se julga a
@@ -166,6 +166,12 @@ class CicloMedioDeVendas:
     dias: Decimal | None
     amostra: int
     aceitas_sem_as_duas_datas: int
+    dias_ate_o_envio: Decimal | None = None
+    """Originação → envio da proposta, nas aceitas com as duas datas (10/10/2026): preparar e enviar."""
+    amostra_ate_o_envio: int = 0
+    dias_do_envio_ao_aceite: Decimal | None = None
+    """Envio → aceite, nas aceitas com as duas datas: a decisão do cliente."""
+    amostra_do_envio_ao_aceite: int = 0
 
     @property
     def calculavel(self) -> bool:
@@ -261,6 +267,8 @@ class Indicadores:
     cobertura: Cobertura
     dependencia_de_canal: DependenciaDeCanal
     ticket_recorrente: TicketRecorrente
+    motivos_de_perda: tuple[tuple[str, int], ...] = ()
+    """Perdidas por motivo, do mais frequente ao menos (10/10/2026); "Sem motivo informado" para as antigas."""
 
 
 @dataclass(frozen=True)
@@ -293,6 +301,36 @@ def e_recorrente(o) -> bool:
             and getattr(o, "linha_servico", LinhaServico.C1) is LinhaServico.C1)
 
 
+def _media(dias: list[int]) -> Decimal | None:
+    return (Decimal(sum(dias)) / Decimal(len(dias))).quantize(Decimal("0.1")) if dias else None
+
+
+def _partes_do_ciclo(aceitas: list) -> dict:
+    """O ciclo em duas partes (10/10/2026): originação → envio e envio → aceite, cada uma com a sua amostra."""
+    ate_envio = [(o.data_envio_proposta - o.data_colocacao).days for o in aceitas
+                 if getattr(o, "data_envio_proposta", None) and o.data_colocacao]
+    do_envio = [(o.data_aceite - o.data_envio_proposta).days for o in aceitas
+                if getattr(o, "data_envio_proposta", None) and o.data_aceite]
+    return {"dias_ate_o_envio": _media(ate_envio), "amostra_ate_o_envio": len(ate_envio),
+            "dias_do_envio_ao_aceite": _media(do_envio), "amostra_do_envio_ao_aceite": len(do_envio)}
+
+
+SEM_MOTIVO = "Sem motivo informado"
+
+
+def _motivo(o) -> str:
+    m = getattr(o, "motivo_recusa", None)
+    return m.value if m is not None else SEM_MOTIVO
+
+
+def _por_motivo(decididas: list) -> tuple[tuple[str, int], ...]:
+    contagem: dict[str, int] = {}
+    for o in decididas:
+        if not o.situacao.ganha:
+            contagem[_motivo(o)] = contagem.get(_motivo(o), 0) + 1
+    return tuple(sorted(contagem.items(), key=lambda x: (x[0] == SEM_MOTIVO, -x[1], x[0])))
+
+
 def _tem_proxima_acao(o: _Oportunidade) -> bool:
     return o.proxima_acao is not None and o.proxima_acao.strip() != ""
 
@@ -303,7 +341,7 @@ def _falta_na_volumetria(o: _Oportunidade) -> tuple[str, ...]:
 
 INDICADORES_COM_COMPOSICAO = (
     "em_aberto", "aceitas", "ticket_recorrente", "ciclo_medio", "taxa_de_conversao",
-    "cobertura_proxima_acao", "cobertura_volumetria", "dependencia_de_canal", "propostas",
+    "cobertura_proxima_acao", "cobertura_volumetria", "dependencia_de_canal", "propostas", "motivos_de_perda",
 )
 """Os números do funil que abrem "Ver composição". `propostas` é a lista inteira (a linha de um recorte)."""
 
@@ -346,6 +384,10 @@ def composicao(oportunidades: Iterable[_Oportunidade], indicador: str) -> list[I
             else:
                 itens.append(I(o, False, "fora: falta a data de colocação ou de aceite"))
         return itens
+    if indicador == "motivos_de_perda":
+        perdidas = [o for o in c.decididas if not o.situacao.ganha]
+        return [I(o, getattr(o, "motivo_recusa", None) is not None, _motivo(o), o.preco_mensal, o.preco_anual)
+                for o in perdidas]
     if indicador == "taxa_de_conversao":
         return [I(o, o.situacao.ganha, o.situacao.value, o.preco_mensal, o.preco_anual) for o in c.decididas]
     if indicador == "cobertura_proxima_acao":
@@ -402,6 +444,7 @@ def calcular(
         ),
         amostra=len(dias_por_aceita),
         aceitas_sem_as_duas_datas=len(aceitas) - len(dias_por_aceita),
+        **_partes_do_ciclo(aceitas),
     )
 
     if decididas:
@@ -458,4 +501,5 @@ def calcular(
         cobertura=cobertura,
         dependencia_de_canal=dependencia_de_canal,
         ticket_recorrente=ticket,
+        motivos_de_perda=_por_motivo(c.decididas),
     )

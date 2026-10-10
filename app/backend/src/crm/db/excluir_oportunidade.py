@@ -5,8 +5,8 @@ por causa dela (propostas, pendências da proposta, histórico de preço). Fica 
 o grupo, as empresas, os contatos, as reuniões, o questionário do site e o lead de origem; esses só
 deixam de apontar para ela.
 
-Recusa a oportunidade **Aceita** ou **Recusada** (é o desfecho do funil e conta na taxa de conversão:
-se a venda não aconteceu, o certo é mudar para Perdido) e a que **virou contrato**.
+Recusa a oportunidade **Aceita** ou **Perdida** (é o desfecho do funil e conta na taxa de conversão; desde
+10/10/2026 "Recusada" e "Perdido" são uma etapa só, Perdida) e a que **virou contrato**.
 
 O motivo vai para o histórico de alterações numa linha própria, mesmo sem login (quem fica
 "sem login"): a exclusão não se desfaz pela tela, e o porquê é o que sobra dela.
@@ -44,15 +44,15 @@ class OQueSai:
     leads: int
     vendas_da_reuniao: int
     sai_da_conversao: bool
-    """Perdido conta na taxa de conversão: excluir muda o número."""
+    """Sempre falso desde 10/10/2026: o que conta na conversão (Aceita, Perdida) não se exclui."""
 
 
 def _recusa(sessao: Session, op: Oportunidade) -> str | None:
     if sessao.scalar(sa.select(Contrato.id).where(Contrato.oportunidade_id == op.id).limit(1)) is not None:
         return "Não dá para excluir: esta oportunidade virou contrato. Resolva o contrato em Gestão de contratos."
-    if op.situacao in (Situacao.ACEITA, Situacao.RECUSADA):
+    if op.situacao in (Situacao.ACEITA, Situacao.PERDIDA):
         return (f"Não dá para excluir uma oportunidade {op.situacao.value}: ela conta na taxa de conversão. "
-                "Se a venda não aconteceu, mude a situação para Perdido.")
+                "Se a venda não aconteceu, ela fica como Perdida, com o motivo.")
     return None
 
 
@@ -70,7 +70,7 @@ def o_que_sai(sessao: Session, op: Oportunidade) -> OQueSai:
                               | (QuestionarioRecebido.oportunidade_em_aberto_id == op.id)),
         leads=_contar(sessao, Lead.id, Lead.convertido_em_id == op.id),
         vendas_da_reuniao=_contar(sessao, OportunidadeDaReuniao.id, OportunidadeDaReuniao.oportunidade_id == op.id),
-        sai_da_conversao=op.situacao is Situacao.PERDIDO,
+        sai_da_conversao=False,
     )
 
 

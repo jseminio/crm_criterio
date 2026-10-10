@@ -243,7 +243,7 @@ def novembro(engine, base):
             s.add(Lead(nome=nome, situacao=SituacaoLead.NOVO, tipo_canal=canal, motivo_descarte=motivo,
                        criado_em=datetime(2026, 11, 3, 15, tzinfo=timezone.utc),
                        reuniao_marcada_para=datetime(2026, 11, 10, 15, tzinfo=timezone.utc) if nome == "a" else None))
-        for situacao in (Situacao.ACEITA, Situacao.RECUSADA):
+        for situacao in (Situacao.ACEITA, Situacao.PERDIDA):
             s.add(Oportunidade(grupo_id=g.id, nome="nov", situacao=situacao, data_colocacao=date(2026, 11, 4),
                                data_aceite=date(2026, 11, 14) if situacao is Situacao.ACEITA else None))
         bpo = Oportunidade(grupo_id=g.id, nome="bpo nov", servico="BPO Financeiro", situacao=Situacao.ACEITA, preco_mensal=D("7000"),
@@ -318,7 +318,7 @@ def test_editar_a_aderencia_do_lead_e_bate_limpa_o_detalhe(cliente, engine):
     listas = cliente.get("/api/listas", headers=ADMIN).json()
     assert listas["aderencias"] == ["Bate", "Em parte", "Não bate"]
     assert "Esperava outra coisa (a promessa não bate)" in listas["motivos_de_descarte"]
-    assert "Expectativa diferente" in listas["motivos_de_recusa"]
+    assert "Expectativa diferente da promessa" in listas["motivos_de_recusa"]
 
 
 def test_engajamento_mede_a_aderencia_a_origem_e_o_tema(cliente, engine):

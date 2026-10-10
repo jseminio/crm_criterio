@@ -320,6 +320,8 @@ def roteador_de_questionarios(
             sa.select(Proposta).where(Proposta.oportunidade_id == o.id).order_by(Proposta.gerada_em.desc())
         ).all() if o else []
         enviadas = [x.enviada_em for x in propostas if x.enviada_em is not None]
+        if o is not None and o.data_envio_proposta is not None:  # enviada fora do gerador (10/10/2026)
+            enviadas.append(o.data_envio_proposta)
         ultima = propostas[0] if propostas else None
         motivo = None
         dias = None
@@ -330,7 +332,7 @@ def roteador_de_questionarios(
             dias = dias_uteis_entre(_dia(q.recebido_em), hoje)
         elif o.situacao is Situacao.ACEITA:
             situacao = "aceita"
-        elif o.situacao in (Situacao.RECUSADA, Situacao.PERDIDO):
+        elif o.situacao is Situacao.PERDIDA:
             situacao = "perdida"
             motivo = o.motivo_recusa.value if o.motivo_recusa else None
         elif o.situacao is Situacao.ON_HOLD:

@@ -29,7 +29,8 @@ const COLUNAS: Record<IndicadorDoFunil, Coluna[]> = {
   propostas: [OPORTUNIDADE, CLIENTE, SERVICO, SITUACAO, MENSAL, ANUAL],
   taxa_de_conversao: [OPORTUNIDADE, CLIENTE, SERVICO, { titulo: "Desfecho", valor: (i) => i.parte }, MENSAL],
   ticket_recorrente: [OPORTUNIDADE, CLIENTE, SERVICO, { titulo: "MRR (× 13 ÷ 12)", numerica: true, valor: (i) => dinheiro(i.valor) }],
-  ciclo_medio: [OPORTUNIDADE, CLIENTE, { titulo: "Colocação", valor: (i) => data(i.data_colocacao) },
+  ciclo_medio: [OPORTUNIDADE, CLIENTE, { titulo: "Originação", valor: (i) => data(i.data_colocacao) },
+    { titulo: "Envio", valor: (i) => data(i.data_envio_proposta) },
     { titulo: "Aceite", valor: (i) => data(i.data_aceite) },
     { titulo: "Dias", numerica: true, valor: (i) => (i.valor !== null ? String(Number(i.valor)) : i.parte) }],
   cobertura_proxima_acao: [OPORTUNIDADE, CLIENTE, SITUACAO, { titulo: "Próxima ação", valor: (i) => i.proxima_acao || "— sem próxima ação" }],
@@ -37,6 +38,7 @@ const COLUNAS: Record<IndicadorDoFunil, Coluna[]> = {
     titulo: "Volumetria", valor: (i) => (i.falta.length === 0 ? "completa" : `falta: ${i.falta.map((f) => DIRECIONADOR[f] ?? f).join(", ")}`),
   }],
   dependencia_de_canal: [OPORTUNIDADE, CLIENTE, { titulo: "Canal", valor: (i) => i.parte }, { titulo: "Captador", valor: (i) => i.captador ?? "—" }],
+  motivos_de_perda: [OPORTUNIDADE, CLIENTE, SERVICO, { titulo: "Motivo da perda", valor: (i) => i.parte }, MENSAL],
 };
 
 /** O que o resumo do topo diz, para conferir com o card. */
@@ -62,6 +64,8 @@ function resumo(indicador: IndicadorDoFunil, itens: ItemDaComposicao[]): string 
       return `${entram.length} de ${n} com a ficha de volumetria completa · ${pct(entram.length, n)}`;
     case "dependencia_de_canal":
       return `${entram.length} de ${n} da rede dos sócios · ${pct(entram.length, n)}`;
+    case "motivos_de_perda":
+      return `${n} perdida${n === 1 ? "" : "s"} · ${n - entram.length} sem motivo informado`;
   }
 }
 

@@ -969,6 +969,7 @@ def _registrar(api: FastAPI) -> None:
                 resultado.taxa_de_conversao
             ),
             cobertura=e.CoberturaResposta.model_validate(resultado.cobertura),
+            motivos_de_perda=list(resultado.motivos_de_perda),
             dependencia_de_canal=e.DependenciaDeCanalResposta.model_validate(
                 resultado.dependencia_de_canal
             ),
@@ -1079,8 +1080,9 @@ def _registrar(api: FastAPI) -> None:
                 )
             )
         ]
-        # Pendência da proposta com prazo (E4): só a de oportunidade em aberto, e a automática só
-        # enquanto a regra continuar aberta. Sem `captador`, como o contrato: o dono é o responsável.
+        # Pendência da proposta com prazo (E4): só enquanto a proposta não foi enviada (Eduardo, 10/10/2026:
+        # depois do envio a Agenda não cobra o que faltava para montá-la), e a automática só enquanto a regra
+        # continuar aberta. Sem `captador`, como o contrato: o dono é o responsável.
         pendentes = []
         if not captador:
             com_prazo = sessao.scalars(
@@ -1088,7 +1090,7 @@ def _registrar(api: FastAPI) -> None:
                 .where(PendenciaDaProposta.prazo.is_not(None), PendenciaDaProposta.feita_em.is_(None)).distinct()
             )
             for o in com_prazo:
-                if not o.situacao.decidida:
+                if o.situacao is Situacao.ENVIAR_PROPOSTA and o.data_envio_proposta is None:
                     pendentes += [(i, o, o.grupo.nome) for i in pendencias_de(sessao, o)]
         itens = regras_da_agenda.montar(
             oportunidades=em_aberto, leads=leads, hoje=dia, contratos=em_vigor,
@@ -1158,6 +1160,7 @@ def _registrar(api: FastAPI) -> None:
                 captador=i.oportunidade.captador,
                 tipo_canal=i.oportunidade.tipo_canal.value if i.oportunidade.tipo_canal else None,
                 data_colocacao=i.oportunidade.data_colocacao, data_aceite=i.oportunidade.data_aceite,
+                data_envio_proposta=i.oportunidade.data_envio_proposta,
                 proxima_acao=i.oportunidade.proxima_acao,
                 entra=i.entra, parte=i.parte, valor=i.valor, anual=i.anual, falta=list(i.falta),
             )
@@ -1242,6 +1245,7 @@ def _registrar(api: FastAPI) -> None:
         origem_da_volumetria = mudancas.pop("origem_da_volumetria", None)
         preco_antes = (oportunidade.preco_mensal, oportunidade.preco_anual)
         servico_antes = oportunidade.servico
+        situacao_antes = oportunidade.situacao
 
         # Lembra o que foi mudado AQUI e a planilha também controla, para a
         # recarga não desfazer. Só conta o que de fato mudou de valor: abrir o
@@ -1344,6 +1348,29 @@ def _registrar(api: FastAPI) -> None:
         # material para recalibrar a régua depois.
         if porte_mudou:
             oportunidade.porte_definido_em = agora()
+
+        # Data de envio da proposta (10/10/2026): sair de "Enviar proposta" para "Em avaliação" é enviar.
+        if (
+            "situacao" in mudancas
+            and situacao_antes is Situacao.ENVIAR_PROPOSTA
+            and oportunidade.situacao is Situacao.EM_AVALIACAO
+            and oportunidade.data_envio_proposta is None
+        ):
+            raise HTTPException(422, "para mover para Em avaliação, informe a data de envio da proposta")
+        if oportunidade.data_envio_proposta is not None and "data_envio_proposta" in mudancas:
+            if oportunidade.data_envio_proposta > date.today():
+                raise HTTPException(422, "a data de envio da proposta não pode ser no futuro")
+            if oportunidade.data_colocacao and oportunidade.data_envio_proposta < oportunidade.data_colocacao:
+                raise HTTPException(422, "a data de envio da proposta não pode ser antes da originação")
+
+        # Perdida pede o motivo (aprovado por Eduardo em 10/10/2026); "Outro" pede a descrição.
+        if "motivo_recusa_detalhe" in mudancas:
+            oportunidade.motivo_recusa_detalhe = (oportunidade.motivo_recusa_detalhe or "").strip() or None
+        if "situacao" in mudancas and oportunidade.situacao is Situacao.PERDIDA and situacao_antes is not Situacao.PERDIDA:
+            if oportunidade.motivo_recusa is None:
+                raise HTTPException(422, "para marcar como perdida, escolha o motivo da perda")
+            if oportunidade.motivo_recusa is MotivoRecusa.OUTRO and len(oportunidade.motivo_recusa_detalhe or "") < 3:
+                raise HTTPException(422, "motivo da perda “Outro”: descreva o motivo")
 
         # Aceita sem data de aceite é o defeito mais comum da planilha de 2026.
         # Aqui não se repete: a API recusa, em vez de deixar passar e virar

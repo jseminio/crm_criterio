@@ -39,7 +39,7 @@ def carteira(sessao: Session) -> dict:
             origem=Origem.CARGA_2026, chave_origem="alfa|2026-03-01|bpo|mensal",
         ),
         Oportunidade(
-            grupo_id=alfa.id, nome="Alfa Consultoria", situacao=Situacao.RECUSADA,
+            grupo_id=alfa.id, nome="Alfa Consultoria", situacao=Situacao.PERDIDA,
             captador="BO", tipo_canal=TipoCanal.PARCEIROS, servico="Consultoria",
             preco_anual=Decimal("30000.00"), data_colocacao=date(2026, 5, 1),
             origem=Origem.CARGA_2026, chave_origem="alfa|2026-05-01|consultoria|projeto",
@@ -87,14 +87,14 @@ class TestFunil:
         """Coluna que desaparece ao zerar esconde que o estado existe."""
         colunas = {c["situacao"]: c for c in cliente.get("/api/funil").json()}
 
-        assert colunas["Perdido"]["quantas"] == 0
-        assert colunas["Perdido"]["oportunidades"] == []
+        assert colunas["On hold"]["quantas"] == 0
+        assert colunas["On hold"]["oportunidades"] == []
 
     def test_soma_o_valor_de_cada_coluna(self, cliente: TestClient, carteira):
         colunas = {c["situacao"]: c for c in cliente.get("/api/funil").json()}
 
         assert Decimal(colunas["Enviar proposta"]["valor_anual"]) == Decimal("65000.00")
-        assert Decimal(colunas["Recusada"]["valor_anual"]) == Decimal("30000.00")
+        assert Decimal(colunas["Perdida"]["valor_anual"]) == Decimal("30000.00")
 
     def test_o_cartao_traz_o_nome_do_grupo(self, cliente: TestClient, carteira):
         """Sem ele o cartão mostra a oportunidade e esconde o cliente."""
@@ -121,7 +121,7 @@ class TestLista:
 
     def test_aceita_varias_situacoes_de_uma_vez(self, cliente: TestClient, carteira):
         pagina = cliente.get(
-            "/api/oportunidades", params=[("situacao", "Aceita"), ("situacao", "Recusada")]
+            "/api/oportunidades", params=[("situacao", "Aceita"), ("situacao", "Perdida")]
         ).json()
 
         assert pagina["total"] == 2
@@ -1183,7 +1183,7 @@ class TestAgenda:
         corpo = r.json()
         assert set(corpo["contagens"]) == {"atrasada", "hoje", "proximos_7_dias", "depois", "sem_data", "sem_acao"}
         assert sum(corpo["contagens"].values()) == len(corpo["itens"])
-        assert all(i["situacao"] not in ("Aceita", "Recusada", "Perdido") for i in corpo["itens"] if i["tipo"] == "oportunidade")
+        assert all(i["situacao"] not in ("Aceita", "Perdida", "Perdida") for i in corpo["itens"] if i["tipo"] == "oportunidade")
 
     def test_definir_a_proxima_acao_tira_a_proposta_do_balde_sem_acao(self, cliente, carteira):
         antes = cliente.get("/api/agenda", params={"hoje": "2026-09-25"}).json()

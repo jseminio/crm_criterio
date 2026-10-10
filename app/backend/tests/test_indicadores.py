@@ -56,8 +56,8 @@ class TestEmAberto:
     def test_decidida_nao_entra_em_aberto(self):
         """Usa o conceito do domínio: se as situações mudarem, a conta muda junto."""
         ind = calcular([
-            Op(Situacao.ACEITA, D("1000")), Op(Situacao.RECUSADA, D("1000")),
-            Op(Situacao.PERDIDO, D("1000")),
+            Op(Situacao.ACEITA, D("1000")), Op(Situacao.PERDIDA, D("1000")),
+            Op(Situacao.PERDIDA, D("1000")),
         ])
         assert ind.em_aberto.quantas == 0
 
@@ -71,7 +71,7 @@ class TestAceitas:
     def test_soma_so_as_aceitas(self):
         ind = calcular([
             Op(Situacao.ACEITA, D("1000"), D("13000")),
-            Op(Situacao.RECUSADA, D("9999"), D("99999")),
+            Op(Situacao.PERDIDA, D("9999"), D("99999")),
         ])
         assert ind.aceitas.quantas == 1
         assert ind.aceitas.valor_mensal == D("1000")
@@ -103,7 +103,7 @@ class TestTaxaDeConversao:
     def test_divide_aceitas_por_decididas_nao_por_todas(self):
         """Em aberto não entra em nenhum dos dois lados da conta."""
         ind = calcular([
-            Op(Situacao.ACEITA), Op(Situacao.RECUSADA),
+            Op(Situacao.ACEITA), Op(Situacao.PERDIDA),
             Op(Situacao.ENVIAR_PROPOSTA),  # em aberto — de fora da conta
         ])
 
@@ -115,7 +115,7 @@ class TestTaxaDeConversao:
         """40 aceitas em 105 decididas — o caso real de 2026, 22/09/2026."""
         ind = calcular(
             [Op(Situacao.ACEITA)] * 40
-            + [Op(Situacao.RECUSADA)] * 65
+            + [Op(Situacao.PERDIDA)] * 65
         )
 
         assert ind.taxa_de_conversao.percentual == D("38.1")
@@ -128,19 +128,19 @@ class TestTaxaDeConversao:
         assert ind.taxa_de_conversao.percentual is None
 
     def test_marca_abaixo_do_alerta_sob_30_por_cento(self):
-        ind = calcular([Op(Situacao.ACEITA)] + [Op(Situacao.RECUSADA)] * 9)  # 10%
+        ind = calcular([Op(Situacao.ACEITA)] + [Op(Situacao.PERDIDA)] * 9)  # 10%
 
         assert ind.taxa_de_conversao.abaixo_do_alerta is True
         assert ind.taxa_de_conversao.atingiu_a_meta is False
 
     def test_marca_meta_atingida_a_partir_de_50_por_cento(self):
-        ind = calcular([Op(Situacao.ACEITA)] * 5 + [Op(Situacao.RECUSADA)] * 5)  # 50%
+        ind = calcular([Op(Situacao.ACEITA)] * 5 + [Op(Situacao.PERDIDA)] * 5)  # 50%
 
         assert ind.taxa_de_conversao.atingiu_a_meta is True
         assert ind.taxa_de_conversao.abaixo_do_alerta is False
 
     def test_entre_alerta_e_meta_nao_marca_nenhum_dos_dois(self):
-        ind = calcular([Op(Situacao.ACEITA)] * 4 + [Op(Situacao.RECUSADA)] * 6)  # 40%
+        ind = calcular([Op(Situacao.ACEITA)] * 4 + [Op(Situacao.PERDIDA)] * 6)  # 40%
 
         assert ind.taxa_de_conversao.abaixo_do_alerta is False
         assert ind.taxa_de_conversao.atingiu_a_meta is False
@@ -150,7 +150,7 @@ class TestCicloMedioDeVendas:
     """Decisão de Eduardo em 23/09/2026: originação → aceite."""
 
     def test_sem_aceitas_nao_e_calculavel(self):
-        ind = calcular([Op(Situacao.RECUSADA)])
+        ind = calcular([Op(Situacao.PERDIDA)])
 
         assert ind.ciclo_medio.calculavel is False
         assert ind.ciclo_medio.dias is None

@@ -199,7 +199,11 @@ export function Funil({ listas }: { listas: Listas | null }) {
     // kanban não carrega esse campo — só o detalhe sabe se ela já existe.
     // Em vez de arriscar um PATCH que a API recusa, o drop abre o painel
     // com a situação pré-marcada: quem arrastou só confirma a data.
-    if (novaSituacao === "Aceita") {
+    // Sair de "Enviar proposta" para "Em avaliação" é enviar: a ficha abre pedindo a data de envio,
+    // com hoje sugerido (10/10/2026).
+    // Perdida pede o motivo da perda (10/10/2026): também abre a ficha.
+    if (novaSituacao === "Aceita" || novaSituacao === "Perdida"
+      || (situacaoAtual === "Enviar proposta" && novaSituacao === "Em avaliação pela empresa")) {
       abrir(id, novaSituacao);
       return;
     }

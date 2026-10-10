@@ -20,12 +20,9 @@ describe("Etiqueta", () => {
     expect(screen.getByText("Aceita")).toHaveClass("etiqueta-ganho");
   });
 
-  it("dá o tom de perda a Recusada e a Perdido", () => {
-    render(<Etiqueta texto="Recusada" />);
-    expect(screen.getByText("Recusada")).toHaveClass("etiqueta-perda");
-
-    render(<Etiqueta texto="Perdido" />);
-    expect(screen.getByText("Perdido")).toHaveClass("etiqueta-perda");
+  it("dá o tom de perda a Perdida (Recusada e Perdido viraram uma etapa em 10/10/2026)", () => {
+    render(<Etiqueta texto="Perdida" />);
+    expect(screen.getByText("Perdida")).toHaveClass("etiqueta-perda");
   });
 
   it("um valor de situação desconhecido cai no tom neutro, não quebra", () => {

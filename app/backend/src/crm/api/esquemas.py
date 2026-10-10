@@ -288,6 +288,7 @@ class OportunidadeDetalhe(OportunidadeResumo):
     servico_tema: str | None = None
     data_aceite: date | None = None
     motivo_recusa: MotivoRecusa | None = None
+    motivo_recusa_detalhe: str | None = None
     motivo_recusa_original: str | None = None
     valor_mensalizado: Decimal | None = None
     observacao: str | None = None
@@ -346,6 +347,8 @@ class OportunidadeEdicao(BaseModel):
     """Captador e origem (tipo de canal e canal) editáveis no painel — Karine, 07/10/2026. Como os
     outros campos da carga, o que mudar aqui entra em `campos_do_crm` e a recarga não desfaz."""
     motivo_recusa: MotivoRecusa | None = None
+    motivo_recusa_detalhe: str | None = Field(default=None, max_length=300)
+    """Obrigatória quando o motivo da perda é “Outro” (10/10/2026)."""
     data_aceite: date | None = None
     proxima_acao: str | None = Field(default=None, max_length=200)
     proxima_acao_em: date | None = None
@@ -795,6 +798,8 @@ class IndicadoresResposta(Base):
     cobertura: CoberturaResposta
     dependencia_de_canal: DependenciaDeCanalResposta
     ticket_recorrente: TicketRecorrenteResposta
+    motivos_de_perda: list[tuple[str, int]] = []
+    """Perdidas por motivo (10/10/2026), do mais frequente ao menos; "Sem motivo informado" por último."""
 
 
 class ExecucaoResumo(Base):

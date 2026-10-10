@@ -62,6 +62,13 @@ resultado (ver "SDR de IA", abaixo).
   proposta" usa o envio. Na planilha de 2026 a originação já era o envio: a tarefa
   `2026_10_10_data_de_envio_da_proposta` copia a originação (menos em quem ainda está em "Enviar proposta").
   Migração `c3e7a1d5b9f2`. **A Agenda não cobra pendência de proposta depois do envio.**
+- **Perdida e motivos** (decisões de Eduardo, 10/10/2026): "Recusada" e "Perdido" viram a etapa única **Perdida**
+  (a tarefa `2026_10_10_perdida_e_motivos` leva as linhas antigas). Marcar como Perdida **exige o motivo** ("Outro"
+  pede a descrição, `motivo_recusa_detalhe`, migração `d9f1b3c7e5a2`); o kanban abre a ficha para isso. As listas de
+  motivos de perda e de churn estão **aprovadas** (alguns nomes ficaram mais claros: "Sem retorno do cliente",
+  "Momento / adiou a decisão", "Escopo não atende", "Expectativa diferente da promessa"). Card **Motivos de perda**
+  em Oportunidades (com composição; as antigas sem motivo aparecem como "Sem motivo informado") e **Motivos de churn**
+  em Gestão de contratos (as saídas do período por motivo). Aceita e Perdida não se excluem: contam na conversão.
 - **Churn**: registra-se em Gestão de contratos › contrato › Registrar evento › **Encerramento** (anúncio, saída
   efetiva, quem decidiu, motivo). O cliente só conta como perdido quando o último contrato dele sai.
 - **Aviso de saída** (decisões de Eduardo, 10/10/2026): o Encerramento tem a **data do anúncio** e a **saída

@@ -38,6 +38,7 @@ const COLUNAS: Record<IndicadorDoFunil, Coluna[]> = {
     titulo: "Volumetria", valor: (i) => (i.falta.length === 0 ? "completa" : `falta: ${i.falta.map((f) => DIRECIONADOR[f] ?? f).join(", ")}`),
   }],
   dependencia_de_canal: [OPORTUNIDADE, CLIENTE, { titulo: "Canal", valor: (i) => i.parte }, { titulo: "Captador", valor: (i) => i.captador ?? "—" }],
+  motivos_de_perda: [OPORTUNIDADE, CLIENTE, SERVICO, { titulo: "Motivo da perda", valor: (i) => i.parte }, MENSAL],
 };
 
 /** O que o resumo do topo diz, para conferir com o card. */
@@ -63,6 +64,8 @@ function resumo(indicador: IndicadorDoFunil, itens: ItemDaComposicao[]): string 
       return `${entram.length} de ${n} com a ficha de volumetria completa · ${pct(entram.length, n)}`;
     case "dependencia_de_canal":
       return `${entram.length} de ${n} da rede dos sócios · ${pct(entram.length, n)}`;
+    case "motivos_de_perda":
+      return `${n} perdida${n === 1 ? "" : "s"} · ${n - entram.length} sem motivo informado`;
   }
 }
 

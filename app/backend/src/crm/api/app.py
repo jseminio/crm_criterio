@@ -969,6 +969,7 @@ def _registrar(api: FastAPI) -> None:
                 resultado.taxa_de_conversao
             ),
             cobertura=e.CoberturaResposta.model_validate(resultado.cobertura),
+            motivos_de_perda=list(resultado.motivos_de_perda),
             dependencia_de_canal=e.DependenciaDeCanalResposta.model_validate(
                 resultado.dependencia_de_canal
             ),
@@ -1361,6 +1362,15 @@ def _registrar(api: FastAPI) -> None:
                 raise HTTPException(422, "a data de envio da proposta não pode ser no futuro")
             if oportunidade.data_colocacao and oportunidade.data_envio_proposta < oportunidade.data_colocacao:
                 raise HTTPException(422, "a data de envio da proposta não pode ser antes da originação")
+
+        # Perdida pede o motivo (aprovado por Eduardo em 10/10/2026); "Outro" pede a descrição.
+        if "motivo_recusa_detalhe" in mudancas:
+            oportunidade.motivo_recusa_detalhe = (oportunidade.motivo_recusa_detalhe or "").strip() or None
+        if "situacao" in mudancas and oportunidade.situacao is Situacao.PERDIDA and situacao_antes is not Situacao.PERDIDA:
+            if oportunidade.motivo_recusa is None:
+                raise HTTPException(422, "para marcar como perdida, escolha o motivo da perda")
+            if oportunidade.motivo_recusa is MotivoRecusa.OUTRO and len(oportunidade.motivo_recusa_detalhe or "") < 3:
+                raise HTTPException(422, "motivo da perda “Outro”: descreva o motivo")
 
         # Aceita sem data de aceite é o defeito mais comum da planilha de 2026.
         # Aqui não se repete: a API recusa, em vez de deixar passar e virar

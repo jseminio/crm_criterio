@@ -58,7 +58,7 @@ class TestNormalizacao:
 class TestPreservacaoDoOriginal:
     def test_motivo_que_e_situacao_guarda_o_texto_original(self):
         propostas, rel = carregar(
-            [linha(Status="Recusada", **{"Motivo da Recusa": "Em formalização"})]
+            [linha(Status="Perdida", **{"Motivo da Recusa": "Em formalização"})]
         )
         assert propostas[0].motivo_recusa is None
         assert propostas[0].motivo_recusa_original == "Em formalização"

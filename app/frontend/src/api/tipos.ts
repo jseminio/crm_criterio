@@ -94,6 +94,8 @@ export interface OportunidadeDetalhe extends OportunidadeResumo {
   servico_tema?: string | null;
   data_aceite: string | null;
   motivo_recusa: string | null;
+  /** Obrigatória quando o motivo da perda é "Outro" (10/10/2026). */
+  motivo_recusa_detalhe?: string | null;
   motivo_recusa_original: string | null;
   valor_mensalizado: string | null;
   observacao: string | null;
@@ -286,6 +288,8 @@ export interface Indicadores {
   cobertura: Cobertura;
   dependencia_de_canal: DependenciaDeCanal;
   ticket_recorrente: TicketRecorrente;
+  /** Perdidas por motivo (10/10/2026), do mais frequente ao menos; "Sem motivo informado" por último. */
+  motivos_de_perda?: [string, number][];
 }
 
 export interface Execucao {
@@ -623,6 +627,9 @@ export interface ItemDoMovimento {
   escopo: string | null;
   valor: string;
   data: string | null;
+  /** No churn: o motivo do encerramento e quem decidiu. */
+  motivo?: string | null;
+  iniciativa?: string | null;
 }
 
 export interface PreviaDeRecebimentos {
@@ -2139,7 +2146,7 @@ export interface KpisDaLideranca {
 /** Os números do funil que abrem "Ver composição" (10/10/2026). `propostas`: a linha de um recorte. */
 export type IndicadorDoFunil =
   | "em_aberto" | "aceitas" | "ticket_recorrente" | "ciclo_medio" | "taxa_de_conversao"
-  | "cobertura_proxima_acao" | "cobertura_volumetria" | "dependencia_de_canal" | "propostas";
+  | "cobertura_proxima_acao" | "cobertura_volumetria" | "dependencia_de_canal" | "propostas" | "motivos_de_perda";
 
 /** Uma oportunidade na lista de um número do funil. */
 export interface ItemDaComposicao {

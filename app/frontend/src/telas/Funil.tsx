@@ -201,7 +201,9 @@ export function Funil({ listas }: { listas: Listas | null }) {
     // com a situação pré-marcada: quem arrastou só confirma a data.
     // Sair de "Enviar proposta" para "Em avaliação" é enviar: a ficha abre pedindo a data de envio,
     // com hoje sugerido (10/10/2026).
-    if (novaSituacao === "Aceita" || (situacaoAtual === "Enviar proposta" && novaSituacao === "Em avaliação pela empresa")) {
+    // Perdida pede o motivo da perda (10/10/2026): também abre a ficha.
+    if (novaSituacao === "Aceita" || novaSituacao === "Perdida"
+      || (situacaoAtual === "Enviar proposta" && novaSituacao === "Em avaliação pela empresa")) {
       abrir(id, novaSituacao);
       return;
     }

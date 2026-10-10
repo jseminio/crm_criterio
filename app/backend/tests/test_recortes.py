@@ -38,7 +38,7 @@ DEZENOVE = [750, 800, 800, 1621, 1621, 1621, 1630, 2000, 2450, 2450, 3000, 3500,
 class TestRecortar:
     def test_agrupa_por_servico_e_calcula_conversao_e_ticket(self):
         linhas = recortar([
-            aceita(1000), aceita(3000), Op(Situacao.RECUSADA, servico="BPO Contábil"),
+            aceita(1000), aceita(3000), Op(Situacao.PERDIDA, servico="BPO Contábil"),
             Op(Situacao.EM_AVALIACAO, servico="BPO Contábil"),
             aceita(500, servico="Consultoria"),
         ], "servico")
@@ -112,4 +112,4 @@ class TestCenarios:
         assert cenarios_de_ticket([aceita(1000), aceita(2000), aceita(3000)]) is None
 
     def test_so_conta_aceita_com_preco_mensal(self):
-        assert cenarios_de_ticket([Op(Situacao.RECUSADA, preco_mensal=D("9")) for _ in range(6)]) is None
+        assert cenarios_de_ticket([Op(Situacao.PERDIDA, preco_mensal=D("9")) for _ in range(6)]) is None

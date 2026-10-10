@@ -11,7 +11,7 @@ vi.mock("../api/cliente", async () => {
     ...real,
     api: {
       contratos: vi.fn(), contrato: vi.fn(), editarContrato: vi.fn(), registrarEventoDeContrato: vi.fn(),
-      mrr: vi.fn().mockResolvedValue(null),
+      mrr: vi.fn().mockResolvedValue(null), itensDoMovimento: vi.fn().mockResolvedValue({ de: "", ate: "", itens: [] }),
     },
   };
 });

@@ -102,14 +102,14 @@ def test_sem_motivo_nao_exclui(cliente, engine, ids, motivo):
         assert s.get(Oportunidade, ids["op"]) is not None
 
 
-@pytest.mark.parametrize("situacao", [Situacao.ACEITA, Situacao.RECUSADA])
-def test_recusa_aceita_e_recusada(cliente, engine, ids, situacao):
+@pytest.mark.parametrize("situacao", [Situacao.ACEITA, Situacao.PERDIDA])
+def test_recusa_aceita_e_perdida(cliente, engine, ids, situacao):
     with Session(engine) as s:
         s.get(Oportunidade, ids["op"]).situacao = situacao
         s.commit()
-    assert "mude a situação para Perdido" in cliente.get(f"/api/oportunidades/{ids['op']}/exclusao").json()["recusa"]
+    assert "ela fica como Perdida, com o motivo" in cliente.get(f"/api/oportunidades/{ids['op']}/exclusao").json()["recusa"]
     r = cliente.post(f"/api/oportunidades/{ids['op']}/excluir", json={"motivo": "x"})
-    assert r.status_code == 409 and "Perdido" in r.json()["detail"]
+    assert r.status_code == 409 and situacao.value in r.json()["detail"]
     with Session(engine) as s:
         assert s.get(Oportunidade, ids["op"]) is not None
 
@@ -122,12 +122,10 @@ def test_recusa_a_que_virou_contrato(cliente, engine, ids):
     assert r.status_code == 409 and "virou contrato" in r.json()["detail"]
 
 
-def test_perdido_sai_mas_avisa_da_conversao(cliente, engine, ids):
-    with Session(engine) as s:
-        s.get(Oportunidade, ids["op"]).situacao = Situacao.PERDIDO
-        s.commit()
+def test_em_aberto_sai_sem_mexer_na_conversao(cliente, engine, ids):
+    # Desde 10/10/2026 o que conta na conversão (Aceita, Perdida) não se exclui; o resto não mexe nela.
     corpo = cliente.get(f"/api/oportunidades/{ids['op']}/exclusao").json()
-    assert corpo["recusa"] is None and corpo["sai_da_conversao"] is True
+    assert corpo["recusa"] is None and corpo["sai_da_conversao"] is False
 
 
 def test_inexistente_da_404(cliente):

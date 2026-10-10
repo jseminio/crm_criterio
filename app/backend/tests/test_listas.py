@@ -32,9 +32,9 @@ class TestSituacao:
             ("On hold", Situacao.ON_HOLD),
             ("Aceita", Situacao.ACEITA),
             ("Aceita ", Situacao.ACEITA),  # com espaço no fim, do histórico
-            ("Recusada", Situacao.RECUSADA),
-            ("Recusada ", Situacao.RECUSADA),
-            ("Perdido", Situacao.PERDIDO),
+            ("Perdida", Situacao.PERDIDA),
+            ("Recusada ", Situacao.PERDIDA),
+            ("Perdida", Situacao.PERDIDA),
         ],
     )
     def test_converte_as_grafias_da_planilha(self, bruto, esperado):
@@ -61,7 +61,7 @@ class TestSituacao:
 
     def test_decididas_sao_as_terminais(self):
         decididas = {s for s in Situacao if s.decidida}
-        assert decididas == {Situacao.ACEITA, Situacao.RECUSADA, Situacao.PERDIDO}
+        assert decididas == {Situacao.ACEITA, Situacao.PERDIDA, Situacao.PERDIDA}
 
     def test_so_aceita_e_ganha(self):
         assert [s for s in Situacao if s.ganha] == [Situacao.ACEITA]

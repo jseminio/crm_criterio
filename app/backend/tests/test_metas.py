@@ -35,7 +35,7 @@ def base(engine):
         s.flush()
         s.add(Usuario(email="karine@grupocriterio.com.br", perfil_id=comercial.id))
         s.add(Contrato(grupo_id=g.id, anterior_ao_crm=True, situacao=SituacaoContrato.ATIVO, preco_mensal=D("250000")))
-        for situacao in (Situacao.ACEITA, Situacao.ACEITA, Situacao.RECUSADA, Situacao.PERDIDO):  # 50% de conversão
+        for situacao in (Situacao.ACEITA, Situacao.ACEITA, Situacao.PERDIDA, Situacao.PERDIDA):  # 50% de conversão
             s.add(Oportunidade(grupo_id=g.id, nome="x", situacao=situacao))
         s.commit()
 

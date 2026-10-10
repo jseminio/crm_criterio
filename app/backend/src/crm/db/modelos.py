@@ -426,6 +426,8 @@ class Oportunidade(CarimboMixin, Base):
     (decisão de Eduardo: lá a originação já era o envio). Conta o follow-up e separa o ciclo de vendas em dois."""
 
     motivo_recusa: Mapped[MotivoRecusa | None] = mapped_column(coluna_lista(MotivoRecusa))
+    motivo_recusa_detalhe: Mapped[str | None] = mapped_column(sa.String(300))
+    """A descrição do motivo de perda (10/10/2026): obrigatória quando o motivo é "Outro"."""
     motivo_recusa_original: Mapped[str | None] = mapped_column(sa.String(200))
     """O texto exato da planilha, preservado mesmo quando a conversão falhou.
 

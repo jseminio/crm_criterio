@@ -36,11 +36,11 @@ describe("Composição do funil", () => {
 
   it("conversão: diz aceita ou não em palavra e calcula o mesmo percentual", async () => {
     vi.mocked(api.composicaoDoFunil).mockResolvedValue({ indicador: "taxa_de_conversao", itens: [
-      item({ situacao: "Aceita", parte: "Aceita" }), item({ id: 2, situacao: "Recusada", parte: "Recusada", entra: false }),
+      item({ situacao: "Aceita", parte: "Aceita" }), item({ id: 2, situacao: "Perdida", parte: "Perdida", entra: false }),
     ] });
     render(<ComposicaoDoFunil indicador="taxa_de_conversao" filtros={{}} />);
     expect(await screen.findByText(/1 aceita de 2 decididas · 50,0%/)).toBeInTheDocument();
-    expect(screen.getByText("Recusada")).toBeInTheDocument();
+    expect(screen.getByText("Perdida")).toBeInTheDocument();
   });
 
   it("volumetria: diz o que falta preencher", async () => {

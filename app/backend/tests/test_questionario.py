@@ -343,7 +343,7 @@ class TestPrecisaDeVoce:
         assert sessao.scalar(sa.select(sa.func.count()).select_from(Oportunidade)) == 2
 
     def test_oportunidade_fechada_nao_trava(self, cliente, sessao, em_aberto):
-        em_aberto.situacao = Situacao.RECUSADA
+        em_aberto.situacao = Situacao.PERDIDA
         sessao.commit()
         assert _buscar(cliente)["novos"][0]["situacao"] == "Importado"
 

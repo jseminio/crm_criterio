@@ -34,12 +34,12 @@ vi.mock("../api/cliente", async () => {
 });
 
 const LISTAS: Listas = {
-  situacoes: ["Enviar proposta", "Em avaliação pela empresa", "On hold", "Aceita", "Recusada", "Perdido"],
+  situacoes: ["Enviar proposta", "Em avaliação pela empresa", "On hold", "Aceita", "Perdida"],
   situacoes_de_lead: [],
   temperaturas: ["Frio", "Morno", "Quente"],
   tipos_de_canal: [],
   tipos_de_canal_em_operacao: [],
-  motivos_de_recusa: ["Preço", "Concorrência"],
+  motivos_de_recusa: ["Preço", "Concorrência", "Outro"],
   motivos_de_encerramento: [],
   iniciativas_de_encerramento: [],
   papeis_de_contato: [],
@@ -259,18 +259,24 @@ describe("DetalheDaOportunidade", () => {
     expect(vi.mocked(api.editarOportunidade).mock.calls[0][1]).toMatchObject({ preco_mensal: "14250" });
   });
 
-  it("mostra o motivo só quando a situação é Recusada ou Perdido", async () => {
+  it("Perdida pede o motivo da perda antes de salvar; Outro pede a descrição (10/10/2026)", async () => {
     await abrir(oportunidade());
-    expect(screen.queryByLabelText("Motivo")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Motivo da perda")).not.toBeInTheDocument();
 
-    await userEvent.selectOptions(screen.getByLabelText("Situação"), "Recusada");
+    await userEvent.selectOptions(screen.getByLabelText("Situação"), "Perdida");
 
-    expect(screen.getByLabelText("Motivo")).toBeInTheDocument();
+    expect(screen.getByLabelText("Motivo da perda")).toBeInTheDocument();
+    expect(screen.getByText(/Para marcar como perdida, escolha o motivo/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /salvar alterações/i })).toBeDisabled();
+    await userEvent.selectOptions(screen.getByLabelText("Motivo da perda"), "Outro");
+    expect(screen.getByRole("button", { name: /salvar alterações/i })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("Descreva o motivo"), "fechou a empresa");
+    expect(screen.getByRole("button", { name: /salvar alterações/i })).toBeEnabled();
   });
 
   it("mostra o texto original da planilha junto do motivo", async () => {
     await abrir(
-      oportunidade({ situacao: "Recusada", motivo_recusa_original: "Cliente internalizou" }),
+      oportunidade({ situacao: "Perdida", motivo_recusa_original: "Cliente internalizou" }),
     );
 
     expect(screen.getByText(/cliente internalizou/i)).toBeInTheDocument();

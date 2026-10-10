@@ -332,7 +332,7 @@ def roteador_de_questionarios(
             dias = dias_uteis_entre(_dia(q.recebido_em), hoje)
         elif o.situacao is Situacao.ACEITA:
             situacao = "aceita"
-        elif o.situacao in (Situacao.RECUSADA, Situacao.PERDIDO):
+        elif o.situacao is Situacao.PERDIDA:
             situacao = "perdida"
             motivo = o.motivo_recusa.value if o.motivo_recusa else None
         elif o.situacao is Situacao.ON_HOLD:

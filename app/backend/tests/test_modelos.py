@@ -126,7 +126,7 @@ class TestOportunidade:
             Oportunidade(
                 grupo_id=grupo.id,
                 nome="Sogamax",
-                situacao=Situacao.RECUSADA,
+                situacao=Situacao.PERDIDA,
                 origem=Origem.CARGA_2026,
                 chave_origem=None,
             )
@@ -154,7 +154,7 @@ class TestOportunidade:
                 Oportunidade(
                     grupo_id=grupo.id,
                     nome="Sogamax",
-                    situacao=Situacao.RECUSADA,
+                    situacao=Situacao.PERDIDA,
                     origem=Origem.CARGA_2026,
                     chave_origem="sogamax|2026-01-01|bpo contabil|recorrente",
                 )
@@ -168,7 +168,7 @@ class TestOportunidade:
         oportunidade = Oportunidade(
             grupo_id=grupo.id,
             nome="Tabor",
-            situacao=Situacao.RECUSADA,
+            situacao=Situacao.PERDIDA,
             motivo_recusa=None,
             motivo_recusa_original="Em formalização",
         )

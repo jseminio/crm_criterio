@@ -64,8 +64,9 @@ class Situacao(Enum):
     EM_AVALIACAO = "Em avaliação pela empresa"
     ON_HOLD = "On hold"
     ACEITA = "Aceita"
-    RECUSADA = "Recusada"
-    PERDIDO = "Perdido"
+    PERDIDA = "Perdida"
+    """Desde 10/10/2026 (decisão de Eduardo), "Recusada" e "Perdido" são uma etapa só: Perdida, com o motivo
+    obrigatório (`MotivoRecusa`). A tarefa `2026_10_10_perdida_e_motivos` levou as linhas antigas."""
 
     @property
     def decidida(self) -> bool:
@@ -76,7 +77,7 @@ class Situacao(Enum):
         contá-la penalizaria o time por um resultado que não aconteceu. Ver
         `crm.domain.indicadores.TaxaDeConversao` para o cálculo.
         """
-        return self in {Situacao.ACEITA, Situacao.RECUSADA, Situacao.PERDIDO}
+        return self in {Situacao.ACEITA, Situacao.PERDIDA}
 
     @property
     def ganha(self) -> bool:
@@ -267,7 +268,7 @@ class IniciativaDoEncerramento(Enum):
 class MotivoDeEncerramento(Enum):
     """Por que um contrato foi encerrado — insumo da análise de saída (churn).
 
-    ⚠️ **Proposta, ainda não aprovada por Eduardo.** Nenhum documento do projeto traz uma
+    **Lista aprovada por Eduardo em 10/10/2026** (antes era proposta). Nenhum documento do projeto trazia uma
     lista de motivos de saída; esta parte da lista de motivos de recusa que já existe
     (Preço, Concorrência, Internalizou, Escopo, Outro) e do conceito de "saída organizada"
     do modelo de classificação da carteira (classe C). Guardada como texto legível, não
@@ -447,7 +448,8 @@ class LinhaServico(Enum):
 
 
 class MotivoRecusa(Enum):
-    """Por que a oportunidade não avançou.
+    """Por que a oportunidade foi perdida — **lista aprovada por Eduardo em 10/10/2026**, obrigatória ao mover para
+    Perdida ("Outro" pede a descrição).
 
     A planilha mistura motivo com situação — "Em formalização" e "Em avaliação
     pela empresa" não são motivos de recusa, são estados. O de-para separa os
@@ -455,13 +457,13 @@ class MotivoRecusa(Enum):
     """
 
     PRECO = "Preço"
-    SEM_RETORNO = "Sem retorno"
+    SEM_RETORNO = "Sem retorno do cliente"
     DESISTENCIA = "Desistência"
     CLIENTE_INTERNALIZOU = "Cliente internalizou"
     CONCORRENCIA = "Concorrência"
-    MOMENTO = "Momento"
-    ESCOPO = "Escopo"
-    EXPECTATIVA = "Expectativa diferente"
+    MOMENTO = "Momento / adiou a decisão"
+    ESCOPO = "Escopo não atende"
+    EXPECTATIVA = "Expectativa diferente da promessa"
     """Entrou em 04/10/2026 com a aderência da promessa: conta em "perdidos por expectativa"."""
     PRO_BONO = "Pro bono"
     OUTRO = "Outro"
@@ -497,10 +499,10 @@ _SITUACAO: dict[str, Situacao] = {
     "on hold": Situacao.ON_HOLD,
     "aceita": Situacao.ACEITA,
     "aceito": Situacao.ACEITA,
-    "recusada": Situacao.RECUSADA,
-    "recusado": Situacao.RECUSADA,
-    "perdido": Situacao.PERDIDO,
-    "perdida": Situacao.PERDIDO,
+    "recusada": Situacao.PERDIDA,
+    "recusado": Situacao.PERDIDA,
+    "perdido": Situacao.PERDIDA,
+    "perdida": Situacao.PERDIDA,
 }
 
 _TIPO_CANAL: dict[str, TipoCanal] = {
@@ -531,6 +533,11 @@ _LINHA: dict[str, LinhaServico] = {"c1": LinhaServico.C1, "c2": LinhaServico.C2}
 _MOTIVO: dict[str, MotivoRecusa] = {
     "preco": MotivoRecusa.PRECO,
     "sem retorno": MotivoRecusa.SEM_RETORNO,
+    "sem retorno do cliente": MotivoRecusa.SEM_RETORNO,
+    "momento / adiou a decisao": MotivoRecusa.MOMENTO,
+    "escopo nao atende": MotivoRecusa.ESCOPO,
+    "expectativa diferente": MotivoRecusa.EXPECTATIVA,
+    "expectativa diferente da promessa": MotivoRecusa.EXPECTATIVA,
     "nao nos retornou": MotivoRecusa.SEM_RETORNO,
     "desistencia": MotivoRecusa.DESISTENCIA,
     "possivel desistencia": MotivoRecusa.DESISTENCIA,

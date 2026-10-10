@@ -2095,6 +2095,8 @@ export interface ItemDoKpi {
   grupo: string;
   detalhe: string;
   valor: string;
+  /** Conta no numerador; fora: a base do churn, quem ficou sem reunião na cobertura. */
+  entra: boolean;
 }
 
 export interface KpiDaLideranca {
@@ -2108,6 +2110,8 @@ export interface KpiDaLideranca {
   meta: string | null;
   extras: Record<string, string | number | null>;
   itens: ItemDoKpi[];
+  /** Como o número é calculado: aparece ao passar o mouse (10/10/2026). */
+  explicacao: string;
 }
 
 export interface KpisDaLideranca {
@@ -2141,4 +2145,15 @@ export interface ItemDaComposicao {
   valor: string | null;
   anual: string | null;
   falta: string[];
+}
+
+/** Um contrato ou evento no realizado do plano de MRR (10/10/2026). Valor com sinal: perdas negativas. */
+export interface ItemDoRealizado {
+  linha: "bpo" | "contabil" | "escada" | "perdas" | "outros";
+  categoria: string;
+  grupo: string;
+  contrato_id: number;
+  escopo: string | null;
+  data: string | null;
+  valor: string;
 }

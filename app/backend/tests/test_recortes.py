@@ -8,7 +8,13 @@ from decimal import Decimal as D
 import pytest
 
 from crm.domain.listas import Situacao, TipoCanal
+from crm.domain.mrr import mensalizar
 from crm.domain.recortes import cenarios_de_ticket, recortar
+
+
+def M(v: str):
+    """Em MRR (× 13 ÷ 12): os Recortes e os cenários seguem a regra do ticket desde 10/10/2026."""
+    return mensalizar(D(v))
 
 
 @dataclass
@@ -39,7 +45,7 @@ class TestRecortar:
         bpo = next(l for l in linhas if l.chave == "BPO Contábil")
         assert (bpo.propostas, bpo.aceitas, bpo.decididas, bpo.em_aberto) == (4, 2, 3, 1)
         assert bpo.conversao == D("66.7")
-        assert (bpo.recorrentes, bpo.valor_mensal, bpo.ticket_medio, bpo.mediana) == (2, D("4000"), D("2000.00"), D("2000.00"))
+        assert (bpo.recorrentes, bpo.valor_mensal, bpo.ticket_medio, bpo.mediana) == (2, M("4000"), D("2166.66"), D("2166.66"))  # soma do MRR de cada uma ÷ 2
 
     def test_sem_valor_vira_rotulo_explicito_e_valor_unico_nao_e_recorrente(self):
         linhas = recortar([aceita(None, servico=None), aceita(0, servico=None)], "servico")
@@ -59,11 +65,11 @@ class TestCenarios:
     def test_reproduz_os_numeros_dos_19_contratos_de_2026(self):
         c = cenarios_de_ticket([aceita(v) for v in DEZENOVE])
         assert c.contratos == 19 and c.atipicos == 2
-        assert c.limite_do_atipico == D("7350.00")
-        assert c.conservador == D("2450.00")
-        assert c.base == D("2956.42")
-        assert c.otimista == D("3500.00")
-        assert (c.atipico_minimo, c.atipico_medio, c.atipico_maximo) == (D("15000"), D("27500.00"), D("40000"))
+        assert c.limite_do_atipico == M("7350.00")
+        assert c.conservador == M("2450.00")
+        assert c.base == D("3202.78")  # 2.956,42 × 13 ÷ 12, da média sem arredondar antes
+        assert c.otimista == M("3500.00")
+        assert (c.atipico_minimo, c.atipico_medio, c.atipico_maximo) == (M("15000"), M("27500"), M("40000"))
 
     def test_sem_atipico_nao_inventa_atipico(self):
         c = cenarios_de_ticket([aceita(v) for v in (1000, 1100, 1200, 1300)])
@@ -73,20 +79,20 @@ class TestCenarios:
         # mediana de todos = 300; sem o atípico (5000): 100, 200, 300, 900 -> mediana 250
         c = cenarios_de_ticket([aceita(v) for v in (100, 200, 300, 900, 5000)])
         assert c.atipicos == 1
-        assert (c.conservador, c.base) == (D("250.00"), D("375.00"))
+        assert (c.conservador, c.base) == (M("250"), M("375"))
 
     def test_conservador_nunca_passa_do_base(self):
         """Regressão: com 100, 1.000, 1.000, 1.000 (+ o atípico 10.000) a mediana
         (1.000) passava da média (775) e o conservador saía maior que o base."""
         c = cenarios_de_ticket([aceita(v) for v in (100, 1000, 1000, 1000, 10000)])
-        assert c.base == D("775.00")
-        assert c.conservador == D("775.00")
+        assert c.base == M("775")
+        assert c.conservador == M("775")
 
     def test_otimista_nunca_fica_abaixo_do_base(self):
         # 1, 1, 1, 1, 3: nada é atípico (limite 3); terceiro quartil 1, média 1,40
         c = cenarios_de_ticket([aceita(v) for v in (1, 1, 1, 1, 3)])
         assert c.atipicos == 0
-        assert (c.conservador, c.base, c.otimista) == (D("1.00"), D("1.40"), D("1.40"))
+        assert (c.conservador, c.base, c.otimista) == (M("1"), M("1.40"), M("1.40"))
 
     @pytest.mark.parametrize(
         "valores",

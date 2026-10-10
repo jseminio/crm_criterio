@@ -18,7 +18,7 @@ from crm.db.modelos import (
     Contrato, ContratoPrevistoDoPlano, EventoDeContrato, GrupoEconomico, Oportunidade, Perfil, PlanoDeMrr, Usuario,
 )
 from crm.domain import plano_de_mrr as regras
-from crm.domain.listas import Situacao, SituacaoContrato, TipoDeEventoDeContrato as T
+from crm.domain.listas import LinhaServico, Situacao, SituacaoContrato, TipoDeEventoDeContrato as T
 
 PIPELINE = (
     regras.ContratoPrevisto("atípico", date(2026, 11, 1), D("18000"), True),
@@ -112,8 +112,10 @@ def base(engine):
         s.flush()
         s.add(Usuario(email="karine@grupocriterio.com.br", perfil_id=comercial.id))
         s.add(Contrato(grupo_id=g.id, anterior_ao_crm=True, situacao=SituacaoContrato.ATIVO, preco_mensal=D("200000")))
-        bpo = Oportunidade(grupo_id=g.id, nome="bpo", servico="BPO Financeiro", situacao=Situacao.ACEITA, preco_mensal=D("7000"))
-        contabil = Oportunidade(grupo_id=g.id, nome="ctb", servico="Contabilidade", situacao=Situacao.ACEITA, preco_mensal=D("3000"))
+        bpo = Oportunidade(grupo_id=g.id, nome="bpo", servico="BPO Financeiro", situacao=Situacao.ACEITA, preco_mensal=D("7000"),
+                          linha_servico=LinhaServico.C1)
+        contabil = Oportunidade(grupo_id=g.id, nome="ctb", servico="Contabilidade", situacao=Situacao.ACEITA, preco_mensal=D("3000"),
+                               linha_servico=LinhaServico.C1)
         s.add_all([bpo, contabil])
         s.flush()
         c_bpo = Contrato(grupo_id=g.id, oportunidade_id=bpo.id, situacao=SituacaoContrato.ATIVO, preco_mensal=D("10000"),
@@ -153,6 +155,19 @@ def test_quem_ve_o_funil_ve_o_plano_com_o_realizado_por_motor(cliente):
     assert D(motores["bpo"]["realizado"]) == D("7583.33")
     assert "contratos/mês" in motores["bpo"]["ajuste"]
     assert [c["nome"] for c in plano["cenarios"]] == ["alerta", "previsto", "otimista"]
+
+
+def test_a_composicao_do_realizado_soma_a_meta_e_cada_motor(cliente):
+    plano = cliente.get("/api/inteligencia/plano", headers=KARINE, params={"hoje": "2026-10-04"}).json()
+    r = cliente.get("/api/inteligencia/plano/realizado", headers=KARINE, params={"hoje": "2026-10-04"})
+    assert r.status_code == 200, r.text
+    itens = r.json()
+    assert sum(D(i["valor"]) for i in itens) == D(plano["meta"]["realizado"])
+    for m in plano["motores"]:
+        soma = sum((D(i["valor"]) for i in itens if i["linha"] == m["motor"]), D("0"))
+        assert abs(soma) == D(m["realizado"]), m["motor"]
+    assert [(i["linha"], i["categoria"]) for i in itens] == [("bpo", "novo"), ("escada", "expansao"), ("contabil", "novo")]
+    assert itens[0]["grupo"] == "Grupo Alfa"
 
 
 def test_so_o_administrador_muda_as_premissas_e_fica_registrado(cliente):
@@ -231,7 +246,8 @@ def novembro(engine, base):
         for situacao in (Situacao.ACEITA, Situacao.RECUSADA):
             s.add(Oportunidade(grupo_id=g.id, nome="nov", situacao=situacao, data_colocacao=date(2026, 11, 4),
                                data_aceite=date(2026, 11, 14) if situacao is Situacao.ACEITA else None))
-        bpo = Oportunidade(grupo_id=g.id, nome="bpo nov", servico="BPO Financeiro", situacao=Situacao.ACEITA, preco_mensal=D("7000"))
+        bpo = Oportunidade(grupo_id=g.id, nome="bpo nov", servico="BPO Financeiro", situacao=Situacao.ACEITA, preco_mensal=D("7000"),
+                          linha_servico=LinhaServico.C1)
         s.add(bpo)
         s.flush()
         s.add(Contrato(grupo_id=g.id, oportunidade_id=bpo.id, situacao=SituacaoContrato.ATIVO, preco_mensal=D("7000"),

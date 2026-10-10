@@ -19,6 +19,7 @@ import type {
   Mrr,
   MrrDaCarteira,
   IndicadorDoFunil,
+  ItemDoRealizado,
   ItemDaComposicao,
   ItemDoMovimento,
   PreviaDeRecebimentos,
@@ -338,6 +339,7 @@ function comParametros(caminho: string, parametros: Record<string, unknown>) {
 
 export interface FiltrosDoFunil {
   captador?: string[];
+  servico?: string[];
   tipo_canal?: string[];
   temperatura?: string[];
   busca?: string;
@@ -540,6 +542,7 @@ export const api = {
     pedir<LinhaDeRecorte[]>(comParametros("/api/indicadores/recortes", { dimensao, ...filtros })),
 
   planoDeMrr: () => pedir<PlanoDeMrr>("/api/inteligencia/plano"),
+  realizadoDoPlano: () => pedir<ItemDoRealizado[]>("/api/inteligencia/plano/realizado"),
   mudarPlanoDeMrr: (premissas: PremissasDoPlano) =>
     pedir<PlanoDeMrr>("/api/inteligencia/plano", { method: "PUT", body: JSON.stringify(premissas) }),
   cenariosPorServico: () => pedir<CenariosDoServico[]>("/api/inteligencia/cenarios-de-ticket"),

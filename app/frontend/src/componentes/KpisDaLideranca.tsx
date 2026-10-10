@@ -4,7 +4,8 @@
 
 import { useState } from "react";
 import { api } from "../api/cliente";
-import type { KpiDaLideranca, KpisDaLideranca as Kpis } from "../api/tipos";
+import type { ItemDoKpi, KpiDaLideranca, KpisDaLideranca as Kpis } from "../api/tipos";
+import { Indicador, type Tom } from "./Indicador";
 import { dinheiro, percentual } from "../formato";
 import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
@@ -58,30 +59,66 @@ function Detalhe({ k }: { k: KpiDaLideranca }) {
   return null;
 }
 
+const TOM: Record<string, Tom> = { mrr_novo: "verde", ticket: "dourado", upsell: "violeta", churn: "vermelho", cobertura: "azul" };
+
+/** A lista que compõe o KPI: quem entra na conta primeiro, quem ficou fora (a base, os sem reunião) depois. */
+function ComposicaoDoKpi({ k }: { k: KpiDaLideranca }) {
+  const entram = k.itens.filter((i) => i.entra);
+  const fora = k.itens.filter((i) => !i.entra);
+  const comValor = k.itens.some((i) => Number(i.valor) > 0);
+  const total = entram.reduce((t, i) => t + Number(i.valor), 0);
+  const tabela = (itens: ItemDoKpi[], rotulo: string) => (
+    <table className="tabela" aria-label={rotulo}>
+      <thead><tr><th>Cliente</th><th>O quê</th>{comValor && <th className="tabela-numero">Valor</th>}</tr></thead>
+      <tbody>
+        {itens.map((i, n) => (
+          <tr key={n}><td>{i.grupo}</td><td>{i.detalhe}</td>{comValor && <td className="tabela-numero">{dinheiro(i.valor)}</td>}</tr>
+        ))}
+        {comValor && itens === entram && (
+          <tr className="composicao-total"><td>Total</td><td />
+            <td className="tabela-numero">{dinheiro(total)}</td></tr>
+        )}
+      </tbody>
+    </table>
+  );
+  return (
+    <>
+      <p className="composicao-linha-resumo"><strong>{valorDoKpi(k)}</strong> · {k.resumo}</p>
+      {entram.length > 0 ? tabela(entram, "Entram na conta") : <p className="numero-estado">Nada entrou na conta no mês.</p>}
+      {fora.length > 0 && (
+        <>
+          <h3 className="numero-rotulo">{k.chave === "churn" ? "Os demais clientes da base" : "Ficaram fora da conta"} ({fora.length})</h3>
+          {tabela(fora, "Ficaram fora da conta")}
+        </>
+      )}
+    </>
+  );
+}
+
 function Cartao({ k }: { k: KpiDaLideranca }) {
   return (
-    <section className={k.valor === null ? "numero numero-pendente" : "numero"} aria-labelledby={`kpi-${k.chave}`}>
-      <h3 className="numero-rotulo" id={`kpi-${k.chave}`}>{k.titulo}</h3>
-      <p className="numero-valor" style={{ margin: "var(--e1) 0" }}>{valorDoKpi(k)}</p>
-      <p className="campo-ajuda" style={{ margin: 0 }}>{k.resumo}</p>
-      <Detalhe k={k} />
-      {k.meta && <p className="campo-ajuda" style={{ margin: "var(--e1) 0 0" }}>Meta: {k.meta}</p>}
-      {k.falta.map((f) => (
-        <p key={f} className="aviso-de-movimento" role="note" style={{ margin: "var(--e1) 0 0" }}>Falta: {f}</p>
-      ))}
-      {k.itens.length > 0 && (
-        <details style={{ marginTop: "var(--e2)" }}>
-          <summary className="campo-ajuda">Ver o que entrou na conta ({k.itens.length})</summary>
-          <ul style={{ margin: "var(--e1) 0 0", paddingLeft: "1.2rem" }}>
-            {k.itens.map((i, n) => (
-              <li key={n} className="campo-ajuda">
-                {i.grupo} · {i.detalhe}{Number(i.valor) > 0 ? ` · ${dinheiro(i.valor)}` : ""}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-    </section>
+    <Indicador
+      rotulo={k.titulo}
+      tom={TOM[k.chave] ?? "marinho"}
+      destaque={valorDoKpi(k)}
+      pendente={k.valor === null}
+      apoio={<>{k.resumo}{k.meta && <><br />Meta: {k.meta}</>}</>}
+      etiqueta={
+        <>
+          <Detalhe k={k} />
+          {k.falta.map((f) => (
+            <p key={f} className="aviso-de-movimento" role="note" style={{ margin: "var(--e1) 0 0" }}>Falta: {f}</p>
+          ))}
+        </>
+      }
+      composicao={k.itens.length > 0 ? {
+        titulo: k.titulo, subtitulo: "O que compõe o indicador no mês", quantos: k.itens.length,
+        conteudo: () => <ComposicaoDoKpi k={k} />,
+      } : undefined}
+    >
+      <p>{k.explicacao}</p>
+      {k.meta && <p>Meta: {k.meta}</p>}
+    </Indicador>
   );
 }
 
@@ -103,7 +140,7 @@ export function KpisDaLideranca() {
       {carregando && !dados && <Carregando rotulo="Calculando os KPIs" />}
       {erro && <Erro mensagem={erro} aoTentarDeNovo={recarregar} />}
       {dados && (
-        <div style={{ display: "grid", gap: "var(--e3)", gridTemplateColumns: "repeat(auto-fit, minmax(16rem, 1fr))" }}>
+        <div className="numeros numeros-kpis">
           {dados.kpis.map((k) => <Cartao key={k.chave} k={k} />)}
         </div>
       )}

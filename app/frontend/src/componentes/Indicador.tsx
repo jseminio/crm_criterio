@@ -95,3 +95,15 @@ function PainelDaComposicao({ composicao, aoFechar }: { composicao: Composicao; 
     document.body,
   );
 }
+
+/** A explicação ao passar o mouse (ou com Tab) para um número que não está num card: título de bloco, linha
+ * de tabela. Mesma janela do `Indicador`. */
+export function Explicavel({ texto, children }: { texto: ReactNode; children: ReactNode }) {
+  const id = useId();
+  return (
+    <span className="explicavel" tabIndex={0} aria-describedby={id}>
+      {children}
+      <span className="explicavel-janela" role="tooltip" id={id}>{texto}</span>
+    </span>
+  );
+}

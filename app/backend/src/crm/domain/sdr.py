@@ -28,6 +28,9 @@ from crm.domain.abordagem import fala_de_preco
 from crm.domain.listas import AutorDaMensagem, DesfechoDaConversa, TipoCanal, Tom
 
 __all__ = [
+    "CHAVES_DA_COMPOSICAO",
+    "ItemDoPainel",
+    "composicao_do_painel",
     "MES",
     "Meta",
     "METAS",
@@ -721,3 +724,105 @@ def resumir(painel: Painel) -> Resumo:
         tma_segundos=painel.tma_segundos,
         csat=painel.csat.valor,
     )
+
+
+# ------------------------------------------------------------ composição (10/10/2026)
+
+NOMES_DAS_ETAPAS = ["Lead recebido ou contatado", "Respondeu à IA", "Informou os dados da empresa", "Qualificado", "Reunião marcada"]
+
+CHAVES_DA_COMPOSICAO = (
+    "leads", "responderam", "qualificados", "qualificacao_concluida", "transbordo", "reunioes", "tma", "primeira_resposta",
+    "csat", "falhas", "interesses", "confianca", "termos", "funil", "gatilhos", "descartes", "tom", "portes", "destinos",
+    "registros", "origem", "custo_poupado",
+)
+"""Os números do Painel do SDR que abrem "Ver composição"."""
+
+
+@dataclass(frozen=True)
+class ItemDoPainel:
+    """Um lead (ou uma conversa, ou uma resposta da IA, do mesmo lead) que compõe um número do painel."""
+
+    lead: object
+    categoria: str
+    entra: bool = True
+    valor: float | None = None
+
+
+def composicao_do_painel(*, mes: str, leads: Iterable[LeadLido], origem: str | None, chave: str) -> list[ItemDoPainel]:
+    """A lista que compõe um número do painel: a mesma coorte e os mesmos recortes de `calcular_painel`."""
+    if chave not in CHAVES_DA_COMPOSICAO:
+        raise ValueError(f"número sem composição: {chave}")
+    inicio, fim = intervalo_do_mes(mes)
+    coorte = [l for l in leads if inicio <= _utc(l.criado_em) < fim and _na_origem(l, origem)]
+    I = ItemDoPainel
+    desfecho = lambda l: _valor(_desfecho(l)) if _desfecho(l) is not None else "em andamento"
+    if chave == "leads":
+        return [I(l, NOMES_DAS_ETAPAS[_etapa(l) - 1]) for l in coorte]
+    if chave == "responderam":
+        return [I(l, "respondeu" if _respondeu(l) else "não respondeu", _respondeu(l)) for l in coorte]
+    if chave == "qualificados":
+        return [I(l, desfecho(l), _desfecho(l) is DesfechoDaConversa.QUALIFICADO) for l in coorte]
+    respondidos = [l for l in coorte if _respondeu(l)]
+    com_desfecho = [l for l in respondidos if _desfecho(l) is not None]
+    if chave == "qualificacao_concluida":
+        return [I(l, desfecho(l), _desfecho(l) in (DesfechoDaConversa.QUALIFICADO, DesfechoDaConversa.FORA_DO_PERFIL))
+                for l in com_desfecho]
+    if chave == "transbordo":
+        return [I(l, desfecho(l), _desfecho(l) is DesfechoDaConversa.TRANSBORDO) for l in com_desfecho]
+    if chave == "reunioes":
+        return [I(l, "reunião marcada" if _etapa(l) == 5 else "qualificado sem reunião", _etapa(l) == 5)
+                for l in respondidos if _desfecho(l) is DesfechoDaConversa.QUALIFICADO]
+    if chave == "tma":
+        return [I(l, _valor(c.desfecho), True, round((_utc(c.encerrada_em) - _utc(c.iniciada_em)).total_seconds() / 60, 1))
+                for l in coorte for c in l.conversas if c.desfecho is not None and c.desfecho.veredito_da_ia and c.encerrada_em]
+    if chave == "primeira_resposta":
+        itens = []
+        for l in coorte:
+            if l.tipo_canal is not TipoCanal.TRAFEGO_PAGO:
+                continue
+            da_ia = [_utc(m.enviada_em) for m in _mensagens(l) if m.autor is AutorDaMensagem.IA]
+            if da_ia:
+                itens.append(I(l, "minutos até a 1ª resposta", True, round(max(0.0, (min(da_ia) - _utc(l.criado_em)).total_seconds()) / 60, 1)))
+        return itens
+    if chave == "csat":
+        return [I(l, "satisfeito (4 ou 5)" if c.nota >= 4 else "nota até 3", c.nota >= 4, float(c.nota))
+                for l in coorte for c in l.conversas if c.nota is not None]
+    if chave == "falhas":
+        return [I(l, "a IA não entendeu alguma resposta" if any(m.fallback for m in c.mensagens) else "sem falha",
+                  any(m.fallback for m in c.mensagens))
+                for l in coorte for c in l.conversas if any(m.autor is AutorDaMensagem.LEAD for m in c.mensagens)]
+    if chave == "interesses":
+        return [I(l, (l.interesse or "").strip() or "Sem assunto reconhecido") for l in respondidos]
+    if chave == "confianca":
+        faixa = lambda v: next((n for n, de, ate in _FAIXAS if de <= v < ate), "abaixo de 0,6")
+        return [I(l, faixa(m.confianca), m.confianca >= Decimal("0.6"), float(m.confianca))
+                for l in coorte for m in _mensagens(l) if m.autor is AutorDaMensagem.IA and m.confianca is not None]
+    if chave == "termos":
+        return [I(l, m.termo_nao_reconhecido.strip().casefold())
+                for l in coorte for m in _mensagens(l)
+                if m.autor is AutorDaMensagem.IA and m.termo_nao_reconhecido and m.termo_nao_reconhecido.strip()]
+    if chave == "funil":
+        return [I(l, NOMES_DAS_ETAPAS[_etapa(l) - 1]) for l in coorte]
+    if chave == "gatilhos":
+        return [I(l, _valor(c.motivo_transbordo) if c.motivo_transbordo else "Sem motivo registrado")
+                for l in coorte for c in l.conversas if c.desfecho is DesfechoDaConversa.TRANSBORDO]
+    if chave == "descartes":
+        return [I(l, _valor(l.motivo_descarte) if l.motivo_descarte else "Sem motivo registrado")
+                for l in respondidos if _desfecho(l) is DesfechoDaConversa.FORA_DO_PERFIL]
+    if chave == "tom":
+        return [I(l, t.value) for l in coorte for c in l.conversas if (t := _tom_da_conversa(c)) is not None]
+    if chave == "portes":
+        return [I(l, l.porte_estimado or "Sem porte") for l in respondidos if _desfecho(l) is DesfechoDaConversa.QUALIFICADO]
+    if chave == "destinos":
+        return [I(l, _valor(c.destino_transbordo) if c.destino_transbordo else "Sem destino", c.atendida_em is not None,
+                  round((_utc(c.atendida_em) - _utc(c.encerrada_em)).total_seconds() / 60, 1) if c.atendida_em and c.encerrada_em else None)
+                for l in coorte for c in l.conversas if c.desfecho is DesfechoDaConversa.TRANSBORDO]
+    if chave == "registros":
+        return [I(l, ("virou oportunidade" if l.convertido_em_id is not None else "com dados da empresa")
+                  if (l.cnpj or l.porte_estimado or l.convertido_em_id is not None) else "sem dados da empresa",
+                  bool(l.cnpj or l.porte_estimado)) for l in coorte]
+    if chave == "origem":
+        return [I(l, rotulo_da_origem(l.tipo_canal, l.canal)) for l in coorte]
+    # custo_poupado: as conversas que a IA concluiu sozinha (qualificado ou fora do perfil)
+    return [I(l, desfecho(l)) for l in com_desfecho
+            if _desfecho(l) in (DesfechoDaConversa.QUALIFICADO, DesfechoDaConversa.FORA_DO_PERFIL)]

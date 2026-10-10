@@ -14,6 +14,36 @@ import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/
 import { data } from "../formato";
 import { usarDados } from "../usarDados";
 import { CampoDeData } from "../componentes/CampoDeData";
+import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
+import type { ResumoDasAbordagens } from "../api/tipos";
+
+const usd = (v: string | number) => `US$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** As contas do mês que compõem um número do resumo (10/10/2026); `entra` separa o numerador da base. */
+function ContasDoResumo({ r, entra, comCusto = false }: {
+  r: ResumoDasAbordagens; entra: (i: NonNullable<ResumoDasAbordagens["itens"]>[number]) => boolean; comCusto?: boolean;
+}) {
+  const itens = r.itens ?? [];
+  const dentro = itens.filter(entra);
+  const fora = itens.filter((i) => !entra(i));
+  const tabela = (lista: typeof itens, rotulo: string) => (
+    <table className="tabela" aria-label={rotulo}>
+      <thead><tr><th>Conta</th><th>Situação</th><th>Diagnóstico</th>{comCusto && <th className="tabela-numero">Custo do agente</th>}</tr></thead>
+      <tbody>
+        {lista.map((i) => (
+          <tr key={i.abordagem_id}><td>{i.conta}</td><td>{i.situacao}</td><td>{i.diagnostico_agendado_em ? data(i.diagnostico_agendado_em) : "—"}</td>
+            {comCusto && <td className="tabela-numero">{i.custo_usd === null ? "sem preço" : usd(i.custo_usd)}</td>}</tr>
+        ))}
+      </tbody>
+    </table>
+  );
+  return (
+    <>
+      {dentro.length > 0 ? tabela(dentro, "Entram na conta") : <p className="numero-estado">Nenhuma conta nesta conta.</p>}
+      {fora.length > 0 && !comCusto && (<><h3 className="numero-rotulo">As demais da fila ({fora.length})</h3>{tabela(fora, "Demais")}</>)}
+    </>
+  );
+}
 
 const MESES = [
   "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -548,15 +578,31 @@ export function Abordagens() {
         {r && (
           <div className="numeros numeros-tres">
             <div className="numero">
-              <span className="numero-rotulo">Abordadas em {nomeDoMes(r.mes)}</span>
+              <span className="numero-rotulo">
+                <Explicavel texto="Contas do mês com a abordagem enviada, de todas as que estão na fila do mês (sem as descartadas).">
+                  Abordadas em {nomeDoMes(r.mes)}
+                </Explicavel>
+                <BotaoDeComposicao rotulo="ver" composicao={{ titulo: `Abordadas em ${nomeDoMes(r.mes)}`, quantos: r.na_fila,
+                  conteudo: () => <ContasDoResumo r={r} entra={(i) => i.situacao === "Enviada"} /> }} />
+              </span>
               <p className="numero-valor">{r.abordadas} de {r.na_fila}</p>
             </div>
             <div className="numero">
-              <span className="numero-rotulo">Diagnósticos agendados</span>
+              <span className="numero-rotulo">
+                <Explicavel texto="Contas do mês com o diagnóstico agendado depois da abordagem.">Diagnósticos agendados</Explicavel>
+                <BotaoDeComposicao rotulo="ver" composicao={{ titulo: "Diagnósticos agendados", quantos: r.diagnosticos,
+                  conteudo: () => <ContasDoResumo r={r} entra={(i) => i.diagnostico_agendado_em !== null} /> }} />
+              </span>
               <p className="numero-valor">{r.diagnosticos}</p>
             </div>
             <div className="numero">
-              <span className="numero-rotulo">Custo do agente nestas contas</span>
+              <span className="numero-rotulo">
+                <Explicavel texto="Soma do custo estimado das execuções do agente (pesquisa e rascunho) para as contas do mês, pela tabela de preços do modelo.">
+                  Custo do agente nestas contas
+                </Explicavel>
+                <BotaoDeComposicao rotulo="ver" composicao={{ titulo: "Custo do agente por conta",
+                  conteudo: () => <ContasDoResumo r={r} comCusto entra={(i) => i.custo_usd !== null} /> }} />
+              </span>
               <p className="numero-valor">
                 {r.custo_usd === null
                   ? "Sem uso ainda"

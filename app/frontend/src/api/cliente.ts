@@ -20,6 +20,7 @@ import type {
   MrrDaCarteira,
   IndicadorDoFunil,
   ItemDoRealizado,
+  ItemDoPainelDoSdr,
   LinhaDaFase,
   ItemDaComposicao,
   ItemDoMovimento,
@@ -636,6 +637,8 @@ export const api = {
   pedidosDeServicoNovo: () => pedir<PedidoDeServicoNovo[]>("/api/servicos/pedidos"),
 
   // ---------------------------------------------------------- SDR de IA
+  composicaoDoPainelDoSdr: (filtros: { mes: string; origem?: string | null; chave: string }) =>
+    pedir<ItemDoPainelDoSdr[]>(comParametros("/api/sdr/painel/composicao", { ...filtros })),
   painelDoSdr: (filtros: { mes: string; origem?: string }) =>
     pedir<PainelDoSdr>(comParametros("/api/sdr/painel", filtros)),
 

@@ -465,6 +465,8 @@ export interface ResumoDasAbordagens {
   aguardando_aprovacao: number;
   custo_usd: string | null;
   custo_parcial: boolean;
+  /** As contas do mês que compõem os números (10/10/2026), sem as descartadas. */
+  itens?: { abordagem_id: number; conta: string; situacao: string; diagnostico_agendado_em: string | null; custo_usd: string | null }[];
 }
 
 /** Um bloco de grupos que parecem ser o mesmo cliente. Só sugestão: quem funde é uma pessoa. */
@@ -2194,4 +2196,18 @@ export interface ItemDoRealizado {
   escopo: string | null;
   data: string | null;
   valor: string;
+}
+
+/** Um lead que compõe um número do Painel do SDR (10/10/2026). */
+export interface ItemDoPainelDoSdr {
+  lead_id: number;
+  lead: string;
+  contato: string;
+  origem: string;
+  criado_em: string;
+  categoria: string;
+  /** Conta no numerador; fora: a base da taxa. */
+  entra: boolean;
+  /** Minutos, nota ou confiança, conforme o número. */
+  valor: number | null;
 }

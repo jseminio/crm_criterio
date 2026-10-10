@@ -18,6 +18,7 @@ vi.mock("../api/cliente", async () => {
     ...real,
     api: {
       painelDoSdr: vi.fn(),
+      composicaoDoPainelDoSdr: vi.fn(),
       parametrosDoSdr: vi.fn(),
       gravarParametrosDoSdr: vi.fn(),
       midia: vi.fn(),
@@ -115,6 +116,23 @@ describe("painel", () => {
     expect(screen.getByText("Na meta · meta de 70%")).toBeInTheDocument();
     expect(screen.getByText("7 min 50 s")).toBeInTheDocument();
     expect(screen.getByText(/1ª resposta em 41 s · Na meta/)).toBeInTheDocument();
+  });
+
+  it("cada número tem a explicação e 'ver' com os leads que o compõem (10/10/2026)", async () => {
+    vi.mocked(api.painelDoSdr).mockResolvedValue(painel());
+    vi.mocked(api.composicaoDoPainelDoSdr).mockResolvedValue([
+      { lead_id: 1, lead: "Clínica Sorriso", contato: "Ana", origem: "Tráfego pago · Meta Ads", criado_em: "2026-09-10T12:00:00Z",
+        categoria: "Qualificado", entra: true, valor: null },
+      { lead_id: 2, lead: "Padaria Pão", contato: "Rui", origem: "Tráfego pago · Meta Ads", criado_em: "2026-09-11T12:00:00Z",
+        categoria: "Fora do perfil", entra: false, valor: null },
+    ]);
+    render(<Sdr />);
+    expect(await screen.findByText(/Leads do mês que a IA qualificou/)).toHaveAttribute("role", "tooltip");
+    await userEvent.click(screen.getByRole("button", { name: "Ver composição: Leads qualificados pela IA" }));
+    const painelLateral = await screen.findByRole("dialog", { name: "Leads qualificados pela IA" });
+    expect(await within(painelLateral).findByText(/Clínica Sorriso/)).toBeInTheDocument();
+    expect(within(painelLateral).getByText(/Ficaram fora da conta \(1\)/)).toBeInTheDocument();
+    expect(api.composicaoDoPainelDoSdr).toHaveBeenCalledWith(expect.objectContaining({ chave: "qualificados" }));
   });
 
   it("compara com o mês anterior", async () => {

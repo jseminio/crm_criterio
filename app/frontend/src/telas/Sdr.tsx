@@ -5,7 +5,7 @@
  * Número sem base não vira zero: a tela diz o que falta.
  */
 
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type {
   Contagem,
@@ -19,6 +19,55 @@ import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/
 import { dinheiro } from "../formato";
 import { mesAnterior, mesAtual, nomeDoMes, numero, pct, tempo } from "../sdrFormato";
 import { usarDados } from "../usarDados";
+import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
+import type { ItemDoPainelDoSdr } from "../api/tipos";
+
+/** O mês e a origem do painel aberto, para a composição de cada número (10/10/2026). */
+const PainelAberto = createContext<{ mes: string; origem: string | null }>({ mes: "", origem: null });
+
+/** A lista que compõe um número do painel: os leads da coorte, quem entra na conta primeiro. */
+function ComposicaoDoSdr({ chave, unidade }: { chave: string; unidade?: string }) {
+  const { mes, origem } = useContext(PainelAberto);
+  const { dados, carregando, erro, recarregar } = usarDados<ItemDoPainelDoSdr[]>(
+    () => api.composicaoDoPainelDoSdr({ mes, origem, chave }), [mes, origem, chave]);
+  if (carregando && !dados) return <Carregando rotulo="Buscando os leads" />;
+  if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
+  if (!dados || dados.length === 0) return <p className="numero-estado">Nenhum lead nesta conta no mês.</p>;
+  const entram = dados.filter((i) => i.entra);
+  const fora = dados.filter((i) => !i.entra);
+  const comValor = dados.some((i) => i.valor !== null);
+  const tabela = (itens: ItemDoPainelDoSdr[], rotulo: string) => (
+    <table className="tabela" aria-label={rotulo}>
+      <thead><tr><th>Lead</th><th>Origem</th><th>O quê</th>{comValor && <th className="tabela-numero">{unidade ?? "Valor"}</th>}</tr></thead>
+      <tbody>
+        {itens.map((i, n) => (
+          <tr key={`${i.lead_id}-${n}`}><td>{i.lead}{i.contato !== i.lead ? ` · ${i.contato}` : ""}</td><td>{i.origem}</td>
+            <td>{i.categoria}</td>{comValor && <td className="tabela-numero">{i.valor === null ? "—" : numero(i.valor, 1)}</td>}</tr>
+        ))}
+      </tbody>
+    </table>
+  );
+  return (
+    <>
+      <p className="composicao-linha-resumo"><strong>{entram.length}</strong> na conta{fora.length > 0 && ` · ${fora.length} fora (a base)`}</p>
+      {entram.length > 0 && tabela(entram, "Entram na conta")}
+      {fora.length > 0 && (<><h3 className="numero-rotulo">Ficaram fora da conta ({fora.length})</h3>{tabela(fora, "Ficaram fora")}</>)}
+    </>
+  );
+}
+
+/** Rótulo de um número do painel no padrão dos indicadores: explicação ao passar o mouse e "ver". */
+function RotuloDoSdr({ rotulo, explicacao, chave, unidade }: { rotulo: string; explicacao: string; chave: string; unidade?: string }) {
+  return (
+    <>
+      <Explicavel texto={explicacao}>{rotulo}</Explicavel>
+      <BotaoDeComposicao rotulo="ver" composicao={{
+        titulo: rotulo, subtitulo: "Os leads da coorte do mês que compõem o número",
+        conteudo: () => <ComposicaoDoSdr chave={chave} unidade={unidade} />,
+      }} />
+    </>
+  );
+}
 import { Leads } from "./Leads";
 
 type Aba = "painel" | "leads" | "custos";
@@ -199,7 +248,11 @@ function PainelDoSdrTela() {
           />
         )
       )}
-      {!carregando && !erro && dados && dados.leads > 0 && <Conteudo painel={dados} />}
+      {!carregando && !erro && dados && dados.leads > 0 && (
+        <PainelAberto.Provider value={{ mes: dados.mes, origem: dados.origem }}>
+          <Conteudo painel={dados} />
+        </PainelAberto.Provider>
+      )}
     </div>
   );
 }
@@ -212,13 +265,14 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
         <div className="sdr-secao-topo">
           <h2 id="sdr-s1">Resultado do SDR</h2>
           <p>
-            {numero(p.leads)} leads · {numero(p.responderam)} responderam à IA
+            <RotuloDoSdr rotulo={`${numero(p.leads)} leads`} chave="leads" explicacao="Os leads que chegaram no mês (pela data de criação), com o filtro de origem." />
+            {" · "}{numero(p.responderam)} responderam à IA
             {p.em_andamento > 0 && ` · ${numero(p.em_andamento)} conversas em andamento`}
           </p>
         </div>
         <div className="sdr-kpis">
           <article className="sdr-bloco sdr-kpi sdr-kpi-principal">
-            <span className="sdr-kpi-rotulo">Leads qualificados pela IA</span>
+            <span className="sdr-kpi-rotulo"><RotuloDoSdr rotulo="Leads qualificados pela IA" chave="qualificados" explicacao="Leads do mês que a IA qualificou (desfecho Qualificado); a base são todos os leads do mês." /></span>
             <span className="sdr-kpi-valor">{numero(p.qualificados)}</span>
             <div className="sdr-linha">
               <span className="etiqueta etiqueta-neutra">
@@ -234,7 +288,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
           </article>
 
           <article className="sdr-bloco sdr-kpi">
-            <span className="sdr-kpi-rotulo">Qualificação concluída pela IA</span>
+            <span className="sdr-kpi-rotulo"><RotuloDoSdr rotulo="Qualificação concluída pela IA" chave="qualificacao_concluida" explicacao="Das conversas que terminaram, quantas a IA concluiu sozinha com veredito: qualificado ou fora do perfil." /></span>
             {pct(p.qualificacao_concluida) ? (
               <span className="sdr-kpi-valor">{pct(p.qualificacao_concluida)}</span>
             ) : (
@@ -257,7 +311,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
           </article>
 
           <article className="sdr-bloco sdr-kpi">
-            <span className="sdr-kpi-rotulo">Passadas para a equipe (transbordo)</span>
+            <span className="sdr-kpi-rotulo"><RotuloDoSdr rotulo="Passadas para a equipe (transbordo)" chave="transbordo" explicacao="Das conversas que terminaram, quantas a IA passou para uma pessoa da equipe." /></span>
             {pct(p.transbordo) ? (
               <span className="sdr-kpi-valor">{pct(p.transbordo)}</span>
             ) : (
@@ -274,7 +328,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
           </article>
 
           <article className="sdr-bloco sdr-kpi">
-            <span className="sdr-kpi-rotulo">Tempo de qualificação (TMA)</span>
+            <span className="sdr-kpi-rotulo"><RotuloDoSdr rotulo="Tempo de qualificação (TMA)" chave="tma" unidade="Minutos" explicacao="Média do tempo das conversas que a IA concluiu sozinha, do início ao fim." /></span>
             {tempo(p.tma_segundos) ? (
               <span className="sdr-kpi-valor">{tempo(p.tma_segundos)}</span>
             ) : (
@@ -297,7 +351,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
           </article>
 
           <article className="sdr-bloco sdr-kpi">
-            <span className="sdr-kpi-rotulo">Nota do lead para a conversa (CSAT)</span>
+            <span className="sdr-kpi-rotulo"><RotuloDoSdr rotulo="Nota do lead para a conversa (CSAT)" chave="csat" unidade="Nota" explicacao="Média das notas (1 a 5) que os leads deram à conversa; satisfeitos são os que deram 4 ou 5." /></span>
             {p.csat.valor !== null ? (
               <span className="sdr-kpi-valor">
                 {numero(p.csat.valor, 1)}
@@ -319,7 +373,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
 
         <article className="sdr-bloco">
           <div>
-            <h3 className="sdr-bloco-titulo">Resultado por origem</h3>
+            <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="Resultado por origem" chave="origem" explicacao="Os leads do mês por origem (tipo de canal e canal), com a resposta, a qualificação e o custo da mídia." /></h3>
             <p className="sdr-bloco-sub">
               O custo considera só a mídia do mês, lançada em Custos e mídia. Lead frio não tem custo
               de mídia.
@@ -336,7 +390,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
         <div className="sdr-grade sdr-grade-7-5">
           <article className="sdr-bloco">
             <div>
-              <h3 className="sdr-bloco-titulo">O que o lead procura</h3>
+              <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="O que o lead procura" chave="interesses" explicacao="O assunto que cada lead que respondeu trouxe na conversa." /></h3>
               <p className="sdr-bloco-sub">Assunto reconhecido nos {numero(p.responderam)} leads que responderam</p>
             </div>
             {p.interesses.length ? (
@@ -353,7 +407,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
           <div className="sdr-coluna">
             <article className="sdr-bloco">
               <div>
-                <h3 className="sdr-bloco-titulo">Confiança da IA ao responder</h3>
+                <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="Confiança da IA ao responder" chave="confianca" unidade="Confiança" explicacao="A confiança que a IA registrou em cada resposta, por faixa; abaixo de 0,6 pede revisão." /></h3>
                 <p className="sdr-bloco-sub">Distribuição das {numero(p.confianca.respostas)} respostas com confiança registrada</p>
               </div>
               {p.confianca.media !== null ? (
@@ -381,7 +435,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
             <article className="sdr-bloco">
               <div className="sdr-bloco-cab">
                 <div>
-                  <h3 className="sdr-bloco-titulo">Falhas de compreensão</h3>
+                  <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="Falhas de compreensão" chave="falhas" explicacao="Das conversas em que o lead respondeu, quantas tiveram alguma resposta que a IA não entendeu." /></h3>
                   <p className="sdr-bloco-sub">Respostas "não entendi" ou intenção padrão de erro</p>
                 </div>
                 <Avaliacao indicador={p.indicador_falhas} />
@@ -407,7 +461,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
         </div>
         <article className="sdr-bloco">
           <div>
-            <h3 className="sdr-bloco-titulo">Termos que a IA não reconheceu</h3>
+            <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="Termos que a IA não reconheceu" chave="termos" explicacao="Os termos que a IA marcou como não reconhecidos nas respostas do mês." /></h3>
             <p className="sdr-bloco-sub">
               Quanto maior, mais vezes apareceu. O número ao lado é a contagem. Cada termo é candidato
               a assunto novo no roteiro ou a sinônimo de um que já existe.
@@ -424,7 +478,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
         <div className="sdr-grade sdr-grade-7-5">
           <article className="sdr-bloco">
             <div>
-              <h3 className="sdr-bloco-titulo">Funil da qualificação</h3>
+              <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="Funil da qualificação" chave="funil" explicacao="Até onde cada lead do mês chegou: recebido, respondeu, deu os dados da empresa, qualificado, reunião marcada." /></h3>
               <p className="sdr-bloco-sub">Leads que chegaram a cada etapa. Entre as etapas, quem saiu e por quê.</p>
             </div>
             <Funil painel={p} />
@@ -432,7 +486,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
           <div className="sdr-coluna">
             <article className="sdr-bloco">
               <div>
-                <h3 className="sdr-bloco-titulo">Por que a IA passou para a equipe</h3>
+                <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="Por que a IA passou para a equipe" chave="gatilhos" explicacao="O motivo registrado em cada conversa passada para a equipe." /></h3>
                 <p className="sdr-bloco-sub">Motivo registrado em cada transbordo</p>
               </div>
               {p.gatilhos.length ? (
@@ -443,7 +497,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
             </article>
             <article className="sdr-bloco">
               <div>
-                <h3 className="sdr-bloco-titulo">Tom do lead</h3>
+                <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="Tom do lead" chave="tom" explicacao="O tom predominante de cada conversa, pelas mensagens do lead." /></h3>
                 <p className="sdr-bloco-sub">Tom predominante nas mensagens do lead, por conversa</p>
               </div>
               {p.tom.length ? <TomDoLead tom={p.tom} /> : <SemDado texto="Nenhuma mensagem com tom registrado" />}
@@ -452,7 +506,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
         </div>
         <article className="sdr-bloco">
           <div>
-            <h3 className="sdr-bloco-titulo">Por que a IA descartou</h3>
+            <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="Por que a IA descartou" chave="descartes" explicacao="O motivo de descarte dos leads que a IA julgou fora do perfil." /></h3>
             <p className="sdr-bloco-sub">
               Motivo de cada lead fora do perfil. Quem pediu para não ser contatado fica marcado "não
               contatar" no CRM.
@@ -472,7 +526,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
         </div>
         <div className="sdr-grade sdr-grade-3">
           <article className="sdr-bloco sdr-kpi">
-            <h3 className="sdr-bloco-titulo">Registros no CRM</h3>
+            <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="Registros no CRM" chave="registros" explicacao="Leads do mês com os dados da empresa registrados e os que já viraram oportunidade." /></h3>
             <span className="sdr-kpi-valor">
               {numero(p.oportunidades)}
               <small>{p.oportunidades === 1 ? "oportunidade" : "oportunidades"}</small>
@@ -487,7 +541,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
           <CustoPoupado painel={p} />
           <article className="sdr-bloco">
             <div>
-              <h3 className="sdr-bloco-titulo">Porte estimado dos qualificados</h3>
+              <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="Porte estimado dos qualificados" chave="portes" explicacao="O porte que a IA estimou para cada lead qualificado." /></h3>
               <p className="sdr-bloco-sub">
                 Pela régua de porte, com o que o lead informou. Quem conduz a entrevista confirma.
               </p>
@@ -501,7 +555,7 @@ function Conteudo({ painel: p }: { painel: PainelDoSdr }) {
         </div>
         <article className="sdr-bloco">
           <div>
-            <h3 className="sdr-bloco-titulo">Fila de transbordo por destino</h3>
+            <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="Fila de transbordo por destino" chave="destinos" unidade="Espera (min)" explicacao="Cada conversa passada para a equipe, pelo destino, e quanto tempo esperou até ser atendida." /></h3>
             <p className="sdr-bloco-sub">
               Para quem foram os transbordos e quanto o lead esperou até a primeira mensagem da equipe
             </p>
@@ -653,7 +707,7 @@ function CustoPoupado({ painel }: { painel: PainelDoSdr }) {
   const c = painel.custo_poupado;
   return (
     <article className="sdr-bloco sdr-kpi">
-      <h3 className="sdr-bloco-titulo">Custo poupado no mês</h3>
+      <h3 className="sdr-bloco-titulo"><RotuloDoSdr rotulo="Custo poupado no mês" chave="custo_poupado" explicacao="Conversas que a IA concluiu sozinha × o custo de um SDR por conversa (Parâmetros), menos o custo da IA no mês." /></h3>
       {c.liquido !== null ? (
         <>
           <span className="sdr-kpi-valor">{dinheiro(c.liquido)}</span>

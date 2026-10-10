@@ -18,6 +18,8 @@ import type {
   TipoDeContato,
   Mrr,
   MrrDaCarteira,
+  IndicadorDoFunil,
+  ItemDaComposicao,
   ItemDoMovimento,
   PreviaDeRecebimentos,
   ImportacaoDeRecebimentos,
@@ -528,6 +530,11 @@ export const api = {
 
   indicadores: (filtros: FiltrosDoFunil = {}) =>
     pedir<Indicadores>(comParametros("/api/indicadores", { ...filtros })),
+
+  composicaoDoFunil: (indicador: IndicadorDoFunil, filtros: FiltrosDoFunil = {}, recorte?: { dimensao: DimensaoDeRecorte; chave: string }) =>
+    pedir<{ indicador: string; itens: ItemDaComposicao[] }>(comParametros("/api/indicadores/composicao", {
+      indicador, ...filtros, recorte: recorte?.dimensao, chave: recorte?.chave,
+    })),
 
   recortes: (dimensao: DimensaoDeRecorte, filtros: FiltrosDoFunil = {}) =>
     pedir<LinhaDeRecorte[]>(comParametros("/api/indicadores/recortes", { dimensao, ...filtros })),

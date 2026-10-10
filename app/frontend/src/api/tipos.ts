@@ -2116,3 +2116,29 @@ export interface KpisDaLideranca {
   ate: string;
   kpis: KpiDaLideranca[];
 }
+
+/** Os números do funil que abrem "Ver composição" (10/10/2026). `propostas`: a linha de um recorte. */
+export type IndicadorDoFunil =
+  | "em_aberto" | "aceitas" | "ticket_recorrente" | "ciclo_medio" | "taxa_de_conversao"
+  | "cobertura_proxima_acao" | "cobertura_volumetria" | "dependencia_de_canal" | "propostas";
+
+/** Uma oportunidade na lista de um número do funil. */
+export interface ItemDaComposicao {
+  id: number;
+  nome: string;
+  grupo: string;
+  servico: string | null;
+  situacao: string;
+  captador: string | null;
+  tipo_canal: string | null;
+  data_colocacao: string | null;
+  data_aceite: string | null;
+  proxima_acao: string | null;
+  /** Conta no numerador (aceita, com próxima ação, da rede dos sócios); nas somas, sempre. */
+  entra: boolean;
+  parte: string;
+  /** Preço mensal, MRR (ticket) ou dias (ciclo médio), conforme o indicador. */
+  valor: string | null;
+  anual: string | null;
+  falta: string[];
+}

@@ -1439,6 +1439,11 @@ td > .celula-fonte { display: block; }
 .ind-mrr { grid-column: span 2; }
 @media (max-width: 720px) { .ind-mrr { grid-column: 1 / -1; } }
 
+.composicao-fora td { color: var(--texto-medio); }
+.composicao-linha-resumo { margin: 0 0 var(--e1); }
+.composicao h3 { margin: var(--e3) 0 var(--e2); }
+.recortes .ind-composicao-solto { --cor: var(--foco); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

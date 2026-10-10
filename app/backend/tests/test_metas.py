@@ -49,10 +49,10 @@ def cliente(engine, base):
 
 def test_sem_nada_gravado_valem_os_padroes_do_kpi_oficial(cliente):
     m = cliente.get("/api/metas", headers=ADMIN).json()
-    assert (m["mrr"]["meta"], m["mrr"]["alerta"]) == ("400000", "200000")
+    assert (m["mrr"]["meta"], m["mrr"]["alerta"]) == ("433333.33", "216666.67")  # 13 parcelas (10/10/2026)
     assert (m["conversao"]["meta"], m["conversao"]["alerta"]) == ("50", "30")
     mrr = cliente.get("/api/mrr", headers=ADMIN, params={"hoje": "2026-10-02"}).json()
-    assert (mrr["contra_a_meta"], mrr["falta_para_a_meta"]) == ("entre", "129166.67")
+    assert (mrr["contra_a_meta"], mrr["falta_para_a_meta"]) == ("entre", "162500.00")
     tx = cliente.get("/api/indicadores", headers=ADMIN).json()["taxa_de_conversao"]
     assert (tx["percentual"], tx["atingiu_a_meta"], tx["meta"]) == ("50.0", True, "50")
 
@@ -77,7 +77,7 @@ def test_mudar_a_meta_muda_a_comparacao_e_registra_quem(cliente):
 def test_so_muda_o_que_veio(cliente):
     cliente.put("/api/metas", headers=ADMIN, json={"conversao": {"meta": "55", "alerta": "35"}})
     m = cliente.get("/api/metas", headers=ADMIN).json()
-    assert m["mrr"]["meta"] == "400000" and m["conversao"]["meta"] == "55.00"
+    assert m["mrr"]["meta"] == "433333.33" and m["conversao"]["meta"] == "55.00"
 
 
 @pytest.mark.parametrize("corpo, trecho", [
@@ -87,7 +87,7 @@ def test_so_muda_o_que_veio(cliente):
 def test_valida_antes_de_gravar(cliente, corpo, trecho):
     r = cliente.put("/api/metas", headers=ADMIN, json=corpo)
     assert r.status_code == 422 and trecho in r.json()["detail"]
-    assert cliente.get("/api/metas", headers=ADMIN).json()["mrr"]["meta"] == "400000"
+    assert cliente.get("/api/metas", headers=ADMIN).json()["mrr"]["meta"] == "433333.33"
 
 
 def test_so_quem_tem_a_funcionalidade_ve_e_muda(cliente):

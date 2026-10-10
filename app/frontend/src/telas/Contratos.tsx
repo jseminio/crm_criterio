@@ -17,6 +17,8 @@ import { EventosDeContrato } from "./EventosDeContrato";
 import { Receita } from "./Receita";
 import { CampoDeData } from "../componentes/CampoDeData";
 import { AlteracoesDoRegistro } from "../componentes/HistoricoDeAlteracoes";
+import { ImportarRecebimentos } from "../componentes/ImportarRecebimentos";
+import { usarAcesso } from "../entrada";
 
 const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "Encerrado"];
 
@@ -295,6 +297,7 @@ export function Contratos({ listas }: { listas: Listas | null }) {
   const [editando, definirEditando] = useState<ContratoResumo | null>(null);
   const [versaoDoMrr, definirVersaoDoMrr] = useState(0);
   const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
+  const { eu } = usarAcesso();
 
   const { dados, carregando, erro, recarregar } = usarDados<Pagina<ContratoResumo>>(
     () => api.contratos(situacao ? { situacao: [situacao] } : {}),
@@ -307,6 +310,11 @@ export function Contratos({ listas }: { listas: Listas | null }) {
   return (
     <>
       <Receita versao={versaoDoMrr} />
+      {eu.administrador && (
+        <div className="acoes-da-tela">
+          <ImportarRecebimentos aoImportar={() => definirVersaoDoMrr((v) => v + 1)} />
+        </div>
+      )}
 
       <div className="filtros">
         <div className="campo">

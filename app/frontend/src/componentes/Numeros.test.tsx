@@ -14,6 +14,8 @@ vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
   return { ...real, api: { indicadores: vi.fn() } };
 });
+// O MRR da carteira tem o seu próprio teste (MrrDaCarteira.test.tsx); aqui, só os números do funil.
+vi.mock("./MrrDaCarteira", () => ({ MrrDaCarteira: () => null }));
 
 function indicadores(taxa: Partial<Indicadores["taxa_de_conversao"]> = {}, extra: Partial<Indicadores> = {}): Indicadores {
   return {

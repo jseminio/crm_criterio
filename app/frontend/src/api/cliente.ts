@@ -17,6 +17,10 @@ import type {
   PessoaDeContato,
   TipoDeContato,
   Mrr,
+  MrrDaCarteira,
+  ItemDoMovimento,
+  PreviaDeRecebimentos,
+  ImportacaoDeRecebimentos,
   AnaliseDaCarteira,
   RevisaoDaCarteira,
   ClassificacaoDaCarteira,
@@ -497,6 +501,13 @@ export const api = {
   editarParametros: (corpo: EdicaoDeParametros) =>
     pedir<Parametros>("/api/carteira/parametros", { method: "POST", body: JSON.stringify(corpo) }),
   mrr: (de?: string) => pedir<Mrr>(comParametros("/api/mrr", { de })),
+  mrrDaCarteira: (competencia?: string) => pedir<MrrDaCarteira>(comParametros("/api/mrr/carteira", { competencia })),
+  itensDoMovimento: (de: string) => pedir<{ de: string; ate: string; itens: ItemDoMovimento[] }>(comParametros("/api/mrr/movimento", { de })),
+  previaDeRecebimentos: (arquivo: string, conteudo_base64: string) =>
+    pedir<PreviaDeRecebimentos>("/api/recebimentos/previa", { method: "POST", body: JSON.stringify({ arquivo, conteudo_base64 }) }),
+  importarRecebimentos: (arquivo: string, conteudo_base64: string) =>
+    pedir<ImportacaoDeRecebimentos>("/api/recebimentos/importar", { method: "POST", body: JSON.stringify({ arquivo, conteudo_base64 }) }),
+  importacoesDeRecebimentos: () => pedir<ImportacaoDeRecebimentos[]>("/api/recebimentos/importacoes"),
 
   agenda: (captador?: string[]) =>
     pedir<Agenda>(comParametros("/api/agenda", { captador })),

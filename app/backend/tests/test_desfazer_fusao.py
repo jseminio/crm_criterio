@@ -43,7 +43,8 @@ def test_a_fusao_registra_o_que_moveu_incluindo_contratos(sessao: Session):
     r = fundir_grupos(sessao, a, b)
     f = sessao.get(FusaoDeGrupos, r.fusao_id)
     # O contato vai junto com a empresa a que está vinculado (01/10/2026); fica registrado.
-    assert f.movidos == {"empresa": [it["e"]], "oportunidade": [it["o"]], "pessoa_contato": [it["p"]], "contrato": [it["c"]]}
+    assert f.movidos == {"empresa": [it["e"]], "oportunidade": [it["o"]], "pessoa_contato": [it["p"]], "contrato": [it["c"]],
+                         "recebimento": []}
     assert set(dono(sessao, it).values()) == {a.id}  # o contrato também foi (antes ficava para trás)
 
 

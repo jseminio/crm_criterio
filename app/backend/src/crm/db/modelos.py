@@ -1765,3 +1765,39 @@ class ConfiguracaoDoSistema(Base):
     cifrado: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False, server_default=sa.false())
     alterado_por: Mapped[str | None] = mapped_column(sa.String(200))
     alterado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=agora)
+
+
+class ImportacaoDeRecebimentos(Base):
+    """Uma planilha de recebimentos importada pela tela (10/10/2026, só o Administrador). Fica como
+    registro mesmo depois de substituída: quem importou, quando, quantas linhas e o total."""
+
+    __tablename__ = "importacao_de_recebimentos"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    arquivo: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    importado_por: Mapped[str | None] = mapped_column(sa.String(200))
+    importado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=agora)
+    competencias: Mapped[list] = mapped_column(_JSON, nullable=False)
+    """Os meses ("AAAA-MM") que a planilha trouxe; reimportar um deles substitui o que havia."""
+    linhas: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    total: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    fora: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0, server_default="0")
+    """Linhas que não entraram (não reconhecidas); o motivo foi mostrado na prévia."""
+
+
+class Recebimento(Base):
+    """O que entrou no caixa de um cliente numa competência (10/10/2026). Vem só da importação da
+    planilha. Reimportar o mês desliga (`ativo` falso) as linhas anteriores daquele mês, sem apagar."""
+
+    __tablename__ = "recebimento"
+    __table_args__ = (sa.Index("ix_recebimento_competencia_ativo", "competencia", "ativo"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    importacao_id: Mapped[int] = mapped_column(sa.ForeignKey("importacao_de_recebimentos.id"), nullable=False, index=True)
+    grupo_id: Mapped[int] = mapped_column(sa.ForeignKey("grupo_economico.id"), nullable=False, index=True)
+    empresa_id: Mapped[int | None] = mapped_column(sa.ForeignKey("empresa.id"), index=True)
+    competencia: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    """Sempre o dia 1 do mês."""
+    valor: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    data_do_recebimento: Mapped[date | None] = mapped_column(sa.Date)
+    ativo: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=True, server_default=sa.true())

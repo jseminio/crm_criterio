@@ -57,6 +57,11 @@ resultado (ver "SDR de IA", abaixo).
   compõe, montada na mesma conta (`_montar_fases` devolve o número e a composição;
   `GET /api/inteligencia/fases/composicao?mes=&chave=`). Nas taxas, a base aparece à parte ("ficaram fora").
   Reuniões em dia saem de `sucesso.reunioes_em_dia_por_grupo`, a mesma regra do Funil do Sucesso.
+- **Entrega 4 — Sucesso do Cliente** (10/10/2026): na Saúde da carteira, unidades, receita, ISC, os três componentes e
+  a distribuição por classe têm a explicação ao passar o mouse e "ver" com os grupos (peso pela receita no ISC; quem
+  fica fora, sem nota de churn, à parte); inadimplentes e semáforo seguem filtrando a lista, com a explicação. No Funil
+  do Sucesso, cada coluna do quadro das classes tem a explicação e cada classe abre os clientes com os números linha a
+  linha. Tudo calculado na tela a partir do que a API já manda: nenhuma rota nova.
 - **Recortes e cenários de ticket alinhados ao card de ticket** (decisão de Eduardo, 10/10/2026): só serviço
   recorrente (C1) e em MRR (parcela × 13 ÷ 12). A estatística dos cenários roda sobre a parcela e cada valor sai em
   MRR, para o arredondamento não mudar quem é atípico. Regra única: `indicadores.e_recorrente`.

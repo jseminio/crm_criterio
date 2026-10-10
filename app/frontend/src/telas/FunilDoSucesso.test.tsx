@@ -103,7 +103,7 @@ describe("Funil do Sucesso do Cliente por classe (03/10/2026)", () => {
     const linhaB = within(quadro).getByRole("button", { name: /B · trimestral/ }).closest("tr")!;
     // 2 clientes, MRR somado, nenhum em dia, 2 vencidas; mensal e projeto separados
     expect(Array.from(linhaB.querySelectorAll("td")).map((td) => td.textContent?.replace(/\s/g, " "))).toEqual([
-      "B · trimestral", "2", "R$ 12.000,00", "0%", "⚠ 2", "2 · ⚠ 1 atrasado", "2R$ 4.500,00/mês+ R$ 14.000,00 em projeto",
+      "B · trimestral", "2ver (2)", "R$ 12.000,00", "0%", "⚠ 2", "2 · ⚠ 1 atrasado", "2R$ 4.500,00/mês+ R$ 14.000,00 em projeto",
     ]);
     const linhaA = within(quadro).getByRole("button", { name: /A · mensal/ }).closest("tr")!;
     expect(linhaA.querySelectorAll("td")[3]).toHaveTextContent("—"); // sem cliente em curso, sem %
@@ -116,13 +116,15 @@ describe("Funil do Sucesso do Cliente por classe (03/10/2026)", () => {
     expect(screen.queryByText("Emitir a proposta comercial")).not.toBeInTheDocument();
     const info = within(coluna("Contrato")).getByRole("button", { name: "O que se faz em Contrato" });
     fireEvent.mouseEnter(info);
-    expect(screen.getByRole("tooltip")).toHaveTextContent("Contrato · Comercial & Cliente");
-    expect(screen.getByRole("tooltip")).toHaveTextContent("Emitir a proposta comercial");
+    // A dica do ⓘ da etapa (as explicações dos números também são tooltip, escondidas até o mouse passar).
+    const dica = document.querySelector(".sucesso-dica")!;
+    expect(dica).toHaveTextContent("Contrato · Comercial & Cliente");
+    expect(dica).toHaveTextContent("Emitir a proposta comercial");
     fireEvent.mouseLeave(info);
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(document.querySelector(".sucesso-dica")).toBeNull();
     // no clique (celular), fica aberta até clicar de novo
     await userEvent.click(within(coluna("Semestral")).getByRole("button", { name: "O que se faz em Semestral" }));
-    expect(screen.getByRole("tooltip")).toHaveTextContent("Estratégia e desafios");
+    expect(document.querySelector(".sucesso-dica")).toHaveTextContent("Estratégia e desafios");
   });
 
   it("em curso, vencidas no topo com ⚠ e texto", async () => {
@@ -149,7 +151,7 @@ describe("Funil do Sucesso do Cliente por classe (03/10/2026)", () => {
     const intencao = screen.getByRole("region", { name: "Intenção da classe B" });
     expect(intencao).toHaveTextContent("Classe B · reunião trimestral · intenção");
     expect(intencao).toHaveTextContent("Subir para A");
-    expect(intencao).toHaveTextContent("2 clientes · R$ 12.000,00 bruto · 0% das reuniões em dia · ⚠ 2 vencidas");
+    expect(intencao).toHaveTextContent(/2 clientes.*ver \(2\) · R\$ 12\.000,00 bruto · 0% das reuniões em dia · ⚠ 2 vencidas/);
     expect(screen.getAllByRole("region").filter((r) => r.classList.contains("coluna")).map((r) => r.getAttribute("aria-label")))
       .toEqual(["Contrato", "Handover", "Kickoff", "Trimestral"]);
     expect(screen.queryByText("Grupo Novo")).not.toBeInTheDocument(); // sem classe ainda, fica no consolidado

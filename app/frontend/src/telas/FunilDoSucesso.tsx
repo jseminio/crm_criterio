@@ -16,6 +16,7 @@ import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { usarAcesso } from "../entrada";
 import { data, dinheiro, dinheiroCurto } from "../formato";
 import { usarDados } from "../usarDados";
+import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
 import { PainelDaCarteira } from "./PainelDaCarteira";
 import { PainelDoGrupo } from "./PainelDoGrupo";
 
@@ -286,6 +287,40 @@ function numerosDe(grupos: Grupo[]): Numeros {
   };
 }
 
+const SITUACAO_DA_REUNIAO: Record<string, string> = { em_dia: "em dia", atrasada: "⚠ vencida", sem_classe: "sem classe" };
+
+/** Os grupos que compõem uma linha do quadro (10/10/2026): cada número da linha, cliente a cliente. */
+function GruposDaClasse({ grupos }: { grupos: Grupo[] }) {
+  const n = numerosDe(grupos);
+  const ordenados = [...grupos].sort((a, b) => Number(b.mrr_bruto) - Number(a.mrr_bruto));
+  return (
+    <table className="tabela" aria-label="Grupos da classe">
+      <thead><tr><th>Cliente</th><th>Etapa</th><th>Reunião</th><th className="tabela-numero">MRR bruto</th>
+        <th className="tabela-numero">Ajustes pendentes</th><th className="tabela-numero">Vendas abertas</th></tr></thead>
+      <tbody>
+        {ordenados.map((g) => (
+          <tr key={g.grupo_id}><td>{g.nome}</td><td>{g.etapa}</td><td>{g.situacao ? SITUACAO_DA_REUNIAO[g.situacao] : "—"}</td>
+            <td className="tabela-numero">{dinheiro(g.mrr_bruto)}</td>
+            <td className="tabela-numero">{g.ajustes_pendentes}{g.ajustes_atrasados ? ` (⚠ ${g.ajustes_atrasados})` : ""}</td>
+            <td className="tabela-numero">{g.vendas_abertas}</td></tr>
+        ))}
+        <tr className="composicao-total"><td>Total · {n.clientes}</td><td /><td>{emDia(n)} em dia</td>
+          <td className="tabela-numero">{dinheiro(n.mrr)}</td><td className="tabela-numero">{n.ajustes}</td>
+          <td className="tabela-numero">{n.vendas}</td></tr>
+      </tbody>
+    </table>
+  );
+}
+
+const EXPLICACAO_DO_QUADRO: Record<string, string> = {
+  Clientes: "Grupos com contrato desta classe no Funil do Sucesso.",
+  "MRR bruto": "Soma do MRR em bruto (× 13 ÷ 12) dos contratos ativos dos grupos da classe.",
+  "Reuniões em dia": "Dos clientes em curso, quantos não têm reunião de resultado vencida pela cadência da classe.",
+  Vencidas: "Clientes em curso com reunião de resultado vencida.",
+  "Ajustes pendentes": "Ajustes da área técnica ainda abertos; entre parênteses, os com prazo vencido.",
+  "Vendas abertas": "Oportunidades abertas no Funil comercial a partir das reuniões e ainda não decididas.",
+};
+
 const emDia = (n: Numeros) => (n.emCurso ? `${Math.round((n.emDia / n.emCurso) * 100)}%` : "—");
 const textoDosAjustes = (n: Numeros) =>
   `${n.ajustes}${n.ajustesAtrasados ? ` · ⚠ ${n.ajustesAtrasados} atrasado${n.ajustesAtrasados === 1 ? "" : "s"}` : ""}`;
@@ -297,8 +332,8 @@ function QuadroDasClasses({ f, aoEscolher }: { f: Funil; aoEscolher: (c: Recorte
         <table className="quadro">
           <thead>
             <tr>
-              <th scope="col">Classe</th><th scope="col">Clientes</th><th scope="col">MRR bruto</th><th scope="col">Reuniões em dia</th>
-              <th scope="col">Vencidas</th><th scope="col">Ajustes pendentes</th><th scope="col">Vendas abertas</th>
+              <th scope="col">Classe</th>
+              {Object.entries(EXPLICACAO_DO_QUADRO).map(([t, x]) => <th key={t} scope="col"><Explicavel texto={x}>{t}</Explicavel></th>)}
             </tr>
           </thead>
           <tbody>
@@ -312,7 +347,15 @@ function QuadroDasClasses({ f, aoEscolher }: { f: Funil; aoEscolher: (c: Recorte
                       <strong>{c}</strong> · {reuniao}
                     </button>
                   </td>
-                  <td>{n.clientes}</td>
+                  <td>
+                    {n.clientes}
+                    {n.clientes > 0 && (
+                      <BotaoDeComposicao rotulo="ver" composicao={{
+                        titulo: `Classe ${c}`, subtitulo: "Os clientes que compõem os números da linha", quantos: n.clientes,
+                        conteudo: () => <GruposDaClasse grupos={f.grupos.filter((g) => g.classe === c)} />,
+                      }} />
+                    )}
+                  </td>
                   <td>{dinheiro(n.mrr)}</td>
                   <td>{emDia(n)}</td>
                   <td className={n.vencidas ? "cartao-prazo-atrasado" : undefined}>{n.vencidas ? `⚠ ${n.vencidas}` : "0"}</td>
@@ -365,7 +408,16 @@ function Intencao({ f, classe, grupos }: { f: Funil; classe: string; grupos: Gru
         {pode("configuracoes.metas") && <span className="campo-ajuda"> · muda em Configurações › Metas</span>}
       </p>
       <p className="campo-ajuda" style={{ margin: 0 }}>
-        {plural(n.clientes, "cliente", "clientes")} · {dinheiro(n.mrr)} bruto · {emDia(n)} das reuniões em dia
+        <Explicavel texto="Os números da classe: clientes, MRR em bruto dos contratos ativos, reuniões de resultado em dia pela cadência, ajustes da área técnica e vendas abertas pelas reuniões.">
+          {plural(n.clientes, "cliente", "clientes")}
+        </Explicavel>
+        {n.clientes > 0 && (
+          <BotaoDeComposicao rotulo="ver" composicao={{
+            titulo: `Classe ${classe}`, subtitulo: "Os clientes que compõem os números", quantos: n.clientes,
+            conteudo: () => <GruposDaClasse grupos={grupos} />,
+          }} />
+        )}
+        {" · "}{dinheiro(n.mrr)} bruto · {emDia(n)} das reuniões em dia
         {n.vencidas > 0 && <span className="cartao-prazo-atrasado"> · ⚠ {plural(n.vencidas, "vencida", "vencidas")}</span>}
         {" · "}{plural(n.ajustes, "ajuste pendente", "ajustes pendentes")}
         {n.ajustesAtrasados > 0 && ` (⚠ ${n.ajustesAtrasados} atrasado${n.ajustesAtrasados === 1 ? "" : "s"})`}

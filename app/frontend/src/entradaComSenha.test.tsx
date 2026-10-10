@@ -69,7 +69,7 @@ describe("entrada com e-mail e senha", () => {
   it("modo senha mostra o formulário, com foco no e-mail, sem perguntar quem é", async () => {
     montar();
     const email = await screen.findByLabelText("E-mail");
-    expect(email).toHaveFocus();
+    await waitFor(() => expect(email).toHaveFocus()); // o foco vem num efeito, depois de montar
     expect(screen.getByLabelText("Senha")).toHaveAttribute("type", "password");
     expect(screen.getByRole("button", { name: "Entrar" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Microsoft/ })).toBeNull();

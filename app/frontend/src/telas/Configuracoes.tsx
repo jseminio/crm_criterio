@@ -17,6 +17,7 @@ import { MetasDosIndicadores } from "../componentes/MetasDosIndicadores";
 import { MatrizesDeProposta } from "../componentes/MatrizesDeProposta";
 import { PerfisEAcesso } from "../componentes/PerfisEAcesso";
 import { usarAcesso } from "../entrada";
+import { MigrarDoCrmLocal } from "../componentes/MigrarDoCrmLocal";
 import { Conferencia } from "./Conferencia";
 import { Grupos } from "./Grupos";
 import { useState } from "react";
@@ -139,7 +140,7 @@ function abaGuardada(): Aba | null {
 }
 
 export function Configuracoes({ listas = null }: { listas?: Listas | null }) {
-  const { pode } = usarAcesso();
+  const { pode, eu } = usarAcesso();
   const visiveis = ABAS.filter((a) => a.permissao === null || pode(a.permissao));
   const [escolhida, definirEscolhida] = useState<Aba | null>(abaGuardada);
   const aba = visiveis.some((a) => a.chave === escolhida) ? escolhida! : visiveis[0].chave;
@@ -212,6 +213,7 @@ export function Configuracoes({ listas = null }: { listas?: Listas | null }) {
       {aba === "historico" && <HistoricoDeAlteracoes />}
       {aba === "backup" && (
       <>
+      {eu.administrador && <MigrarDoCrmLocal />}
       <section className="numero">
         <h3 className="numero-rotulo">Exportar</h3>
         <p>

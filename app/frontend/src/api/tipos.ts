@@ -2211,3 +2211,15 @@ export interface ItemDoPainelDoSdr {
   /** Minutos, nota ou confiança, conforme o número. */
   valor: number | null;
 }
+
+/** Prévia de "Migrar do CRM local" (10/10/2026): nada é gravado. */
+export interface PreviaDaMigracao {
+  criado_em: string;
+  revisao_do_arquivo: string | null;
+  revisao_da_nuvem: string | null;
+  pode_migrar: boolean;
+  motivo: string | null;
+  registros_que_entram: number;
+  registros_que_saem: number;
+  linhas: { tabela: string; no_arquivo: number; na_nuvem: number; acao: "substitui" | "preserva" }[];
+}

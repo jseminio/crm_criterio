@@ -174,6 +174,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET|PUT", r"/api/metas", ("configuracoes.metas",)),
     # backup
     ("GET|POST", r"/api/backup/(exportar|importar|verificar)", ("configuracoes.backup",)),
+    # migrar do CRM local para a nuvem (10/10/2026): só o Administrador — a rota confere
+    ("POST", r"/api/migracao/(previa|migrar)", ("configuracoes.backup",)),
 )
 _COMPILADAS = [(set(m.split("|")), re.compile(p + r"/?"), ps) for m, p, ps in ROTAS]
 

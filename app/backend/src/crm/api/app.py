@@ -14,6 +14,8 @@ duas, a API segue sem login**, como antes do E1: só na máquina do CRM, escutan
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import asyncio
 import contextlib
 from contextlib import asynccontextmanager
@@ -50,7 +52,7 @@ from crm.api.base_de_conhecimento import roteador_da_base
 from crm.api.sucesso import ServicosDaAta, roteador_do_sucesso, servicos_da_ata_reais
 from crm.domain.alcada import motivo_da_alcada
 from crm.api.abordagens import Servicos, roteador_de_abordagens, servicos_reais
-from crm.api.backup import roteador as roteador_de_backup
+from crm.api.backup import roteador as roteador_de_backup, roteador_da_migracao
 from crm.api.classificacao import ServicosDeAnalise, parametros_vigentes, roteador as roteador_de_carteira, servicos_de_analise_reais
 from crm.api.contatos import roteador as roteador_de_contatos
 from crm.api.contatos import roteador_de_empresas
@@ -283,6 +285,12 @@ def criar_app(
     )
     _registrar(api)
     api.include_router(roteador_de_backup(lambda: _fabrica.kw["bind"]))
+    # Migrar do CRM local para a nuvem (10/10/2026): o backup de antes vai para o volume de backups do servidor
+    # (/app/backups) ou, fora dele, para ~/Backups-CRM.
+    api.include_router(roteador_da_migracao(
+        lambda: _fabrica.kw["bind"],
+        lambda: Path("/app/backups") if Path("/app/backups").is_dir() else Path.home() / "Backups-CRM",
+    ))
     api.include_router(
         roteador_de_abordagens(obter_sessao, lambda: _fabrica, servicos or servicos_reais)
     )

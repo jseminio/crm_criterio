@@ -20,6 +20,7 @@ import type {
   MrrDaCarteira,
   IndicadorDoFunil,
   ItemDoRealizado,
+  PreviaDaMigracao,
   ItemDoPainelDoSdr,
   LinhaDaFase,
   ItemDaComposicao,
@@ -409,6 +410,9 @@ export const api = {
     pedir<Alteracao[]>(comParametros("/api/historico", filtros)),
 
   verificarBackup: (arquivo: File) => enviarArquivo("/api/backup/verificar", arquivo),
+  previaDaMigracao: (arquivo: File) => enviarArquivo<PreviaDaMigracao>("/api/migracao/previa", arquivo),
+  migrarDoCrmLocal: (arquivo: File) =>
+    enviarArquivo<{ registros: number; backup_de_antes: string }>("/api/migracao/migrar", arquivo, { "x-confirmacao": "MIGRAR" }),
 
   importarBackup: (arquivo: File, substituir: boolean) =>
     enviarArquivo(

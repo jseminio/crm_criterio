@@ -84,3 +84,16 @@ def test_follow_up_da_agenda_conta_do_envio(cliente, ids):
     itens = cliente.get("/api/agenda").json()["itens"]
     item = next(i for i in itens if i["tipo"] == "oportunidade" and i["id"] == ids["nova"])
     assert item["dias_desde_o_envio"] == 3  # e não 20, da originação
+
+
+def test_roda_com_recusada_ainda_no_banco(engine, ids):
+    """Roda antes de `2026_10_10_perdida_e_motivos`: com "Recusada" no banco, o ORM não leria as linhas."""
+    import sqlalchemy as sa
+
+    with Session(engine) as s:
+        s.execute(sa.text("UPDATE oportunidade SET situacao = 'Recusada' WHERE id = :i"), {"i": ids["planilha"]})
+        s.commit()
+        assert "1 da planilha" in data_de_envio_da_proposta.executar(s)
+        s.commit()
+        assert s.execute(sa.text("SELECT data_envio_proposta FROM oportunidade WHERE id = :i"),
+                         {"i": ids["planilha"]}).scalar() in (date(2026, 5, 4), "2026-05-04")

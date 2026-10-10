@@ -285,6 +285,29 @@ def test_as_quatro_fases_do_mes_com_premissas_de_taxa(cliente, novembro):
     assert por["conversao"]["situacao"]["chave"] == "abaixo"
 
 
+def test_cada_numero_das_fases_tem_explicacao_e_a_lista_bate(cliente, novembro):
+    """Padrão dos indicadores (10/10/2026): explicação ao passar o mouse e a lista que compõe o número."""
+    params = {"mes": "2026-11-01", "hoje": "2026-11-20"}
+    f = cliente.get("/api/inteligencia/fases", headers=KARINE, params=params).json()
+    lista = lambda chave: cliente.get("/api/inteligencia/fases/composicao", headers=KARINE,
+                                      params={**params, "chave": chave}).json()
+    for e in f["cadeia"]:
+        assert e["explicacao"]
+        itens = lista(e["chave"])
+        if e["chave"] == "mrr_novo":
+            assert sum(D(i["valor"]) for i in itens) == D(e["realizado"])
+        else:
+            assert len(itens) == D(e["realizado"]), e["chave"]
+    todos = [x["kpi"] for x in f["fases"]] + [a for x in f["fases"] for a in x["apoio"]]
+    assert all(k["chave"] and k["explicacao"] for k in todos)
+    pct = lista("pct_icp")
+    assert len(pct) == 3 and sum(i["entra"] for i in pct) == 2 and any("fora do ICP" in i["detalhe"] for i in pct)
+    assert len(lista("indicacoes")) == 1
+    conv = lista("conversao")
+    assert (len(conv), sum(i["entra"] for i in conv)) == (2, 1)
+    assert cliente.get("/api/inteligencia/fases/composicao", headers=KARINE, params={**params, "chave": "xyz"}).status_code == 404
+
+
 def test_mes_fora_da_projecao_mostra_so_o_realizado(cliente):
     f = cliente.get("/api/inteligencia/fases", headers=KARINE, params={"mes": "2026-10-01", "hoje": "2026-10-04"}).json()
     assert not f["tem_previsto"] and f["aviso"]

@@ -8,7 +8,8 @@ import { InteligenciaDeConversao } from "./InteligenciaDeConversao";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { planoDeMrr: vi.fn(), mudarPlanoDeMrr: vi.fn(), cenariosPorServico: vi.fn(), fasesDoMes: vi.fn(), kpisDaLideranca: vi.fn() } };
+  return { ...real, api: { planoDeMrr: vi.fn(), mudarPlanoDeMrr: vi.fn(), cenariosPorServico: vi.fn(), fasesDoMes: vi.fn(), kpisDaLideranca: vi.fn(),
+    composicaoDaFase: vi.fn(), realizadoDoPlano: vi.fn() } };
 });
 
 const cenario = (bpo: string) => ({ bpo_por_mes: bpo, ticket_contabil: "2903.28", com_contratos_previstos: true });
@@ -67,7 +68,7 @@ const FASES: FasesDoMes = {
   gargalo: "reunioes",
   gargalo_texto: "Gargalo: reuniões, com 70,8% do previsto no mês.",
   fases: [
-    { chave: "atracao", titulo: "Atração", pergunta: "Trazemos gente certa em volume?", kpi: indicador("Leads no ICP no mês", "numero", "60.0", "54"),
+    { chave: "atracao", titulo: "Atração", pergunta: "Trazemos gente certa em volume?", kpi: { ...indicador("Leads no ICP no mês", "numero", "60.0", "54"), chave: "leads_icp", explicacao: "Leads criados no mês, menos os fora do ICP." },
       apoio: [indicador("% dos leads dentro do ICP", "pct", "55", "46")], situacao: { chave: "atencao", percentual: "90.0" },
       ajuste: "Faltaram 6 leads no ICP para o previsto do mês." },
     { chave: "engajamento", titulo: "Engajamento", pergunta: "A promessa bate com o 1º contato?",
@@ -94,6 +95,19 @@ describe("Funil › Inteligência de Conversão", () => {
     vi.mocked(api.cenariosPorServico).mockResolvedValue([]);
     vi.mocked(api.fasesDoMes).mockResolvedValue(FASES);
     vi.mocked(api.kpisDaLideranca).mockResolvedValue({ mes: "2026-10", de: "2026-10-01", ate: "2026-10-09", kpis: [] });
+  });
+
+  it("quatro fases: explicação ao passar o mouse e 'ver' com a lista que compõe o número (10/10/2026)", async () => {
+    vi.mocked(api.composicaoDaFase).mockResolvedValue([
+      { titulo: "Clínica Sorriso", detalhe: "Google", data: "2026-11-03", valor: null, entra: true },
+    ]);
+    render(<InteligenciaDeConversao />);
+    const janela = await screen.findByText("Leads criados no mês, menos os fora do ICP.");
+    expect(janela).toHaveAttribute("role", "tooltip");
+    fireEvent.click(screen.getByRole("button", { name: "Ver composição: Leads no ICP no mês" }));
+    const painel = await screen.findByRole("dialog", { name: "Leads no ICP no mês" });
+    expect(await within(painel).findByText("Clínica Sorriso")).toBeInTheDocument();
+    expect(api.composicaoDaFase).toHaveBeenCalledWith("2026-11-01", "leads_icp");
   });
 
   it("os KPIs da liderança aparecem só para o Administrador (09/10/2026)", async () => {

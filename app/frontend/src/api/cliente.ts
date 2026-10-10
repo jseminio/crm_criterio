@@ -20,6 +20,7 @@ import type {
   MrrDaCarteira,
   IndicadorDoFunil,
   ItemDoRealizado,
+  LinhaDaFase,
   ItemDaComposicao,
   ItemDoMovimento,
   PreviaDeRecebimentos,
@@ -547,6 +548,8 @@ export const api = {
     pedir<PlanoDeMrr>("/api/inteligencia/plano", { method: "PUT", body: JSON.stringify(premissas) }),
   cenariosPorServico: () => pedir<CenariosDoServico[]>("/api/inteligencia/cenarios-de-ticket"),
   fasesDoMes: (mes?: string) => pedir<FasesDoMes>(comParametros("/api/inteligencia/fases", { mes })),
+  composicaoDaFase: (mes: string, chave: string) =>
+    pedir<LinhaDaFase[]>(comParametros("/api/inteligencia/fases/composicao", { mes, chave })),
 
   oportunidades: (filtros: FiltrosDoFunil & { situacao?: string[]; grupo_id?: number } = {}) =>
     pedir<Pagina<OportunidadeResumo>>(

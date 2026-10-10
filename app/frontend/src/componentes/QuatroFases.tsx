@@ -1,14 +1,69 @@
 /** Inteligência de Conversão › as quatro fases do cliente (amostra aprovada por Eduardo em 03/10/2026,
  * construída em 04/10/2026): a cadeia do funil no mês com o gargalo, e um cartão por fase — Atração,
  * Engajamento, Conversão e Pós-venda — com o KPI principal, os de apoio (previsto × realizado) e o
- * ajuste. O ajuste é regra fixa do servidor, não sugestão de IA. Situação sempre com palavra e sinal. */
+ * ajuste. O ajuste é regra fixa do servidor, não sugestão de IA. Situação sempre com palavra e sinal.
+ * Desde 10/10/2026, cada número tem a explicação ao passar o mouse e "ver" com a lista que o compõe. */
 
 import { useState } from "react";
 import { api } from "../api/cliente";
-import type { ChaveDaSituacao, EtapaDaCadeia, FaseDoCliente, FasesDoMes, IndicadorDaFase, SituacaoDoPlano } from "../api/tipos";
-import { dinheiro, dinheiroCurto, percentual } from "../formato";
+import type { ChaveDaSituacao, EtapaDaCadeia, FaseDoCliente, FasesDoMes, IndicadorDaFase, LinhaDaFase, SituacaoDoPlano } from "../api/tipos";
+import { data, dinheiro, dinheiroCurto, percentual } from "../formato";
 import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
+import { BotaoDeComposicao, Explicavel } from "./Indicador";
+
+/** A lista que compõe um número das fases (10/10/2026): o que entra na conta primeiro, a base à parte. */
+function ComposicaoDaFase({ mes, chave, unidade }: { mes: string; chave: string; unidade: IndicadorDaFase["unidade"] }) {
+  const { dados, carregando, erro, recarregar } = usarDados<LinhaDaFase[]>(() => api.composicaoDaFase(mes, chave), [mes, chave]);
+  if (carregando && !dados) return <Carregando rotulo="Buscando a lista" />;
+  if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
+  if (!dados || dados.length === 0) return <p className="numero-estado">Nada nesta conta no mês.</p>;
+  const comValor = dados.some((l) => l.valor !== null);
+  const emReais = unidade === "reais" || chave === "mrr_novo" || chave === "contratos" || chave === "propostas"
+    || chave === "nrr" || chave === "upgrades";
+  const mostrar = (v: string | null) => (v === null ? "—" : emReais ? dinheiro(v) : Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 }));
+  const entram = dados.filter((l) => l.entra);
+  const fora = dados.filter((l) => !l.entra);
+  const tabela = (linhas: LinhaDaFase[], rotulo: string, total: boolean) => (
+    <table className="tabela" aria-label={rotulo}>
+      <thead><tr><th>Item</th><th>Detalhe</th><th>Data</th>{comValor && <th className="tabela-numero">Valor</th>}</tr></thead>
+      <tbody>
+        {linhas.map((l, i) => (
+          <tr key={i}><td>{l.titulo}</td><td>{l.detalhe ?? "—"}</td><td>{data(l.data)}</td>
+            {comValor && <td className="tabela-numero">{mostrar(l.valor)}</td>}</tr>
+        ))}
+        {total && comValor && emReais && (
+          <tr className="composicao-total"><td>Total</td><td /><td />
+            <td className="tabela-numero">{dinheiro(linhas.reduce((t, l) => t + Number(l.valor ?? 0), 0))}</td></tr>
+        )}
+      </tbody>
+    </table>
+  );
+  return (
+    <>
+      <p className="composicao-linha-resumo"><strong>{entram.length}</strong> na conta{fora.length > 0 && ` · ${fora.length} fora (a base)`}</p>
+      {entram.length > 0 && tabela(entram, "Entram na conta", true)}
+      {fora.length > 0 && (<><h3 className="numero-rotulo">Ficaram fora da conta ({fora.length})</h3>{tabela(fora, "Ficaram fora", false)}</>)}
+    </>
+  );
+}
+
+/** Rótulo com a explicação ao passar o mouse e o botão da composição, no padrão dos indicadores. */
+function RotuloDoNumero({ rotulo, explicacao, chave, mes, unidade, quantos }: {
+  rotulo: string; explicacao?: string; chave?: string; mes: string; unidade: IndicadorDaFase["unidade"]; quantos?: number;
+}) {
+  return (
+    <>
+      {explicacao ? <Explicavel texto={explicacao}>{rotulo}</Explicavel> : rotulo}
+      {chave && (
+        <BotaoDeComposicao rotulo="ver" composicao={{
+          titulo: rotulo, subtitulo: `Mês de ${mesCurto(mes)}`, quantos,
+          conteudo: () => <ComposicaoDaFase mes={mes} chave={chave} unidade={unidade} />,
+        }} />
+      )}
+    </>
+  );
+}
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const mesCurto = (iso: string) => `${MESES[Number(iso.slice(5, 7)) - 1]}/${iso.slice(0, 4)}`;
@@ -56,13 +111,18 @@ function Barra({ previsto, realizado, tom }: { previsto: string | null; realizad
   );
 }
 
-function Cadeia({ etapas, gargalo }: { etapas: EtapaDaCadeia[]; gargalo: string | null }) {
+function Cadeia({ etapas, gargalo, mes }: { etapas: EtapaDaCadeia[]; gargalo: string | null; mes: string }) {
   return (
     <ol className="cadeia" aria-label="Cadeia do funil no mês, realizado sobre previsto">
       {etapas.map((e, i) => (
         <li key={e.chave} className="cadeia-passo">
           <div className={`cadeia-etapa${e.chave === "mrr_novo" ? " cadeia-mrr" : ""}${e.chave === gargalo ? " cadeia-gargalo" : ""}`}>
-            <span className="cadeia-rotulo">{e.rotulo}{e.chave === gargalo && " · gargalo"}</span>
+            <span className="cadeia-rotulo">
+              <RotuloDoNumero rotulo={e.rotulo} explicacao={e.explicacao} chave={e.realizado !== null ? e.chave : undefined} mes={mes}
+                unidade={e.chave === "mrr_novo" ? "reais" : "numero"}
+                quantos={e.chave !== "mrr_novo" && e.realizado !== null ? Number(e.realizado) : undefined} />
+              {e.chave === gargalo && " · gargalo"}
+            </span>
             <span className="cadeia-valor">
               {e.chave === "mrr_novo" ? dinheiroCurto(e.realizado) : valor(e.realizado, "numero")}
               <span className="cadeia-previsto"> / {e.chave === "mrr_novo" ? dinheiroCurto(e.previsto) : valor(e.previsto, "numero")}</span>
@@ -80,7 +140,7 @@ function Cadeia({ etapas, gargalo }: { etapas: EtapaDaCadeia[]; gargalo: string 
   );
 }
 
-function Cartao({ fase, gargalo }: { fase: FaseDoCliente; gargalo: boolean }) {
+function Cartao({ fase, gargalo, mes }: { fase: FaseDoCliente; gargalo: boolean; mes: string }) {
   const tom = fase.situacao ? SITUACAO[fase.situacao.chave].tom : "neutra";
   const k = fase.kpi;
   return (
@@ -93,7 +153,9 @@ function Cartao({ fase, gargalo }: { fase: FaseDoCliente; gargalo: boolean }) {
         <Etiqueta situacao={fase.situacao} gargalo={gargalo} />
       </header>
       <div>
-        <p className="fase-kpi-rotulo">{k.rotulo}</p>
+        <p className="fase-kpi-rotulo">
+          <RotuloDoNumero rotulo={k.rotulo} explicacao={k.explicacao} chave={k.realizado !== null ? k.chave : undefined} mes={mes} unidade={k.unidade} />
+        </p>
         {k.realizado === null && k.previsto === null ? (
           <p className="fase-kpi-pendente">{k.nota ?? "Sem dado no mês"}</p>
         ) : (
@@ -111,7 +173,10 @@ function Cartao({ fase, gargalo }: { fase: FaseDoCliente; gargalo: boolean }) {
         <tbody>
           {fase.apoio.map((a) => (
             <tr key={a.rotulo}>
-              <td>{a.rotulo}{a.nota && <span className="fase-nota"> · {a.nota}</span>}</td>
+              <td>
+                <RotuloDoNumero rotulo={a.rotulo} explicacao={a.explicacao} chave={a.realizado !== null ? a.chave : undefined} mes={mes} unidade={a.unidade} />
+                {a.nota && <span className="fase-nota"> · {a.nota}</span>}
+              </td>
               <td className="tabela-numero">{valor(a.previsto, a.unidade)}</td>
               <td className="tabela-numero">{valor(a.realizado, a.unidade)}</td>
             </tr>
@@ -147,14 +212,14 @@ export function QuatroFases() {
         </label>
       </div>
       {dados.aviso && <p className="campo-ajuda" role="note">{dados.aviso}</p>}
-      <Cadeia etapas={dados.cadeia} gargalo={dados.gargalo} />
+      <Cadeia etapas={dados.cadeia} gargalo={dados.gargalo} mes={dados.mes} />
       {dados.gargalo_texto && <p className="cadeia-gargalo-texto"><span aria-hidden="true">◎ </span>{dados.gargalo_texto}</p>}
       <p className="campo-ajuda">
         Taxas do previsto: {Object.entries(dados.taxas).map(([k, t]) =>
           `${NOME_DA_TAXA[k] ?? k} ${t.valor !== null ? percentual(t.valor) : "—"} (${ORIGEM[t.origem]})`).join(" · ")}.
       </p>
       <div className="fases">
-        {dados.fases.map((f) => <Cartao key={f.chave} fase={f} gargalo={f.chave === faseGargalo} />)}
+        {dados.fases.map((f) => <Cartao key={f.chave} fase={f} gargalo={f.chave === faseGargalo} mes={dados.mes} />)}
       </div>
     </section>
   );

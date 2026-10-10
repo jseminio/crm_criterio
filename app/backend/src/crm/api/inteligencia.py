@@ -467,6 +467,13 @@ def roteador_de_inteligencia(obter_sessao: Callable[[], Iterator[Session]]) -> A
         lista.sort(key=lambda x: (-x.contratos_recorrentes, x.servico))
         return lista
 
+    @r.get("/api/inteligencia/fases/composicao", response_model=list[LinhaDaFase])
+    def composicao_da_fase(chave: str, sessao: Session = Depends(obter_sessao, scope="function"), mes: date | None = None,
+                           hoje: date | None = None) -> list[LinhaDaFase]:
+        """A lista que compõe um número das quatro fases no mês (10/10/2026), da mesma conta."""
+        dia = hoje or date.today()
+        return composicao_das_fases(sessao, mes or dia, dia, chave)
+
     @r.get("/api/inteligencia/fases", response_model=FasesResposta)
     def ver_fases(sessao: Session = Depends(obter_sessao, scope="function"), mes: date | None = None, hoje: date | None = None) -> FasesResposta:
         """As quatro fases do cliente no mês (padrão: o corrente): cadeia, gargalo, KPIs e ajuste."""
@@ -497,6 +504,21 @@ class IndicadorDaFase(BaseModel):
     previsto: Decimal | None
     realizado: Decimal | None
     nota: str | None = None
+    chave: str = ""
+    """Abre a composição em `/api/inteligencia/fases/composicao` (10/10/2026); vazio = sem lista."""
+    explicacao: str = ""
+    """Como o número é calculado: aparece ao passar o mouse."""
+
+
+class LinhaDaFase(BaseModel):
+    """Um item que compõe um número das quatro fases (10/10/2026)."""
+
+    titulo: str
+    detalhe: str | None = None
+    data: date | None = None
+    valor: Decimal | None = None
+    entra: bool = True
+    """Conta no numerador; fora: a base de uma taxa (ex.: lead fora do ICP)."""
 
 
 class FaseResposta(BaseModel):
@@ -517,6 +539,7 @@ class EtapaDaCadeia(BaseModel):
     taxa_prevista: Decimal | None
     """Para a etapa seguinte, em %."""
     taxa_realizada: Decimal | None
+    explicacao: str = ""
 
 
 class FasesResposta(BaseModel):
@@ -550,6 +573,23 @@ def _texto_num(v: Decimal) -> str:
 
 
 def montar_fases(sessao: Session, mes: date, hoje: date) -> FasesResposta:
+    return _montar_fases(sessao, mes, hoje)[0]
+
+
+def composicao_das_fases(sessao: Session, mes: date, hoje: date, chave: str) -> list[LinhaDaFase]:
+    """A lista que compõe um número das quatro fases: sai da mesma conta de `montar_fases`."""
+    comp = _montar_fases(sessao, mes, hoje)[1]
+    if chave not in comp:
+        raise HTTPException(404, f"sem composição para “{chave}”")
+    return comp[chave]
+
+
+def _lead(l) -> str:
+    return l.empresa_texto or l.nome
+
+
+def _montar_fases(sessao: Session, mes: date, hoje: date) -> tuple[FasesResposta, dict[str, list[LinhaDaFase]]]:
+    comp: dict[str, list[LinhaDaFase]] = {}
     p, _ = premissas_vigentes(sessao)
     mes = mes.replace(day=1)
     ini = mes
@@ -614,13 +654,40 @@ def montar_fases(sessao: Session, mes: date, hoje: date) -> FasesResposta:
         "mrr_novo": (lr.novo_contabil + lr.novo_bpo + lr.escada) if lr else None,
     }
     taxas_prev_seq = [taxas["lead_reuniao"].valor, taxas["reuniao_proposta"].valor, taxas["conversao"].valor, None, None]
+    # Composição da cadeia (10/10/2026): o que soma em cada etapa, da mesma conta.
+    novos_do_mes = [c for m in (regras.MOTOR_BPO, regras.MOTOR_CONTABIL) for c in por_motor[m]
+                    if dentro(c.data_inicio, ini, fim) and getattr(c.situacao, "name", "") != "AGUARDANDO_ASSINATURA"] if passou else []
+    nome_do_grupo = dict(sessao.execute(sa.select(GrupoEconomico.id, GrupoEconomico.nome)).all())
+    escopo = {c.id: c.escopo for c in registrados}
+    comp["leads_icp"] = [LinhaDaFase(titulo=_lead(l), detalhe=l.canal or (l.tipo_canal.value if l.tipo_canal else None),
+                                     data=_dia_local(l.criado_em)) for l in icp_mes]
+    comp["reunioes"] = [LinhaDaFase(titulo=_lead(l), detalhe="reunião marcada", data=_dia_local(l.reuniao_marcada_para))
+                        for l in reunioes_mes]
+    comp["propostas"] = [LinhaDaFase(titulo=o.nome, detalhe=o.situacao.value, data=o.data_colocacao, valor=o.preco_mensal)
+                         for o in propostas_mes]
+    comp["contratos"] = [LinhaDaFase(titulo=nome_do_grupo.get(c.grupo_id, "?"), detalhe=escopo.get(c.id), data=c.data_inicio,
+                                     valor=c.preco_mensal) for c in novos_do_mes]
+    comp["mrr_novo"] = [
+        LinhaDaFase(titulo=nome_do_grupo.get(i.grupo_id, "?"),
+                    detalhe=f"{escopo.get(i.contrato_id) or 'contrato'} · {'escada (upgrade de BPO)' if linha == 'escada' else 'novo'}",
+                    data=i.data, valor=i.valor)
+        for linha, i in (regras.itens_do_realizado(por_motor, ini, fim) if passou else []) if linha in ("bpo", "contabil", "escada")
+    ]
+    explicacao_da_etapa = {
+        "leads_icp": "Leads criados no mês, menos os descartados por estar fora do ICP (porte, segmento, orçamento).",
+        "reunioes": "Leads com reunião marcada para o mês.",
+        "propostas": "Oportunidades com data de originação no mês.",
+        "contratos": "Contratos (BPO e contábil) com início no mês.",
+        "mrr_novo": "MRR (× 13 ÷ 12) dos contratos novos de BPO e contábeis do mês, mais a escada (expansão de BPO).",
+    }
     chaves = [c for c, _ in fases.ETAPAS]
     etapas = []
     for i, (chave, rotulo) in enumerate(fases.ETAPAS):
         prox = chaves[i + 1] if i + 1 < len(chaves) - 1 else None
         taxa_real = fases.proporcao(cadeia_real[prox], cadeia_real[chave]) if prox and cadeia_real[chave] is not None and cadeia_real[prox] is not None else None
         etapas.append(EtapaDaCadeia(chave=chave, rotulo=rotulo, previsto=cadeia_prev[chave], realizado=cadeia_real[chave],
-                                    taxa_prevista=taxas_prev_seq[i], taxa_realizada=taxa_real))
+                                    taxa_prevista=taxas_prev_seq[i], taxa_realizada=taxa_real,
+                                    explicacao=explicacao_da_etapa.get(chave, "")))
     pior = fases.gargalo([fases.Etapa(e.chave, e.rotulo, e.previsto, e.realizado) for e in etapas])
     gargalo_texto = None
     if pior is not None:
@@ -635,7 +702,15 @@ def montar_fases(sessao: Session, mes: date, hoje: date) -> FasesResposta:
     pagos = sum(1 for l in leads_mes if l.tipo_canal is TipoCanal.TRAFEGO_PAGO)
     investido = sum((i.valor for i in sessao.scalars(sa.select(InvestimentoEmMidia).where(InvestimentoEmMidia.mes == mes.strftime("%Y-%m")))), D("0"))
     cpl = (investido / pagos).quantize(D("0.01")) if passou and pagos and investido > 0 else None
-    k_atr = IndicadorDaFase(rotulo="Leads no ICP no mês", unidade="numero", previsto=cadeia_prev["leads_icp"], realizado=cadeia_real["leads_icp"])
+    k_atr = IndicadorDaFase(rotulo="Leads no ICP no mês", unidade="numero", previsto=cadeia_prev["leads_icp"], realizado=cadeia_real["leads_icp"],
+                            chave="leads_icp", explicacao=explicacao_da_etapa["leads_icp"])
+    comp["pct_icp"] = [LinhaDaFase(titulo=_lead(l), data=_dia_local(l.criado_em), entra=l.motivo_descarte not in FORA_DO_ICP,
+                                   detalhe="no ICP" if l.motivo_descarte not in FORA_DO_ICP else f"fora do ICP: {l.motivo_descarte.value}")
+                       for l in leads_mes]
+    comp["indicacoes"] = [LinhaDaFase(titulo=_lead(l), detalhe=l.tipo_canal.value, data=_dia_local(l.criado_em))
+                          for l in leads_mes if l.tipo_canal in INDICACAO] if passou else []
+    comp["cpl"] = [LinhaDaFase(titulo=_lead(l), detalhe=l.campanha or "tráfego pago", data=_dia_local(l.criado_em))
+                   for l in leads_mes if l.tipo_canal is TipoCanal.TRAFEGO_PAGO]
     if k_atr.previsto is None:
         aj_atr = "Sem previsto: o mês está fora da projeção do plano ou falta a taxa do funil (premissa ou histórico)."
     elif k_atr.realizado is not None and k_atr.realizado < k_atr.previsto:
@@ -648,10 +723,13 @@ def montar_fases(sessao: Session, mes: date, hoje: date) -> FasesResposta:
     atracao = FaseResposta(
         chave="atracao", titulo="Atração", pergunta="Trazemos gente certa em volume?", kpi=k_atr,
         apoio=[
-            IndicadorDaFase(rotulo="% dos leads dentro do ICP", unidade="pct", previsto=p.icp_alvo_pct, realizado=pct_icp),
-            IndicadorDaFase(rotulo="Leads por indicação", unidade="numero", previsto=p.indicacoes_por_mes, realizado=indicacoes),
+            IndicadorDaFase(rotulo="% dos leads dentro do ICP", unidade="pct", previsto=p.icp_alvo_pct, realizado=pct_icp,
+                            chave="pct_icp", explicacao="Leads do mês no ICP ÷ todos os leads do mês."),
+            IndicadorDaFase(rotulo="Leads por indicação", unidade="numero", previsto=p.indicacoes_por_mes, realizado=indicacoes,
+                            chave="indicacoes", explicacao="Leads do mês vindos de sócios, parceiros, advogados, carteira ou colaboradores."),
             IndicadorDaFase(rotulo="Custo por lead (tráfego pago)", unidade="reais", previsto=None, realizado=cpl,
-                            nota=None if cpl is not None else "sem investimento em mídia lançado no mês"),
+                            nota=None if cpl is not None else "sem investimento em mídia lançado no mês", chave="cpl",
+                            explicacao=f"Investimento em mídia do mês ({_reais(investido)}) ÷ leads de tráfego pago do mês."),
         ],
         situacao=sit(k_atr.realizado, k_atr.previsto), ajuste=aj_atr,
     )
@@ -677,8 +755,29 @@ def montar_fases(sessao: Session, mes: date, hoje: date) -> FasesResposta:
             + sum(1 for o in propostas_mes if o.motivo_recusa is MotivoRecusa.EXPECTATIVA)
         )
     k_eng = IndicadorDaFase(rotulo="Aderência da promessa", unidade="pct", previsto=p.aderencia_alvo_pct, realizado=aderencia,
-                            nota=None if aderencia is not None else "nenhum lead do mês com a aderência respondida")
-    apoio_lr = IndicadorDaFase(rotulo="Lead no ICP → reunião", unidade="pct", previsto=taxas["lead_reuniao"].valor, realizado=taxa_lr_real)
+                            nota=None if aderencia is not None else "nenhum lead do mês com a aderência respondida", chave="aderencia",
+                            explicacao="Leads do mês que disseram que o 1º contato bate com a promessa da peça ÷ leads com a aderência respondida.")
+    apoio_lr = IndicadorDaFase(rotulo="Lead no ICP → reunião", unidade="pct", previsto=taxas["lead_reuniao"].valor, realizado=taxa_lr_real,
+                               chave="lead_reuniao", explicacao="Reuniões marcadas para o mês ÷ leads no ICP criados no mês.")
+    comp["aderencia"] = [LinhaDaFase(titulo=_lead(l), detalhe=l.aderencia.value, data=_dia_local(l.criado_em),
+                                     entra=l.aderencia is AderenciaDaPromessa.BATE) for l in respondidos]
+    comp["aderencia_parcial"] = [LinhaDaFase(titulo=_lead(l), detalhe=l.aderencia.value, data=_dia_local(l.criado_em),
+                                             entra=l.aderencia is AderenciaDaPromessa.EM_PARTE) for l in respondidos]
+    comp["lead_reuniao"] = comp["reunioes"] + [LinhaDaFase(titulo=_lead(l), detalhe="lead no ICP sem reunião no mês",
+                                                           data=_dia_local(l.criado_em), entra=False)
+                                               for l in icp_mes if l not in reunioes_mes]
+    comp["primeiro_contato"] = []
+    for l in leads_mes:
+        contato = l.primeiro_contato_em or l.primeiro_contato_pelo_sdr
+        if contato is not None and l.criado_em is not None:
+            t0 = l.criado_em if l.criado_em.tzinfo else l.criado_em.replace(tzinfo=ZoneInfo("UTC"))
+            t1 = contato if contato.tzinfo else contato.replace(tzinfo=ZoneInfo("UTC"))
+            comp["primeiro_contato"].append(LinhaDaFase(titulo=_lead(l), detalhe="horas até o 1º contato", data=_dia_local(l.criado_em),
+                                                        valor=D(str(round(max((t1 - t0).total_seconds() / 3600, 0), 1)))))
+    comp["perdidos_expectativa"] = ([LinhaDaFase(titulo=_lead(l), detalhe="lead descartado por expectativa", data=_dia_local(l.descartado_em))
+                                     for l in leads if l.motivo_descarte is MotivoDeDescarte.EXPECTATIVA and dentro(_dia_local(l.descartado_em), ini, fim)]
+                                    + [LinhaDaFase(titulo=o.nome, detalhe="proposta perdida por expectativa", data=o.data_colocacao)
+                                       for o in propostas_mes if o.motivo_recusa is MotivoRecusa.EXPECTATIVA]) if passou else []
     partes = []
     if k_eng.previsto is not None and aderencia is not None and aderencia < k_eng.previsto:
         nao_aderentes = len(respondidos) - bate
@@ -713,10 +812,14 @@ def montar_fases(sessao: Session, mes: date, hoje: date) -> FasesResposta:
         apoio=[
             apoio_lr,
             IndicadorDaFase(rotulo="Aderência parcial (em parte)", unidade="pct", previsto=None,
-                            realizado=fases.proporcao(em_parte, len(respondidos)) if passou else None),
+                            realizado=fases.proporcao(em_parte, len(respondidos)) if passou else None, chave="aderencia_parcial",
+                            explicacao="Leads que disseram que a promessa bate só em parte ÷ leads com a aderência respondida."),
             IndicadorDaFase(rotulo="Tempo até o 1º contato (mediana)", unidade="horas", previsto=p.primeiro_contato_horas, realizado=horas,
-                            nota=None if horas is not None or not passou else "sem primeiro contato registrado no mês"),
-            IndicadorDaFase(rotulo="Perdidos por expectativa", unidade="numero", previsto=None, realizado=perdidos),
+                            nota=None if horas is not None or not passou else "sem primeiro contato registrado no mês",
+                            chave="primeiro_contato", explicacao="Mediana das horas entre a criação do lead e o 1º contato (da equipe ou do SDR)."),
+            IndicadorDaFase(rotulo="Perdidos por expectativa", unidade="numero", previsto=None, realizado=perdidos,
+                            chave="perdidos_expectativa",
+                            explicacao="Leads descartados por expectativa no mês + propostas do mês perdidas por expectativa diferente da promessa."),
         ],
         situacao=sit(k_eng.realizado, k_eng.previsto) or sit(apoio_lr.realizado, apoio_lr.previsto),
         ajuste=" ".join(partes) or "No ritmo do previsto: nenhum ajuste.",
@@ -730,7 +833,16 @@ def montar_fases(sessao: Session, mes: date, hoje: date) -> FasesResposta:
     ticket = (sum(normais, D("0")) / len(normais)).quantize(D("0.01")) if normais else None
     aceitas = [o for o in oportunidades if o.situacao.ganha and dentro(o.data_aceite, ini, fim) and o.data_colocacao] if passou else []
     ciclo = D(str(round(sum((o.data_aceite - o.data_colocacao).days for o in aceitas) / len(aceitas)))) if aceitas else None
-    k_conv = IndicadorDaFase(rotulo="Contratos no mês", unidade="numero", previsto=contratos_prev, realizado=cadeia_real["contratos"])
+    k_conv = IndicadorDaFase(rotulo="Contratos no mês", unidade="numero", previsto=contratos_prev, realizado=cadeia_real["contratos"],
+                             chave="contratos", explicacao=explicacao_da_etapa["contratos"])
+    comp["conversao"] = [LinhaDaFase(titulo=o.nome, detalhe=o.situacao.value, data=o.data_colocacao, entra=o.situacao.ganha)
+                         for o in propostas_mes if o.situacao.decidida]
+    comp["ticket_contabil"] = [LinhaDaFase(titulo=nome_do_grupo.get(c.grupo_id, "?"), data=c.data_inicio, valor=c.preco_mensal,
+                                           entra=c.preco_mensal <= 3 * p.previsto.ticket_contabil,
+                                           detalhe=None if c.preco_mensal <= 3 * p.previsto.ticket_contabil else "atípico: fora da média")
+                               for c in novos(regras.MOTOR_CONTABIL) if c.preco_mensal]
+    comp["ciclo"] = [LinhaDaFase(titulo=o.nome, detalhe="dias da originação ao aceite", data=o.data_aceite,
+                                 valor=D((o.data_aceite - o.data_colocacao).days)) for o in aceitas]
     if contratos_prev is None:
         aj_conv = "Sem previsto: o mês está fora da projeção do plano."
     elif lr is None:
@@ -754,9 +866,13 @@ def montar_fases(sessao: Session, mes: date, hoje: date) -> FasesResposta:
         chave="conversao", titulo="Conversão", pergunta="Fechamos no ritmo e no preço?", kpi=k_conv,
         apoio=[
             IndicadorDaFase(rotulo="Conversão (aceitas ÷ decididas)", unidade="pct", previsto=taxas["conversao"].valor,
-                            realizado=conversao_de(propostas_mes) if passou else None),
-            IndicadorDaFase(rotulo="Ticket contábil normal", unidade="reais", previsto=p.previsto.ticket_contabil, realizado=ticket),
-            IndicadorDaFase(rotulo="Ciclo de venda", unidade="dias", previsto=p.ciclo_alvo_dias, realizado=ciclo),
+                            realizado=conversao_de(propostas_mes) if passou else None, chave="conversao",
+                            explicacao="Das propostas originadas no mês que já têm desfecho, quantas foram aceitas."),
+            IndicadorDaFase(rotulo="Ticket contábil normal", unidade="reais", previsto=p.previsto.ticket_contabil, realizado=ticket,
+                            chave="ticket_contabil",
+                            explicacao="Média do MRR dos contratos contábeis novos do mês, sem os atípicos (acima de 3 × o ticket previsto)."),
+            IndicadorDaFase(rotulo="Ciclo de venda", unidade="dias", previsto=p.ciclo_alvo_dias, realizado=ciclo, chave="ciclo",
+                            explicacao="Média de dias da originação ao aceite das propostas aceitas no mês."),
         ],
         situacao=sit(k_conv.realizado, k_conv.previsto), ajuste=aj_conv,
     )
@@ -793,7 +909,25 @@ def montar_fases(sessao: Session, mes: date, hoje: date) -> FasesResposta:
     corrente = ini <= hoje <= fim_do_mes
     em_dia_total = sucesso.reunioes_em_dia(sessao, hoje) if corrente else None
     pct_em_dia = fases.proporcao(*em_dia_total) if em_dia_total else None
-    k_pos = IndicadorDaFase(rotulo="NRR do mês", unidade="pct", previsto=nrr_prev, realizado=nrr_real)
+    k_pos = IndicadorDaFase(rotulo="NRR do mês", unidade="pct", previsto=nrr_prev, realizado=nrr_real, chave="nrr",
+                            explicacao="(MRR no início do mês + expansão + reajuste − contração − churn) ÷ MRR no início, só com "
+                                       "contratos que já existiam no início do mês.")
+    sinal = {"expansao": 1, "reajuste": 1, "contracao": -1, "churn_cliente": -1, "churn_criterio": -1}
+    comp["nrr"] = [LinhaDaFase(titulo=nome_do_grupo.get(i.grupo_id, "?"), detalhe=f"{escopo.get(i.contrato_id) or 'contrato'} · {i.categoria}",
+                               data=i.data, valor=i.valor * sinal[i.categoria])
+                   for i in (regras_de_mrr.itens_do_movimento(em_bruto, ini, fim, so_existentes_em=ini) if passou else [])
+                   if i.categoria in sinal]
+    comp["churn"] = [LinhaDaFase(titulo=nome_do_grupo.get(i.grupo_id, "?"), detalhe=f"{escopo.get(i.contrato_id) or 'contrato'} · {i.categoria}",
+                                 data=i.data, valor=i.valor)
+                     for linha, i in (regras.itens_do_realizado(por_motor, ini, fim) if passou else []) if linha == "perdas"]
+    comp["upgrades"] = [LinhaDaFase(titulo=nome_do_grupo.get(c.grupo_id, "?"), detalhe=f"{ev.tipo.value} de BPO", data=ev.data_do_evento,
+                                    valor=ev.preco_mensal_novo - ev.preco_mensal_anterior)
+                        for c in por_motor[regras.MOTOR_BPO] for ev in c.eventos
+                        if passou and ev.tipo in (TipoDeEventoDeContrato.EXPANSAO, TipoDeEventoDeContrato.ADITIVO)
+                        and dentro(ev.data_do_evento, ini, fim) and ev.preco_mensal_novo and ev.preco_mensal_anterior
+                        and ev.preco_mensal_novo > ev.preco_mensal_anterior]
+    comp["reunioes_em_dia"] = [LinhaDaFase(titulo=n, detalhe=f"classe {cl} · {'em dia' if ok else 'reunião vencida'}", entra=ok)
+                               for n, cl, ok in (sucesso.reunioes_em_dia_por_grupo(sessao, hoje) if corrente else [])]
     partes = []
     if lr is not None and lp is not None and lr.perdas > lp.churn:
         partes.append(f"Perdas de {_reais(lr.perdas)} acima da premissa de churn ({_reais(lp.churn)}): veja os encerramentos na Carteira.")
@@ -804,10 +938,13 @@ def montar_fases(sessao: Session, mes: date, hoje: date) -> FasesResposta:
     pos_venda = FaseResposta(
         chave="pos_venda", titulo="Pós-venda", pergunta="O cliente fica, cresce e indica?", kpi=k_pos,
         apoio=[
-            IndicadorDaFase(rotulo="Churn no mês", unidade="reais", previsto=lp.churn if lp else None, realizado=lr.perdas if lr else None),
-            IndicadorDaFase(rotulo="Upgrades na escada", unidade="numero", previsto=upg_prev, realizado=upgrades),
+            IndicadorDaFase(rotulo="Churn no mês", unidade="reais", previsto=lp.churn if lp else None, realizado=lr.perdas if lr else None,
+                            chave="churn", explicacao="MRR perdido no mês: churn (cliente e Critério) e contração, na saída efetiva."),
+            IndicadorDaFase(rotulo="Upgrades na escada", unidade="numero", previsto=upg_prev, realizado=upgrades, chave="upgrades",
+                            explicacao="Expansões e aditivos que aumentaram o preço de contratos de BPO no mês."),
             IndicadorDaFase(rotulo="Reuniões de resultado em dia", unidade="pct", previsto=D(100) if corrente else None, realizado=pct_em_dia,
-                            nota=None if corrente else "só no mês corrente"),
+                            nota=None if corrente else "só no mês corrente", chave="reunioes_em_dia",
+                            explicacao="Clientes em curso com classe sem reunião de resultado vencida (cadência da classe) ÷ todos eles."),
         ],
         situacao=sit(k_pos.realizado, k_pos.previsto), ajuste=" ".join(partes) or "Nenhum ajuste no número.",
     )
@@ -818,4 +955,4 @@ def montar_fases(sessao: Session, mes: date, hoje: date) -> FasesResposta:
         fases=[atracao, engajamento, conversao, pos_venda],
         taxas={k: TaxaResposta(valor=t.valor, origem=t.origem) for k, t in taxas.items()},
         aviso=None if lp else "Este mês está fora da projeção do plano: só o realizado aparece.",
-    )
+    ), comp

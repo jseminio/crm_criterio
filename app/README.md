@@ -16,6 +16,17 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Migrar do CRM local para a nuvem (10/10/2026)
+
+Decisão de Eduardo: **o CRM oficial passa a ser a nuvem** (`www.crmcs.criterioconsultores.com.br`); o local era o oficial
+até aqui e tem os dados. Em **Configurações › Backup › Migrar do CRM local** (só o Administrador; na nuvem, com login):
+escolha o backup baixado no CRM local; a **prévia** mostra, tabela por tabela, o que vem do local e o que fica da nuvem,
+sem gravar. Com a palavra **MIGRAR**, a nuvem grava antes o backup dela como estava (`/app/backups`) e, numa transação só,
+substitui os dados de negócio pelos do local. **Ficam os da nuvem:** usuários e perfis, chaves das integrações (cifradas
+com a chave do servidor), registro de manutenção e eventos do WhatsApp (`crm.backup.migracao.PRESERVADAS`). Os dois CRMs
+precisam estar na mesma versão do banco: a prévia recusa e diz por quê. Rotas: `POST /api/migracao/previa` e `/migrar`
+(as rotas `/api/backup/*` seguem só na máquina).
+
 ## Indicadores com explicação e composição; MRR contratado × recebido (10/10/2026)
 
 - **Padrão de todo indicador do CRM** (pedido de Eduardo): a **explicação do cálculo ao passar o mouse**

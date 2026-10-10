@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 from datetime import datetime
+from pathlib import Path
 from typing import Callable
 
 import sqlalchemy as sa
@@ -82,5 +83,87 @@ def roteador(obter_engine: Callable[[], sa.Engine]) -> APIRouter:
             return _resumo(importar(obter_engine(), await _corpo(request), substituir=substituir))
         except ErroDeBackup as erro:
             raise HTTPException(409, str(erro)) from erro
+
+    return r
+
+
+
+# ---------------------------------------------------------------- migrar do CRM local (10/10/2026)
+
+def administrador_ou_local(request: Request) -> None:
+    """A migração roda na nuvem, por proxy, com login: só o Administrador (aprovado por Eduardo em 10/10/2026).
+    Sem login (a máquina do CRM), vale a regra de sempre do backup: só direto no localhost."""
+    from crm.acesso.auditoria import usuario_atual
+
+    u = usuario_atual.get()
+    if u is not None:
+        if not u.administrador:
+            raise HTTPException(403, "Migrar do CRM local é só do Administrador.")
+        return
+    somente_local(request)
+
+
+class LinhaDaPreviaResposta(BaseModel):
+    tabela: str
+    no_arquivo: int
+    na_nuvem: int
+    acao: str
+
+
+class PreviaDaMigracaoResposta(BaseModel):
+    criado_em: str
+    revisao_do_arquivo: str | None
+    revisao_da_nuvem: str | None
+    pode_migrar: bool
+    motivo: str | None
+    registros_que_entram: int
+    registros_que_saem: int
+    linhas: list[LinhaDaPreviaResposta]
+
+
+class MigracaoFeitaResposta(BaseModel):
+    registros: int
+    backup_de_antes: str
+
+
+async def _corpo_da_migracao(request: Request) -> io.BytesIO:
+    dados = await request.body()
+    if not dados:
+        raise HTTPException(400, "Nenhum arquivo enviado.")
+    if len(dados) > _LIMITE:
+        raise HTTPException(413, "Arquivo grande demais para a migração pela tela.")
+    return io.BytesIO(dados)
+
+
+def roteador_da_migracao(obter_engine: Callable[[], sa.Engine], pasta_do_backup: Callable[[], "Path"]) -> APIRouter:
+    from crm.backup.migracao import migrar, previa
+
+    r = APIRouter(prefix="/api/migracao", tags=["backup"], dependencies=[Depends(administrador_ou_local)])
+
+    @r.post("/previa", response_model=PreviaDaMigracaoResposta)
+    async def ver_previa(request: Request) -> PreviaDaMigracaoResposta:
+        """O que a migração faria, tabela por tabela. Não grava nada."""
+        try:
+            p = previa(obter_engine(), await _corpo_da_migracao(request))
+        except ErroDeBackup as erro:
+            raise HTTPException(422, str(erro)) from erro
+        return PreviaDaMigracaoResposta(
+            criado_em=p.criado_em, revisao_do_arquivo=p.revisao_do_arquivo, revisao_da_nuvem=p.revisao_da_nuvem,
+            pode_migrar=p.pode_migrar, motivo=p.motivo, registros_que_entram=p.registros_que_entram,
+            registros_que_saem=p.registros_que_saem,
+            linhas=[LinhaDaPreviaResposta(**vars(l)) for l in p.linhas],
+        )
+
+    @r.post("/migrar", response_model=MigracaoFeitaResposta)
+    async def fazer(request: Request) -> MigracaoFeitaResposta:
+        """Substitui os dados de negócio pelos do arquivo e preserva os da nuvem (usuários, perfis, integrações,
+        manutenção, WhatsApp). Irreversível: pede a confirmação MIGRAR e grava o backup da nuvem antes."""
+        if request.headers.get("x-confirmacao") != "MIGRAR":
+            raise HTTPException(400, "Migrar substitui os dados da nuvem e exige a confirmação explícita.")
+        try:
+            resumo, antes = migrar(obter_engine(), await _corpo_da_migracao(request), pasta_do_backup=pasta_do_backup())
+        except ErroDeBackup as erro:
+            raise HTTPException(409, str(erro)) from erro
+        return MigracaoFeitaResposta(registros=resumo.total, backup_de_antes=antes.name)
 
     return r

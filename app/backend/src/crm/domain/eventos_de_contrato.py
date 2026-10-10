@@ -17,7 +17,13 @@ Cada tipo:
 | Contração | novo preço, **não maior** | novo preço |
 | Renovação | nova data de fim, **depois** da atual | nova data de fim |
 | Correção | novo preço **e o motivo** | novo preço, para cima ou para baixo; **não** entra no movimento do MRR |
-| Encerramento | **quem decidiu** (cliente ou Critério) e a **categoria do motivo** (`Outro` exige texto) | situação Encerrado; fim = data do evento |
+| Encerramento | **quem decidiu** (cliente ou Critério) e a **categoria do motivo** (`Outro` exige texto); a **saída efetiva** (vazia = a data do anúncio) | fim = saída; Encerrado só quando a saída chega |
+| Desistência da saída | contrato **em aviso de saída** | desfaz o encerramento anunciado; fim volta ao de antes |
+
+**Aviso de saída** (10/10/2026): o cliente anuncia (data do evento) e sai de fato 30 ou 60 dias depois (saída
+efetiva). Até a saída o contrato segue Ativo, faturando e no MRR; o MRR cai e o churn conta na saída. Em aviso,
+o contrato só recebe Correção, outro Encerramento (que troca a saída) ou a Desistência. Quem passa o contrato a
+Encerrado quando a saída chega é `crm.db.saidas.efetivar_saidas`.
 
 Funções puras: não tocam no banco. Quem chama grava o evento e aplica o efeito.
 """
@@ -36,7 +42,7 @@ from crm.domain.listas import (
     TipoDeEventoDeContrato,
 )
 
-__all__ = ["ErroDeEvento", "Pedido", "efeito_do_evento"]
+__all__ = ["ErroDeEvento", "Pedido", "efeito_do_evento", "encerramento_vigente", "saida_vigente"]
 
 T = TipoDeEventoDeContrato
 MINIMO_DO_TEXTO = 3
@@ -50,7 +56,16 @@ class ErroDeEvento(ValueError):
         self.status = status
 
 
+class _Evento(Protocol):
+    id: int
+    tipo: TipoDeEventoDeContrato
+    data_do_evento: date
+    data_da_saida: date | None
+    data_fim_anterior: date | None
+
+
 class _Contrato(Protocol):
+    eventos: list
     situacao: SituacaoContrato
     escopo: str | None
     preco_mensal: Decimal | None
@@ -70,6 +85,39 @@ class Pedido:
     data_fim_nova: date | None = None
     motivo_categoria: MotivoDeEncerramento | None = None
     iniciativa: IniciativaDoEncerramento | None = None
+    data_da_saida: date | None = None
+    """Só no Encerramento: a saída efetiva. Vazia = a data do anúncio (sai no mesmo dia)."""
+
+
+def encerramento_vigente(contrato) -> _Evento | None:
+    """O último Encerramento que nenhuma Desistência posterior desfez; `None` se não há saída anunciada."""
+    vigente = None
+    for ev in sorted(getattr(contrato, "eventos", None) or [], key=lambda e: (e.id or 0)):
+        if ev.tipo is T.ENCERRAMENTO:
+            vigente = ev
+        elif ev.tipo is T.DESISTENCIA:
+            vigente = None
+    return vigente
+
+
+def _fim_antes_do_aviso(contrato) -> date | None:
+    """O fim do contrato antes do primeiro Encerramento do aviso em curso (um segundo Encerramento só troca a
+    saída): é o que a Desistência devolve."""
+    fim, em_aviso = None, False
+    for ev in sorted(getattr(contrato, "eventos", None) or [], key=lambda e: (e.id or 0)):
+        if ev.tipo is T.ENCERRAMENTO and not em_aviso:
+            fim, em_aviso = ev.data_fim_anterior, True
+        elif ev.tipo is T.DESISTENCIA:
+            em_aviso = False
+    return fim
+
+
+def saida_vigente(contrato) -> date | None:
+    """A data da saída efetiva do encerramento vigente (a do evento, nos antigos sem saída)."""
+    ev = encerramento_vigente(contrato)
+    if ev is None:
+        return None
+    return getattr(ev, "data_da_saida", None) or ev.data_do_evento
 
 
 def _texto_obrigatorio(pedido: Pedido, o_que: str) -> None:
@@ -77,11 +125,12 @@ def _texto_obrigatorio(pedido: Pedido, o_que: str) -> None:
         raise ErroDeEvento(f"{pedido.tipo.value}: informe {o_que}.")
 
 
-def efeito_do_evento(contrato: _Contrato, pedido: Pedido) -> dict[str, object]:
+def efeito_do_evento(contrato: _Contrato, pedido: Pedido, hoje: date | None = None) -> dict[str, object]:
     """Valida o pedido contra o contrato e devolve o que muda nele (campo → valor novo).
 
-    Levanta `ErroDeEvento` sem alterar nada.
+    Levanta `ErroDeEvento` sem alterar nada. `hoje` decide se o encerramento já vale (saída até hoje).
     """
+    hoje = hoje or date.today()
     if contrato.situacao is SituacaoContrato.AGUARDANDO_ASSINATURA:
         raise ErroDeEvento("O contrato ainda não foi assinado: registre a assinatura antes de qualquer evento.", 409)
     if contrato.situacao is SituacaoContrato.ENCERRADO:
@@ -90,6 +139,15 @@ def efeito_do_evento(contrato: _Contrato, pedido: Pedido) -> dict[str, object]:
         raise ErroDeEvento("O evento não pode ser anterior à assinatura do contrato.")
 
     tipo = pedido.tipo
+    saida = saida_vigente(contrato)
+    if saida is not None and tipo not in (T.ENCERRAMENTO, T.DESISTENCIA, T.CORRECAO):
+        raise ErroDeEvento(
+            f"O contrato está em aviso de saída (sai em {saida:%d/%m/%Y}): só recebe Correção, um novo Encerramento "
+            "(para trocar a saída) ou a Desistência da saída, se o cliente ficar.", 409)
+    if tipo is T.DESISTENCIA:
+        if saida is None:
+            raise ErroDeEvento("Desistência da saída: o contrato não está em aviso de saída.", 409)
+        return {"data_fim": _fim_antes_do_aviso(contrato)}
     novos_precos = {
         campo: valor
         for campo, valor in (("preco_mensal", pedido.preco_mensal_novo), ("preco_anual", pedido.preco_anual_novo))
@@ -147,7 +205,11 @@ def efeito_do_evento(contrato: _Contrato, pedido: Pedido) -> dict[str, object]:
             raise ErroDeEvento("Encerramento: escolha a categoria do motivo.")
         if pedido.motivo_categoria is MotivoDeEncerramento.OUTRO:
             _texto_obrigatorio(pedido, "o motivo (a categoria é “Outro”)")
-        efeito["situacao"] = SituacaoContrato.ENCERRADO
-        efeito["data_fim"] = pedido.data_do_evento
+        saida_nova = pedido.data_da_saida or pedido.data_do_evento
+        if saida_nova < pedido.data_do_evento:
+            raise ErroDeEvento("Encerramento: a saída efetiva não pode ser antes do anúncio.")
+        if saida_nova <= hoje:
+            efeito["situacao"] = SituacaoContrato.ENCERRADO
+        efeito["data_fim"] = saida_nova
 
     return efeito

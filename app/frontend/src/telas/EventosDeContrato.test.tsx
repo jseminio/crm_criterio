@@ -17,6 +17,13 @@ const contrato = (o: Partial<ContratoDetalhe> = {}): ContratoDetalhe => ({
   situacao: "Ativo", signatario: null, documento_assinado: null, observacao: null, eventos: [], ...o,
 });
 
+/** Hoje + n dias, como a tela calcula a saída efetiva. */
+function emDias(n: number) {
+  const d = new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 describe("EventosDeContrato", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -95,7 +102,32 @@ describe("EventosDeContrato", () => {
     await userEvent.selectOptions(screen.getByLabelText("Motivo do encerramento"), "Migrou para concorrente");
     await userEvent.click(screen.getByRole("button", { name: /registrar encerramento/i }));
     await userEvent.click(screen.getByRole("button", { name: /confirmar encerramento/i }));
-    await waitFor(() => expect(api.registrarEventoDeContrato).toHaveBeenCalledWith(7, { tipo: "Encerramento", data_do_evento: null, motivo_categoria: "Migrou para concorrente", iniciativa: "Cliente" }));
+    await waitFor(() => expect(api.registrarEventoDeContrato).toHaveBeenCalledWith(7, {
+      tipo: "Encerramento", data_do_evento: null, motivo_categoria: "Migrou para concorrente", iniciativa: "Cliente",
+      data_da_saida: emDias(30),
+    }));
+  });
+
+  it("aviso de saída: 60 dias do anúncio, e diz que segue ativo até a saída", async () => {
+    vi.mocked(api.registrarEventoDeContrato).mockResolvedValue(contrato());
+    render(<EventosDeContrato contrato={contrato()} aoRegistrar={vi.fn()} motivos={MOTIVOS} />);
+    await userEvent.selectOptions(screen.getByLabelText("Registrar evento"), "Encerramento");
+    expect(screen.getByLabelText(/Data do anúncio/)).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText("60 dias"));
+    expect(screen.getByText(/Saída efetiva em/)).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Quem decidiu encerrar?"), "Cliente");
+    await userEvent.selectOptions(screen.getByLabelText("Motivo do encerramento"), "Migrou para concorrente");
+    await userEvent.click(screen.getByRole("button", { name: /registrar encerramento/i }));
+    expect(screen.getByText(/fica em aviso de saída até/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /confirmar encerramento/i }));
+    await waitFor(() => expect(api.registrarEventoDeContrato).toHaveBeenCalledWith(7, expect.objectContaining({ data_da_saida: emDias(60) })));
+  });
+
+  it("em aviso de saída, oferece a desistência e não oferece reajuste", () => {
+    render(<EventosDeContrato contrato={contrato({ saida_em: "2026-12-09" })} aoRegistrar={vi.fn()} motivos={MOTIVOS} />);
+    expect(screen.getByText(/Em aviso de saída/)).toBeInTheDocument();
+    const opcoes = Array.from((screen.getByLabelText("Registrar evento") as HTMLSelectElement).options).map((o) => o.value);
+    expect(opcoes).toEqual(["Correção", "Encerramento", "Desistência da saída"]);
   });
 
   it("o histórico mostra a categoria do motivo do encerramento", () => {

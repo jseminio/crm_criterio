@@ -1458,6 +1458,10 @@ td > .celula-fonte { display: block; }
   letter-spacing: normal; white-space: normal; text-align: left; }
 .explicavel:hover .explicavel-janela, .explicavel:focus .explicavel-janela, .explicavel:focus-within .explicavel-janela { display: block; }
 
+/* Prazo do aviso de saída (10/10/2026): 30 dias, 60 dias ou outra data. */
+.opcoes-em-linha { display: flex; gap: var(--e3); flex-wrap: wrap; margin: var(--e1) 0; }
+.opcao-em-linha { display: inline-flex; gap: var(--e1); align-items: center; font-size: 13px; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

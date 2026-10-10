@@ -29,7 +29,7 @@ resultado (ver "SDR de IA", abaixo).
   contratos, MRR contratado, esperado no mês, recebido e situação (Em dia · Parcial · Em aberto · Sem registro).
   Rota: `GET /api/mrr/carteira?competencia=AAAA-MM`.
 - **Esperado do mês** = a parcela em bruto dos contratos que faturavam na competência, **sem** o 13 ÷ 12 (o caixa
-  recebe parcela). Em dezembro, em dobro (a 13ª) — **hipótese a confirmar** com o financeiro.
+  recebe parcela), mais a 13ª quando cabe (ver "13ª no esperado do caixa", abaixo).
 - **Recebido** vem de planilha importada em Gestão de contratos › **Importar recebimentos**, **só o
   Administrador** (`POST /api/recebimentos/previa` e `/importar`, arquivo em base64). Colunas: CNPJ (ou Grupo),
   Competência, Valor recebido, Data do recebimento; .xlsx ou .csv. A prévia não grava e lista cada linha que
@@ -55,8 +55,19 @@ resultado (ver "SDR de IA", abaixo).
 - **Recortes e cenários de ticket alinhados ao card de ticket** (decisão de Eduardo, 10/10/2026): só serviço
   recorrente (C1) e em MRR (parcela × 13 ÷ 12). A estatística dos cenários roda sobre a parcela e cada valor sai em
   MRR, para o arredondamento não mudar quem é atípico. Regra única: `indicadores.e_recorrente`.
-- **Churn**: registra-se em Gestão de contratos › contrato › Registrar evento › **Encerramento** (data, quem
-  decidiu, motivo). O cliente só conta como perdido quando o último contrato dele é encerrado.
+- **Churn**: registra-se em Gestão de contratos › contrato › Registrar evento › **Encerramento** (anúncio, saída
+  efetiva, quem decidiu, motivo). O cliente só conta como perdido quando o último contrato dele sai.
+- **Aviso de saída** (decisões de Eduardo, 10/10/2026): o Encerramento tem a **data do anúncio** e a **saída
+  efetiva** (30 dias, 60 dias ou outra data negociada — cláusula de multa e transição ao novo contador). Até a saída
+  o contrato segue **Ativo, faturando e no MRR**, com a etiqueta "Em aviso de saída · sai em dd/mm"; só recebe
+  Correção, novo Encerramento (troca a saída) ou **Desistência da saída** (o cliente fica). O MRR cai, o churn do
+  movimento e o KPI 17 contam **na saída efetiva**; o card do MRR mostra à parte "R$ X em aviso de saída". Na data,
+  o contrato passa a Encerrado sozinho (`crm.db.saidas`: ao subir a API, a cada hora e antes das contas de MRR).
+  Migração `b8d4f2a6c1e9` (`evento_de_contrato.data_da_saida`); a tarefa `2026_10_10_saida_dos_encerramentos_antigos`
+  põe a saída = data do evento nos encerramentos antigos (nada muda).
+- **13ª no esperado do caixa** (confirmado por Eduardo, 10/10/2026): parcela × avos ÷ 12, um avo por mês do ano com
+  15 dias ou mais de serviço, contados da assinatura; cobrada em dezembro, ou **na saída**, proporcional, junto com a
+  última parcela (o mês da saída tem parcela). O MRR não muda: já tem a 13ª no × 13 ÷ 12.
 
 ## MRR com 13 parcelas e KPIs da liderança (09/10/2026)
 

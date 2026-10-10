@@ -533,6 +533,8 @@ class ContratoResumo(Base):
     data_fim: date | None = None
     situacao: SituacaoContrato
     signatario: str | None = None
+    saida_em: date | None = None
+    """Saída efetiva anunciada (10/10/2026): com o contrato Ativo, ele está em aviso de saída até esta data."""
 
 
 class EventoDeContratoResposta(Base):
@@ -553,6 +555,8 @@ class EventoDeContratoResposta(Base):
     escopo_novo: str | None = None
     data_fim_anterior: date | None = None
     data_fim_nova: date | None = None
+    data_da_saida: date | None = None
+    """Só no Encerramento: a saída efetiva; `data_do_evento` é o anúncio."""
 
 
 class AprovacaoResposta(Base):
@@ -607,6 +611,8 @@ class EventoDeContratoNovo(BaseModel):
     preco_mensal_novo: Decimal | None = None
     preco_anual_novo: Decimal | None = None
     data_fim_nova: date | None = None
+    data_da_saida: date | None = None
+    """Só no Encerramento: a saída efetiva (vazia = a data do anúncio). Até ela o contrato segue Ativo."""
 
 
 class ContratoEdicao(BaseModel):

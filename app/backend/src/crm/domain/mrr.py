@@ -44,11 +44,12 @@ from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Iterable, Protocol
 
+from crm.domain.eventos_de_contrato import encerramento_vigente, saida_vigente
 from crm.domain.listas import IniciativaDoEncerramento, SituacaoContrato, TipoDeEventoDeContrato
 
 __all__ = [
     "ALERTA_DE_MRR", "CATEGORIAS_DO_MOVIMENTO", "ItemDoMovimento", "ItemDoMrr", "META_DE_MRR", "MrrAtual", "Movimento",
-    "ativo_em", "contra_a_meta", "em_bruto", "itens_do_movimento", "itens_do_mrr", "mrr_atual", "movimento", "mrr_em",
+    "fatura_entre", "saida_vigente", "contra_a_meta", "em_bruto", "itens_do_movimento", "itens_do_mrr", "mrr_atual", "movimento", "mrr_em",
     "preco_em",
 ]
 
@@ -108,6 +109,7 @@ class _EventoEmBruto:
     preco_mensal_novo: Decimal | None
     iniciativa: IniciativaDoEncerramento | None
     id: int
+    data_da_saida: date | None = None
 
 
 @dataclass(frozen=True)
@@ -141,7 +143,8 @@ def em_bruto(contratos: Iterable[_Contrato], imposto: Decimal, *, em_mrr: bool =
         lista.append(_ContratoEmBruto(
             c.id, c.grupo_id, c.situacao, converter(c.preco_mensal, liq), c.data_inicio,
             [_EventoEmBruto(e.tipo, e.data_do_evento, converter(e.preco_mensal_anterior, liq),
-                            converter(e.preco_mensal_novo, liq), e.iniciativa, e.id) for e in c.eventos],
+                            converter(e.preco_mensal_novo, liq), e.iniciativa, e.id,
+                            getattr(e, "data_da_saida", None)) for e in c.eventos],
         ))
     return lista
 
@@ -277,18 +280,20 @@ def itens_do_movimento(
             inicial = _preco_inicial(c)
             if inicial and inicial > 0:
                 itens.append(ItemDoMovimento("novo", c.id, c.grupo_id, inicial, c.data_inicio))
+        vigente = encerramento_vigente(c)
         for ev in c.eventos:
+            if ev.tipo is T.ENCERRAMENTO:
+                # Conta na **saída efetiva** (10/10/2026), e só o encerramento que vale (sem desistência depois).
+                # O preço não muda no encerramento: o que se perde é o que o contrato valia.
+                saida = getattr(ev, "data_da_saida", None) or ev.data_do_evento
+                if ev is vigente and de <= saida <= ate and c.preco_mensal and c.preco_mensal > 0:
+                    cat = "churn_criterio" if ev.iniciativa is IniciativaDoEncerramento.CRITERIO else "churn_cliente"
+                    itens.append(ItemDoMovimento(cat, c.id, c.grupo_id, c.preco_mensal, saida, ev.id))
+                continue
             if not (de <= ev.data_do_evento <= ate):
                 continue
-            if ev.tipo is T.CORRECAO:
+            if ev.tipo in (T.CORRECAO, T.DESISTENCIA):
                 continue  # corrige um lançamento errado; o MRR do passado também já era o corrigido
-            if ev.tipo is T.ENCERRAMENTO:
-                # O preço não muda no encerramento: o que se perde é o que o contrato valia.
-                # Se o contrato foi reajustado depois... não pode: encerrado não recebe evento.
-                if c.preco_mensal and c.preco_mensal > 0:
-                    cat = "churn_criterio" if ev.iniciativa is IniciativaDoEncerramento.CRITERIO else "churn_cliente"
-                    itens.append(ItemDoMovimento(cat, c.id, c.grupo_id, c.preco_mensal, ev.data_do_evento, ev.id))
-                continue
             if ev.preco_mensal_novo is None or ev.preco_mensal_anterior is None:
                 continue
             delta = ev.preco_mensal_novo - ev.preco_mensal_anterior
@@ -338,14 +343,18 @@ def movimento(contratos: Iterable[_Contrato], de: date, ate: date, hoje: date) -
     return Movimento(de, ate, inicio, novo, exp, rej, con, ch_c, ch_k, fim, nrr, grr)
 
 
-def ativo_em(c: _Contrato, dia: date) -> bool:
-    """Se o contrato estava faturando ao fim de `dia`: assinado até lá (ou da carteira anterior) e sem
-    encerramento até lá. Suspenso não fatura. Para a parcela esperada do mês (`crm.domain.recebimentos`)."""
+def fatura_entre(c: _Contrato, de: date, ate: date) -> bool:
+    """Se o contrato faturava em algum dia de [de, ate]: assinado até `ate` (ou da carteira anterior) e sem saída
+    efetiva antes de `de`. Suspenso não fatura; encerrado sem data de saída também não. Para a parcela esperada
+    do mês (`crm.domain.recebimentos`): o mês da saída ainda tem parcela (10/10/2026)."""
     if c.situacao in (SituacaoContrato.AGUARDANDO_ASSINATURA, SituacaoContrato.SUSPENSO):
         return False
-    if c.data_inicio is not None and c.data_inicio > dia:
+    if c.data_inicio is not None and c.data_inicio > ate:
         return False
-    return not any(ev.tipo is T.ENCERRAMENTO and ev.data_do_evento <= dia for ev in c.eventos)
+    saida = saida_vigente(c)
+    if saida is None:
+        return c.situacao is not SituacaoContrato.ENCERRADO
+    return saida >= de
 
 
 def preco_em(c: _Contrato, dia: date) -> Decimal | None:
@@ -355,7 +364,7 @@ def preco_em(c: _Contrato, dia: date) -> Decimal | None:
         return None
     preco = c.preco_mensal
     for ev in c.eventos:
-        if ev.data_do_evento <= dia or ev.tipo in (T.CORRECAO, T.ENCERRAMENTO):
+        if ev.data_do_evento <= dia or ev.tipo in (T.CORRECAO, T.ENCERRAMENTO, T.DESISTENCIA):
             continue
         if ev.preco_mensal_novo is not None and ev.preco_mensal_anterior is not None:
             preco -= ev.preco_mensal_novo - ev.preco_mensal_anterior

@@ -329,12 +329,14 @@ export interface ContratoResumo {
   data_fim: string | null;
   situacao: string;
   signatario: string | null;
+  /** Saída efetiva anunciada (10/10/2026): Ativo com esta data = em aviso de saída. */
+  saida_em?: string | null;
 }
 
 /** Um fato do contrato depois de assinado, com o antes e o depois. Só cresce. */
 export interface EventoDeContrato {
   id: number;
-  tipo: "Aditivo" | "Reajuste" | "Expansão" | "Contração" | "Renovação" | "Encerramento" | "Correção";
+  tipo: "Aditivo" | "Reajuste" | "Expansão" | "Contração" | "Renovação" | "Encerramento" | "Desistência da saída" | "Correção";
   data_do_evento: string;
   registrado_em: string;
   descricao: string | null;
@@ -350,6 +352,8 @@ export interface EventoDeContrato {
   escopo_novo: string | null;
   data_fim_anterior: string | null;
   data_fim_nova: string | null;
+  /** Só no Encerramento: a saída efetiva; `data_do_evento` é o anúncio. */
+  data_da_saida?: string | null;
 }
 
 export interface ContratoDetalhe extends ContratoResumo {
@@ -562,8 +566,9 @@ export interface ContratoDaCarteira {
   empresa: string | null;
   parte: "somado" | "suspenso" | "sem_preco" | "encerrado";
   mrr: string | null;
-  /** A parcela em bruto que o caixa espera na competência (sem o 13 ÷ 12). */
+  /** A parcela em bruto que o caixa espera na competência (sem o 13 ÷ 12), com a 13ª quando cabe. */
   esperado: string;
+  saida_em?: string | null;
 }
 
 export interface GrupoDaCarteira {
@@ -586,6 +591,9 @@ export interface MrrDaCarteira {
   grupos: number;
   suspenso: string;
   sem_preco_mensal: number;
+  /** MRR em aviso de saída: ainda soma, sai na data anunciada (10/10/2026). */
+  em_aviso: string;
+  em_aviso_contratos: number;
   meta: string;
   alerta: string;
   esperado: string;

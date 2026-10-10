@@ -841,6 +841,13 @@ class Contrato(CarimboMixin, Base):
         back_populates="contrato", order_by="EventoDeContrato.id.desc()"
     )
 
+    @property
+    def saida_em(self) -> date | None:
+        """A saída efetiva anunciada e ainda valendo (10/10/2026); `None` sem encerramento anunciado."""
+        from crm.domain.eventos_de_contrato import saida_vigente
+
+        return saida_vigente(self)
+
     def __repr__(self) -> str:
         return f"<Contrato {self.id} grupo={self.grupo_id} {self.situacao.value}>"
 
@@ -1002,6 +1009,9 @@ class EventoDeContrato(Base):
     escopo_novo: Mapped[str | None] = mapped_column(sa.String(200))
     data_fim_anterior: Mapped[date | None] = mapped_column(sa.Date)
     data_fim_nova: Mapped[date | None] = mapped_column(sa.Date)
+    data_da_saida: Mapped[date | None] = mapped_column(sa.Date)
+    """Só no encerramento (10/10/2026): a **saída efetiva**. `data_do_evento` é o anúncio. O MRR cai e o churn
+    conta nesta data; até ela o contrato segue Ativo, em aviso de saída."""
 
     contrato: Mapped[Contrato] = relationship(back_populates="eventos")
 

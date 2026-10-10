@@ -103,8 +103,8 @@ def test_esperado_e_a_parcela_sem_o_13_avos_e_conta_quem_saiu_no_mes(cliente):
     por_nome = {g["grupo"]: g for g in carteira["itens"]}
     assert D(por_nome["Grupo Alfa"]["esperado"]) == D("14400")
     assert D(por_nome["Beta"]["esperado"]) == D("3600")  # o suspenso não fatura
-    # Gama encerrou em 15/10: fora do MRR de hoje, mas faturava em outubro? Não — encerrou antes do fim do mês.
-    assert "Gama" not in por_nome
+    # Gama saiu em 15/10 (10/10/2026: o mês da saída tem parcela e a 13ª proporcional, 10 avos: jan a out).
+    assert D(por_nome["Gama"]["esperado"]) == D("6000") + D("5000") and D(por_nome["Gama"]["mrr"]) == 0
     setembro = cliente.get("/api/mrr/carteira", params={"hoje": HOJE, "competencia": "2026-09"}, headers=ADMIN).json()
     por_nome = {g["grupo"]: g for g in setembro["itens"]}
     assert D(por_nome["Gama"]["esperado"]) == D("6000") and D(por_nome["Gama"]["mrr"]) == 0
@@ -116,6 +116,22 @@ def test_esperado_e_a_parcela_sem_o_13_avos_e_conta_quem_saiu_no_mes(cliente):
 def test_dezembro_espera_a_13a_parcela():
     assert regra.esperado_no_mes(D("1000"), date(2026, 12, 1)) == D("2000")
     assert regra.esperado_no_mes(D("1000"), date(2026, 11, 1)) == D("1000")
+
+
+def test_13a_em_avos_como_no_13o_salario():
+    # Entrou em 05/03/2026: março conta (27 dias), então 10 avos em dezembro.
+    assert regra.avos(2026, date(2026, 3, 5), None) == 10
+    assert regra.esperado_no_mes(D("1200"), date(2026, 12, 1), inicio=date(2026, 3, 5)) == D("2200")
+    # Entrou em 20/03: março tem 12 dias, não conta.
+    assert regra.avos(2026, date(2026, 3, 20), None) == 9
+
+
+def test_na_saida_paga_a_13a_proporcional_junto_com_a_ultima_parcela():
+    # Exemplos aprovados por Eduardo (10/10/2026): parcela de R$ 3.600.
+    assert regra.esperado_no_mes(D("3600"), date(2026, 12, 1), saida=date(2026, 12, 9)) == D("3600") + D("3300")  # 11 avos
+    assert regra.esperado_no_mes(D("3600"), date(2026, 10, 1), saida=date(2026, 10, 31)) == D("3600") + D("3000")  # 10 avos
+    # Quem saiu antes de dezembro não tem 13ª em dezembro.
+    assert regra.decima_terceira(D("3600"), date(2026, 12, 1), None, date(2026, 10, 31)) == 0
 
 
 def test_sem_planilha_o_mes_fica_sem_registro(cliente):
@@ -184,9 +200,9 @@ def test_importar_mostra_recebido_e_situacao_e_reimportar_substitui(cliente, eng
 
 
 def test_recebido_de_quem_nao_tem_parcela_fica_fora_da_conta(cliente):
-    gama = _xlsx([["Grupo", "Competência", "Valor"], ["Gama", "10/2026", 6000]])
+    gama = _xlsx([["Grupo", "Competência", "Valor"], ["Gama", "11/2026", 6000]])  # Gama saiu em 15/10
     cliente.post("/api/recebimentos/importar", json={"arquivo": "g.xlsx", "conteudo_base64": gama}, headers=ADMIN)
-    carteira = cliente.get("/api/mrr/carteira", params={"hoje": HOJE}, headers=ADMIN).json()
+    carteira = cliente.get("/api/mrr/carteira", params={"hoje": HOJE, "competencia": "2026-11"}, headers=ADMIN).json()
     assert D(carteira["recebido"]) == 0 and D(carteira["recebido_fora"]) == D("6000")
     assert {g["grupo"]: g["situacao"] for g in carteira["itens"]}["Gama"] is None
 

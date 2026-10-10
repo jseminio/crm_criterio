@@ -339,6 +339,34 @@ def roteador(
             anterior=anterior,
         )
 
+    @r.get("/painel/composicao")
+    def composicao_do_painel(
+        chave: str,
+        mes: str = Query(pattern=regras.MES.pattern),
+        origem: str | None = Query(
+            default=None, pattern=f"^({regras.ORIGEM_TRAFEGO_PAGO}|{regras.ORIGEM_FRIO})$"
+        ),
+        sessao: Session = Depends(obter_sessao, scope="function"),
+    ) -> list[dict]:
+        """A lista que compõe um número do painel (10/10/2026): cada lead da coorte do mês, com a categoria em
+        que caiu, se entra na conta e o valor (minutos, nota, confiança), da mesma conta de `calcular_painel`."""
+        inicio, fim = regras.intervalo_do_mes(mes)
+        leads = sessao.scalars(
+            sa.select(Lead)
+            .where(Lead.criado_em >= inicio, Lead.criado_em < fim)
+            .options(selectinload(Lead.conversas).selectinload(ConversaDoSdr.mensagens))
+        ).all()
+        try:
+            itens = regras.composicao_do_painel(mes=mes, leads=leads, origem=origem, chave=chave)
+        except ValueError as erro:
+            raise HTTPException(404, str(erro)) from erro
+        return [
+            {"lead_id": i.lead.id, "lead": i.lead.empresa_texto or i.lead.nome, "contato": i.lead.nome,
+             "origem": regras.rotulo_da_origem(i.lead.tipo_canal, i.lead.canal), "criado_em": i.lead.criado_em,
+             "categoria": i.categoria, "entra": i.entra, "valor": i.valor}
+            for i in itens
+        ]
+
     @r.get("/painel")
     def painel(
         mes: str = Query(pattern=regras.MES.pattern),

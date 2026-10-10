@@ -8,6 +8,7 @@ O agente prepara ficha e rascunho em segundo plano; a pessoa revisa e aprova.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Callable, Iterator
 
 import sqlalchemy as sa
@@ -308,7 +309,20 @@ def roteador_de_abordagens(
             .where(Abordagem.mes == mes)
         ).all()
         conhecidos = [c for c in custos if c is not None]
+        custo_por: dict[int, Decimal] = {}
+        for abordagem_id, custo in sessao.execute(
+            sa.select(ExecucaoDoAgente.abordagem_id, ExecucaoDoAgente.custo_usd)
+            .join(Abordagem, ExecucaoDoAgente.abordagem_id == Abordagem.id).where(Abordagem.mes == mes)
+        ).all():
+            if custo is not None:
+                custo_por[abordagem_id] = custo_por.get(abordagem_id, Decimal(0)) + custo
+        nomes = dict(sessao.execute(sa.select(GrupoEconomico.id, GrupoEconomico.nome)
+                                    .where(GrupoEconomico.id.in_({a.grupo_id for a in ativas} or {0}))).all())
         return e.ResumoDasAbordagens(
+            itens=[e.ItemDoResumoDasAbordagens(
+                abordagem_id=a.id, conta=nomes.get(a.grupo_id, "?"), situacao=a.situacao.value,
+                diagnostico_agendado_em=a.diagnostico_agendado_em, custo_usd=custo_por.get(a.id),
+            ) for a in ativas],
             mes=mes,
             na_fila=len(ativas),
             abordadas=sum(1 for a in ativas if a.situacao is S.ENVIADA),

@@ -19,6 +19,41 @@ import { usarDados } from "../usarDados";
 import { RevisaoMensal } from "./RevisaoMensal";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
 import { usarAcesso } from "../entrada";
+import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
+
+/** A lista de grupos que compõe um número da Saúde da carteira (10/10/2026). `peso` mostra a participação na
+ * receita, que é como o ISC pondera; `fora` são os grupos que não entram na conta, à parte. */
+function GruposDaConta({ itens, fora = [], peso = false, extra }: {
+  itens: ItemDaCarteira[]; fora?: ItemDaCarteira[]; peso?: boolean;
+  extra?: { titulo: string; valor: (i: ItemDaCarteira) => string };
+}) {
+  const total = itens.reduce((t, i) => t + Number(i.receita_mensal), 0);
+  const ordenados = [...itens].sort((a, b) => Number(b.receita_mensal) - Number(a.receita_mensal));
+  const tabela = (lista: ItemDaCarteira[], rotulo: string, comTotal: boolean) => (
+    <table className="tabela" aria-label={rotulo}>
+      <thead><tr><th>Grupo</th><th>Classe</th><th>Semáforo</th>{extra && <th>{extra.titulo}</th>}
+        <th className="tabela-numero">Receita mensal</th>{peso && <th className="tabela-numero">Peso</th>}</tr></thead>
+      <tbody>
+        {lista.map((i) => (
+          <tr key={i.grupo_id}><td>{i.grupo_nome}</td><td>{i.classe_efetiva}</td><td>{i.semaforo}</td>
+            {extra && <td>{extra.valor(i)}</td>}
+            <td className="tabela-numero">{dinheiro(i.receita_mensal)}</td>
+            {peso && <td className="tabela-numero">{total ? `${um1(String((Number(i.receita_mensal) / total) * 100))}%` : "—"}</td>}</tr>
+        ))}
+        {comTotal && (
+          <tr className="composicao-total"><td>Total · {lista.length} grupo{lista.length === 1 ? "" : "s"}</td><td /><td />{extra && <td />}
+            <td className="tabela-numero">{dinheiro(total)}</td>{peso && <td className="tabela-numero">100%</td>}</tr>
+        )}
+      </tbody>
+    </table>
+  );
+  return (
+    <>
+      {tabela(ordenados, "Grupos na conta", true)}
+      {fora.length > 0 && (<><h3 className="numero-rotulo">Ficaram fora da conta ({fora.length})</h3>{tabela(fora, "Fora da conta", false)}</>)}
+    </>
+  );
+}
 
 const decimais = (v: string, n: number) =>
   Number(v).toLocaleString("pt-BR", { minimumFractionDigits: n, maximumFractionDigits: n });
@@ -131,10 +166,16 @@ function Medidor({ valor, zona }: { valor: string; zona: string }) {
   );
 }
 
-function Componente({ nome, valor, legenda, cor }: { nome: string; valor: string; legenda: string; cor: string }) {
+function Componente({ nome, valor, legenda, cor, explicacao, composicao }: {
+  nome: string; valor: string; legenda: string; cor: string; explicacao: string;
+  composicao: () => React.ReactNode;
+}) {
   return (
     <div className="isc-componente">
-      <h4>{nome}</h4>
+      <h4>
+        <Explicavel texto={explicacao}>{nome}</Explicavel>
+        <BotaoDeComposicao rotulo="ver" composicao={{ titulo: `Componente ${nome} do ISC`, subtitulo: "Grupos ponderados pela receita", conteudo: composicao }} />
+      </h4>
       <div className="isc-numero">{um1(valor)} <small>/100</small></div>
       <div className="isc-trilho" aria-hidden="true"><div style={{ width: `${Math.min(100, Number(valor))}%`, background: cor }} /></div>
       <p>{legenda}</p>
@@ -142,16 +183,26 @@ function Componente({ nome, valor, legenda, cor }: { nome: string; valor: string
   );
 }
 
-function DistribuicaoNoHero({ faixas }: { faixas: FaixaDeClasse[] }) {
+function DistribuicaoNoHero({ faixas, itens }: { faixas: FaixaDeClasse[]; itens: ItemDaCarteira[] }) {
   return (
     <div className="hero-distribuicao">
-      <div className="isc-rotulo">DISTRIBUIÇÃO</div>
+      <div className="isc-rotulo">
+        <Explicavel texto="Quantos grupos estão em cada classe (A, B, C) e o percentual do total, contra a faixa da meta de cada classe.">
+          DISTRIBUIÇÃO
+        </Explicavel>
+      </div>
       <div className="hero-distribuicao-linhas">
         {faixas.map((f) => (
           <div key={f.classe} className="distribuicao-linha distribuicao-linha-hero">
             <div className="distribuicao-cab">
               <b>{f.classe}</b>
-              <span>{f.unidades} · {um1(f.percentual)}%</span>
+              <span>
+                {f.unidades} · {um1(f.percentual)}%
+                <BotaoDeComposicao rotulo="ver" composicao={{
+                  titulo: `Classe ${f.classe}`, subtitulo: "Os grupos desta classe", quantos: f.unidades,
+                  conteudo: () => <GruposDaConta itens={itens.filter((i) => i.classe === f.classe)} />,
+                }} />
+              </span>
             </div>
             <div className="isc-trilho isc-trilho-hero" aria-hidden="true">
               <div style={{ width: `${Math.min(100, Number(f.percentual))}%`, background: COR_DA_CLASSE[f.classe] ?? "#666" }} />
@@ -302,14 +353,33 @@ export function Carteira({ listas }: { listas: Listas | null }) {
     <section className="carteira" aria-label="Classificação da carteira">
       {dados.retrato && (
         <div className="retrato-faixa">
-          <div className="retrato-chip"><b>{dados.retrato.unidades}</b><small>unidades (grupos + individuais)</small></div>
-          <div className="retrato-chip"><b>{dinheiro(dados.retrato.receita_total)}</b><small>receita mensal recorrente</small></div>
+          <div className="retrato-chip"><b>{dados.retrato.unidades}</b>
+            <small>
+              <Explicavel texto="Grupos classificados na leitura de referência; cliente individual conta como um grupo de uma empresa.">
+                unidades (grupos + individuais)
+              </Explicavel>
+              <BotaoDeComposicao rotulo="ver" composicao={{
+                titulo: "Unidades da carteira", subtitulo: "Os grupos classificados", quantos: dados.itens.length,
+                conteudo: () => <GruposDaConta itens={dados.itens} />,
+              }} />
+            </small>
+          </div>
+          <div className="retrato-chip"><b>{dinheiro(dados.retrato.receita_total)}</b>
+            <small>
+              <Explicavel texto="Soma da receita mensal dos grupos classificados, como está na leitura da carteira.">receita mensal recorrente</Explicavel>
+              <BotaoDeComposicao rotulo="ver" composicao={{
+                titulo: "Receita mensal recorrente", subtitulo: "Por grupo, da maior para a menor", quantos: dados.itens.length,
+                conteudo: () => <GruposDaConta itens={dados.itens} peso />,
+              }} />
+            </small>
+          </div>
           <button
             type="button"
             className={`retrato-chip retrato-chip-trav${somenteInadimplentes ? " retrato-chip-ativo" : ""}`}
             onClick={filtrarInadimplentes}
             aria-pressed={somenteInadimplentes}
             aria-label={`${dados.retrato.grupos_travados} grupos inadimplentes, ${um1(dados.retrato.percentual_travado)}% da receita travada — clique para ver quais`}
+            title="Grupos com a nota de adimplência na trava (em cobrança); o percentual é a receita deles sobre a receita total. Clique para filtrar a lista."
           >
             <b>{dados.retrato.grupos_travados}</b>
             <small>
@@ -319,7 +389,11 @@ export function Carteira({ listas }: { listas: Listas | null }) {
             </small>
           </button>
           <div className="retrato-chip retrato-semaforo">
-            <small className="retrato-semaforo-rotulo">Semáforo (clique para filtrar)</small>
+            <small className="retrato-semaforo-rotulo">
+              <Explicavel texto="Saúde operacional de cada grupo: 1 em dia, 2 atenção, 3 crítico. Clique num número para filtrar a lista.">
+                Semáforo
+              </Explicavel>{" "}(clique para filtrar)
+            </small>
             <div className="retrato-semaforo-itens">
               {([1, 2, 3] as const).map((s) => (
                 <button
@@ -347,20 +421,38 @@ export function Carteira({ listas }: { listas: Listas | null }) {
           <section className="isc-hero" aria-label="Índice de saúde da carteira">
             <div>
               <div className="isc-rotulo">ÍNDICE DE SAÚDE DA CARTEIRA</div>
-              <div className="isc-titulo">ISC</div>
+              <div className="isc-titulo">
+                <Explicavel texto="Índice 0–100: média dos valores de classe, semáforo e churn de cada grupo, ponderada pela receita, com os pesos dos Parâmetros. Grupo sem nota de churn fica fora.">
+                  ISC
+                </Explicavel>
+                <BotaoDeComposicao rotulo="ver composição" composicao={{
+                  titulo: "Índice de saúde da carteira", subtitulo: "Os grupos e o peso de cada um (receita)",
+                  conteudo: () => (
+                    <GruposDaConta peso itens={dados.itens.filter((i) => i.churn !== null && Number(i.receita_mensal) > 0)}
+                      fora={dados.itens.filter((i) => i.churn === null || Number(i.receita_mensal) <= 0)}
+                      extra={{ titulo: "Churn", valor: (i) => (i.churn === null ? "sem nota" : String(i.churn)) }} />
+                  ),
+                }} />
+              </div>
               <p>Indicador único 0–100 · revisão mensal</p>
               <p>Base: classe + semáforo + churn, ponderados por receita</p>
               <p className="isc-ref">Referência {data(dados.referencia)} · parâmetros {dados.versao_dos_parametros}</p>
             </div>
             <Medidor valor={isc.valor} zona={isc.zona} />
-            {dados.distribuicao_por_classe.length > 0 && <DistribuicaoNoHero faixas={dados.distribuicao_por_classe} />}
+            {dados.distribuicao_por_classe.length > 0 && <DistribuicaoNoHero faixas={dados.distribuicao_por_classe} itens={dados.itens} />}
           </section>
 
           <div className="isc-componentes">
             <Componente nome="Classe" valor={isc.componente_classe} cor="#2e5496"
-              legenda={`${Object.entries(dados.por_classe).map(([c, n]) => `${c} ${n}`).join(" · ")}, ponderado por receita`} />
-            <Componente nome="Semáforo" valor={isc.componente_semaforo} cor="#b8860b" legenda="Saúde operacional (pior = 3, melhor = 1)" />
-            <Componente nome="Churn" valor={isc.componente_churn} cor="#2e7d5b" legenda="Risco de saída ponderado por receita" />
+              legenda={`${Object.entries(dados.por_classe).map(([c, n]) => `${c} ${n}`).join(" · ")}, ponderado por receita`}
+              explicacao="O valor da classe de cada grupo (Parâmetros), ponderado pela receita."
+              composicao={() => <GruposDaConta peso itens={dados.itens.filter((i) => i.churn !== null && Number(i.receita_mensal) > 0)} />} />
+            <Componente nome="Semáforo" valor={isc.componente_semaforo} cor="#b8860b" legenda="Saúde operacional (pior = 3, melhor = 1)"
+              explicacao="O valor do semáforo de cada grupo (Parâmetros), ponderado pela receita."
+              composicao={() => <GruposDaConta peso itens={dados.itens.filter((i) => i.churn !== null && Number(i.receita_mensal) > 0)} />} />
+            <Componente nome="Churn" valor={isc.componente_churn} cor="#2e7d5b" legenda="Risco de saída ponderado por receita"
+              explicacao="O valor da nota de churn de cada grupo (Parâmetros), ponderado pela receita."
+              composicao={() => <GruposDaConta peso itens={dados.itens.filter((i) => i.churn !== null && Number(i.receita_mensal) > 0)} extra={{ titulo: "Churn", valor: (i) => String(i.churn) }} />} />
           </div>
         </>
       )}

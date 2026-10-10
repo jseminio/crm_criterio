@@ -57,6 +57,20 @@ resultado (ver "SDR de IA", abaixo).
   compõe, montada na mesma conta (`_montar_fases` devolve o número e a composição;
   `GET /api/inteligencia/fases/composicao?mes=&chave=`). Nas taxas, a base aparece à parte ("ficaram fora").
   Reuniões em dia saem de `sucesso.reunioes_em_dia_por_grupo`, a mesma regra do Funil do Sucesso.
+- **Entrega 4 — Sucesso do Cliente** (10/10/2026): na Saúde da carteira, unidades, receita, ISC, os três componentes e
+  a distribuição por classe têm a explicação ao passar o mouse e "ver" com os grupos (peso pela receita no ISC; quem
+  fica fora, sem nota de churn, à parte); inadimplentes e semáforo seguem filtrando a lista, com a explicação. No Funil
+  do Sucesso, cada coluna do quadro das classes tem a explicação e cada classe abre os clientes com os números linha a
+  linha. Tudo calculado na tela a partir do que a API já manda: nenhuma rota nova.
+- **Entrega 5 — SDR** (10/10/2026): os 19 números do Painel do SDR de IA e os 3 de Abordagens têm a explicação ao
+  passar o mouse e "ver" com a lista. No painel, os leads da coorte do mês, com a categoria em que caíram e quem fica
+  fora da conta (a base da taxa) à parte (`GET /api/sdr/painel/composicao?mes=&origem=&chave=`, a mesma conta de
+  `calcular_painel`; só para quem já vê o Painel do SDR). Em Abordagens, as contas do mês vêm no próprio resumo.
+- **Entrega 6 — demais telas** (10/10/2026): os 5 números de Questionários têm a explicação e "ver" com os
+  questionários do período (com os filtros de serviço e porte); na Base de conhecimento, cada bloco explica a conta e
+  segue abrindo as fichas ao clicar; na Conferência, cada número explica como se forma (a carga guarda só a contagem;
+  linha a linha, as ocorrências nas abas); em Grupos, "grupos com mais de uma proposta" abre a lista. Com isso, todos
+  os indicadores do CRM seguem o padrão de 10/10/2026.
 - **Recortes e cenários de ticket alinhados ao card de ticket** (decisão de Eduardo, 10/10/2026): só serviço
   recorrente (C1) e em MRR (parcela × 13 ÷ 12). A estatística dos cenários roda sobre a parcela e cada valor sai em
   MRR, para o arredondamento não mudar quem é atípico. Regra única: `indicadores.e_recorrente`.

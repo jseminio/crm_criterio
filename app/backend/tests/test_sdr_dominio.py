@@ -358,3 +358,45 @@ class TestMetasETravas:
 
     def test_mes_anterior_vira_o_ano(self):
         assert sdr.mes_anterior("2026-01") == "2025-12"
+
+
+# ------------------------------------------------------------ composição (10/10/2026)
+
+class TestComposicaoDoPainel:
+    """Cada número do painel abre a lista que o compõe, da mesma coorte e do mesmo recorte."""
+
+    def _leads(self):
+        return [
+            lead(respondeu(D.QUALIFICADO, nota=5), reuniao_marcada_para=INICIO, porte_estimado="Pequeno", interesse="BPO"),
+            lead(respondeu(D.QUALIFICADO, nota=3), porte_estimado="Médio"),
+            lead(respondeu(D.FORA_DO_PERFIL), motivo_descarte=MotivoDeDescarte.PORTE_ABAIXO),
+            lead(respondeu(D.TRANSBORDO, motivo_transbordo=MotivoDeTransbordo.PEDIU_PESSOA)),
+            lead(conversa(msg(A.IA, 30))),
+            lead(conversa(msg(A.IA, 30, fallback=True, confianca=Decimal("0.5"), termo_nao_reconhecido="DRE"), msg(A.LEAD, 60))),
+        ]
+
+    def _comp(self, chave):
+        return sdr.composicao_do_painel(mes="2026-09", leads=self._leads(), origem=None, chave=chave)
+
+    def test_as_listas_batem_com_os_numeros(self):
+        p = painel(self._leads())
+        assert len(self._comp("leads")) == p.leads
+        assert sum(i.entra for i in self._comp("responderam")) == p.responderam
+        assert sum(i.entra for i in self._comp("qualificados")) == p.qualificados
+        conc = self._comp("qualificacao_concluida")
+        assert (sum(i.entra for i in conc), len(conc)) == (p.qualificacao_concluida.numerador, p.qualificacao_concluida.denominador)
+        tb = self._comp("transbordo")
+        assert (sum(i.entra for i in tb), len(tb)) == (p.transbordo.numerador, p.transbordo.denominador)
+        assert sum(i.entra for i in self._comp("reunioes")) == p.reunioes
+        assert len(self._comp("csat")) == p.notas
+        assert sum(i.entra for i in self._comp("csat")) == p.satisfeitos.numerador
+        fa = self._comp("falhas")
+        assert (sum(i.entra for i in fa), len(fa)) == (p.falhas_por_conversa.numerador, p.falhas_por_conversa.denominador)
+        assert [i.categoria for i in self._comp("termos")] == ["dre"]
+        assert {i.categoria for i in self._comp("descartes")} == {MotivoDeDescarte.PORTE_ABAIXO.value}
+        assert sorted(i.categoria for i in self._comp("portes")) == ["Médio", "Pequeno"]
+        assert len(self._comp("custo_poupado")) == p.custo_poupado.conversas_concluidas
+
+    def test_numero_desconhecido_e_recusado(self):
+        with pytest.raises(ValueError):
+            self._comp("xyz")

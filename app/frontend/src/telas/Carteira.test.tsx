@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
@@ -143,11 +143,21 @@ describe("Carteira", () => {
     expect(linhas[1]).toHaveTextContent("Alfa");
   });
 
+  it("a receita do retrato abre a lista dos grupos com o total, e o ISC explica o cálculo (10/10/2026)", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira listas={null} />);
+    await screen.findByText(/▸ Alfa/);
+    expect(screen.getByText(/ponderada pela receita, com os pesos dos Parâmetros/)).toHaveAttribute("role", "tooltip");
+    fireEvent.click(screen.getByRole("button", { name: "Ver composição: Receita mensal recorrente" }));
+    const painel = await screen.findByRole("dialog", { name: "Receita mensal recorrente" });
+    expect(within(painel).getByText(/Total · 2 grupos/)).toBeInTheDocument();
+  });
+
   it("mostra o retrato com o travado e o percentual juntos num só chip, e filtra ao clicar", async () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
     render(<Carteira listas={null} />);
     await screen.findByText(/▸ Alfa/);
-    expect(screen.getByText("unidades (grupos + individuais)").previousElementSibling).toHaveTextContent("2");
+    expect(screen.getByText("unidades (grupos + individuais)").closest(".retrato-chip")!.querySelector("b")).toHaveTextContent("2");
     const chipTravado = screen.getByRole("button", { name: /grupos inadimplentes, 16,7% da receita travada/ });
     expect(chipTravado).toHaveTextContent("1"); // grupos_travados
     const rolou = vi.spyOn(Element.prototype, "scrollIntoView");

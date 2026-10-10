@@ -60,7 +60,10 @@ function falha(f: unknown): string {
 
 function Bloco({ b, ativo, aoEscolher }: { b: BlocoDaBase; ativo: boolean; aoEscolher: () => void }) {
   return (
-    <button type="button" className="base-bloco" aria-pressed={ativo} onClick={aoEscolher}>
+    <button type="button" className="base-bloco" aria-pressed={ativo} onClick={aoEscolher}
+      title={b.vai_para_a_ia
+        ? "Fichas do bloco que valem para a IA: aprovadas e dentro da validade, sobre o total do bloco. Clique para ver as fichas."
+        : "Fichas do bloco para consulta da equipe: não vão para a IA. Clique para ver as fichas."}>
       <span className="base-bloco-nome">{b.bloco}</span>
       {b.vai_para_a_ia ? (
         <span className="base-bloco-valor">{b.valem} de {b.total}<small> valem para a IA</small></span>

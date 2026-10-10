@@ -1010,6 +1010,14 @@ class Aprovacao(BaseModel):
     """Sem login até o E1: quem aprova é quem está na máquina — Eduardo."""
 
 
+class ItemDoResumoDasAbordagens(BaseModel):
+    abordagem_id: int
+    conta: str
+    situacao: str
+    diagnostico_agendado_em: datetime | None = None
+    custo_usd: Decimal | None = None
+
+
 class ResumoDasAbordagens(BaseModel):
     mes: str
     na_fila: int
@@ -1021,6 +1029,9 @@ class ResumoDasAbordagens(BaseModel):
     Nulo quando nenhuma execução tem custo conhecido."""
     custo_parcial: bool = False
     """Há execução de modelo sem preço na tabela: a soma está incompleta."""
+    itens: list[ItemDoResumoDasAbordagens] = []
+    """As contas do mês que compõem os números (10/10/2026), sem as descartadas."""
+
 
 
 # ------------------------------------------------------------ SDR de IA

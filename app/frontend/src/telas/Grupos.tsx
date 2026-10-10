@@ -13,6 +13,7 @@ import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { usarDados } from "../usarDados";
+import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
 import { DetalheDoGrupo } from "./DetalheDoGrupo";
 import { FusoesFeitas } from "./FusoesFeitas";
 import { SugestoesDeFusao } from "./SugestoesDeFusao";
@@ -163,8 +164,26 @@ export function Grupos({ listas }: { listas: Listas | null }) {
         <div className="recado">
           A carga formou os grupos pelo <strong>nome exato</strong> do cliente, e a coluna de
           origem mistura cliente com serviço. Por isso o mesmo cliente pode aparecer repartido em
-          vários grupos. Junte-os aqui: <strong>{comMaisDeUma}</strong> grupos já têm mais de uma
-          proposta e são o melhor lugar para começar.
+          vários grupos. Junte-os aqui: <strong>{comMaisDeUma}</strong>{" "}
+          <Explicavel texto="Grupos com mais de uma oportunidade, na busca atual: os candidatos mais prováveis a ser o mesmo cliente repartido.">
+            grupos já têm mais de uma proposta
+          </Explicavel>
+          {comMaisDeUma > 0 && (
+            <BotaoDeComposicao rotulo="ver" composicao={{
+              titulo: "Grupos com mais de uma proposta", quantos: comMaisDeUma,
+              conteudo: () => (
+                <table className="tabela" aria-label="Grupos com mais de uma proposta">
+                  <thead><tr><th>Grupo</th><th className="tabela-numero">Oportunidades</th></tr></thead>
+                  <tbody>
+                    {(dados?.itens ?? []).filter((g) => g.quantas_oportunidades > 1)
+                      .sort((a, b) => b.quantas_oportunidades - a.quantas_oportunidades)
+                      .map((g) => <tr key={g.id}><td>{g.nome}</td><td className="tabela-numero">{g.quantas_oportunidades}</td></tr>)}
+                  </tbody>
+                </table>
+              ),
+            }} />
+          )}{" "}
+          e são o melhor lugar para começar.
         </div>
       )}
 

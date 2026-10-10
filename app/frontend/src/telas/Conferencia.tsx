@@ -13,6 +13,7 @@ import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
 import { data, dataHora } from "../formato";
 import { usarDados } from "../usarDados";
+import { Explicavel } from "../componentes/Indicador";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 
 const DATA_DE_ACEITE = "data de aceite";
@@ -50,14 +51,17 @@ function Numero({
   rotulo,
   valor,
   nota,
+  explicacao,
 }: {
   rotulo: string;
   valor: string | number;
   nota?: string;
+  /** Como o número se forma (10/10/2026). A carga guarda a contagem; linha a linha, só as ocorrências abaixo. */
+  explicacao: string;
 }) {
   return (
     <section className="numero">
-      <h3 className="numero-rotulo">{rotulo}</h3>
+      <h3 className="numero-rotulo"><Explicavel texto={explicacao}>{rotulo}</Explicavel></h3>
       <p className="numero-valor">{valor}</p>
       {nota && <div className="numero-detalhe">{nota}</div>}
     </section>
@@ -95,21 +99,25 @@ function Detalhe({ execucao, listas, maisRecente }: { execucao: ExecucaoDetalhe;
       <div className="numeros">
         <Numero
           rotulo="Lidas na planilha"
+          explicacao="Todas as linhas da planilha nesta rodada. A carga guarda a contagem: a lista linha a linha não fica registrada."
           valor={execucao.lidas}
           nota={`${execucao.de_outro_ano} são de outro ano e não entram — só 2026.`}
         />
         <Numero
           rotulo="De 2026"
+          explicacao="As linhas de 2026, que a carga tentou gravar; as de outro ano ficam fora. A carga guarda só a contagem."
           valor={execucao.importadas}
           nota="Linhas que a carga tentou gravar."
         />
         <Numero
           rotulo="Gravadas no CRM"
+          explicacao="Linhas gravadas: novas, alteradas e sem mudança. O que mudou, com o antes e o depois, está na aba “Mudou na recarga”."
           valor={execucao.gravadas}
           nota={`${execucao.criadas} novas · ${execucao.atualizadas} alteradas · ${execucao.inalteradas} sem mudança`}
         />
         <Numero
           rotulo="Ficaram de fora"
+          explicacao="Linhas incompletas e duplicatas que não entraram. Cada uma, com o motivo, está na aba “Precisa de você”, abaixo."
           valor={fora}
           nota={`${execucao.ignoradas_incompletas} incompletas · ${execucao.ignoradas_duplicatas} duplicata(s)`}
         />

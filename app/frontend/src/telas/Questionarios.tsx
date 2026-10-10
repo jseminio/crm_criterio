@@ -12,6 +12,34 @@ import { usarAcesso } from "../entrada";
 import { cnpj, data, dataHora } from "../formato";
 import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
+import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
+
+/** Os questionários do período que compõem um número do topo (10/10/2026), com os filtros de serviço e porte
+ * (a situação escolhida na lista não muda os números, então aqui também não). */
+function QuestionariosDaConta({ filtros, entra, comDias = false }: {
+  filtros: { dias: number | null; servico?: string; porte?: string }; entra: (l: LinhaDoPainel) => boolean; comDias?: boolean;
+}) {
+  const { dados, carregando, erro, recarregar } = usarDados<PainelDeQuestionarios>(
+    () => api.painelDeQuestionarios({ ...filtros, situacao: "" }), [filtros.dias, filtros.servico, filtros.porte]);
+  if (carregando && !dados) return <Carregando rotulo="Buscando os questionários" />;
+  if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
+  const itens = (dados?.itens ?? []).filter(entra);
+  if (itens.length === 0) return <p className="numero-estado">Nenhum questionário nesta conta no período.</p>;
+  const dias = (l: LinhaDoPainel) =>
+    l.proposta_enviada_em ? Math.round((new Date(`${l.proposta_enviada_em}T12:00:00`).getTime() - new Date(l.recebido_em).getTime()) / 86400000) : null;
+  return (
+    <table className="tabela" aria-label="Questionários na conta">
+      <thead><tr><th>Empresa</th><th>Recebido</th><th>Situação</th>{comDias ? <th className="tabela-numero">Dias até a proposta</th> : <th>Proposta</th>}</tr></thead>
+      <tbody>
+        {itens.map((l) => (
+          <tr key={l.id}><td>{l.nome_fantasia || l.razao_social}</td><td>{data(l.recebido_em)}</td>
+            <td>{l.situacao_do_painel.replaceAll("_", " ")}{l.dias_uteis_aguardando ? ` · ${l.dias_uteis_aguardando} dias úteis` : ""}</td>
+            {comDias ? <td className="tabela-numero">{dias(l) ?? "—"}</td> : <td>{l.proposta_enviada_em ? `enviada ${data(l.proposta_enviada_em)}` : "—"}</td>}</tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 const PERIODOS: { dias: number; rotulo: string; antes: string }[] = [
   { dias: 30, rotulo: "Últimos 30 dias", antes: "30 dias anteriores" },
@@ -131,37 +159,58 @@ export function Questionarios({ listas }: { listas: Listas | null }) {
   if (!dados) return null;
   const n = dados.numeros;
   const media = n.media_de_dias_ate_a_proposta;
+  const filtrosDaConta = { dias, servico: servico || undefined, porte: porte || undefined };
+  const ver = (titulo: string, quantos: number, entra: (l: LinhaDoPainel) => boolean, comDias = false) => (
+    <BotaoDeComposicao rotulo="ver" composicao={{ titulo, subtitulo: periodo.rotulo, quantos,
+      conteudo: () => <QuestionariosDaConta filtros={filtrosDaConta} entra={entra} comDias={comDias} /> }} />
+  );
+  const enviado = (l: LinhaDoPainel) => l.proposta_enviada_em !== null || l.situacao_do_painel === "proposta_enviada" || l.situacao_do_painel === "aceita";
 
   return (
     <div className="questionarios">
       <EstadoDaBuscaDeQuestionarios aoChegar={recarregar} />
       <div className="questionarios-numeros">
         <div className="numero">
-          <div className="numero-rotulo">Recebidos · {periodo.rotulo.toLowerCase()}</div>
+          <div className="numero-rotulo">
+            <Explicavel texto="Questionários do site recebidos no período, com os filtros de serviço e porte.">Recebidos · {periodo.rotulo.toLowerCase()}</Explicavel>
+            {ver("Recebidos", n.recebidos, () => true)}
+          </div>
           <div className="numero-valor">{n.recebidos}</div>
           <div className="numero-detalhe">{n.recebidos_antes !== null ? `${periodo.antes}: ${n.recebidos_antes}` : "desde o primeiro questionário"}</div>
         </div>
         <div className="numero">
-          <div className="numero-rotulo">Aguardando proposta</div>
+          <div className="numero-rotulo">
+            <Explicavel texto="Recebidos no período cuja proposta ainda não foi enviada; conta os dias úteis de espera (alerta acima de 5).">Aguardando proposta</Explicavel>
+            {ver("Aguardando proposta", n.aguardando, (l) => l.situacao_do_painel === "aguardando_proposta")}
+          </div>
           <div className="numero-valor">{n.aguardando}</div>
           <div className="numero-detalhe">
             {n.aguardando_atrasados > 0 ? `⚠ ${n.aguardando_atrasados} há mais de 5 dias úteis` : "nenhum há mais de 5 dias úteis"}
           </div>
         </div>
         <div className="numero">
-          <div className="numero-rotulo">Viraram proposta enviada</div>
+          <div className="numero-rotulo">
+            <Explicavel texto="Recebidos no período cuja proposta já foi enviada (ou aceita), sobre todos os recebidos.">Viraram proposta enviada</Explicavel>
+            {ver("Viraram proposta enviada", n.enviados, enviado)}
+          </div>
           <div className="numero-valor">{n.enviados} de {n.recebidos}</div>
           <div className="numero-detalhe">
             {n.recebidos > 0 ? `${Math.round((n.enviados / n.recebidos) * 100)}% no período` : "nenhum recebido no período"}
           </div>
         </div>
         <div className="numero">
-          <div className="numero-rotulo">Do questionário à proposta</div>
+          <div className="numero-rotulo">
+            <Explicavel texto="Média de dias corridos entre o recebimento do questionário e o envio da proposta, nos que já foram enviados.">Do questionário à proposta</Explicavel>
+            {ver("Do questionário à proposta", n.enviados, (l) => l.proposta_enviada_em !== null, true)}
+          </div>
           <div className="numero-valor">{media !== null ? `${Number(media).toLocaleString("pt-BR")} dia${Number(media) === 1 ? "" : "s"}` : "—"}</div>
           <div className="numero-detalhe">{media !== null ? "média dos enviados" : "nenhuma proposta enviada ainda"}</div>
         </div>
         <div className="numero">
-          <div className="numero-rotulo">Precisam de você</div>
+          <div className="numero-rotulo">
+            <Explicavel texto="Questionários de grupo que já tinha oportunidade aberta: alguém decide se junta ou abre outra.">Precisam de você</Explicavel>
+            {ver("Precisam de você", n.precisam_de_voce, (l) => l.situacao_do_painel === "precisa_de_voce")}
+          </div>
           <div className="numero-valor">{n.precisam_de_voce}</div>
           <div className="numero-detalhe">já havia oportunidade aberta no grupo</div>
         </div>

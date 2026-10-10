@@ -66,6 +66,11 @@ resultado (ver "SDR de IA", abaixo).
   passar o mouse e "ver" com a lista. No painel, os leads da coorte do mês, com a categoria em que caíram e quem fica
   fora da conta (a base da taxa) à parte (`GET /api/sdr/painel/composicao?mes=&origem=&chave=`, a mesma conta de
   `calcular_painel`; só para quem já vê o Painel do SDR). Em Abordagens, as contas do mês vêm no próprio resumo.
+- **Entrega 6 — demais telas** (10/10/2026): os 5 números de Questionários têm a explicação e "ver" com os
+  questionários do período (com os filtros de serviço e porte); na Base de conhecimento, cada bloco explica a conta e
+  segue abrindo as fichas ao clicar; na Conferência, cada número explica como se forma (a carga guarda só a contagem;
+  linha a linha, as ocorrências nas abas); em Grupos, "grupos com mais de uma proposta" abre a lista. Com isso, todos
+  os indicadores do CRM seguem o padrão de 10/10/2026.
 - **Recortes e cenários de ticket alinhados ao card de ticket** (decisão de Eduardo, 10/10/2026): só serviço
   recorrente (C1) e em MRR (parcela × 13 ÷ 12). A estatística dos cenários roda sobre a parcela e cada valor sai em
   MRR, para o arredondamento não mudar quem é atípico. Regra única: `indicadores.e_recorrente`.

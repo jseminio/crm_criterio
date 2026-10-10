@@ -85,6 +85,19 @@ PAD-002, aprovado por Eduardo em 19/09/2026. A fonte da verdade é
 só por cor, uma ação primária por tela ou painel, os quatro estados de toda
 lista, e a logomarca da Critério sempre sozinha.
 
+## Apresentações
+
+Decisão de Eduardo em 09/10/2026: **toda apresentação construída usa o template
+da Critério**, em PowerPoint ou deck web. O template e o gerador ficam em
+`apresentacoes/`; as regras e os layouts estão em `apresentacoes/README.md`.
+
+- Use `apresentacoes/estilo-template.js`: os fundos do template, com rodapé e
+  logomarca, a fonte Delight, os títulos à esquerda e o slide "Obrigado!" no fim.
+- Gere a imagem de todos os slides e revise três vezes, uma para fórmulas, uma
+  para design e uma para incorreções, antes de entregar.
+- O gerador de cada apresentação, com nomes e valores de clientes, fica fora do
+  repositório. Só o template e o estilo são versionados.
+
 ## Documentos históricos
 
 Os `.md` da raiz anteriores a 23/09/2026 usam o vocabulário do vortexOS (PF-xx,

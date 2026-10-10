@@ -1,0 +1,11 @@
+{
+  "name": "apresentacoes-criterio",
+  "private": true,
+  "description": "Gerador de apresentações no template da Critério",
+  "scripts": {
+    "exemplo": "node exemplo.js saida/exemplo.pptx"
+  },
+  "dependencies": {
+    "pptxgenjs": "^4.0.1"
+  }
+}

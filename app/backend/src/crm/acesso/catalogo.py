@@ -115,6 +115,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("PUT", r"/api/oportunidades/\d+/ficha/[^/]+", ("funil.editar", "funil.proposta")),
     ("POST|PATCH", r"/api/oportunidades/\d+/pendencias(/[^/]+)?", ("funil.editar", "funil.proposta")),
     ("POST", r"/api/oportunidades/\d+/proposta", ("funil.proposta",)),
+    # A reunião com o lead pelo Granola alimenta a proposta (10/10/2026)
+    ("POST", r"/api/oportunidades/\d+/proposta/reuniao-com-lead(/sugestao)?", ("funil.proposta",)),
     ("GET", r"/api/propostas/\d+/pptx", ("funil.ver",)),
     ("POST", r"/api/propostas/\d+/enviada", ("funil.enviar_proposta",)),
     ("GET", r"/api/propostas/(matrizes|configuracao)", ("funil.proposta", "configuracoes.propostas")),

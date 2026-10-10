@@ -1401,6 +1401,34 @@ class Proposta(CarimboMixin, Base):
     enviada_por: Mapped[str | None] = mapped_column(sa.String(60))
 
 
+class ReuniaoComLead(CarimboMixin, Base):
+    """A reunião com o lead, pela nota do Granola feita com o template [Potencial Cliente] (amostra
+    aprovada por Eduardo em 10/10/2026). Do lead guarda-se **só o resumo**, com a data, os participantes
+    e a ciência de que foi gravada (arquitetura, entidade Entrevista); nunca a transcrição.
+
+    O que a pessoa aplicou à proposta fica aqui: `contextualizacao` e os campos do `perfil` que vieram
+    da reunião. A aba Proposta usa a reunião mais recente para a contextualização e junta os perfis de
+    todas, a mais nova por cima."""
+
+    __tablename__ = "reuniao_com_lead"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    oportunidade_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("oportunidade.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    data: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    participantes: Mapped[str | None] = mapped_column(sa.String(300))
+    link_do_granola: Mapped[str | None] = mapped_column(sa.String(400))
+    resumo_do_granola: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    """Dado de cliente: só no banco, fora do histórico de alterações (`crm.acesso.auditoria`)."""
+    ciencia_da_gravacao: Mapped[bool] = mapped_column(sa.Boolean, nullable=False)
+    contextualizacao: Mapped[str | None] = mapped_column(sa.Text)
+    """A contextualização escolhida; vazia quando a pessoa manteve a que já estava."""
+    perfil: Mapped[dict] = mapped_column(_JSON, nullable=False, default=dict)
+    """Os campos do perfil do cliente aplicados da reunião, `{"segmento": "Insumos hospitalares"}`."""
+    registrada_por: Mapped[str | None] = mapped_column(sa.String(200))
+
+
 
 class PendenciaDaProposta(CarimboMixin, Base):
     """Um item de "o que falta para a proposta" (E4, 02/10/2026).

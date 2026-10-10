@@ -12,15 +12,46 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from crm.db.modelos import Empresa, GrupoEconomico, Oportunidade, PessoaContato, QuestionarioRecebido, VinculoDeContato
+from crm.db.modelos import (
+    Empresa, GrupoEconomico, Oportunidade, PessoaContato, QuestionarioRecebido, ReuniaoComLead, VinculoDeContato,
+)
 from crm.domain import porte as regras_de_porte
 from crm.domain.listas import TipoDeMatriz
 from crm.proposta.conta import faturamento_por_extenso
 from crm.questionario.leitura import inteiro_ou_nada
 
-__all__ = ["ND", "Base", "base_da_proposta", "porte_da_oportunidade", "matriz_pelos_servicos", "cnpj_formatado"]
+__all__ = ["CAMPOS_DO_PERFIL", "FRASE_PADRAO", "ND", "Base", "base_da_proposta", "reunioes_com_o_lead", "porte_da_oportunidade", "matriz_pelos_servicos", "cnpj_formatado"]
 
 ND = "N/D"
+FRASE_PADRAO = (
+    "Esta proposta foi construída para acompanhar de perto essa transição, buscando a melhoria dos "
+    "processos e a segurança nas informações que apoiam a tomada de decisão da empresa."
+)
+"""A frase que fecha toda contextualização, venha do questionário ou da reunião com o lead."""
+CAMPOS_DO_PERFIL: dict[TipoDeMatriz, dict[str, tuple[str, str]]] = {
+    TipoDeMatriz.CONTABIL: {
+        "movimentacao": ("Movimentação", "lançamentos contábeis por mês, só o número"),
+        "faturamento": ("Faturamento", "faturamento anual, por extenso (ex.: R$ 18 milhões)"),
+        "instituicoes": ("Instituições", "quantidade de contas bancárias, só o número"),
+        "funcionarios": ("Funcionários", "empregados CLT + PJs, só o número"),
+        "regime": ("Regime", "regime tributário (Simples Nacional, Lucro Presumido, Lucro Real)"),
+        "sistema": ("Sistema", "ERP ou sistema contábil usado hoje"),
+        "empresas": ("Empresas", "quantos CNPJs entram no escopo (ex.: 3 empresas)"),
+        "localidade": ("Localidade", "cidades/UF onde opera"),
+    },
+    TipoDeMatriz.FINANCEIRO: {
+        "volume_documentos": ("Volume de documentos", "documentos financeiros por mês, só o número"),
+        "faturamento": ("Faturamento", "faturamento anual, por extenso (ex.: R$ 18 milhões)"),
+        "instituicoes": ("Instituições", "quantidade de contas bancárias, só o número"),
+        "meios_de_pagamento": ("Meios de pagamento", "como recebe e paga (boleto, cartão, Pix…)"),
+        "regime": ("Regime", "regime tributário (Simples Nacional, Lucro Presumido, Lucro Real)"),
+        "sistema": ("Sistema", "ERP ou sistema financeiro usado hoje"),
+        "segmento": ("Segmento", "atividade da empresa"),
+        "localidade": ("Localidade", "cidades/UF onde opera"),
+    },
+}
+"""Os campos do perfil do cliente em cada matriz, como a aba Proposta mostra: rótulo e o que a IA deve
+trazer da reunião com o lead."""
 _SERVICOS_NO_TEXTO = {"Contábil": "contábeis", "Fiscal": "fiscais", "Folha / DP": "de departamento pessoal",
                       "Financeiro": "financeiros"}
 
@@ -40,6 +71,8 @@ class Base:
     """PJs e estagiários do questionário (entram no honorário de DP com os CLT da oportunidade)."""
     jovens_aprendizes: int | None
     """Do questionário desde 03/10/2026; o que chegou antes conta zero."""
+    perfil_da_reuniao: tuple[str, ...] = ()
+    """Os campos do perfil que vieram da reunião com o lead (a tela marca "da reunião")."""
 
 
 def cnpj_formatado(cnpj: str | None) -> str:
@@ -98,11 +131,15 @@ def _contextualizacao(cliente: str, r: dict[str, Any], servicos: list[str]) -> s
         frase = f"A {cliente}, com operação em {local}, {verbo}."
     else:
         frase = f"A {cliente} {verbo}."
-    return (
-        frase + "\n"
-        "Esta proposta foi construída para acompanhar de perto essa transição, buscando a melhoria dos "
-        "processos e a segurança nas informações que apoiam a tomada de decisão da empresa."
-    )
+    return f"{frase}\n{FRASE_PADRAO}"
+
+
+def reunioes_com_o_lead(sessao: Session, oportunidade_id: int) -> list[ReuniaoComLead]:
+    """Da mais recente para a mais antiga."""
+    return list(sessao.scalars(
+        sa.select(ReuniaoComLead).where(ReuniaoComLead.oportunidade_id == oportunidade_id)
+        .order_by(ReuniaoComLead.data.desc(), ReuniaoComLead.id.desc())
+    ))
 
 
 def base_da_proposta(sessao: Session, o: Oportunidade) -> Base:
@@ -159,10 +196,22 @@ def base_da_proposta(sessao: Session, o: Oportunidade) -> Base:
         "empresas": ND if not n_empresas else f"{n_empresas} empresa{'s' if n_empresas > 1 else ''}",
         "localidade": _ou_nd(local),
     }
+    # A reunião com o lead (10/10/2026): o que a pessoa aplicou vale por cima do questionário, a mais
+    # nova por cima das outras; a contextualização é a da mais nova que trouxe uma.
+    contextualizacao = _contextualizacao(cliente, r, servicos)
+    da_reuniao: list[str] = []
+    for reuniao in reunioes_com_o_lead(sessao, o.id)[::-1]:
+        for campo, valor in (reuniao.perfil or {}).items():
+            if campo in perfil and campo != "cnpj" and str(valor).strip():
+                perfil[campo] = str(valor).strip()
+                if campo not in da_reuniao:
+                    da_reuniao.append(campo)
+        if reuniao.contextualizacao:
+            contextualizacao = reuniao.contextualizacao
     return Base(
         matriz=matriz_pelos_servicos(servicos), servicos=servicos, tem_dp="Folha / DP" in servicos or not servicos,
         cliente=cliente, tratamento=f"Prezado(a) Sr(a). {contato}",
-        contextualizacao=_contextualizacao(cliente, r, servicos), perfil=perfil,
+        contextualizacao=contextualizacao, perfil=perfil, perfil_da_reuniao=tuple(da_reuniao),
         questionario_id=q.id if q else None,
         pjs_estagiarios=inteiro_ou_nada((r.get("vol") or {}).get("pjs_estagiarios")),
         jovens_aprendizes=inteiro_ou_nada((r.get("vol") or {}).get("jovens_aprendizes")),

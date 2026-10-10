@@ -21,16 +21,22 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, defer
 
 from crm.acesso.auditoria import usuario_atual
+from crm.agente.contexto_da_proposta import sugerir_contexto
+from crm.agente.erros import mensagem_de_falha
+from crm.agente.sdr import Uso
 from crm.api.acesso import quem_fez
 from crm.api.classificacao import janela_vigente, parametros_vigentes
 from crm.db.base import agora
+from crm.api.sucesso import ServicosDaAta, servicos_da_ata_reais
 from crm.db.modelos import (
-    ConfiguracaoDeProposta, HistoricoDePreco, MatrizDeProposta, Oportunidade, Proposta,
+    ConfiguracaoDeProposta, HistoricoDePreco, MatrizDeProposta, Oportunidade, Proposta, ReuniaoComLead,
 )
 from crm.domain.listas import ORIGEM_DA_MUDANCA_NO_CRM, Situacao, TipoDeMatriz
 from crm.domain.servicos import meses_no_ano
 from crm.proposta import conta, marcadores
-from crm.proposta.rascunho import Base, base_da_proposta, porte_da_oportunidade
+from crm.proposta.rascunho import (
+    CAMPOS_DO_PERFIL, ND, Base, base_da_proposta, porte_da_oportunidade, reunioes_com_o_lead,
+)
 
 __all__ = ["roteador_de_propostas", "PADRAO_DA_CONFIGURACAO"]
 
@@ -117,6 +123,58 @@ class MatrizResumo(BaseModel):
     utilizavel: bool
 
 
+class ReuniaoComLeadResumo(BaseModel):
+    """A reunião com o lead já guardada (10/10/2026). Só o resumo da nota, nunca a transcrição."""
+    id: int
+    data: date
+    participantes: str | None
+    link_do_granola: str | None
+    resumo_do_granola: str
+    ciencia_da_gravacao: bool
+    contextualizacao_aplicada: bool
+    campos_aplicados: list[str]
+    registrada_por: str | None
+    registrada_em: datetime
+
+
+class PedidoDeSugestao(BaseModel):
+    matriz: Matriz
+    data: date
+    participantes: str | None = Field(default=None, max_length=300)
+    resumo: str = Field(min_length=1, max_length=30000)
+
+
+class CampoSugerido(BaseModel):
+    campo: str
+    rotulo: str
+    valor: str
+    trecho: str | None
+    atual: str
+    diverge: bool
+    """O perfil já tem outro valor (do questionário ou da oportunidade): a tela traz desmarcado, com ⚠."""
+
+
+class SugestaoDoContextoResposta(BaseModel):
+    contextualizacao: str
+    perfil: list[CampoSugerido]
+    nao_apareceu: list[str]
+    """Rótulos dos campos que a reunião não informou: seguem como estão."""
+    para_a_carta: list[str]
+    custo_usd: str | None
+
+
+class NovaReuniaoComLead(BaseModel):
+    data: date
+    participantes: str | None = Field(default=None, max_length=300)
+    link_do_granola: str | None = Field(default=None, max_length=400)
+    resumo: str = Field(min_length=1, max_length=30000)
+    ciencia_da_gravacao: bool
+    contextualizacao: str | None = Field(default=None, max_length=4000)
+    """A sugestão escolhida; vazia quando a pessoa mantém a atual."""
+    perfil: dict[str, str] = {}
+    """Só os campos marcados para usar."""
+
+
 class AbaDaProposta(BaseModel):
     matriz_sugerida: Matriz
     servicos: list[str]
@@ -135,6 +193,10 @@ class AbaDaProposta(BaseModel):
     revisores: list[str]
     proximo_numero: str
     propostas: list[PropostaResumo]
+    perfil_da_reuniao: list[str] = []
+    """Os campos do perfil que vieram da reunião com o lead."""
+    reunioes_com_o_lead: list[ReuniaoComLeadResumo] = []
+    """Da mais recente para a mais antiga."""
 
 
 class Envio(BaseModel):
@@ -192,7 +254,27 @@ def _disposicao(nome: str) -> str:
     return f'attachment; filename="{sem_acento.replace(chr(34), "")}"'
 
 
-def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
+_MINIMO_DO_RESUMO = 80
+"""Menos que isso não é um resumo de reunião: a IA não teria do que tirar o contexto."""
+
+
+def _texto(v: str | None) -> str | None:
+    return " ".join((v or "").split()) or None
+
+
+def _resumo_da_reuniao(x: ReuniaoComLead) -> ReuniaoComLeadResumo:
+    return ReuniaoComLeadResumo(
+        id=x.id, data=x.data, participantes=x.participantes, link_do_granola=x.link_do_granola,
+        resumo_do_granola=x.resumo_do_granola, ciencia_da_gravacao=x.ciencia_da_gravacao,
+        contextualizacao_aplicada=bool(x.contextualizacao), campos_aplicados=list((x.perfil or {}).keys()),
+        registrada_por=x.registrada_por, registrada_em=x.criado_em,
+    )
+
+
+def roteador_de_propostas(
+    obter_sessao: Callable[[], Iterator[Session]],
+    servicos_da_ia: Callable[[], ServicosDaAta] = servicos_da_ata_reais,
+) -> APIRouter:
     r = APIRouter(tags=["proposta"])
 
     def _configuracao(sessao: Session, *, travar: bool = False) -> ConfiguracaoDeProposta:
@@ -280,8 +362,11 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
 
     @r.get("/api/oportunidades/{oportunidade_id}/proposta", response_model=AbaDaProposta)
     def aba(oportunidade_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> AbaDaProposta:
-        o = _oportunidade(sessao, oportunidade_id)
+        return _aba(sessao, _oportunidade(sessao, oportunidade_id))
+
+    def _aba(sessao: Session, o: Oportunidade) -> AbaDaProposta:
         base = base_da_proposta(sessao, o)
+        reunioes = reunioes_com_o_lead(sessao, o.id)
         sugestao, sem = _sugestao(sessao, o)
         config = _configuracao(sessao)
         propostas = _propostas(sessao, o.id)
@@ -289,6 +374,10 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         colaboradores = _colaboradores(o, base)
         if propostas:  # reabrir a aba traz o que foi usado na última, para ajustar e gerar de novo
             rascunho = EntradaDaProposta(**propostas[0].valores["entrada"])
+            # A reunião com o lead aplicada depois da última geração traz a contextualização dela.
+            nova = next((x for x in reunioes if x.contextualizacao), None)
+            if nova is not None and nova.criado_em > propostas[0].gerada_em:
+                rascunho.contextualizacao = nova.contextualizacao
         else:
             rascunho = EntradaDaProposta(
                 matriz=base.matriz.value, cliente=base.cliente, tratamento=base.tratamento,
@@ -307,7 +396,82 @@ def roteador_de_propostas(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
             valor_da_hora_de_consulta=conta.VALOR_DA_HORA_DE_CONSULTA, rascunho=rascunho, perfil=base.perfil, imposto=_imposto(sessao),
             matrizes=_em_uso(sessao), revisores=list(config.revisores), proximo_numero=proximo,
             propostas=[_resumo(sessao, p) for p in propostas],
+            perfil_da_reuniao=list(base.perfil_da_reuniao),
+            reunioes_com_o_lead=[_resumo_da_reuniao(x) for x in reunioes],
         )
+
+    @r.post("/api/oportunidades/{oportunidade_id}/proposta/reuniao-com-lead/sugestao",
+            response_model=SugestaoDoContextoResposta)
+    def sugerir(oportunidade_id: int, corpo: PedidoDeSugestao,
+                sessao: Session = Depends(obter_sessao, scope="function")) -> SugestaoDoContextoResposta:
+        """A IA lê o resumo da nota [Potencial Cliente] e sugere a contextualização e o perfil.
+        **Não grava nada**: a tela mostra ao lado do que já está, e a pessoa aplica."""
+        o = _oportunidade(sessao, oportunidade_id)
+        resumo = corpo.resumo.strip()
+        if len(resumo) < _MINIMO_DO_RESUMO:
+            raise HTTPException(422, "Cole o resumo inteiro da nota do Granola: o que veio é curto demais.")
+        base = base_da_proposta(sessao, o)
+        campos = CAMPOS_DO_PERFIL[TipoDeMatriz(corpo.matriz)]
+        servicos = servicos_da_ia()
+        uso = Uso(modelo=servicos.modelo)
+        try:
+            sugestao = sugerir_contexto(
+                servicos.cliente(), servicos.modelo, cliente=base.cliente, servicos=base.servicos,
+                campos={c: f"{rotulo} — {dica}" for c, (rotulo, dica) in campos.items()},
+                data=corpo.data.strftime("%d/%m/%Y"), participantes=_texto(corpo.participantes),
+                resumo=resumo, uso=uso,
+            )
+        except Exception as falha:  # noqa: BLE001 — a mensagem é para a pessoa, sem dado do cliente
+            raise HTTPException(502, mensagem_de_falha(falha)) from falha
+        perfil = []
+        for p in sugestao.perfil:
+            atual = base.perfil.get(p["campo"], ND)
+            perfil.append(CampoSugerido(
+                campo=p["campo"], rotulo=campos[p["campo"]][0], valor=p["valor"], trecho=p["trecho"], atual=atual,
+                diverge=atual != ND and atual.casefold() != p["valor"].casefold(),
+            ))
+        sugeridos = {p.campo for p in perfil}
+        return SugestaoDoContextoResposta(
+            contextualizacao=sugestao.contextualizacao, perfil=perfil,
+            nao_apareceu=[rotulo for c, (rotulo, _) in campos.items() if c not in sugeridos],
+            para_a_carta=sugestao.para_a_carta,
+            custo_usd=f"{uso.custo_usd:.4f}" if uso.custo_usd is not None else None,
+        )
+
+    @r.post("/api/oportunidades/{oportunidade_id}/proposta/reuniao-com-lead", response_model=AbaDaProposta,
+            status_code=201)
+    def guardar_reuniao(oportunidade_id: int, corpo: NovaReuniaoComLead,
+                        sessao: Session = Depends(obter_sessao, scope="function")) -> AbaDaProposta:
+        """Guarda a reunião com o lead (só o resumo) e o que a pessoa aplicou à proposta; devolve a aba
+        já com a contextualização e o perfil novos."""
+        o = _oportunidade(sessao, oportunidade_id)
+        if not corpo.ciencia_da_gravacao:
+            raise HTTPException(422, "Confirme que o lead foi avisado de que a reunião foi gravada.")
+        if corpo.data > date.today():
+            raise HTTPException(422, "A data da reunião não pode ser futura.")
+        resumo = corpo.resumo.strip()
+        if len(resumo) < _MINIMO_DO_RESUMO:
+            raise HTTPException(422, "Cole o resumo inteiro da nota do Granola: o que veio é curto demais.")
+        validos = {c for campos in CAMPOS_DO_PERFIL.values() for c in campos}
+        perfil: dict[str, str] = {}
+        for campo, valor in corpo.perfil.items():
+            if campo not in validos:
+                raise HTTPException(422, f"Campo do perfil desconhecido: {campo}")
+            valor = " ".join(valor.split())
+            if not valor or len(valor) > 120:
+                raise HTTPException(422, f"Valor do perfil vazio ou longo demais: {campo}")
+            perfil[campo] = valor
+        contextualizacao = (corpo.contextualizacao or "").strip() or None
+        sessao.add(ReuniaoComLead(
+            oportunidade_id=o.id, data=corpo.data, participantes=_texto(corpo.participantes),
+            link_do_granola=_texto(corpo.link_do_granola), resumo_do_granola=resumo,
+            ciencia_da_gravacao=True, contextualizacao=contextualizacao, perfil=perfil,
+            registrada_por=quem_fez("") or None,
+        ))
+        sessao.flush()
+        resposta = _aba(sessao, o)
+        sessao.commit()
+        return resposta
 
     def _valores(entrada: EntradaDaProposta, tipo: TipoDeMatriz, numero: str, perfil: dict[str, str],
                  imposto: Decimal) -> tuple[dict[str, str], Decimal | None, Decimal | None]:

@@ -52,6 +52,11 @@ resultado (ver "SDR de IA", abaixo).
   **Plano de MRR**: o realizado e cada linha por motor abrem os contratos e eventos que somam
   (`GET /api/inteligencia/plano/realizado`, valor com sinal; a soma é o realizado); cada cenário abre o mês a mês;
   cada serviço dos cenários de ticket abre os recorrentes aceitos. Explicação fora de card: `Explicavel`.
+- **Entrega 3b — quatro fases** (10/10/2026): cada etapa da cadeia (leads no ICP, reuniões, propostas, contratos,
+  MRR novo) e cada número das fases (KPI e apoio) tem a explicação ao passar o mouse e "ver" com a lista que o
+  compõe, montada na mesma conta (`_montar_fases` devolve o número e a composição;
+  `GET /api/inteligencia/fases/composicao?mes=&chave=`). Nas taxas, a base aparece à parte ("ficaram fora").
+  Reuniões em dia saem de `sucesso.reunioes_em_dia_por_grupo`, a mesma regra do Funil do Sucesso.
 - **Recortes e cenários de ticket alinhados ao card de ticket** (decisão de Eduardo, 10/10/2026): só serviço
   recorrente (C1) e em MRR (parcela × 13 ÷ 12). A estatística dos cenários roda sobre a parcela e cada valor sai em
   MRR, para o arredondamento não mudar quem é atípico. Regra única: `indicadores.e_recorrente`.

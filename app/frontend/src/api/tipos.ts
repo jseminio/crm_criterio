@@ -2040,6 +2040,20 @@ export interface IndicadorDaFase {
   previsto: string | null;
   realizado: string | null;
   nota: string | null;
+  /** Abre a composição (10/10/2026); vazio = sem lista. */
+  chave?: string;
+  /** Como o número é calculado: aparece ao passar o mouse. */
+  explicacao?: string;
+}
+
+/** Um item que compõe um número das quatro fases (10/10/2026). */
+export interface LinhaDaFase {
+  titulo: string;
+  detalhe: string | null;
+  data: string | null;
+  valor: string | null;
+  /** Conta no numerador; fora: a base de uma taxa. */
+  entra: boolean;
 }
 
 export interface FaseDoCliente {
@@ -2059,6 +2073,7 @@ export interface EtapaDaCadeia {
   realizado: string | null;
   taxa_prevista: string | null;
   taxa_realizada: string | null;
+  explicacao?: string;
 }
 
 export interface FasesDoMes {

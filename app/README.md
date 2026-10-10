@@ -16,6 +16,33 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Indicadores com explicação e composição; MRR contratado × recebido (10/10/2026)
+
+- **Padrão de todo indicador do CRM** (pedido de Eduardo): a **explicação do cálculo ao passar o mouse**
+  (ou ao focar com Tab) e o botão **"Ver composição"**, que abre o painel lateral com a lista de dados que
+  compõem o número, cada um com o valor ao lado. A lista vem da mesma conta do número e soma o mesmo total
+  (teste por indicador). Componente único: `componentes/Indicador.tsx` (`Indicador` e `BotaoDeComposicao`).
+  Aplicação em entregas: 1) MRR (esta); 2) Funil › Oportunidades; 3) Inteligência de Conversão; 4) Sucesso do
+  Cliente; 5) SDR; 6) Questionários, Base de conhecimento, Conferência e Grupos.
+- **MRR atual da carteira** é o primeiro número de Funil › Oportunidades: carteira inteira, em bruto, parcela ×
+  13 ÷ 12, **não muda com os filtros**. Mostra o % da meta e o recebido do mês. A composição lista cada cliente:
+  contratos, MRR contratado, esperado no mês, recebido e situação (Em dia · Parcial · Em aberto · Sem registro).
+  Rota: `GET /api/mrr/carteira?competencia=AAAA-MM`.
+- **Esperado do mês** = a parcela em bruto dos contratos que faturavam na competência, **sem** o 13 ÷ 12 (o caixa
+  recebe parcela). Em dezembro, em dobro (a 13ª) — **hipótese a confirmar** com o financeiro.
+- **Recebido** vem de planilha importada em Gestão de contratos › **Importar recebimentos**, **só o
+  Administrador** (`POST /api/recebimentos/previa` e `/importar`, arquivo em base64). Colunas: CNPJ (ou Grupo),
+  Competência, Valor recebido, Data do recebimento; .xlsx ou .csv. A prévia não grava e lista cada linha que
+  ficou de fora com o motivo. Reimportar um mês **substitui** o que havia (as linhas antigas ficam desligadas;
+  o histórico em `GET /api/recebimentos/importacoes`). A fusão de grupos leva os recebimentos junto. O CRM
+  mostra; não cobra.
+- **Movimento do MRR** em Gestão de contratos: cada linha (novos, expansão, reajuste, contração, churn) tem "ver
+  composição" com cada contrato ou evento, cliente, data e valor (`GET /api/mrr/movimento?de=`).
+- **Meta de MRR em 13 parcelas**: R$ 400 mil → **R$ 433.333,33**; alerta R$ 200 mil → **R$ 216.666,67**. A tarefa
+  `2026_10_10_meta_de_mrr_em_13_parcelas` converte no Redeploy só a meta que ainda está nos valores de origem.
+- **Churn**: registra-se em Gestão de contratos › contrato › Registrar evento › **Encerramento** (data, quem
+  decidiu, motivo). O cliente só conta como perdido quando o último contrato dele é encerrado.
+
 ## MRR com 13 parcelas e KPIs da liderança (09/10/2026)
 
 Decisões de Eduardo:

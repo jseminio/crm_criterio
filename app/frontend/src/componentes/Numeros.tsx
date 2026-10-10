@@ -9,8 +9,9 @@
  * receita contratada da carteira inteira, e este número é outra coisa.
  */
 
-import { useId } from "react";
 import { api } from "../api/cliente";
+import { Indicador, type Tom } from "./Indicador";
+import { MrrDaCarteira } from "./MrrDaCarteira";
 import type { Indicadores, TaxaDeConversao } from "../api/tipos";
 import { Carregando, Erro } from "./estados";
 import { paraConsulta, type EstadoDosFiltros } from "./Filtros";
@@ -37,40 +38,8 @@ function EtiquetaDeConversao({ tx }: { tx: TaxaDeConversao }) {
   return <span className={`etiqueta etiqueta-${tom}`}>{texto}</span>;
 }
 
-type Tom = "azul" | "verde" | "ambar" | "vermelho" | "dourado" | "violeta" | "rosa" | "marinho";
-
-/** Um indicador compacto: rótulo, número e uma linha de apoio. O que explica o número (definição, ressalvas)
- * fica numa janela que abre ao passar o mouse ou ao focar com o teclado (Tab), ao redor do indicador. */
-function Cartao({
-  rotulo,
-  destaque,
-  apoio,
-  etiqueta,
-  tom,
-  children,
-  pendente = false,
-}: {
-  rotulo: string;
-  destaque?: string;
-  apoio?: string;
-  etiqueta?: React.ReactNode;
-  tom: Tom;
-  children?: React.ReactNode;
-  pendente?: boolean;
-}) {
-  const id = useId();
-  return (
-    <section className={`numero ind ind-${tom} ${pendente ? "numero-pendente" : ""}`} tabIndex={0} aria-describedby={id}>
-      <h3 className="numero-rotulo ind-rotulo">{rotulo}</h3>
-      {destaque ? <p className="numero-valor ind-valor">{destaque}</p> : <p className="ind-valor ind-valor-pendente">Não calculável</p>}
-      {apoio && <p className="ind-apoio">{apoio}</p>}
-      {etiqueta}
-      <div className="numero-detalhe ind-janela" role="tooltip" id={id}>
-        {children}
-      </div>
-    </section>
-  );
-}
+/** O card do funil é o `Indicador` do CRM: explicação ao passar o mouse e, quando há, "Ver composição". */
+const Cartao = Indicador;
 
 export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
   const { dados, carregando, erro, recarregar } = usarDados<Indicadores>(
@@ -103,6 +72,7 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
 
   return (
     <div className="numeros" aria-label="Números do funil">
+      <MrrDaCarteira />
       <Cartao
         rotulo="Em aberto"
         tom="azul"

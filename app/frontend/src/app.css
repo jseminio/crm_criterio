@@ -202,7 +202,7 @@
 /* --------------------------------------------------------- faixa de números
    Indicadores compactos: número à vista, explicação em janela (hover ou foco). Cores do design base
    "Critério CRM": chart-1/4/5/6 e status-ganho/atenção/perdido, com fundo em tom suave. */
-.numeros { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--e2); margin-bottom: var(--e3); }
+.numeros { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: var(--e2); margin-bottom: var(--e3); }
 @media (max-width: 1280px) { .numeros { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .numero { background: var(--surface-card); border: 1px solid var(--borda);
@@ -225,6 +225,17 @@
 .ind .ind-valor-pendente { font-family: var(--fonte-ui); font-size: 13px; font-weight: 600; color: var(--espera); margin: 0; }
 .ind-apoio { margin: 0; font-size: 11px; color: #5a6779; line-height: 1.3; }
 .ind > .etiqueta { align-self: flex-start; margin-top: 2px; }
+/* "Ver composição" (10/10/2026): abre a lista do que compõe o número, no painel lateral. */
+.ind-composicao { align-self: flex-start; margin-top: auto; padding: 2px 0 0; background: none; border: 0; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 600; color: var(--cor, #0072b2); text-decoration: underline; text-underline-offset: 2px; }
+.ind-composicao:hover { color: var(--texto-forte); }
+.ind-composicao-solto { margin: 0 0 0 var(--e1); padding: 0; }
+.composicao .tabela { width: 100%; }
+.composicao-total td { font-weight: 700; border-top: 2px solid var(--borda); }
+.composicao-resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--e2); margin-bottom: var(--e3); }
+.composicao-resumo div { background: var(--surface-sunken); border-radius: var(--raio-md); padding: var(--e2) var(--e3); }
+.composicao-resumo strong { display: block; font-size: 16px; }
+.composicao-sub td { font-size: 12px; color: var(--texto-medio); padding-left: var(--e4); }
 .ind-janela { display: none; position: absolute; z-index: 20; top: calc(100% + 8px); left: 0; width: 280px; max-width: 80vw;
   background: var(--surface-card); border: 1px solid var(--borda); border-top: 4px solid var(--cor); border-radius: var(--raio-md);
   box-shadow: var(--sombra-painel); padding: var(--e3); font-size: 12px; color: #2a3242; line-height: 1.45; }
@@ -1423,6 +1434,10 @@ td > .celula-fonte { display: block; }
   .numeros-tres { grid-template-columns: minmax(0, 1fr); }
   .topo-detalhe { -webkit-line-clamp: 1; }
 }
+
+.acoes-da-tela { display: flex; justify-content: flex-end; gap: var(--e2); margin: var(--e2) 0 var(--e3); }
+.ind-mrr { grid-column: span 2; }
+@media (max-width: 720px) { .ind-mrr { grid-column: 1 / -1; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

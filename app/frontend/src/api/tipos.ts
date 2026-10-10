@@ -540,7 +540,7 @@ export interface Mrr {
   contratos_da_carteira_anterior: number;
   cobertura_completa: boolean;
   aviso: string;
-  /** KPI oficial: meta R$ 400 mil, alerta abaixo de R$ 200 mil. */
+  /** KPI oficial em 13 parcelas: meta R$ 433.333,33, alerta abaixo de R$ 216.666,67 (Configurações › Metas). */
   meta: string;
   alerta: string;
   /** Só com a carteira inteira no CRM; com o MRR parcial, null (não se compara). */
@@ -551,6 +551,82 @@ export interface Mrr {
   contratos_liquidos: number;
   /** Sem bruto/líquido informado: somados como estão. */
   contratos_sem_base: number;
+}
+
+export type SituacaoDoRecebido = "Em dia" | "Parcial" | "Em aberto" | "Sem registro";
+
+/** Um contrato na composição do MRR da carteira (10/10/2026). */
+export interface ContratoDaCarteira {
+  id: number;
+  escopo: string | null;
+  empresa: string | null;
+  parte: "somado" | "suspenso" | "sem_preco" | "encerrado";
+  mrr: string | null;
+  /** A parcela em bruto que o caixa espera na competência (sem o 13 ÷ 12). */
+  esperado: string;
+}
+
+export interface GrupoDaCarteira {
+  grupo_id: number;
+  grupo: string;
+  contratos: number;
+  mrr: string;
+  esperado: string;
+  recebido: string;
+  /** null: recebeu sem ter parcela esperada na competência (fora da conta). */
+  situacao: SituacaoDoRecebido | null;
+  itens: ContratoDaCarteira[];
+}
+
+/** MRR da carteira por cliente: contratado × recebido na competência (10/10/2026). */
+export interface MrrDaCarteira {
+  competencia: string;
+  mrr: string;
+  contratos: number;
+  grupos: number;
+  suspenso: string;
+  sem_preco_mensal: number;
+  meta: string;
+  alerta: string;
+  esperado: string;
+  recebido: string;
+  recebido_fora: string;
+  mes_importado: boolean;
+  importado_em: string | null;
+  importado_por: string | null;
+  grupos_registrados: number;
+  itens: GrupoDaCarteira[];
+}
+
+export type CategoriaDoMovimento = "novo" | "expansao" | "reajuste" | "contracao" | "churn_cliente" | "churn_criterio";
+
+export interface ItemDoMovimento {
+  categoria: CategoriaDoMovimento;
+  grupo_id: number;
+  grupo: string;
+  contrato_id: number;
+  escopo: string | null;
+  valor: string;
+  data: string | null;
+}
+
+export interface PreviaDeRecebimentos {
+  arquivo: string;
+  reconhecidas: number;
+  total: string;
+  meses: { competencia: string; linhas: number; total: string; substitui: string | null }[];
+  problemas: { linha: number; motivo: string; trecho: string }[];
+}
+
+export interface ImportacaoDeRecebimentos {
+  id: number;
+  arquivo: string;
+  importado_por: string | null;
+  importado_em: string;
+  competencias: string[];
+  linhas: number;
+  total: string;
+  fora: number;
 }
 
 export type TipoDeContato = "cliente" | "prospect";

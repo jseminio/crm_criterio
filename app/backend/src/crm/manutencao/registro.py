@@ -23,7 +23,7 @@ como registro (o `--listar` de `scripts/manutencao.py` mostra o que já rodou).
 from __future__ import annotations
 
 from crm.manutencao.executor import Tarefa
-from crm.manutencao.tarefas import configuracao_para_a_tela, premissas_em_13_parcelas
+from crm.manutencao.tarefas import configuracao_para_a_tela, meta_de_mrr_em_13_parcelas, premissas_em_13_parcelas
 
 TAREFAS: list[Tarefa] = [
     Tarefa("2026_10_07_configuracao_para_a_tela",
@@ -32,5 +32,8 @@ TAREFAS: list[Tarefa] = [
     Tarefa("2026_10_09_premissas_em_13_parcelas",
            "Converte as premissas em reais do plano de MRR para a base de 13 parcelas (× 13 ÷ 12)",
            premissas_em_13_parcelas.executar),
+    Tarefa("2026_10_10_meta_de_mrr_em_13_parcelas",
+           "Converte a meta e o alerta do MRR para a base de 13 parcelas (R$ 433.333,33 e R$ 216.666,67)",
+           meta_de_mrr_em_13_parcelas.executar),
     # Acrescente no fim. Ex.: Tarefa("2026_10_06_assunto", "o que faz", modulo.executar),
 ]

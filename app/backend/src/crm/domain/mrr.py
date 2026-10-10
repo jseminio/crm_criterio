@@ -47,18 +47,21 @@ from typing import Iterable, Protocol
 from crm.domain.listas import IniciativaDoEncerramento, SituacaoContrato, TipoDeEventoDeContrato
 
 __all__ = [
-    "ALERTA_DE_MRR", "META_DE_MRR", "MrrAtual", "Movimento", "contra_a_meta", "em_bruto", "mrr_atual", "movimento", "mrr_em",
+    "ALERTA_DE_MRR", "CATEGORIAS_DO_MOVIMENTO", "ItemDoMovimento", "ItemDoMrr", "META_DE_MRR", "MrrAtual", "Movimento",
+    "ativo_em", "contra_a_meta", "em_bruto", "itens_do_movimento", "itens_do_mrr", "mrr_atual", "movimento", "mrr_em",
+    "preco_em",
 ]
 
-META_DE_MRR = Decimal("400000")
-"""KPI oficial "MRR" (planilha "KPI de Head de Novos Negócios"): meta R$ 400 mil. É o padrão: o
-valor que vale fica em Configurações › Metas (02/10/2026)."""
-ALERTA_DE_MRR = Decimal("200000")
-"""Abaixo disto, alerta (padrão)."""
+META_DE_MRR = Decimal("433333.33")
+"""KPI oficial "MRR" (planilha "KPI de Head de Novos Negócios"): meta de R$ 400 mil pela parcela, que em
+MRR de 13 parcelas é R$ 433.333,33 (conversão aprovada por Eduardo em 10/10/2026, mesma régua do plano).
+É o padrão: o valor que vale fica em Configurações › Metas (02/10/2026)."""
+ALERTA_DE_MRR = Decimal("216666.67")
+"""Abaixo disto, alerta (padrão): R$ 200 mil pela parcela, em MRR de 13 parcelas."""
 
 
 def contra_a_meta(valor: Decimal, meta: Decimal = META_DE_MRR, alerta: Decimal = ALERTA_DE_MRR) -> str:
-    """"abaixo_do_alerta" (< R$ 200 mil), "entre" ou "na_meta" (>= R$ 400 mil). Só vale com a
+    """"abaixo_do_alerta" (< alerta), "entre" ou "na_meta" (>= meta). Só vale com a
     carteira inteira no CRM: com o MRR parcial, quem chama não compara."""
     if valor >= meta:
         return "na_meta"
@@ -117,9 +120,12 @@ class _ContratoEmBruto:
     eventos: list[_EventoEmBruto] = field(default_factory=list)
 
 
-def em_bruto(contratos: Iterable[_Contrato], imposto: Decimal) -> list[_ContratoEmBruto]:
+def em_bruto(contratos: Iterable[_Contrato], imposto: Decimal, *, em_mrr: bool = True) -> list[_ContratoEmBruto]:
     """Os contratos com os valores em bruto e em MRR: o marcado `base_do_valor == "liquido"` tem preço e
-    eventos divididos por (1 − imposto); depois, todo valor vira MRR (× 13 ÷ 12, `mensalizar`)."""
+    eventos divididos por (1 − imposto); depois, todo valor vira MRR (× 13 ÷ 12, `mensalizar`).
+
+    `em_mrr=False` fica na parcela em bruto, sem o 13 ÷ 12: é o que o caixa espera receber no mês
+    (`crm.domain.recebimentos`)."""
     if not Decimal(0) <= imposto < 1:
         raise ValueError("o imposto precisa estar entre 0 e 100%")
 
@@ -127,7 +133,7 @@ def em_bruto(contratos: Iterable[_Contrato], imposto: Decimal) -> list[_Contrato
         if v is None:
             return None
         bruto = (Decimal(v) / (1 - imposto)).quantize(CENTAVOS, rounding=ROUND_HALF_UP) if liquido else Decimal(v)
-        return mensalizar(bruto)
+        return mensalizar(bruto) if em_mrr else bruto
 
     lista = []
     for c in contratos:
@@ -182,22 +188,45 @@ class Movimento:
         return self.mrr_fim - self.mrr_inicio
 
 
-def mrr_atual(contratos: Iterable[_Contrato]) -> MrrAtual:
-    valor = suspenso = ZERO
-    ativos = suspensos = sem_preco = 0
-    por_grupo: dict[int, Decimal] = {}
+@dataclass(frozen=True)
+class ItemDoMrr:
+    """Um contrato na conta do MRR atual (10/10/2026): o que a lista "Ver composição" mostra.
+    `parte`: "somado" (ativo com preço), "suspenso" (à parte) ou "sem_preco" (fora da soma)."""
+
+    parte: str
+    contrato_id: int
+    grupo_id: int
+    valor: Decimal | None
+
+
+def itens_do_mrr(contratos: Iterable[_Contrato]) -> list[ItemDoMrr]:
+    """Os contratos Ativos e Suspensos e onde cada um entra. `mrr_atual` soma esta mesma lista."""
+    itens = []
     for c in contratos:
         if c.situacao not in (SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO):
             continue
         if c.preco_mensal is None or c.preco_mensal <= 0:
-            sem_preco += 1
-            continue
-        if c.situacao is SituacaoContrato.ATIVO:
-            valor += c.preco_mensal
-            ativos += 1
-            por_grupo[c.grupo_id] = por_grupo.get(c.grupo_id, ZERO) + c.preco_mensal
+            itens.append(ItemDoMrr("sem_preco", c.id, c.grupo_id, None))
+        elif c.situacao is SituacaoContrato.ATIVO:
+            itens.append(ItemDoMrr("somado", c.id, c.grupo_id, c.preco_mensal))
         else:
-            suspenso += c.preco_mensal
+            itens.append(ItemDoMrr("suspenso", c.id, c.grupo_id, c.preco_mensal))
+    return itens
+
+
+def mrr_atual(contratos: Iterable[_Contrato]) -> MrrAtual:
+    valor = suspenso = ZERO
+    ativos = suspensos = sem_preco = 0
+    por_grupo: dict[int, Decimal] = {}
+    for item in itens_do_mrr(contratos):
+        if item.parte == "sem_preco":
+            sem_preco += 1
+        elif item.parte == "somado":
+            valor += item.valor
+            ativos += 1
+            por_grupo[item.grupo_id] = por_grupo.get(item.grupo_id, ZERO) + item.valor
+        else:
+            suspenso += item.valor
             suspensos += 1
     totais = list(por_grupo.values())
     return MrrAtual(
@@ -216,9 +245,28 @@ def _preco_inicial(c: _Contrato) -> Decimal | None:
     return c.preco_mensal
 
 
-def _fluxos(contratos: Iterable[_Contrato], de: date, ate: date, *, so_existentes_em: date | None = None):
-    """Soma os movimentos com data em [de, ate]. Devolve (novo, expansao, reajuste, contracao, churn_cliente, churn_criterio)."""
-    novo = expansao = reajuste = contracao = churn_c = churn_k = ZERO
+CATEGORIAS_DO_MOVIMENTO = ("novo", "expansao", "reajuste", "contracao", "churn_cliente", "churn_criterio")
+"""As linhas do movimento do MRR, na ordem da tela."""
+
+
+@dataclass(frozen=True)
+class ItemDoMovimento:
+    """Um contrato ou evento que moveu o MRR: o que compõe cada linha do movimento (10/10/2026)."""
+
+    categoria: str
+    contrato_id: int
+    grupo_id: int
+    valor: Decimal
+    data: date | None
+    evento_id: int | None = None
+
+
+def itens_do_movimento(
+    contratos: Iterable[_Contrato], de: date, ate: date, *, so_existentes_em: date | None = None,
+) -> list[ItemDoMovimento]:
+    """Cada movimento com data em [de, ate], um por contrato ou evento. É daqui que saem as somas do
+    movimento (`_fluxos`): a lista que a tela abre é a mesma conta do número."""
+    itens: list[ItemDoMovimento] = []
     for c in contratos:
         if c.situacao is SituacaoContrato.AGUARDANDO_ASSINATURA:
             continue
@@ -228,7 +276,7 @@ def _fluxos(contratos: Iterable[_Contrato], de: date, ate: date, *, so_existente
         if c.data_inicio is not None and de <= c.data_inicio <= ate:
             inicial = _preco_inicial(c)
             if inicial and inicial > 0:
-                novo += inicial
+                itens.append(ItemDoMovimento("novo", c.id, c.grupo_id, inicial, c.data_inicio))
         for ev in c.eventos:
             if not (de <= ev.data_do_evento <= ate):
                 continue
@@ -238,22 +286,26 @@ def _fluxos(contratos: Iterable[_Contrato], de: date, ate: date, *, so_existente
                 # O preço não muda no encerramento: o que se perde é o que o contrato valia.
                 # Se o contrato foi reajustado depois... não pode: encerrado não recebe evento.
                 if c.preco_mensal and c.preco_mensal > 0:
-                    if ev.iniciativa is IniciativaDoEncerramento.CRITERIO:
-                        churn_k += c.preco_mensal
-                    else:
-                        churn_c += c.preco_mensal
+                    cat = "churn_criterio" if ev.iniciativa is IniciativaDoEncerramento.CRITERIO else "churn_cliente"
+                    itens.append(ItemDoMovimento(cat, c.id, c.grupo_id, c.preco_mensal, ev.data_do_evento, ev.id))
                 continue
             if ev.preco_mensal_novo is None or ev.preco_mensal_anterior is None:
                 continue
             delta = ev.preco_mensal_novo - ev.preco_mensal_anterior
             if delta > 0:
-                if ev.tipo is T.REAJUSTE:
-                    reajuste += delta
-                else:
-                    expansao += delta
+                cat = "reajuste" if ev.tipo is T.REAJUSTE else "expansao"
+                itens.append(ItemDoMovimento(cat, c.id, c.grupo_id, delta, ev.data_do_evento, ev.id))
             elif delta < 0:
-                contracao += -delta
-    return novo, expansao, reajuste, contracao, churn_c, churn_k
+                itens.append(ItemDoMovimento("contracao", c.id, c.grupo_id, -delta, ev.data_do_evento, ev.id))
+    return itens
+
+
+def _fluxos(contratos: Iterable[_Contrato], de: date, ate: date, *, so_existentes_em: date | None = None):
+    """Soma os movimentos com data em [de, ate]. Devolve (novo, expansao, reajuste, contracao, churn_cliente, churn_criterio)."""
+    somas = dict.fromkeys(CATEGORIAS_DO_MOVIMENTO, ZERO)
+    for item in itens_do_movimento(contratos, de, ate, so_existentes_em=so_existentes_em):
+        somas[item.categoria] += item.valor
+    return tuple(somas[c] for c in CATEGORIAS_DO_MOVIMENTO)
 
 
 def _liquido(f) -> Decimal:
@@ -284,3 +336,27 @@ def movimento(contratos: Iterable[_Contrato], de: date, ate: date, hoje: date) -
     else:
         nrr = grr = None
     return Movimento(de, ate, inicio, novo, exp, rej, con, ch_c, ch_k, fim, nrr, grr)
+
+
+def ativo_em(c: _Contrato, dia: date) -> bool:
+    """Se o contrato estava faturando ao fim de `dia`: assinado até lá (ou da carteira anterior) e sem
+    encerramento até lá. Suspenso não fatura. Para a parcela esperada do mês (`crm.domain.recebimentos`)."""
+    if c.situacao in (SituacaoContrato.AGUARDANDO_ASSINATURA, SituacaoContrato.SUSPENSO):
+        return False
+    if c.data_inicio is not None and c.data_inicio > dia:
+        return False
+    return not any(ev.tipo is T.ENCERRAMENTO and ev.data_do_evento <= dia for ev in c.eventos)
+
+
+def preco_em(c: _Contrato, dia: date) -> Decimal | None:
+    """O preço mensal ao fim de `dia`: o atual menos o que os eventos depois de `dia` mudaram (a Correção
+    não volta: o passado também já era o corrigido, como em `mrr_em`)."""
+    if c.preco_mensal is None:
+        return None
+    preco = c.preco_mensal
+    for ev in c.eventos:
+        if ev.data_do_evento <= dia or ev.tipo in (T.CORRECAO, T.ENCERRAMENTO):
+            continue
+        if ev.preco_mensal_novo is not None and ev.preco_mensal_anterior is not None:
+            preco -= ev.preco_mensal_novo - ev.preco_mensal_anterior
+    return preco

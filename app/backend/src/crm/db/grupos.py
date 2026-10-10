@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from crm.db.base import agora
-from crm.db.modelos import Contrato, Empresa, FusaoDeGrupos, GrupoEconomico, Oportunidade, VinculoDeContato
+from crm.db.modelos import Contrato, Empresa, FusaoDeGrupos, GrupoEconomico, Oportunidade, Recebimento, VinculoDeContato
 from crm.domain.listas import SituacaoGrupo
 
 __all__ = ["fundir_grupos", "desfazer_fusao", "FusaoInvalida", "ResultadoDaFusao"]
@@ -24,7 +24,7 @@ __all__ = ["fundir_grupos", "desfazer_fusao", "FusaoInvalida", "ResultadoDaFusao
 #: (Ficha de conta e abordagem do agente SDR ainda não são movidas: têm regra própria.)
 #: Contato não está aqui desde 01/10/2026: ele é ligado às empresas e vai junto com elas. A chave
 #: "pessoa_contato" de `movidos` é só registro (quem foi junto) e é ignorada ao desfazer.
-_MOVIDOS = ((Empresa, "empresa"), (Oportunidade, "oportunidade"), (Contrato, "contrato"))
+_MOVIDOS = ((Empresa, "empresa"), (Oportunidade, "oportunidade"), (Contrato, "contrato"), (Recebimento, "recebimento"))
 
 
 class FusaoInvalida(ValueError):

@@ -1395,9 +1395,9 @@ class TestMrrComCarteiraAnterior:
         assert c["atual"]["valor"] == "3250.00" and c["contratos_da_carteira_anterior"] == 1  # 3.000 × 13 ÷ 12
         assert c["cobertura_completa"] is True and "Inclui a carteira anterior" in c["aviso"]
         assert (c["movimento"]["mrr_inicio"], c["movimento"]["novo"]) == ("3250.00", "0.00")
-        # Com a carteira inteira, compara com o KPI oficial (meta R$ 400 mil, alerta < R$ 200 mil).
+        # Com a carteira inteira, compara com o KPI oficial em 13 parcelas (R$ 433.333,33, alerta < R$ 216.666,67).
         assert (c["meta"], c["alerta"], c["contra_a_meta"], c["falta_para_a_meta"]) == (
-            "400000", "200000", "abaixo_do_alerta", "396750.00")
+            "433333.33", "216666.67", "abaixo_do_alerta", "430083.33")
 
     def test_sem_a_carteira_anterior_nao_compara_com_a_meta(self, cliente):
         c = cliente.get("/api/mrr", params={"hoje": "2026-09-25"}).json()

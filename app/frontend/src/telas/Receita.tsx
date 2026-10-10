@@ -2,13 +2,18 @@
  *
  * O KPI oficial de MRR é a receita da carteira inteira. Sem a carteira anterior ao CRM
  * carregada, o número é **parcial**, a tela diz isso e **não compara com a meta**. Com ela,
- * compara com a meta (R$ 400 mil) e o alerta (R$ 200 mil), com ícone e texto (02/10/2026).
+ * compara com a meta e o alerta de Configurações › Metas, com ícone e texto (02/10/2026; em 13 parcelas desde 10/10).
  * Churn vem separado por quem decidiu: cliente (churn) e Critério (saída organizada).
+ *
+ * Padrão dos indicadores (10/10/2026): cada número tem "Ver composição", que abre a lista do que o
+ * compõe — o MRR por cliente, e cada contrato ou evento de cada linha do movimento.
  */
 
 import { useState } from "react";
 import { api } from "../api/cliente";
-import type { Mrr } from "../api/tipos";
+import type { CategoriaDoMovimento, ItemDoMovimento, Mrr } from "../api/tipos";
+import { BotaoDeComposicao } from "../componentes/Indicador";
+import { ComposicaoDaCarteira } from "../componentes/MrrDaCarteira";
 import { Carregando, Erro } from "../componentes/estados";
 import { aliquota, data, dinheiro, percentual } from "../formato";
 import { usarDados } from "../usarDados";
@@ -33,12 +38,51 @@ const SITUACAO_DA_META = {
   abaixo_do_alerta: ["⚠ Abaixo do alerta", "perda"],
 } as const;
 
-function Linha({ rotulo, valor, sinal, nota }: { rotulo: string; valor: string; sinal?: "+" | "−"; nota?: string }) {
+const ROTULO_DA_CATEGORIA: Record<CategoriaDoMovimento, string> = {
+  novo: "Novos contratos", expansao: "Expansão", reajuste: "Reajuste", contracao: "Contração",
+  churn_cliente: "Churn: decidido pelo cliente", churn_criterio: "Saída organizada: decidida pela Critério",
+};
+
+/** A lista de uma linha do movimento: cada contrato (novo) ou evento, com cliente, data e valor. */
+function ItensDaLinha({ de, categoria }: { de: string; categoria: CategoriaDoMovimento }) {
+  const { dados, carregando, erro, recarregar } = usarDados<{ itens: ItemDoMovimento[] }>(() => api.itensDoMovimento(de), [de]);
+  if (carregando && !dados) return <Carregando rotulo="Buscando os contratos" />;
+  if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
+  const itens = (dados?.itens ?? []).filter((i) => i.categoria === categoria);
+  if (itens.length === 0) return <p className="numero-estado">Nada nesta linha no período.</p>;
+  const total = itens.reduce((t, i) => t + Number(i.valor), 0);
+  return (
+    <table className="tabela" aria-label={ROTULO_DA_CATEGORIA[categoria]}>
+      <thead><tr><th>Cliente</th><th>Contrato</th><th>Data</th><th className="tabela-numero">MRR</th></tr></thead>
+      <tbody>
+        {itens.map((i, n) => (
+          <tr key={n}>
+            <td>{i.grupo}</td>
+            <td>{i.escopo ?? `Contrato ${i.contrato_id}`}</td>
+            <td>{i.data ? data(i.data) : "—"}</td>
+            <td className="tabela-numero">{dinheiro(i.valor)}</td>
+          </tr>
+        ))}
+        <tr className="composicao-total"><td>Total</td><td /><td /><td className="tabela-numero">{dinheiro(total)}</td></tr>
+      </tbody>
+    </table>
+  );
+}
+
+function Linha({ rotulo, valor, sinal, nota, categoria, de, explicacao }: {
+  rotulo: string; valor: string; sinal?: "+" | "−"; nota?: string; categoria?: CategoriaDoMovimento; de?: string; explicacao?: string;
+}) {
   return (
     <tr>
-      <td>
+      <td title={explicacao}>
         {rotulo}
         {nota && <span className="numero-nota"> · {nota}</span>}
+        {categoria && de && Number(valor) !== 0 && (
+          <BotaoDeComposicao rotulo="ver composição" composicao={{
+            titulo: ROTULO_DA_CATEGORIA[categoria], subtitulo: `Desde ${data(de)}`,
+            conteudo: () => <ItensDaLinha de={de} categoria={categoria} />,
+          }} />
+        )}
       </td>
       <td className="tabela-numero">
         {sinal && Number(valor) !== 0 ? `${sinal} ` : ""}
@@ -67,7 +111,13 @@ export function Receita({ versao = 0 }: { versao?: number }) {
       <div className="receita-topo">
         <div>
           <h3 className="numero-rotulo">{dados.cobertura_completa ? "MRR da carteira" : "MRR dos contratos registrados"}</h3>
-          <p className="numero-valor">{dinheiro(atual.valor)}</p>
+          <p className="numero-valor" title="Soma da parcela mensal dos contratos ativos, em bruto, × 13 ÷ 12 (13 parcelas no ano).">
+            {dinheiro(atual.valor)}
+            <BotaoDeComposicao rotulo="ver composição" composicao={{
+              titulo: "MRR atual da carteira", subtitulo: "Contratado e recebido por cliente", quantos: atual.grupos,
+              conteudo: () => <ComposicaoDaCarteira />,
+            }} />
+          </p>
           {dados.contra_a_meta && (
             <p className="receita-meta">
               <span className={`etiqueta etiqueta-${SITUACAO_DA_META[dados.contra_a_meta][1]}`}>
@@ -129,13 +179,19 @@ export function Receita({ versao = 0 }: { versao?: number }) {
           De {data(m.de)} a {data(m.ate)}
         </caption>
         <tbody>
-          <Linha rotulo="MRR no início" valor={m.mrr_inicio} />
-          <Linha rotulo="Novos contratos" valor={m.novo} sinal="+" nota="assinados no período" />
-          <Linha rotulo="Expansão" valor={m.expansao} sinal="+" />
-          <Linha rotulo="Reajuste" valor={m.reajuste} sinal="+" />
-          <Linha rotulo="Contração" valor={m.contracao} sinal="−" />
-          <Linha rotulo="Churn: decidido pelo cliente" valor={m.churn_cliente} sinal="−" />
-          <Linha rotulo="Saída organizada: decidida pela Critério" valor={m.churn_criterio} sinal="−" />
+          <Linha rotulo="MRR no início" valor={m.mrr_inicio} explicacao="O MRR de hoje menos tudo o que se moveu desde o início do período." />
+          <Linha rotulo="Novos contratos" valor={m.novo} sinal="+" nota="assinados no período" categoria="novo" de={m.de}
+            explicacao="Preço mensal na assinatura dos contratos assinados no período, × 13 ÷ 12." />
+          <Linha rotulo="Expansão" valor={m.expansao} sinal="+" categoria="expansao" de={m.de}
+            explicacao="Aumento de preço por Expansão ou Aditivo no período." />
+          <Linha rotulo="Reajuste" valor={m.reajuste} sinal="+" categoria="reajuste" de={m.de}
+            explicacao="Aumento de preço por Reajuste no período." />
+          <Linha rotulo="Contração" valor={m.contracao} sinal="−" categoria="contracao" de={m.de}
+            explicacao="Qualquer queda de preço no período (a Correção de lançamento não conta)." />
+          <Linha rotulo="Churn: decidido pelo cliente" valor={m.churn_cliente} sinal="−" categoria="churn_cliente" de={m.de}
+            explicacao="Contratos encerrados no período por decisão do cliente, pelo valor que tinham." />
+          <Linha rotulo="Saída organizada: decidida pela Critério" valor={m.churn_criterio} sinal="−" categoria="churn_criterio" de={m.de}
+            explicacao="Contratos encerrados no período por decisão da Critério, pelo valor que tinham." />
           <tr>
             <td><strong>MRR no fim</strong></td>
             <td className="tabela-numero"><strong>{dinheiro(m.mrr_fim)}</strong></td>
@@ -145,9 +201,11 @@ export function Receita({ versao = 0 }: { versao?: number }) {
 
       <div className="receita-retencao">
         <p>
-          <strong>NRR</strong> {m.nrr !== null ? percentual(m.nrr) : "não calculável"}
+          <strong title="(MRR no início + expansão + reajuste − contração − churn) ÷ MRR no início, só com contratos que já existiam no início.">NRR</strong>{" "}
+          {m.nrr !== null ? percentual(m.nrr) : "não calculável"}
           {" · "}
-          <strong>GRR</strong> {m.grr !== null ? percentual(m.grr) : "não calculável"}
+          <strong title="(MRR no início − contração − churn) ÷ MRR no início, só com contratos que já existiam no início.">GRR</strong>{" "}
+          {m.grr !== null ? percentual(m.grr) : "não calculável"}
         </p>
         <p className="numero-nota">
           {m.nrr === null

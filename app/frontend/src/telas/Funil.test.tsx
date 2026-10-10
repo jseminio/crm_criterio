@@ -13,6 +13,7 @@ import { api } from "../api/cliente";
 import type { ColunaDoFunil, Indicadores, Listas, OportunidadeDetalhe } from "../api/tipos";
 import { Funil } from "./Funil";
 
+vi.mock("../componentes/MrrDaCarteira", () => ({ MrrDaCarteira: () => null }));
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
   return {

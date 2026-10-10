@@ -1444,6 +1444,20 @@ td > .celula-fonte { display: block; }
 .composicao h3 { margin: var(--e3) 0 var(--e2); }
 .recortes .ind-composicao-solto { --cor: var(--foco); }
 
+/* KPIs da liderança no padrão dos indicadores (10/10/2026): cinco por linha. */
+.numeros-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1280px) { .numeros-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .numeros-kpis { grid-template-columns: minmax(0, 1fr); } }
+.numeros-kpis .ind .campo-ajuda, .numeros-kpis .ind .aviso-de-movimento { font-size: 11px; }
+
+/* Explicação ao passar o mouse fora dos cards (10/10/2026): sublinhado pontilhado diz que há explicação. */
+.explicavel { position: relative; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+.explicavel-janela { display: none; position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; width: 300px; max-width: 80vw;
+  background: var(--surface-card); border: 1px solid var(--borda); border-top: 4px solid var(--foco); border-radius: var(--raio-md);
+  box-shadow: var(--sombra-painel); padding: var(--e3); font: 400 12px/1.45 var(--fonte-ui); color: #2a3242; text-transform: none;
+  letter-spacing: normal; white-space: normal; text-align: left; }
+.explicavel:hover .explicavel-janela, .explicavel:focus .explicavel-janela, .explicavel:focus-within .explicavel-janela { display: block; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

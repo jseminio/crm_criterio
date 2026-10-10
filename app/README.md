@@ -46,6 +46,15 @@ resultado (ver "SDR de IA", abaixo).
   conta (recusada na conversão, sem data no ciclo, sem próxima ação) aparece dito em palavra. Rota:
   `GET /api/indicadores/composicao?indicador=…` (mais os filtros; `recorte` e `chave` para uma linha dos
   Recortes). `calcular` e `composicao` usam os mesmos conjuntos (`_conjuntos`).
+- **Entrega 3a — Inteligência de Conversão** (10/10/2026): os 5 **KPIs da liderança** passam ao card do padrão
+  (explicação ao passar o mouse e "Ver composição"); a composição separa o que entra na conta do que fica fora
+  (a base do churn, quem ficou sem reunião na cobertura) e inclui as expansões no upsell e os contratos no ticket.
+  **Plano de MRR**: o realizado e cada linha por motor abrem os contratos e eventos que somam
+  (`GET /api/inteligencia/plano/realizado`, valor com sinal; a soma é o realizado); cada cenário abre o mês a mês;
+  cada serviço dos cenários de ticket abre os recorrentes aceitos. Explicação fora de card: `Explicavel`.
+- **Recortes e cenários de ticket alinhados ao card de ticket** (decisão de Eduardo, 10/10/2026): só serviço
+  recorrente (C1) e em MRR (parcela × 13 ÷ 12). A estatística dos cenários roda sobre a parcela e cada valor sai em
+  MRR, para o arredondamento não mudar quem é atípico. Regra única: `indicadores.e_recorrente`.
 - **Churn**: registra-se em Gestão de contratos › contrato › Registrar evento › **Encerramento** (data, quem
   decidiu, motivo). O cliente só conta como perdido quando o último contrato dele é encerrado.
 

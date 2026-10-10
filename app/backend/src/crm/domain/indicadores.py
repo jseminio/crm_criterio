@@ -46,6 +46,7 @@ __all__ = [
     "ItemDaComposicao",
     "calcular",
     "composicao",
+    "e_recorrente",
 ]
 
 ZERO = Decimal("0.00")
@@ -281,9 +282,15 @@ def _conjuntos(todas: list[_Oportunidade]) -> _Conjuntos:
         em_aberto=[o for o in todas if not o.situacao.decidida],
         decididas=[o for o in todas if o.situacao.decidida],
         aceitas=aceitas,
-        recorrentes=[o for o in aceitas if o.preco_mensal is not None and o.preco_mensal > 0
-                     and getattr(o, "linha_servico", LinhaServico.C1) is LinhaServico.C1],
+        recorrentes=[o for o in aceitas if e_recorrente(o)],
     )
+
+
+def e_recorrente(o) -> bool:
+    """Aceita, de serviço recorrente (C1), com preço mensal (09/10/2026). A mesma regra no ticket do card,
+    nos Recortes e nos cenários de ticket (`crm.domain.recortes`, alinhado em 10/10/2026)."""
+    return (o.situacao.ganha and o.preco_mensal is not None and o.preco_mensal > 0
+            and getattr(o, "linha_servico", LinhaServico.C1) is LinhaServico.C1)
 
 
 def _tem_proxima_acao(o: _Oportunidade) -> bool:

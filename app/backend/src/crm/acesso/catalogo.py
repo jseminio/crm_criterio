@@ -102,7 +102,7 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     # Recebimentos (10/10/2026): importar é só do Administrador — a rota confere; aqui, o nível das metas
     ("POST", r"/api/recebimentos/(previa|importar)", ("configuracoes.metas",)),
     ("GET", r"/api/recebimentos/importacoes", ("contratos.ver",)),
-    ("GET", r"/api/inteligencia/(plano|cenarios-de-ticket|fases)", ("funil.ver",)),
+    ("GET", r"/api/inteligencia/(plano|plano/realizado|cenarios-de-ticket|fases)", ("funil.ver",)),
     ("PUT", r"/api/inteligencia/plano", ("configuracoes.metas",)),  # só o Administrador (03/10/2026)
     # KPIs da liderança (09/10/2026): só o Administrador — a rota confere; aqui, o mesmo nível das metas
     ("GET", r"/api/inteligencia/kpis-lideranca", ("configuracoes.metas",)),

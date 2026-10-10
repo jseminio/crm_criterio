@@ -1,7 +1,8 @@
 /** Recortes do funil por serviço, canal e captador — E5.
  *
  * Segue os mesmos filtros da faixa de números. Ticket e mediana são só dos
- * contratos **recorrentes aceitos** (preço mensal > 0); a coluna "Recorrentes"
+ * contratos **recorrentes aceitos** (serviço recorrente C1, em MRR: parcela × 13 ÷ 12 — alinhado ao card de
+ * ticket em 10/10/2026); a coluna "Recorrentes"
  * diz quantos são, porque com poucos a média não diz nada.
  */
 

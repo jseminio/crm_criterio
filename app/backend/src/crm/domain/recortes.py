@@ -1,7 +1,8 @@
 """Recortes do funil por serviço, canal e captador, e os cenários de ticket.
 
-**Recorrente** = aceita com preço mensal **maior que zero**, a mesma definição do
-`TicketRecorrente` em `crm.domain.indicadores`.
+**Recorrente** = aceita de serviço recorrente (C1) com preço mensal, e o valor é MRR (parcela × 13 ÷ 12):
+a mesma regra do `TicketRecorrente` em `crm.domain.indicadores` (alinhado em 10/10/2026 — antes, aqui
+entravam consultoria e legalização e o valor era a parcela).
 
 Os cenários de ticket saem de uma regra estatística, não de escolha manual de quem
 tirar da conta (pedido de Eduardo, 25/09/2026):
@@ -25,7 +26,9 @@ from decimal import Decimal
 from statistics import median, quantiles
 from typing import Iterable, Protocol
 
+from crm.domain.indicadores import e_recorrente
 from crm.domain.listas import Situacao
+from crm.domain.mrr import mensalizar
 
 __all__ = ["CenariosDeTicket", "LinhaDeRecorte", "DIMENSOES", "recortar", "cenarios_de_ticket", "valor_do_recorte"]
 
@@ -85,8 +88,16 @@ def valor_do_recorte(o, dimensao: str) -> str:
     return _valor(o, dimensao)
 
 
+def _parcela(o) -> Decimal | None:
+    """A parcela da aceita recorrente — só serviço recorrente (C1), a mesma regra do card de ticket
+    (`indicadores.e_recorrente`; alinhado por decisão de Eduardo em 10/10/2026)."""
+    return o.preco_mensal if e_recorrente(o) else None
+
+
 def _mensal(o) -> Decimal | None:
-    return o.preco_mensal if o.situacao.ganha and o.preco_mensal is not None and o.preco_mensal > 0 else None
+    """O MRR da aceita recorrente: a parcela × 13 ÷ 12, como todo MRR do CRM."""
+    p = _parcela(o)
+    return mensalizar(p) if p is not None else None
 
 
 def recortar(oportunidades: Iterable[_Oportunidade], dimensao: str) -> list[LinhaDeRecorte]:
@@ -119,8 +130,10 @@ def recortar(oportunidades: Iterable[_Oportunidade], dimensao: str) -> list[Linh
 
 
 def cenarios_de_ticket(oportunidades: Iterable[_Oportunidade]) -> CenariosDeTicket | None:
-    """`None` com menos de 4 contratos recorrentes: não há base para cenário."""
-    mensais = sorted(m for o in oportunidades if (m := _mensal(o)) is not None)
+    """`None` com menos de 4 contratos recorrentes: não há base para cenário. A estatística (mediana,
+    atípico, quartil) roda sobre a parcela, e cada valor sai em MRR (× 13 ÷ 12): o fator é o mesmo para
+    todos, e assim o arredondamento ao centavo não muda quem é atípico."""
+    mensais = sorted(m for o in oportunidades if (m := _parcela(o)) is not None)
     if len(mensais) < MINIMO_PARA_CENARIOS:
         return None
     mediana = Decimal(median(mensais))
@@ -130,14 +143,15 @@ def cenarios_de_ticket(oportunidades: Iterable[_Oportunidade]) -> CenariosDeTick
     media_comum = sum(comuns, ZERO) / len(comuns)
     mediana_comum = Decimal(median(comuns))
     q3 = Decimal(quantiles(comuns, n=4, method="inclusive")[2]) if len(comuns) >= 2 else comuns[0]
+    mrr = mensalizar
     return CenariosDeTicket(
         contratos=len(mensais),
         atipicos=len(atipicos),
-        limite_do_atipico=limite.quantize(CENTAVOS),
-        conservador=min(mediana_comum, media_comum).quantize(CENTAVOS),
-        base=media_comum.quantize(CENTAVOS),
-        otimista=max(q3, media_comum).quantize(CENTAVOS),
-        atipico_minimo=min(atipicos) if atipicos else None,
-        atipico_medio=(sum(atipicos, ZERO) / len(atipicos)).quantize(CENTAVOS) if atipicos else None,
-        atipico_maximo=max(atipicos) if atipicos else None,
+        limite_do_atipico=mrr(limite),
+        conservador=mrr(min(mediana_comum, media_comum)),
+        base=mrr(media_comum),
+        otimista=mrr(max(q3, media_comum)),
+        atipico_minimo=mrr(min(atipicos)) if atipicos else None,
+        atipico_medio=mrr(sum(atipicos, ZERO) / len(atipicos)) if atipicos else None,
+        atipico_maximo=mrr(max(atipicos)) if atipicos else None,
     )

@@ -121,7 +121,23 @@ def test_churn_de_clientes_sobre_a_base_do_fim_do_ano(cliente):
 def test_cobertura_conta_so_reuniao_realizada_na_janela_da_classe(cliente):
     c = _kpis(cliente)["cobertura"]
     assert D(c["valor"]) == D("50.0")  # Antigo (A) teve a mensal; Novo (B) não teve a trimestral
-    assert [i["grupo"] for i in c["itens"]] == ["Novo (classe B)"]
+    # A composição traz quem conta (em dia, com a data) e quem ficou fora (10/10/2026).
+    assert [(i["grupo"], i["entra"]) for i in c["itens"]] == [("Antigo", True), ("Novo (classe B)", False)]
+    assert "reunião em 12/10/2026 (classe A)" == c["itens"][0]["detalhe"]
+
+
+def test_cada_kpi_tem_explicacao_e_a_lista_bate_com_o_numero(cliente):
+    k = _kpis(cliente)
+    assert all(x["explicacao"] for x in k.values())
+    assert sum(D(i["valor"]) for i in k["mrr_novo"]["itens"]) == D(k["mrr_novo"]["valor"])
+    assert sum(D(i["valor"]) for i in k["ticket"]["itens"]) == D(k["mrr_novo"]["valor"])  # o ticket reparte o MRR novo
+    ups = k["upsell"]
+    assert sum(D(i["valor"]) for i in ups["itens"]) == D(ups["extras"]["recorrente"]) + D(ups["extras"]["nao_recorrente"])
+    churn = k["churn"]
+    assert sum(i["entra"] for i in churn["itens"]) == churn["extras"]["perdidos"]
+    assert len(churn["itens"]) == churn["extras"]["base"]  # os perdidos estavam na base
+    cob = k["cobertura"]
+    assert sum(i["entra"] for i in cob["itens"]) == cob["extras"]["em_dia"] and len(cob["itens"]) == cob["extras"]["total"]
 
 
 def test_mes_que_nao_comecou_e_recusado(cliente):

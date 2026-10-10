@@ -25,12 +25,13 @@ from crm.api.acesso import quem_fez
 from crm.api.classificacao import parametros_vigentes
 from crm.db.base import agora
 from crm.db.modelos import (
-    Contrato, ContratoPrevistoDoPlano, InvestimentoEmMidia, Lead, Oportunidade, PlanoDeMrr,
+    Contrato, ContratoPrevistoDoPlano, GrupoEconomico, InvestimentoEmMidia, Lead, Oportunidade, PlanoDeMrr,
 )
 from crm.domain import fases_do_cliente as fases
 from crm.domain import mrr as regras_de_mrr
 from crm.domain import plano_de_mrr as regras
 from crm.domain.listas import AderenciaDaPromessa, MotivoDeDescarte, MotivoRecusa, TipoCanal, TipoDeEventoDeContrato
+from crm.domain.indicadores import e_recorrente
 from crm.domain.recortes import cenarios_de_ticket
 
 __all__ = ["montar_fases", "premissas_vigentes", "roteador_de_inteligencia"]
@@ -253,18 +254,50 @@ def _ajuste_de_volume(falta: Decimal, meses_restantes: int, ticket: Decimal, tet
     return texto + f" (teto: {_num(teto)}, {nome_do_teto})."
 
 
-def montar_plano(sessao: Session, hoje: date) -> PlanoResposta:
-    p, linha = premissas_vigentes(sessao)
-    projecoes = {n: regras.projetar(p, n) for n in regras.CENARIOS}
-    prev = projecoes["previsto"]
+class ItemDoRealizado(BaseModel):
+    linha: Literal["bpo", "contabil", "escada", "perdas", "outros"]
+    categoria: str
+    grupo: str
+    contrato_id: int
+    escopo: str | None
+    data: date | None
+    valor: Decimal
+    """Com sinal: perdas negativas."""
 
+
+def _contratos_do_plano(sessao: Session):
     registrados = list(sessao.scalars(sa.select(Contrato)))
     imposto = parametros_vigentes(sessao)[1].imposto
     em_bruto = regras_de_mrr.em_bruto(registrados, imposto)
     motor = {
         c.id: regras.motor_do_contrato(c.oportunidade.servico if c.oportunidade else None, c.escopo) for c in registrados
     }
-    por_motor = regras.contratos_por_motor(em_bruto, lambda c: motor[c.id])
+    return registrados, em_bruto, regras.contratos_por_motor(em_bruto, lambda c: motor[c.id])
+
+
+def composicao_do_realizado(sessao: Session, hoje: date) -> list[ItemDoRealizado]:
+    p, _ = premissas_vigentes(sessao)
+    ate = min(hoje, p.fim)
+    if ate < p.inicio:
+        return []
+    registrados, _, por_motor = _contratos_do_plano(sessao)
+    escopo = {c.id: c.escopo for c in registrados}
+    itens = regras.itens_do_realizado(por_motor, p.inicio, ate)
+    nomes = dict(sessao.execute(sa.select(GrupoEconomico.id, GrupoEconomico.nome)
+                                .where(GrupoEconomico.id.in_({i.grupo_id for _, i in itens} or {0}))).all())
+    return [
+        ItemDoRealizado(linha=linha, categoria=i.categoria, grupo=nomes.get(i.grupo_id, "?"), contrato_id=i.contrato_id,
+                        escopo=escopo.get(i.contrato_id), data=i.data, valor=-i.valor if linha == "perdas" else i.valor)
+        for linha, i in sorted(itens, key=lambda x: (x[1].data or date.min, x[1].contrato_id))
+    ]
+
+
+def montar_plano(sessao: Session, hoje: date) -> PlanoResposta:
+    p, linha = premissas_vigentes(sessao)
+    projecoes = {n: regras.projetar(p, n) for n in regras.CENARIOS}
+    prev = projecoes["previsto"]
+
+    registrados, em_bruto, por_motor = _contratos_do_plano(sessao)
     ate = min(hoje, p.fim)
     realizado = regras.realizar(por_motor, p.inicio, ate) if ate >= p.inicio else []
     acumulado = realizado[-1].acumulado if realizado else ZERO
@@ -406,6 +439,12 @@ def roteador_de_inteligencia(obter_sessao: Callable[[], Iterator[Session]]) -> A
         sessao.flush()
         return montar_plano(sessao, hoje or date.today())
 
+    @r.get("/api/inteligencia/plano/realizado", response_model=list[ItemDoRealizado])
+    def realizado_do_plano(sessao: Session = Depends(obter_sessao, scope="function"), hoje: date | None = None) -> list[ItemDoRealizado]:
+        """Cada contrato ou evento que compõe o realizado do plano (10/10/2026), com a linha (motor) e o valor
+        com sinal: a soma é o realizado do bloco da meta; a soma de uma linha, o realizado do motor."""
+        return composicao_do_realizado(sessao, hoje or date.today())
+
     @r.get("/api/inteligencia/cenarios-de-ticket", response_model=list[CenariosDoServico])
     def cenarios_por_servico(sessao: Session = Depends(obter_sessao, scope="function")) -> list[CenariosDoServico]:
         """Os cenários de ticket separados por serviço: o atípico de um serviço não é o de outro."""
@@ -415,7 +454,7 @@ def roteador_de_inteligencia(obter_sessao: Callable[[], Iterator[Session]]) -> A
                 por_servico.setdefault(o.servico or "Sem serviço", []).append(o)
         lista = []
         for servico, itens in por_servico.items():
-            recorrentes = sum(1 for o in itens if o.preco_mensal is not None and o.preco_mensal > 0)
+            recorrentes = sum(1 for o in itens if e_recorrente(o))  # a regra do ticket (10/10/2026)
             if not recorrentes:
                 continue
             c = cenarios_de_ticket(itens)

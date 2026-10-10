@@ -34,9 +34,10 @@ from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Iterable
 
-from crm.domain.mrr import _fluxos
+from crm.domain.mrr import ItemDoMovimento, _fluxos, itens_do_movimento
 
 __all__ = [
+    "itens_do_realizado", "linha_do_plano",
     "CENARIOS", "MOTOR_BPO", "MOTOR_CONTABIL", "PADRAO", "Cenario", "ContratoPrevisto", "LinhaPrevista",
     "LinhaRealizada", "Premissas", "contratos_por_motor", "Projecao", "Situacao", "meses", "motor_do_contrato", "projetar",
     "realizar", "situacao",
@@ -286,6 +287,29 @@ def realizar(contratos_por_motor: dict[str, list], inicio: date, ate: date) -> l
             contar(contratos_por_motor.get(MOTOR_CONTABIL, [])), contar(contratos_por_motor.get(MOTOR_BPO, [])),
         ))
     return linhas
+
+
+def linha_do_plano(motor: str, categoria: str) -> str:
+    """Em que linha do plano um movimento cai — a mesma conta de `realizar`: novo de contábil e de BPO;
+    expansão de BPO é a escada; reajuste e expansão de contábil, e reajuste de BPO, são "outros"; contração e
+    churn são perdas."""
+    if categoria in ("contracao", "churn_cliente", "churn_criterio"):
+        return "perdas"
+    if categoria == "novo":
+        return "bpo" if motor == MOTOR_BPO else "contabil"
+    if motor == MOTOR_BPO and categoria == "expansao":
+        return "escada"
+    return "outros"
+
+
+def itens_do_realizado(contratos_por_motor: dict[str, list], inicio: date, ate: date) -> list[tuple[str, ItemDoMovimento]]:
+    """Cada contrato ou evento que compõe o realizado do plano de `inicio` a `ate` (10/10/2026), com a linha
+    do plano. Perdas somam negativo: a soma com sinal é o acumulado de `realizar`."""
+    itens = []
+    for motor, contratos in contratos_por_motor.items():
+        for item in itens_do_movimento(contratos, inicio, ate):
+            itens.append((linha_do_plano(motor, item.categoria), item))
+    return itens
 
 
 # ---------------------------------------------------------------- situação

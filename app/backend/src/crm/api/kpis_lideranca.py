@@ -52,6 +52,8 @@ class Item(BaseModel):
     grupo: str
     detalhe: str
     valor: Decimal
+    entra: bool = True
+    """Conta no numerador do KPI (10/10/2026). Fora: a base do churn, quem ficou sem reunião na cobertura."""
 
 
 class Kpi(BaseModel):
@@ -67,6 +69,9 @@ class Kpi(BaseModel):
     meta: str | None = None
     extras: dict[str, Decimal | int | str | None] = {}
     itens: list[Item] = []
+    """A composição do número ("Ver composição", 10/10/2026): o que entrou na conta, e o que ficou fora."""
+    explicacao: str = ""
+    """Como o número é calculado: aparece ao passar o mouse."""
 
 
 class KpisResposta(BaseModel):
@@ -107,13 +112,19 @@ def _valendo_em(c, dia: date) -> bool:
     return c.situacao is not SituacaoContrato.ENCERRADO
 
 
+def _cnpj_do(c) -> str:
+    if c.empresa is not None:
+        return c.empresa.nome_fantasia or c.empresa.razao_social
+    return "sem CNPJ"
+
+
 def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
     de, ate_do_mes = _intervalo(mes)
     if de > hoje:
         raise HTTPException(422, "o mês ainda não começou")
     ate = min(ate_do_mes, hoje)
     imposto = parametros_vigentes(sessao)[1].imposto
-    originais = list(sessao.scalars(sa.select(Contrato).options(selectinload(Contrato.eventos))))
+    originais = list(sessao.scalars(sa.select(Contrato).options(selectinload(Contrato.eventos), selectinload(Contrato.empresa))))
     bruto = {c.id: c for c in regras_de_mrr.em_bruto(originais, imposto)}
     nomes = dict(sessao.execute(sa.select(GrupoEconomico.id, GrupoEconomico.nome)).all())
     mov = regras_de_mrr.movimento(list(bruto.values()), de, ate, hoje)
@@ -152,6 +163,8 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         chave="mrr_novo", titulo="20 · MRR novo no mês", valor=total_novo, unidade="R$",
         resumo=f"{len(novos)} contrato(s) recorrente(s) começaram no mês, já com a 13ª parcela",
         falta=falta_contrato, meta="Fixar após o baseline", itens=itens_novos,
+        explicacao="Soma do MRR (parcela × 13 ÷ 12, em bruto) dos contratos recorrentes com início no mês, da carteira "
+                   "inteira. Proposta aceita sem contrato não entra: aparece em Falta.",
     )
 
     def ticket(lista: list[tuple[Contrato, Decimal]]) -> dict[str, Decimal | int | None]:
@@ -179,6 +192,10 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         falta=falta_contrato + ([f"{sem_cnpj} contrato(s) sem CNPJ: contam como um CNPJ cada"] if sem_cnpj else []),
         meta="Crescendo sem elevar a concentração",
         extras={**{f"mes_{k}": v for k, v in do_mes.items()}, **{f"ano_{k}": v for k, v in do_ano.items()}},
+        itens=[Item(grupo=nomes.get(c.grupo_id, "?"),
+                    detalhe=f"{c.escopo or 'contrato'} · {_cnpj_do(c)}", valor=v) for c, v in novos],
+        explicacao="MRR novo do mês ÷ número de grupos (e ÷ número de CNPJs) que o geraram. Empresas do mesmo grupo "
+                   "contam como um grupo; contrato sem CNPJ conta como um CNPJ. O acumulado do ano vai na linha de baixo.",
     )
 
     # ------------------------------------------------ 18: upsell
@@ -186,6 +203,7 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         return any(c.grupo_id == grupo_id and c.id != exceto and _valendo_em(c, dia) for c in originais)
 
     expansao = mov.expansao
+    itens_de_expansao = [i for i in regras_de_mrr.itens_do_movimento(list(bruto.values()), de, ate) if i.categoria == "expansao"]
     cross_rec = [(c, v) for c, v in novos if era_cliente(c.grupo_id, de - timedelta(days=1), exceto=c.id)]
     recorrente = expansao + sum((v for _, v in cross_rec), ZERO)
     pontuais = [
@@ -207,9 +225,14 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         extras={"recorrente": recorrente, "recorrente_pct": _pct(recorrente, mrr_anterior),
                 "nao_recorrente": nao_recorrente, "nao_recorrente_pct": _pct(nao_recorrente, mrr_anterior),
                 "expansao": expansao, "contratos_de_clientes": len(cross_rec), "pontuais": len(pontuais)},
-        itens=[Item(grupo=nomes.get(c.grupo_id, "?"), detalhe="novo contrato recorrente", valor=v) for c, v in cross_rec]
+        itens=[Item(grupo=nomes.get(i.grupo_id, "?"), detalhe=f"expansão ou aditivo em {i.data:%d/%m}", valor=i.valor)
+               for i in itens_de_expansao]
+        + [Item(grupo=nomes.get(c.grupo_id, "?"), detalhe="novo contrato recorrente", valor=v) for c, v in cross_rec]
         + [Item(grupo=nomes.get(o.grupo_id, "?"), detalhe=f"{o.servico} (pontual)", valor=o.preco_anual or o.preco_mensal or ZERO)
            for o in pontuais],
+        explicacao="Recorrente: expansões e aditivos do mês + contratos recorrentes novos de quem já era cliente (MRR). "
+                   "Não recorrente: consultoria e legalização aceitas no mês por quem já era cliente (valor do serviço). "
+                   "Cada um sobre o MRR do fim do mês anterior.",
     )
 
     # ------------------------------------------------ 17: churn de clientes
@@ -238,13 +261,18 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         falta=([] if ano_anterior else [f"Os clientes perdidos em {de.year - 1}, para o baseline (contrato encerrado com a data)"]),
         meta=f"Abaixo do baseline de {de.year - 1} em 20%",
         extras={"perdidos": len(perdidos), "base": len(base), "perdidos_no_ano": len(perdidos_ano)},
-        itens=[Item(grupo=nomes.get(g, "?"), detalhe="perdeu o último contrato", valor=ZERO) for g in perdidos],
+        itens=[Item(grupo=nomes.get(g, "?"), detalhe="perdeu o último contrato no mês", valor=ZERO) for g in perdidos]
+        + [Item(grupo=nomes.get(g, "?"), detalhe=f"na base de {base_dia:%d/%m/%Y}", valor=ZERO, entra=False)
+           for g in sorted(base - set(perdidos), key=lambda g: nomes.get(g, ""))],
+        explicacao=f"Clientes (grupos) que perderam o último contrato no mês ÷ clientes com contrato valendo em "
+                   f"{base_dia:%d/%m/%Y}. Encerrar um contrato de quem tem outro não conta: é contração do MRR.",
     )
 
     # ------------------------------------------------ 21: cobertura de relacionamento
     classes, ultimas, cadencia = sucesso._classes(sessao), sucesso._ultimas(sessao), sucesso.cadencia_vigente(sessao)
     em_dia = total = 0
     sem_reuniao: list[str] = []
+    com_reuniao: list[str] = []
     for g, _anterior in sucesso._grupos(sessao):
         classe = classes.get(g.id)
         tipos = [t for t in cadencia.get(classe or "", []) if regras_do_sucesso.tipo(t)]
@@ -253,8 +281,10 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         total += 1
         meses = min(regras_do_sucesso.tipo(t).meses for t in tipos)
         janela = regras_do_sucesso.mais_meses(ate, -meses)
-        if any(janela < d <= ate for t, d in ultimas.get(g.id, {}).items() if t in tipos):
+        datas = [d for t, d in ultimas.get(g.id, {}).items() if t in tipos and janela < d <= ate]
+        if datas:
             em_dia += 1
+            com_reuniao.append(f"{g.nome}|reunião em {max(datas):%d/%m/%Y} (classe {classe})")
         else:
             sem_reuniao.append(f"{g.nome} (classe {classe})")
     kpi21 = Kpi(
@@ -264,7 +294,10 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         falta=([] if em_dia else ["Nenhuma reunião de resultado registrada na janela (Sucesso do Cliente)"]),
         meta="100% dos clientes-chave com reunião no trimestre",
         extras={"em_dia": em_dia, "total": total},
-        itens=[Item(grupo=n, detalhe="sem reunião na janela da classe", valor=ZERO) for n in sem_reuniao],
+        itens=[Item(grupo=n.split("|")[0], detalhe=n.split("|")[1], valor=ZERO) for n in com_reuniao]
+        + [Item(grupo=n, detalhe="sem reunião na janela da classe", valor=ZERO, entra=False) for n in sem_reuniao],
+        explicacao="Clientes com classe que tiveram a reunião realizada dentro da janela da classe (A: 1 mês, B: 3 meses, "
+                   "C: 6 meses) até o fim do mês ÷ clientes com classe. Só conta reunião registrada no Sucesso do Cliente.",
     )
 
     return KpisResposta(mes=mes, de=de, ate=ate, kpis=[kpi20, kpi19, kpi18, kpi17, kpi21])

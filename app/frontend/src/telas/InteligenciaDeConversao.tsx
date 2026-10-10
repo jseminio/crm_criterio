@@ -10,10 +10,13 @@
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type {
-  CenariosDoServico, ChaveDaSituacao, ContratoPrevistoDoPlano, NomeDoCenario, PlanoDeMrr, PremissasDoPlano, SituacaoDoPlano,
+  CenariosDoServico, ChaveDaSituacao, ContratoPrevistoDoPlano, ItemDoRealizado, NomeDoCenario, PlanoDeMrr, PremissasDoPlano,
+  SituacaoDoPlano,
 } from "../api/tipos";
 import { CampoDeValor } from "../componentes/CampoDeValor";
 import { KpisDaLideranca } from "../componentes/KpisDaLideranca";
+import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
+import { ComposicaoDoFunil } from "../componentes/ComposicaoDoFunil";
 import { Carregando, Erro } from "../componentes/estados";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { QuatroFases } from "../componentes/QuatroFases";
@@ -61,6 +64,70 @@ function Situacao({ situacao }: { situacao: SituacaoDoPlano | null }) {
   );
 }
 
+// ---------------------------------------------------------------- composição do realizado (10/10/2026)
+
+const LINHA_DO_PLANO: Record<ItemDoRealizado["linha"], string> = {
+  bpo: "Novo BPO Financeiro", contabil: "Novo contábil", escada: "Escada (upgrade de BPO)", perdas: "Churn e contração",
+  outros: "Reajuste e expansão contábil",
+};
+const CATEGORIA: Record<string, string> = {
+  novo: "contrato novo", expansao: "expansão", reajuste: "reajuste", contracao: "contração",
+  churn_cliente: "churn (cliente)", churn_criterio: "saída (Critério)",
+};
+
+/** Cada contrato ou evento que soma ao realizado, com o valor com sinal; `linha` filtra um motor. */
+function ComposicaoDoRealizado({ linha }: { linha?: ItemDoRealizado["linha"] }) {
+  const { dados, carregando, erro, recarregar } = usarDados<ItemDoRealizado[]>(() => api.realizadoDoPlano(), []);
+  if (carregando && !dados) return <Carregando rotulo="Buscando os contratos" />;
+  if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
+  const itens = (dados ?? []).filter((i) => !linha || i.linha === linha);
+  if (itens.length === 0) return <p className="numero-estado">Nenhum contrato ou evento nesta conta ainda.</p>;
+  const total = itens.reduce((t, i) => t + n(i.valor), 0);
+  return (
+    <table className="tabela" aria-label="Composição do realizado">
+      <thead><tr><th>Data</th><th>Cliente</th><th>Contrato</th>{!linha && <th>Linha do plano</th>}<th>O quê</th><th className="tabela-numero">MRR</th></tr></thead>
+      <tbody>
+        {itens.map((i, k) => (
+          <tr key={k}>
+            <td>{data(i.data)}</td><td>{i.grupo}</td><td>{i.escopo ?? `Contrato ${i.contrato_id}`}</td>
+            {!linha && <td>{LINHA_DO_PLANO[i.linha]}</td>}
+            <td>{CATEGORIA[i.categoria] ?? i.categoria}</td>
+            <td className="tabela-numero">{n(i.valor) < 0 ? "− " : ""}{dinheiro(Math.abs(n(i.valor)))}</td>
+          </tr>
+        ))}
+        <tr className="composicao-total"><td>Total</td><td /><td />{!linha && <td />}<td />
+          <td className="tabela-numero">{total < 0 ? "− " : ""}{dinheiro(Math.abs(total))}</td></tr>
+      </tbody>
+    </table>
+  );
+}
+
+/** O mês a mês do cenário: o que soma até o líquido do card. */
+function ComposicaoDoCenario({ plano, nome }: { plano: PlanoDeMrr; nome: NomeDoCenario }) {
+  const c = plano.cenarios.find((x) => x.nome === nome)!;
+  return (
+    <>
+      <p className="composicao-linha-resumo">
+        <strong>{dinheiro(c.liquido)}</strong> = partida {dinheiro(plano.premissas.ponto_de_partida)} + mês a mês abaixo
+      </p>
+      <table className="tabela" aria-label={`Cenário ${NOME_DO_CENARIO[nome]} mês a mês`}>
+        <thead><tr><th>Mês</th><th className="tabela-numero">Contábil</th><th className="tabela-numero">BPO</th>
+          <th className="tabela-numero">Escada</th><th className="tabela-numero">Churn</th><th className="tabela-numero">Acumulado</th></tr></thead>
+        <tbody>
+          {c.linhas.map((l) => (
+            <tr key={l.mes}>
+              <td>{mesCurto(l.mes)}</td><td className="tabela-numero">{dinheiro(l.contabil)}</td>
+              <td className="tabela-numero">{dinheiro(l.bpo)}</td><td className="tabela-numero">{dinheiro(l.escada)}</td>
+              <td className="tabela-numero">− {dinheiro(l.churn)}</td><td className="tabela-numero">{dinheiro(l.acumulado)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="numero-nota">Projeção pelas premissas do plano (veja Premissas, abaixo). Não é dado realizado.</p>
+    </>
+  );
+}
+
 // ---------------------------------------------------------------- meta
 
 function BlocoDaMeta({ plano }: { plano: PlanoDeMrr }) {
@@ -75,7 +142,15 @@ function BlocoDaMeta({ plano }: { plano: PlanoDeMrr }) {
             Acréscimo líquido sobre a receita · meta de {dinheiroCurto(meta.meta_liquida)} até {data(premissas.fim)}
           </h3>
           <p className="plano-meta-valor">
-            {dinheiro(meta.realizado)}{" "}
+            <Explicavel texto={<>Soma do MRR (× 13 ÷ 12) que entrou desde {data(premissas.inicio)}: contratos novos de BPO e
+              contábeis, a escada (expansão de BPO), reajustes e expansões, menos churn e contração. É o mesmo movimento do MRR,
+              separado pelos motores do plano.</>}>
+              {dinheiro(meta.realizado)}
+            </Explicavel>{" "}
+            <BotaoDeComposicao rotulo="ver composição" composicao={{
+              titulo: "Realizado do plano de MRR", subtitulo: `Cada contrato e evento desde ${data(premissas.inicio)}`,
+              conteudo: () => <ComposicaoDoRealizado />,
+            }} />{" "}
             <span className="plano-meta-detalhe">realizado · previsto até hoje {dinheiro(meta.previsto_ate_hoje)}</span>
           </p>
         </div>
@@ -214,7 +289,15 @@ function PlanoPorMotor({ plano }: { plano: PlanoDeMrr }) {
                 <td><strong>{m.rotulo}</strong></td>
                 <td className="tabela-numero">{m.motor === "perdas" && m.previsto_no_plano ? "− " : ""}{dinheiro(m.previsto_no_plano)}</td>
                 <td className="tabela-numero">{dinheiro(m.previsto_ate_hoje)}</td>
-                <td className="tabela-numero">{m.motor === "perdas" && n(m.realizado) > 0 ? "− " : ""}{dinheiro(m.realizado)}</td>
+                <td className="tabela-numero">
+                  {m.motor === "perdas" && n(m.realizado) > 0 ? "− " : ""}{dinheiro(m.realizado)}
+                  {n(m.realizado) !== 0 && (
+                    <BotaoDeComposicao rotulo="ver" composicao={{
+                      titulo: m.rotulo, subtitulo: "Contratos e eventos que compõem o realizado do motor",
+                      conteudo: () => <ComposicaoDoRealizado linha={m.motor} />,
+                    }} />
+                  )}
+                </td>
                 <td>{m.motor === "outros" ? <span className="etiqueta etiqueta-neutra">Fora do plano</span> : <Situacao situacao={m.situacao} />}</td>
                 <td className="plano-ajuste">{m.ajuste}</td>
               </tr>
@@ -233,12 +316,22 @@ function Cenarios({ plano }: { plano: PlanoDeMrr }) {
       <div className="plano-cenarios">
         {plano.cenarios.map((c) => (
           <div key={c.nome} className={`numero plano-cenario plano-cenario-${c.nome}`}>
-            <span className="numero-rotulo">{NOME_DO_CENARIO[c.nome]} · {PAPEL_DO_CENARIO[c.nome]}</span>
+            <span className="numero-rotulo">
+              <Explicavel texto={<>Projeção até {data(plano.premissas.fim)} pelas premissas do cenário: BPO, contábil e escada
+                somados mês a mês, menos o churn sobre o MRR de partida, a partir de {dinheiro(plano.premissas.ponto_de_partida)} já
+                realizados. Não é dado realizado.</>}>
+                {NOME_DO_CENARIO[c.nome]} · {PAPEL_DO_CENARIO[c.nome]}
+              </Explicavel>
+            </span>
             <p className="numero-valor">{dinheiro(c.liquido)}</p>
             <p className="numero-detalhe">
               {percentual(c.percentual_da_meta)} da meta · BPO {dinheiroCurto(c.bpo)} + contábil {dinheiroCurto(c.contabil)} +
               escada {dinheiroCurto(c.escada)} − churn {dinheiroCurto(c.churn)}
             </p>
+            <BotaoDeComposicao rotulo="Ver composição" composicao={{
+              titulo: `Cenário ${NOME_DO_CENARIO[c.nome].toLowerCase()}`, subtitulo: "Mês a mês até o fim do prazo",
+              quantos: c.linhas.length, conteudo: () => <ComposicaoDoCenario plano={plano} nome={c.nome} />,
+            }} />
           </div>
         ))}
       </div>
@@ -310,7 +403,14 @@ function CenariosDeTicketPorServico() {
           {dados.map((s) => (
             <tr key={s.servico}>
               <td><strong>{s.servico}</strong></td>
-              <td className="tabela-numero">{s.contratos_recorrentes}</td>
+              <td className="tabela-numero">
+                {s.contratos_recorrentes}
+                {s.servico !== "Sem serviço" && <BotaoDeComposicao rotulo="ver" composicao={{
+                  titulo: `Recorrentes aceitos · ${s.servico}`, subtitulo: "Os contratos que formam os cenários (MRR, × 13 ÷ 12)",
+                  quantos: s.contratos_recorrentes,
+                  conteudo: () => <ComposicaoDoFunil indicador="ticket_recorrente" filtros={{ servico: [s.servico] }} />,
+                }} />}
+              </td>
               {s.base === null ? (
                 <td colSpan={4} className="numero-nota">Sem base: precisa de pelo menos 4 contratos recorrentes aceitos.</td>
               ) : (

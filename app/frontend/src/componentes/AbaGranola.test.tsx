@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ErroDaApi } from "../api/cliente";
 import type { AbaDaProposta, MatrizResumo, SugestaoDoContexto } from "../api/tipos";
+import { guardarRascunho, lerRascunho } from "../rascunhoDaProposta";
+import { AbaGranola } from "./AbaGranola";
 import { PropostaDaOportunidade } from "./PropostaDaOportunidade";
 
 vi.mock("../api/cliente", async () => {
@@ -63,8 +65,8 @@ const DEPOIS: AbaDaProposta = {
   }],
 };
 
-async function colarESugerir() {
-  render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
+async function colarESugerir(aoMudar = vi.fn()) {
+  render(<AbaGranola oportunidadeId={10} aoMudar={aoMudar} aoIrParaProposta={vi.fn()} />);
   const resumo = await screen.findByLabelText("Resumo da nota [Potencial Cliente]");
   const botao = screen.getByRole("button", { name: "Sugerir contexto e perfil com a IA" });
   expect(botao).toBeDisabled(); // sem resumo, não há o que ler
@@ -74,13 +76,21 @@ async function colarESugerir() {
   return screen.findByLabelText("Sugestão da IA");
 }
 
-describe("reunião com o lead na aba Proposta", () => {
+describe("aba Granola", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.resetAllMocks();
     vi.mocked(api.abaDaProposta).mockResolvedValue(ABA);
     vi.mocked(api.sugerirContextoDaReuniao).mockResolvedValue(SUGESTAO);
     vi.mocked(api.guardarReuniaoComLead).mockResolvedValue(DEPOIS);
+  });
+
+  it("sem reunião: abre colando, com a lista vazia dita em palavras", async () => {
+    render(<AbaGranola oportunidadeId={10} />);
+    expect(await screen.findByText("Nenhuma reunião com o lead guardada ainda.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Resumo da nota [Potencial Cliente]")).toHaveValue("");
+    // A aba é só do Granola: sugerir é a ação principal dela.
+    expect(screen.getByRole("button", { name: "Sugerir contexto e perfil com a IA" })).toHaveClass("botao-primario");
   });
 
   it("sugere sem mudar a proposta: contexto lado a lado e o campo que diverge desmarcado", async () => {
@@ -95,24 +105,35 @@ describe("reunião com o lead na aba Proposta", () => {
     expect(within(painel).getByText("⚠ diverge")).toBeInTheDocument(); // estado com palavra, não só cor
     expect(within(painel).getByText("“Usa o Omie”")).toBeInTheDocument();
     expect(within(painel).getByText(/Movimentação, Instituições/)).toBeInTheDocument();
-    // Nada aplicado ainda: a contextualização da proposta é a mesma.
-    expect(screen.getByDisplayValue("A Exemplo Alfa busca um novo parceiro.")).toBeInTheDocument();
+    expect(api.guardarReuniaoComLead).not.toHaveBeenCalled();
     // Sem a ciência da gravação, não aplica.
     expect(within(painel).getByRole("button", { name: "Aplicar à proposta" })).toBeDisabled();
   });
 
-  it("aplica só o marcado, guarda a reunião e preenche a proposta", async () => {
+  it("a contextualização atual e a matriz vêm do rascunho guardado da proposta, se houver", async () => {
+    guardarRascunho(10, { ...ABA.rascunho, matriz: "Financeiro", contextualizacao: "Texto editado na Proposta." });
     const painel = await colarESugerir();
+    expect(api.sugerirContextoDaReuniao).toHaveBeenCalledWith(10, expect.objectContaining({ matriz: "Financeiro" }));
+    expect(within(painel).getByLabelText(/Manter a atual/).closest("label")).toHaveTextContent("Texto editado na Proposta.");
+  });
+
+  it("aplica só o marcado, guarda a reunião, troca o rascunho guardado e atualiza a contagem", async () => {
+    guardarRascunho(10, { ...ABA.rascunho, valor_contabil: "6000" });
+    const aoMudar = vi.fn();
+    const painel = await colarESugerir(aoMudar);
     await userEvent.click(screen.getByLabelText(/O lead foi avisado de que a reunião foi gravada/));
     await userEvent.click(within(painel).getByRole("button", { name: "Aplicar à proposta" }));
     expect(api.guardarReuniaoComLead).toHaveBeenCalledWith(10, expect.objectContaining({
       resumo: RESUMO, ciencia_da_gravacao: true, contextualizacao: CONTEXTO, perfil: { sistema: "Omie" },
     }));
     expect(await screen.findByText(/Reunião guardada e aplicada à proposta/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Contextualização \(da reunião de 08\/10\/2026/)).toHaveValue(CONTEXTO);
-    expect(screen.getByText("Omie").closest("dd")).toHaveTextContent("da reunião");
+    expect(screen.getByRole("button", { name: "Ver na aba Proposta" })).toBeInTheDocument();
+    expect(aoMudar).toHaveBeenCalledWith(1);
+    // O que foi digitado na Proposta fica; só a contextualização troca.
+    expect(lerRascunho(10)?.entrada).toMatchObject({ contextualizacao: CONTEXTO, valor_contabil: "6000" });
     expect(screen.queryByLabelText("Sugestão da IA")).not.toBeInTheDocument();
-    expect(screen.getByText("✓ Reunião guardada")).toBeInTheDocument();
+    expect(screen.getByText("✓ Aplicada")).toBeInTheDocument();
+    expect(screen.getByText("Reuniões guardadas (1)")).toBeInTheDocument();
   });
 
   it("manter a atual não troca a contextualização", async () => {
@@ -125,20 +146,55 @@ describe("reunião com o lead na aba Proposta", () => {
 
   it("falha da IA aparece para a pessoa", async () => {
     vi.mocked(api.sugerirContextoDaReuniao).mockRejectedValue(new ErroDaApi(502, "A Anthropic recusou a chave da API."));
-    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
+    render(<AbaGranola oportunidadeId={10} />);
     fireEvent.change(await screen.findByLabelText("Resumo da nota [Potencial Cliente]"), { target: { value: RESUMO } });
     await userEvent.click(screen.getByRole("button", { name: "Sugerir contexto e perfil com a IA" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("A Anthropic recusou a chave da API.");
   });
 
-  it("com reunião guardada, mostra o resumo e deixa colar outra", async () => {
+  it("falha ao abrir oferece tentar de novo", async () => {
+    vi.mocked(api.abaDaProposta).mockRejectedValue(new ErroDaApi(500, "Falhou."));
+    render(<AbaGranola oportunidadeId={10} />);
+    expect(await screen.findByText(/Falhou\./)).toBeInTheDocument();
+  });
+
+  it("com reunião guardada: histórico com o que foi aplicado, resumo sob demanda e colar outra", async () => {
     vi.mocked(api.abaDaProposta).mockResolvedValue(DEPOIS);
-    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} />);
-    expect(await screen.findByText("✓ Reunião guardada")).toBeInTheDocument();
+    render(<AbaGranola oportunidadeId={10} />);
+    expect(await screen.findByText("✓ Aplicada")).toBeInTheDocument();
+    expect(screen.getByText(/contexto \+ 1 campo do perfil · por Eduardo/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Resumo da nota [Potencial Cliente]")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Ver o resumo" }));
     expect(screen.getByText(/Distribuidora de insumos hospitalares/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Colar outra reunião" }));
     expect(screen.getByLabelText("Resumo da nota [Potencial Cliente]")).toHaveValue("");
+  });
+});
+
+describe("aba Proposta sem o bloco do Granola", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.resetAllMocks();
+  });
+
+  it("sem reunião, nada do Granola aparece", async () => {
+    vi.mocked(api.abaDaProposta).mockResolvedValue(ABA);
+    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} aoAbrirGranola={vi.fn()} />);
+    await screen.findByText("Carta e contexto");
+    expect(screen.queryByLabelText("Resumo da nota [Potencial Cliente]")).not.toBeInTheDocument();
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("com reunião aplicada, um aviso de uma linha leva à aba Granola e o perfil marca a origem", async () => {
+    vi.mocked(api.abaDaProposta).mockResolvedValue({ ...DEPOIS, rascunho: { ...DEPOIS.rascunho, contextualizacao: CONTEXTO } });
+    const aoAbrirGranola = vi.fn();
+    render(<PropostaDaOportunidade oportunidadeId={10} aoEnviar={vi.fn()} aoAbrirGranola={aoAbrirGranola} />);
+    const aviso = await screen.findByRole("note");
+    expect(aviso).toHaveTextContent("Da reunião com o lead: a contextualização e 1 campo do perfil.");
+    expect(screen.queryByLabelText("Resumo da nota [Potencial Cliente]")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Contextualização \(da reunião de 08\/10\/2026/)).toHaveValue(CONTEXTO);
+    expect(screen.getByText("Omie").closest("dd")).toHaveTextContent("da reunião");
+    await userEvent.click(within(aviso).getByRole("button", { name: "Abrir a aba Granola" }));
+    expect(aoAbrirGranola).toHaveBeenCalled();
   });
 });

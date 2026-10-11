@@ -82,6 +82,7 @@ from crm.db.modelos import (
     EventoDeContrato,
     FusaoDeGrupos,
     HistoricoDePreco,
+    ReuniaoComLead,
     ExecucaoDeCarga,
     GrupoEconomico,
     Lead,
@@ -344,6 +345,10 @@ def _detalhe_de(oportunidade: Oportunidade, nome_do_grupo: str | None) -> e.Opor
     detalhe.tem_contrato = sessao is not None and oportunidade.id is not None and sessao.scalar(
         sa.select(Contrato.id).where(Contrato.oportunidade_id == oportunidade.id).limit(1)
     ) is not None
+    if sessao is not None and oportunidade.id is not None:
+        detalhe.reunioes_com_o_lead = sessao.scalar(
+            sa.select(sa.func.count(ReuniaoComLead.id)).where(ReuniaoComLead.oportunidade_id == oportunidade.id)
+        ) or 0
     volumetria = regras_de_porte.Volumetria(
         documentos_fiscais_mes=oportunidade.documentos_fiscais_mes,
         lancamentos_contabeis_mes=oportunidade.lancamentos_contabeis_mes,

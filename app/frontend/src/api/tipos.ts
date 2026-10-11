@@ -104,6 +104,8 @@ export interface OportunidadeDetalhe extends OportunidadeResumo {
   /** {campo: "Entrevista" | "Questionário"}, só de campo preenchido. */
   origem_da_volumetria: Record<string, string>;
   historico_de_preco: MudancaDePreco[];
+  /** Quantas reuniões com o lead (Granola) estão guardadas: a contagem da aba Granola. */
+  reunioes_com_o_lead?: number;
 
   complexidade: number | null;
   risco_tecnico: number | null;

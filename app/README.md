@@ -985,9 +985,16 @@ Perfil numerado 5 antes de Honorários 4. Texto escrito para cada cliente que n�
 
 ## Reunião com o lead (Granola) na proposta (10/10/2026)
 
-Amostra aprovada por Eduardo em 10/10/2026. Na aba **Proposta**, acima da contextualização, cole o
-**resumo** da nota do Granola feita com o template **[Potencial Cliente]**, com a data, os participantes
-e o link da nota (opcional). "Sugerir contexto e perfil com a IA" devolve, **sem gravar nada**:
+Amostra aprovada por Eduardo em 10/10/2026. **Desde 11/10/2026 (amostra aprovada), tudo isto fica na aba
+"Granola" do card da oportunidade, entre Ficha e Proposta**, com o número de reuniões guardadas no
+rótulo. Na aba Granola, a ação principal é sugerir e, depois, aplicar; embaixo, o histórico de todas as
+reuniões, com o que cada uma aplicou e quem aplicou. A aba Proposta ficou só com um aviso de uma linha
+("Da reunião com o lead: a contextualização e 2 campos do perfil", com link para a aba Granola) e a marca
+"da reunião" no perfil. Aplicar a contextualização também troca a do rascunho da proposta guardado no
+navegador, sem mexer no resto do que foi digitado.
+
+Cole o **resumo** da nota do Granola feita com o template **[Potencial Cliente]**, com a data, os
+participantes e o link da nota (opcional). "Sugerir contexto e perfil com a IA" devolve, **sem gravar nada**:
 
 - uma **contextualização** de 2 a 4 frases tirada da reunião, sempre fechada pela frase padrão da
   Critério, ao lado da atual: a pessoa escolhe uma das duas;

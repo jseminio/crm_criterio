@@ -42,6 +42,7 @@ __all__ = [
     "Cobertura",
     "DependenciaDeCanal",
     "TicketRecorrente",
+    "PrazoAteOEnvio",
     "INDICADORES_COM_COMPOSICAO",
     "ItemDaComposicao",
     "calcular",
@@ -258,6 +259,22 @@ class TicketRecorrente:
 
 
 @dataclass(frozen=True)
+class PrazoAteOEnvio:
+    """Originação → envio da proposta, de **todas** as propostas enviadas, aceitas ou não (amostra aprovada por Eduardo
+    em 11/10/2026). As da planilha de 2026 ficam fora: lá o envio foi gravado igual à originação, por regra, e não
+    mediria nada. `sem_data_de_envio` conta quem já saiu de "Enviar proposta" sem a data (fora da conta, a preencher)."""
+
+    dias: Decimal | None
+    mediana: Decimal | None
+    amostra: int
+    sem_data_de_envio: int = 0
+
+    @property
+    def calculavel(self) -> bool:
+        return self.dias is not None
+
+
+@dataclass(frozen=True)
 class Indicadores:
     em_aberto: Recorte
     aceitas: Recorte
@@ -268,6 +285,7 @@ class Indicadores:
     dependencia_de_canal: DependenciaDeCanal
     ticket_recorrente: TicketRecorrente
     motivos_de_perda: tuple[tuple[str, int], ...] = ()
+    prazo_ate_o_envio: PrazoAteOEnvio = PrazoAteOEnvio(None, None, 0)
     """Perdidas por motivo, do mais frequente ao menos (10/10/2026); "Sem motivo informado" para as antigas."""
 
 
@@ -331,6 +349,19 @@ def _por_motivo(decididas: list) -> tuple[tuple[str, int], ...]:
     return tuple(sorted(contagem.items(), key=lambda x: (x[0] == SEM_MOTIVO, -x[1], x[0])))
 
 
+def _da_planilha(o) -> bool:
+    origem = getattr(o, "origem", None)
+    return getattr(origem, "name", None) == "CARGA_2026"
+
+
+def _prazo_ate_o_envio(todas: list) -> tuple[list, list]:
+    """(enviadas com as duas datas, fora da planilha de 2026; as que saíram de "Enviar proposta" sem a data de envio)."""
+    enviadas = [o for o in todas if not _da_planilha(o) and getattr(o, "data_envio_proposta", None) and o.data_colocacao]
+    sem_data = [o for o in todas if not _da_planilha(o) and getattr(o, "data_envio_proposta", None) is None
+                and o.situacao is not Situacao.ENVIAR_PROPOSTA]
+    return enviadas, sem_data
+
+
 def _tem_proxima_acao(o: _Oportunidade) -> bool:
     return o.proxima_acao is not None and o.proxima_acao.strip() != ""
 
@@ -342,6 +373,7 @@ def _falta_na_volumetria(o: _Oportunidade) -> tuple[str, ...]:
 INDICADORES_COM_COMPOSICAO = (
     "em_aberto", "aceitas", "ticket_recorrente", "ciclo_medio", "taxa_de_conversao",
     "cobertura_proxima_acao", "cobertura_volumetria", "dependencia_de_canal", "propostas", "motivos_de_perda",
+    "prazo_ate_o_envio",
 )
 """Os números do funil que abrem "Ver composição". `propostas` é a lista inteira (a linha de um recorte)."""
 
@@ -384,6 +416,10 @@ def composicao(oportunidades: Iterable[_Oportunidade], indicador: str) -> list[I
             else:
                 itens.append(I(o, False, "fora: falta a data de colocação ou de aceite"))
         return itens
+    if indicador == "prazo_ate_o_envio":
+        enviadas, sem_data = _prazo_ate_o_envio(todas)
+        return ([I(o, True, "originação → envio", Decimal((o.data_envio_proposta - o.data_colocacao).days)) for o in enviadas]
+                + [I(o, False, "sem data de envio: preencher") for o in sem_data])
     if indicador == "motivos_de_perda":
         perdidas = [o for o in c.decididas if not o.situacao.ganha]
         return [I(o, getattr(o, "motivo_recusa", None) is not None, _motivo(o), o.preco_mensal, o.preco_anual)
@@ -502,4 +538,14 @@ def calcular(
         dependencia_de_canal=dependencia_de_canal,
         ticket_recorrente=ticket,
         motivos_de_perda=_por_motivo(c.decididas),
+        prazo_ate_o_envio=_calcular_prazo(todas),
+    )
+
+
+def _calcular_prazo(todas: list) -> PrazoAteOEnvio:
+    enviadas, sem_data = _prazo_ate_o_envio(todas)
+    dias = [(o.data_envio_proposta - o.data_colocacao).days for o in enviadas]
+    return PrazoAteOEnvio(
+        dias=_media(dias), mediana=Decimal(median(dias)).quantize(Decimal("0.1")) if dias else None,
+        amostra=len(dias), sem_data_de_envio=len(sem_data),
     )

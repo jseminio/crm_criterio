@@ -791,6 +791,16 @@ class CenariosDeTicketResposta(Base):
     atipico_maximo: Decimal | None
 
 
+class PrazoAteOEnvioResposta(Base):
+    """Originação → envio da proposta (11/10/2026), fora a planilha de 2026."""
+
+    dias: Decimal | None
+    mediana: Decimal | None
+    amostra: int
+    sem_data_de_envio: int = 0
+    calculavel: bool
+
+
 class IndicadoresResposta(Base):
     em_aberto: RecorteResposta
     aceitas: RecorteResposta
@@ -802,6 +812,7 @@ class IndicadoresResposta(Base):
     ticket_recorrente: TicketRecorrenteResposta
     motivos_de_perda: list[tuple[str, int]] = []
     """Perdidas por motivo (10/10/2026), do mais frequente ao menos; "Sem motivo informado" por último."""
+    prazo_ate_o_envio: PrazoAteOEnvioResposta | None = None
 
 
 class ExecucaoResumo(Base):

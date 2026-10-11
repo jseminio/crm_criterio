@@ -292,6 +292,8 @@ export interface Indicadores {
   ticket_recorrente: TicketRecorrente;
   /** Perdidas por motivo (10/10/2026), do mais frequente ao menos; "Sem motivo informado" por último. */
   motivos_de_perda?: [string, number][];
+  /** Originação → envio da proposta (11/10/2026), fora a planilha de 2026. */
+  prazo_ate_o_envio?: { dias: string | null; mediana: string | null; amostra: number; sem_data_de_envio: number; calculavel: boolean } | null;
 }
 
 export interface Execucao {
@@ -2211,7 +2213,8 @@ export interface KpisDaLideranca {
 /** Os números do funil que abrem "Ver composição" (10/10/2026). `propostas`: a linha de um recorte. */
 export type IndicadorDoFunil =
   | "em_aberto" | "aceitas" | "ticket_recorrente" | "ciclo_medio" | "taxa_de_conversao"
-  | "cobertura_proxima_acao" | "cobertura_volumetria" | "dependencia_de_canal" | "propostas" | "motivos_de_perda";
+  | "cobertura_proxima_acao" | "cobertura_volumetria" | "dependencia_de_canal" | "propostas" | "motivos_de_perda"
+  | "prazo_ate_o_envio";
 
 /** Uma oportunidade na lista de um número do funil. */
 export interface ItemDaComposicao {

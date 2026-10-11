@@ -74,6 +74,8 @@ import type {
   QuestionarioResumo,
   ResultadoDaBusca,
   AbaDaProposta,
+  NovaReuniaoComLead,
+  SugestaoDoContexto,
   ConfiguracaoDeProposta,
   Alteracao,
   ConfiguracaoDeEntrada,
@@ -594,6 +596,17 @@ export const api = {
   abaDaProposta: (oportunidadeId: number) => pedir<AbaDaProposta>(`/api/oportunidades/${oportunidadeId}/proposta`),
   gerarProposta: (oportunidadeId: number, entrada: EntradaDaProposta) =>
     pedir<PropostaResumo>(`/api/oportunidades/${oportunidadeId}/proposta`, { method: "POST", body: JSON.stringify(entrada) }),
+  sugerirContextoDaReuniao: (
+    oportunidadeId: number,
+    pedido: { matriz: TipoDeMatriz; data: string; participantes?: string; resumo: string },
+  ) =>
+    pedir<SugestaoDoContexto>(`/api/oportunidades/${oportunidadeId}/proposta/reuniao-com-lead/sugestao`, {
+      method: "POST", body: JSON.stringify(pedido),
+    }),
+  guardarReuniaoComLead: (oportunidadeId: number, reuniao: NovaReuniaoComLead) =>
+    pedir<AbaDaProposta>(`/api/oportunidades/${oportunidadeId}/proposta/reuniao-com-lead`, {
+      method: "POST", body: JSON.stringify(reuniao),
+    }),
   marcarPropostaEnviada: (propostaId: number, por: string, em: string) =>
     pedir<PropostaResumo>(`/api/propostas/${propostaId}/enviada`, { method: "POST", body: JSON.stringify({ por, em }) }),
   matrizesDeProposta: () => pedir<MatrizesDeProposta>("/api/propostas/matrizes"),

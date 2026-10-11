@@ -17,6 +17,7 @@ import { CampoDeValor } from "./CampoDeValor";
 import { Etiqueta } from "./Etiqueta";
 import { Carregando, Erro } from "./estados";
 import { LinkDeArquivo } from "./LinkDeArquivo";
+import { ReuniaoComLeadNaProposta } from "./ReuniaoComLeadNaProposta";
 import { SEM_PERMISSAO, usarAcesso } from "../entrada";
 
 const virgula = (v: string | number) => String(v).replace(".", ",");
@@ -155,6 +156,8 @@ export function PropostaDaOportunidade({
   const col = aba.colaboradores;
   const apurado = numero(aba.contabil_apurado);
   const aberta = aba.propostas.find((p) => p.enviada_em === null);
+  const reuniaoAplicada = (aba.reunioes_com_o_lead ?? []).find((r) => r.contextualizacao_aplicada);
+  const daReuniao = new Set(aba.perfil_da_reuniao ?? []);
 
   const gerar = async () => {
     definirGerando(true);
@@ -353,13 +356,25 @@ export function PropostaDaOportunidade({
         <span className="campo-rotulo">Tratamento</span>
         <input className="entrada" value={entrada.tratamento} onChange={(e) => mudar("tratamento", e.target.value)} />
       </label>
+      <ReuniaoComLeadNaProposta
+        oportunidadeId={oportunidadeId} matriz={matriz} aba={aba} contextualizacaoAtual={entrada.contextualizacao}
+        podeEditar={pode("funil.proposta")}
+        aoAplicar={(nova, contextualizacao) => {
+          definirAba(nova);
+          if (contextualizacao !== null) mudar("contextualizacao", contextualizacao);
+        }}
+      />
       <label className="campo">
-        <span className="campo-rotulo">Contextualização (rascunho a partir do questionário; ajuste aqui ou no PowerPoint)</span>
+        <span className="campo-rotulo">
+          Contextualização ({reuniaoAplicada ? `da reunião de ${data(reuniaoAplicada.data)}` : "rascunho a partir do questionário"}; ajuste aqui ou no PowerPoint)
+        </span>
         <textarea className="entrada" rows={5} value={entrada.contextualizacao} onChange={(e) => mudar("contextualizacao", e.target.value)} />
       </label>
 
       <h3 className="proposta-titulo">Perfil do cliente</h3>
-      <p className="campo-ajuda">Do questionário e da oportunidade; o que não veio sai como "N/D". Ajuste no PowerPoint, se preciso.</p>
+      <p className="campo-ajuda">
+        Do questionário, da oportunidade{daReuniao.size ? " e da reunião com o lead" : ""}; o que não veio sai como "N/D". Ajuste no PowerPoint, se preciso.
+      </p>
       <dl className="proposta-perfil">
         {PERFIL[matriz].map(([chave, rotulo, unidade]) => (
           <div key={chave}>
@@ -368,6 +383,7 @@ export function PropostaDaOportunidade({
               {aba.perfil[chave]}
               {chave === "regime" && <span className="celula-fonte">CNPJ {aba.perfil.cnpj}</span>}
               {unidade && aba.perfil[chave] !== "N/D" && <span className="celula-fonte">{unidade}</span>}
+              {daReuniao.has(chave) && <span className="celula-fonte proposta-da-reuniao">da reunião</span>}
             </dd>
           </div>
         ))}

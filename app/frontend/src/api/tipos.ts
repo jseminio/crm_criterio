@@ -1486,6 +1486,52 @@ export interface AbaDaProposta {
   revisores: string[];
   proximo_numero: string;
   propostas: PropostaResumo[];
+  /** Os campos do perfil que vieram da reunião com o lead (10/10/2026). */
+  perfil_da_reuniao?: string[];
+  /** Da mais recente para a mais antiga. */
+  reunioes_com_o_lead?: ReuniaoComLead[];
+}
+
+/** A reunião com o lead pelo Granola, template [Potencial Cliente] (10/10/2026). Só o resumo da nota. */
+export interface ReuniaoComLead {
+  id: number;
+  data: string;
+  participantes: string | null;
+  link_do_granola: string | null;
+  resumo_do_granola: string;
+  ciencia_da_gravacao: boolean;
+  contextualizacao_aplicada: boolean;
+  campos_aplicados: string[];
+  registrada_por: string | null;
+  registrada_em: string;
+}
+
+export interface CampoDoPerfilSugerido {
+  campo: string;
+  rotulo: string;
+  valor: string;
+  trecho: string | null;
+  atual: string;
+  /** O perfil já tem outro valor: vem desmarcado, com ⚠. */
+  diverge: boolean;
+}
+
+export interface SugestaoDoContexto {
+  contextualizacao: string;
+  perfil: CampoDoPerfilSugerido[];
+  nao_apareceu: string[];
+  para_a_carta: string[];
+  custo_usd: string | null;
+}
+
+export interface NovaReuniaoComLead {
+  data: string;
+  participantes?: string;
+  link_do_granola?: string;
+  resumo: string;
+  ciencia_da_gravacao: boolean;
+  contextualizacao: string | null;
+  perfil: Record<string, string>;
 }
 
 export interface ConfiguracaoDeProposta {

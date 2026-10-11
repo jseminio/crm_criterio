@@ -796,6 +796,31 @@
 .proposta-envio { display: flex; gap: var(--e2); align-items: end; flex-wrap: wrap; margin-top: var(--e2); }
 .matrizes-de-proposta .tabela { margin-bottom: var(--e3); }
 .matrizes-de-proposta .proposta-grade { max-width: 760px; }
+/* Reunião com o lead (Granola) na proposta — amostra aprovada em 10/10/2026 */
+.reuniao-lead { display: flex; flex-direction: column; gap: var(--e3); margin-bottom: var(--e3); }
+.reuniao-lead-colar { border: 1px dashed var(--borda-forte); border-radius: var(--raio-md); padding: var(--e4);
+  margin: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--e2); }
+.reuniao-lead-colar legend { font-weight: 600; padding: 0 var(--e1); }
+.reuniao-lead-colar .campo-ajuda { margin: 0; }
+.reuniao-lead-ciencia { display: flex; gap: var(--e2); align-items: flex-start; font-size: 13px; }
+.reuniao-lead-ciencia input { margin-top: 4px; }
+.reuniao-lead-guardada { background: var(--surface-sunken); border-radius: var(--raio-md); padding: var(--e3) var(--e4); }
+.reuniao-lead-linha { display: flex; gap: var(--e3); align-items: center; flex-wrap: wrap; font-size: 13px; }
+.reuniao-lead-resumo { white-space: pre-wrap; font-family: var(--fonte-ui); font-size: 13px; margin: var(--e3) 0 0;
+  background: var(--surface-card); border: 1px solid var(--borda); border-radius: var(--raio-sm); padding: var(--e3);
+  max-height: 320px; overflow: auto; }
+.reuniao-lead-sugestao { background: var(--surface-ai-soft); border: 1px solid var(--azul-neve); border-radius: var(--raio-md);
+  padding: var(--e4); display: flex; flex-direction: column; gap: var(--e3); }
+.reuniao-lead-sugestao h4 { margin: 0; font-size: 14px; display: flex; gap: var(--e2); align-items: center; flex-wrap: wrap; }
+.reuniao-lead-sugestao .campo-ajuda { margin: 0; }
+.reuniao-lead-compara { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--e3); }
+.reuniao-lead-opcao { display: flex; gap: var(--e2); align-items: flex-start; background: var(--surface-card);
+  border: 1px solid var(--borda); border-radius: var(--raio-sm); padding: var(--e3); font-size: 13px; cursor: pointer; }
+.reuniao-lead-opcao input { margin-top: 4px; }
+.reuniao-lead-texto { display: block; white-space: pre-wrap; margin-top: var(--e1); }
+.reuniao-lead-perfil { background: var(--surface-card); font-size: 13px; }
+.reuniao-lead-carta { margin: 0; padding-left: var(--e5); font-size: 13px; color: var(--texto-medio); }
+.proposta-perfil .proposta-da-reuniao { color: var(--andamento); }
 .marcador-falta { color: var(--perda); }
 .marcador-ok { color: var(--ganho); }
 

@@ -1,9 +1,9 @@
 """Excluir uma oportunidade pela tela (04/10/2026, amostra aprovada por Eduardo).
 
 Para o que entrou errado: duplicada, teste, cadastrada no grupo errado. Sai junto o que só existe
-por causa dela (propostas, pendências da proposta, histórico de preço). Fica o que tem vida própria:
-o grupo, as empresas, os contatos, as reuniões, o questionário do site e o lead de origem; esses só
-deixam de apontar para ela.
+por causa dela (propostas, pendências da proposta, histórico de preço, reuniões com o lead). Fica o
+que tem vida própria: o grupo, as empresas, os contatos, as reuniões de resultado, o questionário do
+site e o lead de origem; esses só deixam de apontar para ela.
 
 Recusa a oportunidade **Aceita** ou **Perdida** (é o desfecho do funil e conta na taxa de conversão; desde
 10/10/2026 "Recusada" e "Perdido" são uma etapa só, Perdida) e a que **virou contrato**.
@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from crm.acesso.auditoria import usuario_atual
 from crm.db.modelos import (
     Contrato, HistoricoDePreco, Lead, Oportunidade, OportunidadeDaReuniao, PendenciaDaProposta, Proposta,
-    QuestionarioRecebido, RegistroDeAlteracao,
+    QuestionarioRecebido, RegistroDeAlteracao, ReuniaoComLead,
 )
 from crm.domain.listas import Situacao
 
@@ -89,7 +89,7 @@ def excluir(sessao: Session, op: Oportunidade, motivo: str) -> None:
                    .values(oportunidade_em_aberto_id=None))
     sessao.execute(sa.update(OportunidadeDaReuniao).where(OportunidadeDaReuniao.oportunidade_id == op.id)
                    .values(oportunidade_id=None))
-    for modelo in (PendenciaDaProposta, Proposta, HistoricoDePreco):
+    for modelo in (PendenciaDaProposta, Proposta, HistoricoDePreco, ReuniaoComLead):
         for x in sessao.scalars(sa.select(modelo).where(modelo.oportunidade_id == op.id)):
             sessao.delete(x)
         sessao.flush()

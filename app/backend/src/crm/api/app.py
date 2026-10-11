@@ -306,7 +306,7 @@ def criar_app(
     api.include_router(roteador_de_integracoes(obter_sessao, fonte_de_questionarios or fonte_real, testadores))
     api.include_router(roteador_de_kpis(obter_sessao))
     api.include_router(roteador_de_recebimentos(obter_sessao))
-    api.include_router(roteador_de_propostas(obter_sessao))
+    api.include_router(roteador_de_propostas(obter_sessao, servicos_da_ata or servicos_da_ata_reais))
     api.include_router(roteador_da_ficha(obter_sessao))
     api.include_router(roteador_de_metas(obter_sessao))
     api.include_router(roteador_de_inteligencia(obter_sessao))

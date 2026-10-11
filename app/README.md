@@ -977,6 +977,32 @@ Perfil numerado 5 antes de Honorários 4. Texto escrito para cada cliente que n�
 `cd backend && ~/.venvs/criterio-crm/bin/pip install -e ".[dev]"` (instala o `python-pptx`) e
 `~/.venvs/criterio-crm/bin/alembic upgrade head` (cria as três tabelas novas, sem tocar no que existe).
 
+## Reunião com o lead (Granola) na proposta (10/10/2026)
+
+Amostra aprovada por Eduardo em 10/10/2026. Na aba **Proposta**, acima da contextualização, cole o
+**resumo** da nota do Granola feita com o template **[Potencial Cliente]**, com a data, os participantes
+e o link da nota (opcional). "Sugerir contexto e perfil com a IA" devolve, **sem gravar nada**:
+
+- uma **contextualização** de 2 a 4 frases tirada da reunião, sempre fechada pela frase padrão da
+  Critério, ao lado da atual: a pessoa escolhe uma das duas;
+- os **campos do perfil do cliente** que a reunião informou, cada um com a frase de onde saiu. O que já
+  está no perfil (questionário ou oportunidade) prevalece: o campo que diverge vem **desmarcado, com
+  ⚠ diverge**, e só entra se a pessoa marcar;
+- o que não apareceu na reunião e até quatro pontos para a carta (dor, o que espera, quem decide).
+
+"Aplicar à proposta" exige a confirmação de que o lead foi avisado da gravação. Grava a reunião e o
+que foi aplicado; o perfil marca "da reunião" nos campos que vieram dela, e a mais nova vale por cima
+das anteriores. Reunião aplicada depois de a proposta ser gerada traz a contextualização dela ao
+reabrir a aba. Custa centavos de dólar por sugestão; usa a mesma chave de IA da ata.
+
+- **Do lead guarda-se só o resumo** (arquitetura, entidade Entrevista), nunca a transcrição. O resumo é
+  dado de cliente: fica só no banco, fora do histórico de alterações. Excluir a oportunidade leva junto
+  as reuniões com o lead.
+- Rotas: `POST /api/oportunidades/{id}/proposta/reuniao-com-lead/sugestao` (não grava) e
+  `POST /api/oportunidades/{id}/proposta/reuniao-com-lead` (grava e devolve a aba). Permissão: gerar
+  proposta.
+- **Etapa seguinte:** com o plano Business do Granola, a nota chega sozinha, sem colar.
+
 ## Questionário do site vira oportunidade (01/10/2026)
 
 O cliente preenche o questionário para proposta no site (Lovable), que grava na tabela

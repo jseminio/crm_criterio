@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import { api } from "../api/cliente";
-import type { CategoriaDoMovimento, ItemDoMovimento, Mrr } from "../api/tipos";
+import type { CategoriaDoMovimento, ItemDoMovimento, Mrr, SaidaAnunciada } from "../api/tipos";
 import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
 import { ComposicaoDaCarteira } from "../componentes/MrrDaCarteira";
 import { Carregando, Erro } from "../componentes/estados";
@@ -69,11 +69,12 @@ function ItensDaLinha({ de, categoria }: { de: string; categoria: CategoriaDoMov
   );
 }
 
-/** Motivos de churn no período (10/10/2026): os encerramentos do movimento, por motivo (lista aprovada). */
+/** Motivos de churn no período (10/10/2026), **pelo anúncio** (decisão de Eduardo em 11/10/2026): os encerramentos
+ * que os clientes pediram no período, por motivo, mesmo com o MRR seguindo até a saída efetiva. */
 function MotivosDeChurn({ de }: { de: string }) {
-  const { dados } = usarDados<{ itens: ItemDoMovimento[] }>(() => api.itensDoMovimento(de), [de]);
-  const saidas = (dados?.itens ?? []).filter((i) => i.categoria === "churn_cliente" || i.categoria === "churn_criterio");
+  const { dados } = usarDados<{ churn_anunciado?: SaidaAnunciada[] }>(() => api.itensDoMovimento(de), [de]);
   if (!dados) return null;
+  const saidas = dados.churn_anunciado ?? [];
   const porMotivo = new Map<string, { n: number; valor: number }>();
   for (const i of saidas) {
     const m = i.motivo ?? "Sem motivo informado";
@@ -84,19 +85,19 @@ function MotivosDeChurn({ de }: { de: string }) {
   return (
     <div className="receita-retencao">
       <p>
-        <Explicavel texto="Os contratos que saíram no período (saída efetiva), agrupados pelo motivo do encerramento — a lista aprovada em 10/10/2026. Valor em MRR (× 13 ÷ 12).">
+        <Explicavel texto="Churn anunciado: os contratos cujo encerramento o cliente (ou a Critério) pediu no período, agrupados pelo motivo. Conta no anúncio; o MRR só cai na saída efetiva, depois da transição e da multa. Valor em MRR (× 13 ÷ 12).">
           <strong>Motivos de churn</strong>
         </Explicavel>{" "}
-        {linhas.length === 0 ? "nenhuma saída no período" : linhas.map(([m, x]) => `${m}: ${x.n} (${dinheiro(x.valor)})`).join(" · ")}
+        {linhas.length === 0 ? "nenhum encerramento anunciado no período" : linhas.map(([m, x]) => `${m}: ${x.n} (${dinheiro(x.valor)})`).join(" · ")}
         {saidas.length > 0 && (
           <BotaoDeComposicao rotulo="ver composição" composicao={{
-            titulo: "Motivos de churn", subtitulo: `Saídas desde ${data(de)}`, quantos: saidas.length,
+            titulo: "Motivos de churn", subtitulo: `Encerramentos anunciados desde ${data(de)}`, quantos: saidas.length,
             conteudo: () => (
-              <table className="tabela" aria-label="Saídas por motivo">
-                <thead><tr><th>Cliente</th><th>Contrato</th><th>Saída</th><th>Quem decidiu</th><th>Motivo</th><th className="tabela-numero">MRR</th></tr></thead>
+              <table className="tabela" aria-label="Encerramentos anunciados por motivo">
+                <thead><tr><th>Cliente</th><th>Contrato</th><th>Anunciou</th><th>Sai em</th><th>Quem decidiu</th><th>Motivo</th><th className="tabela-numero">MRR</th></tr></thead>
                 <tbody>
                   {saidas.map((i, n) => (
-                    <tr key={n}><td>{i.grupo}</td><td>{i.escopo ?? `Contrato ${i.contrato_id}`}</td><td>{data(i.data)}</td>
+                    <tr key={n}><td>{i.grupo}</td><td>{i.escopo ?? `Contrato ${i.contrato_id}`}</td><td>{data(i.anuncio)}</td><td>{data(i.saida)}</td>
                       <td>{i.iniciativa ?? "—"}</td><td>{i.motivo ?? "Sem motivo informado"}</td><td className="tabela-numero">{dinheiro(i.valor)}</td></tr>
                   ))}
                 </tbody>

@@ -2271,3 +2271,17 @@ export interface PreviaDaMigracao {
   registros_que_saem: number;
   linhas: { tabela: string; no_arquivo: number; na_nuvem: number; acao: "substitui" | "preserva" }[];
 }
+
+/** Um encerramento pelo anúncio (11/10/2026): o indicador de churn conta aqui; o MRR cai na saída. */
+export interface SaidaAnunciada {
+  categoria: "churn_cliente" | "churn_criterio";
+  grupo_id: number;
+  grupo: string;
+  contrato_id: number;
+  escopo: string | null;
+  valor: string;
+  anuncio: string;
+  saida: string;
+  motivo: string | null;
+  iniciativa: string | null;
+}

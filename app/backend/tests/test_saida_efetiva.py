@@ -114,3 +114,35 @@ def test_encerramentos_antigos_ganham_a_saida_igual_a_data(engine, ids):
         assert "1 encerramento" in saida_dos_encerramentos_antigos.executar(s)
         assert s.query(EventoDeContrato).one().data_da_saida == date(2026, 9, 1)
         assert saida_dos_encerramentos_antigos.executar(s) == "nada a preencher"
+
+
+def test_churn_conta_no_anuncio_e_o_mrr_segue_ate_a_saida(cliente, ids):
+    """Decisão de Eduardo em 11/10/2026: o indicador de churn conta quando o cliente pede; o MRR, o movimento e o
+    NRR/GRR seguem pela saída efetiva (transição e multa)."""
+    from crm.api.kpis_lideranca import calcular
+    from crm.db.base import Base  # noqa: F401
+
+    saida = HOJE + timedelta(days=60)
+    assert _encerrar(cliente, ids["contrato"], saida).status_code == 201
+    inicio = HOJE.replace(day=1).isoformat()
+    mov = cliente.get("/api/mrr/movimento", params={"de": inicio}).json()
+    assert not [i for i in mov["itens"] if i["categoria"].startswith("churn")]  # o MRR não caiu
+    anunciado = mov["churn_anunciado"]
+    assert len(anunciado) == 1 and anunciado[0]["anuncio"] == HOJE.isoformat() and anunciado[0]["saida"] == saida.isoformat()
+    assert anunciado[0]["motivo"] == "Preço" and anunciado[0]["iniciativa"] == "Cliente"
+    assert D(cliente.get("/api/mrr").json()["atual"]["valor"]) == D("3900.00")
+
+
+def test_kpi17_conta_o_cliente_no_mes_do_anuncio(engine, ids):
+    from crm.api.kpis_lideranca import calcular
+
+    with Session(engine) as s:
+        c = s.get(Contrato, ids["contrato"])
+        s.add(EventoDeContrato(contrato_id=c.id, tipo=T.ENCERRAMENTO, data_do_evento=date(2026, 10, 5),
+                               data_da_saida=date(2026, 12, 4)))
+        s.commit()
+        kpis = {k.chave: k for k in calcular(s, "2026-10", date(2026, 10, 20)).kpis}
+        churn = kpis["churn"]
+        assert churn.extras["perdidos"] == 1 and churn.valor == D("100.0")
+        assert churn.itens[0].detalhe == "anunciou em 05/10/2026 · sai em 04/12/2026"
+        assert calcular(s, "2026-12", date(2026, 12, 20)).kpis[3].extras["perdidos"] == 0  # não conta de novo na saída

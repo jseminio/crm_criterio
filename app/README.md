@@ -109,6 +109,12 @@ precisam estar na mesma versão do banco: a prévia recusa e diz por quê. Rotas
   o contrato passa a Encerrado sozinho (`crm.db.saidas`: ao subir a API, a cada hora e antes das contas de MRR).
   Migração `b8d4f2a6c1e9` (`evento_de_contrato.data_da_saida`); a tarefa `2026_10_10_saida_dos_encerramentos_antigos`
   põe a saída = data do evento nos encerramentos antigos (nada muda).
+- **Churn no anúncio** (decisão de Eduardo em 11/10/2026, ajusta a de 10/10): os **indicadores de churn** contam
+  quando o cliente pede para sair — KPI 17 (churn de clientes), Motivos de churn em Gestão de contratos e "Churn
+  anunciado no mês" no Pós-venda das quatro fases —, mesmo com o MRR seguindo até a saída efetiva (transição e multa).
+  O **MRR**, o movimento do MRR (a linha de churn), o NRR/GRR e o plano de MRR seguem **pela saída**, para a conta do
+  MRR fechar. As listas mostram "anunciou em · sai em". `mrr.saidas_anunciadas`; `GET /api/mrr/movimento` traz
+  `churn_anunciado`.
 - **13ª no esperado do caixa** (confirmado por Eduardo, 10/10/2026): parcela × avos ÷ 12, um avo por mês do ano com
   15 dias ou mais de serviço, contados da assinatura; cobrada em dezembro, ou **na saída**, proporcional, junto com a
   última parcela (o mês da saída tem parcela). O MRR não muda: já tem a 13ª no × 13 ÷ 12.

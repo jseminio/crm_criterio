@@ -1,18 +1,22 @@
-/** A reunião com o lead alimenta a proposta (amostra aprovada por Eduardo em 10/10/2026).
+/** Aba "Granola" do card da oportunidade (amostra aprovada por Eduardo em 11/10/2026), entre Ficha e
+ * Proposta: tudo o que é da reunião com o lead saiu da aba Proposta para cá.
  *
  * Cola-se o **resumo** da nota do Granola feita com o template [Potencial Cliente]; a IA sugere a
  * contextualização e os campos do perfil que a reunião trouxe, cada um com a frase de onde saiu. Nada
  * muda na proposta até "Aplicar": a pessoa escolhe entre a sugestão e o texto atual e marca os campos.
  * O questionário prevalece: campo que diverge vem desmarcado, com ⚠. Do lead guarda-se só o resumo,
- * com a ciência de que a reunião foi gravada. Quando houver a API do Granola, o campo de colar vira
- * "Buscar no Granola" e o resto não muda.
+ * com a ciência de que a reunião foi gravada. Abaixo, o histórico de todas as reuniões guardadas.
+ * Quando houver a API do Granola, a nota nova chega aqui sozinha para revisar.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { AbaDaProposta, ReuniaoComLead, SugestaoDoContexto, TipoDeMatriz } from "../api/tipos";
+import type { AbaDaProposta, ReuniaoComLead, SugestaoDoContexto } from "../api/tipos";
+import { usarAcesso } from "../entrada";
 import { data } from "../formato";
+import { lerRascunho, trocarContextualizacaoGuardada } from "../rascunhoDaProposta";
 import { CampoDeData } from "./CampoDeData";
+import { Carregando, Erro } from "./estados";
 
 /** O mesmo mínimo do servidor: menos que isso não é um resumo de reunião. */
 export const MINIMO_DO_RESUMO = 80;
@@ -22,52 +26,57 @@ const hoje = () => new Date().toLocaleDateString("sv");
 type Campos = { data: string; participantes: string; link: string; resumo: string; ciencia: boolean };
 const VAZIO = (): Campos => ({ data: hoje(), participantes: "", link: "", resumo: "", ciencia: false });
 
-function Guardada({ r, aoColarOutra, podeEditar }: { r: ReuniaoComLead; aoColarOutra: () => void; podeEditar: boolean }) {
-  const [vendo, definirVendo] = useState(false);
+function oQueFoiAplicado(r: ReuniaoComLead): string {
+  const n = r.campos_aplicados.length;
+  const partes = [
+    r.contextualizacao_aplicada ? "contexto" : null,
+    n > 0 ? `${n} campo${n === 1 ? "" : "s"} do perfil` : null,
+  ].filter(Boolean);
+  return partes.length ? partes.join(" + ") : "nada aplicado à proposta";
+}
+
+function ReuniaoNoHistorico({ r, aberta }: { r: ReuniaoComLead; aberta: boolean }) {
+  const [vendo, definirVendo] = useState(aberta);
+  const aplicada = r.contextualizacao_aplicada || r.campos_aplicados.length > 0;
   return (
-    <div className="reuniao-lead-guardada">
+    <li className="granola-reuniao">
       <div className="reuniao-lead-linha">
-        <span className="etiqueta etiqueta-ganho">✓ Reunião guardada</span>
-        <span>
-          {data(r.data)}
-          {r.participantes ? ` · ${r.participantes}` : ""} · resumo guardado · ciência da gravação ✓
-          {r.link_do_granola && (
-            <>
-              {" · "}
-              <a href={r.link_do_granola} target="_blank" rel="noreferrer">nota no Granola</a>
-            </>
-          )}
+        <span className={`etiqueta ${aplicada ? "etiqueta-ganho" : "etiqueta-neutra"}`}>
+          {aplicada ? "✓ Aplicada" : "Guardada"}
+        </span>
+        <strong>{data(r.data)}</strong>
+        {r.participantes && <span>{r.participantes}</span>}
+        <span className="campo-ajuda">
+          {oQueFoiAplicado(r)}
+          {r.registrada_por ? ` · por ${r.registrada_por}` : ""} · ciência da gravação ✓
         </span>
         <button type="button" className="link-de-tabela" aria-expanded={vendo} onClick={() => definirVendo((v) => !v)}>
           {vendo ? "Esconder o resumo" : "Ver o resumo"}
         </button>
-        {podeEditar && (
-          <button type="button" className="link-de-tabela" onClick={aoColarOutra}>Colar outra reunião</button>
+        {r.link_do_granola && (
+          <a className="campo-ajuda" href={r.link_do_granola} target="_blank" rel="noreferrer">nota no Granola</a>
         )}
       </div>
       {vendo && <pre className="reuniao-lead-resumo">{r.resumo_do_granola}</pre>}
-    </div>
+    </li>
   );
 }
 
-export function ReuniaoComLeadNaProposta({
+export function AbaGranola({
   oportunidadeId,
-  matriz,
-  aba,
-  contextualizacaoAtual,
-  podeEditar,
-  aoAplicar,
+  aoMudar,
+  aoIrParaProposta,
 }: {
   oportunidadeId: number;
-  matriz: TipoDeMatriz;
-  aba: AbaDaProposta;
-  contextualizacaoAtual: string;
-  podeEditar: boolean;
-  /** A aba nova (perfil já com a reunião) e a contextualização escolhida; `null` mantém a atual. */
-  aoAplicar: (aba: AbaDaProposta, contextualizacao: string | null) => void;
+  /** Uma reunião nova foi guardada: o card atualiza a contagem da aba. */
+  aoMudar?: (quantas: number) => void;
+  aoIrParaProposta?: () => void;
 }) {
-  const reunioes = aba.reunioes_com_o_lead ?? [];
-  const [colando, definirColando] = useState(reunioes.length === 0);
+  const { pode } = usarAcesso();
+  const podeEditar = pode("funil.proposta");
+  const [aba, definirAba] = useState<AbaDaProposta | null>(null);
+  const [erroAoAbrir, definirErroAoAbrir] = useState<string | null>(null);
+  const [colando, definirColando] = useState(false);
   const [campos, definirCampos] = useState<Campos>(VAZIO);
   const [sugestao, definirSugestao] = useState<SugestaoDoContexto | null>(null);
   const [usarSugestao, definirUsarSugestao] = useState(true);
@@ -76,8 +85,29 @@ export function ReuniaoComLeadNaProposta({
   const [falha, definirFalha] = useState<string | null>(null);
   const [feito, definirFeito] = useState<string | null>(null);
 
+  const carregar = () => {
+    definirErroAoAbrir(null);
+    api
+      .abaDaProposta(oportunidadeId)
+      .then((a) => {
+        definirAba(a);
+        if ((a.reunioes_com_o_lead ?? []).length === 0) definirColando(true);
+      })
+      .catch((f) => definirErroAoAbrir(f instanceof ErroDaApi ? f.message : "Falha ao abrir as reuniões."));
+  };
+  useEffect(carregar, [oportunidadeId]);
+
   const mudar = <K extends keyof Campos>(campo: K, valor: Campos[K]) => definirCampos((c) => ({ ...c, [campo]: valor }));
   const curto = campos.resumo.trim().length < MINIMO_DO_RESUMO;
+
+  if (erroAoAbrir) return <Erro mensagem={erroAoAbrir} aoTentarDeNovo={carregar} />;
+  if (!aba) return <Carregando rotulo="Abrindo as reuniões" />;
+
+  const reunioes = aba.reunioes_com_o_lead ?? [];
+  // A proposta usa o que está no rascunho guardado neste navegador, se houver; senão, o da API.
+  const guardado = lerRascunho(oportunidadeId);
+  const matriz = guardado?.entrada.matriz ?? aba.rascunho.matriz;
+  const contextualizacaoAtual = guardado?.entrada.contextualizacao ?? aba.rascunho.contextualizacao;
 
   const sugerir = async () => {
     definirOcupado("sugerindo");
@@ -108,11 +138,13 @@ export function ReuniaoComLeadNaProposta({
         resumo: campos.resumo, ciencia_da_gravacao: campos.ciencia, contextualizacao,
         perfil: Object.fromEntries(sugestao.perfil.filter((p) => marcados.has(p.campo)).map((p) => [p.campo, p.valor])),
       });
+      if (contextualizacao !== null) trocarContextualizacaoGuardada(oportunidadeId, contextualizacao);
+      definirAba(nova);
       definirSugestao(null);
       definirCampos(VAZIO());
       definirColando(false);
-      definirFeito("Reunião guardada e aplicada à proposta. Revise a contextualização e o perfil abaixo.");
-      aoAplicar(nova, contextualizacao);
+      definirFeito("Reunião guardada e aplicada à proposta.");
+      aoMudar?.((nova.reunioes_com_o_lead ?? []).length);
     } catch (e) {
       definirFalha(e instanceof ErroDaApi ? e.message : "Não consegui guardar a reunião. Tente de novo.");
     } finally {
@@ -129,15 +161,19 @@ export function ReuniaoComLeadNaProposta({
     });
 
   return (
-    <div className="reuniao-lead">
-      {reunioes.length > 0 && (
-        <Guardada r={reunioes[0]} podeEditar={podeEditar} aoColarOutra={() => { definirColando(true); definirFeito(null); }} />
+    <section className="reuniao-lead" aria-label="Granola">
+      {feito && (
+        <p className="recado" role="status">
+          ✓ {feito}{" "}
+          {aoIrParaProposta && (
+            <button type="button" className="link-de-tabela" onClick={aoIrParaProposta}>Ver na aba Proposta</button>
+          )}
+        </p>
       )}
-      {feito && <p className="recado" role="status">✓ {feito}</p>}
 
       {colando && podeEditar && (
         <fieldset className="reuniao-lead-colar">
-          <legend>Reunião com o lead (Granola)</legend>
+          <legend>Nova reunião com o lead</legend>
           <p className="campo-ajuda">
             Cole o <strong>resumo</strong> da nota feita com o template [Potencial Cliente]. Não cole a transcrição: do
             lead, o CRM guarda só o resumo.
@@ -170,7 +206,7 @@ export function ReuniaoComLeadNaProposta({
             </span>
           </label>
           <div className="proposta-acoes">
-            <button type="button" className="botao botao-secundario" disabled={curto || ocupado !== null}
+            <button type="button" className="botao botao-primario" disabled={curto || ocupado !== null}
               onClick={() => void sugerir()}>
               {ocupado === "sugerindo" ? "Lendo a reunião…" : "Sugerir contexto e perfil com a IA"}
             </button>
@@ -254,7 +290,7 @@ export function ReuniaoComLeadNaProposta({
           )}
 
           <div className="proposta-acoes">
-            <button type="button" className="botao botao-secundario" disabled={!campos.ciencia || ocupado !== null}
+            <button type="button" className="botao botao-primario" disabled={!campos.ciencia || ocupado !== null}
               onClick={() => void aplicar()}>
               {ocupado === "aplicando" ? "Aplicando…" : "Aplicar à proposta"}
             </button>
@@ -272,6 +308,23 @@ export function ReuniaoComLeadNaProposta({
         </div>
       )}
       {falha && <p className="estado estado-erro estado-texto" role="alert">✗ {falha}</p>}
-    </div>
+
+      {!colando && podeEditar && (
+        <div className="proposta-acoes">
+          <button type="button" className="botao botao-secundario" onClick={() => { definirColando(true); definirFeito(null); }}>
+            Colar outra reunião
+          </button>
+        </div>
+      )}
+
+      <h3 className="proposta-titulo">Reuniões guardadas{reunioes.length > 0 ? ` (${reunioes.length})` : ""}</h3>
+      {reunioes.length === 0 ? (
+        <p className="campo-ajuda">Nenhuma reunião com o lead guardada ainda.</p>
+      ) : (
+        <ul className="granola-historico">
+          {reunioes.map((r) => <ReuniaoNoHistorico key={r.id} r={r} aberta={false} />)}
+        </ul>
+      )}
+    </section>
   );
 }

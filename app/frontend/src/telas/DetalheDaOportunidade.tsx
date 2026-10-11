@@ -10,6 +10,7 @@ import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { DIRECIONADORES_DE_PORTE } from "../componentes/direcionadoresDePorte";
 import { FichaDaOportunidade } from "../componentes/FichaDaOportunidade";
 import { ListaDoQueFalta } from "../componentes/ListaDoQueFalta";
+import { AbaGranola } from "../componentes/AbaGranola";
 import { PropostaDaOportunidade } from "../componentes/PropostaDaOportunidade";
 import { QuestionarioDaOportunidade } from "../componentes/QuestionarioDaOportunidade";
 import { PainelLateral } from "../componentes/PainelLateral";
@@ -296,7 +297,7 @@ export function DetalheDaOportunidade({
   // Excluir (04/10/2026): ao clicar, a API diz o que sai junto, ou por que não pode sair.
   const [exclusao, definirExclusao] = useState<ExclusaoDaOportunidade | null>(null);
   const [abrindoExclusao, definirAbrindoExclusao] = useState(false);
-  const [aba, definirAba] = useState<"cadastro" | "volumetria" | "ficha" | "proposta" | "historico">("cadastro");
+  const [aba, definirAba] = useState<"cadastro" | "volumetria" | "ficha" | "granola" | "proposta" | "historico">("cadastro");
   // O que falta para a proposta (E4): a contagem fica no rótulo da aba; falhar aqui não impede o painel.
   const [pendencias, definirPendencias] = useState<PendenciasDaProposta | null>(null);
   const carregarPendencias = () => {
@@ -493,10 +494,10 @@ export function DetalheDaOportunidade({
         <span className="campo-ajuda">Converter em contrato: o seu perfil não libera.</span>
       )}
       {/* Uma ação primária por painel — regra 2 do PAD-002. Na aba Proposta a primária é
-          "Gerar PowerPoint", e salvar a oportunidade fica secundário. */}
+          "Gerar PowerPoint", e na Granola, sugerir e aplicar: salvar a oportunidade fica secundário. */}
       <button
         type="button"
-        className={`botao ${aba === "proposta" ? "botao-secundario" : "botao-primario"}`}
+        className={`botao ${aba === "proposta" || aba === "granola" ? "botao-secundario" : "botao-primario"}`}
         onClick={salvar}
         disabled={salvando || exigeDataDeAceite || exigeDataDeEnvio || exigeMotivoDaPerda || !pode("funil.editar")}
       >
@@ -586,6 +587,18 @@ export function DetalheDaOportunidade({
               onClick={() => definirAba("ficha")}
             >
               Ficha
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className="aba"
+              aria-selected={aba === "granola"}
+              onClick={() => definirAba("granola")}
+            >
+              Granola
+              {(detalhe.reunioes_com_o_lead ?? 0) > 0 && (
+                <span className="aba-contagem"> ({detalhe.reunioes_com_o_lead})</span>
+              )}
             </button>
             <button
               type="button"
@@ -971,10 +984,20 @@ export function DetalheDaOportunidade({
           {aba === "proposta" && pendencias && (
             <ListaDoQueFalta oportunidadeId={id} dados={pendencias} aoMudar={definirPendencias} />
           )}
+          {aba === "granola" && (
+            <AbaGranola oportunidadeId={id}
+              aoMudar={(quantas) => {
+                // Só a contagem: recarregar o detalhe desfaria o que está sendo editado no Cadastro.
+                definirDetalhe((d) => (d ? { ...d, reunioes_com_o_lead: quantas } : d));
+                carregarPendencias();
+              }}
+              aoIrParaProposta={() => definirAba("proposta")} />
+          )}
           {aba === "proposta" && (
             <PropostaDaOportunidade
               oportunidadeId={id}
               aoGerar={carregarPendencias}
+              aoAbrirGranola={() => definirAba("granola")}
               aoEnviar={() => {
                 carregar();
                 carregarPendencias();

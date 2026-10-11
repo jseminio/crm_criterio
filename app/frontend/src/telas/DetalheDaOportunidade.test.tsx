@@ -125,13 +125,13 @@ describe("DetalheDaOportunidade", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Abrindo a oportunidade");
   });
 
-  it("a aba Proposta conta o que falta, e a Ficha fica entre Volumetria e Proposta", async () => {
+  it("a aba Proposta conta o que falta; Ficha e Granola (11/10/2026) ficam antes da Proposta", async () => {
     vi.mocked(api.pendencias).mockResolvedValue({ abertas: 3, atrasadas: 1, feitas: 0, revisores: ["Eduardo"], itens: [] });
-    await abrir(oportunidade());
+    await abrir(oportunidade({ reunioes_com_o_lead: 2 }));
     const abas = screen.getByRole("tablist", { name: "Seções da oportunidade" });
-    await waitFor(() => expect(within(abas).getAllByRole("tab")[3]).toHaveTextContent(/^Proposta\s*· 3 pendentes$/));
+    await waitFor(() => expect(within(abas).getAllByRole("tab")[4]).toHaveTextContent(/^Proposta\s*· 3 pendentes$/));
     expect(within(abas).getAllByRole("tab").map((t) => t.textContent?.replace(/\s+/g, " ").trim())).toEqual([
-      "Cadastro", "Volumetria e porte", "Ficha", "Proposta · 3 pendentes", "Histórico",
+      "Cadastro", "Volumetria e porte", "Ficha", "Granola (2)", "Proposta · 3 pendentes", "Histórico",
     ]);
   });
 

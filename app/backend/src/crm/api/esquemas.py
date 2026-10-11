@@ -315,6 +315,8 @@ class OportunidadeDetalhe(OportunidadeResumo):
     """`{campo: "Entrevista" | "Questionário"}`, só para campos preenchidos."""
     historico_de_preco: list[MudancaDePreco] = []
     """Mais recente primeiro. Só cresce: reajustar não apaga o preço anterior."""
+    reunioes_com_o_lead: int = 0
+    """Quantas reuniões com o lead (Granola) estão guardadas: a contagem da aba Granola (11/10/2026)."""
 
     porte: str | None = None
     porte_definido_por: str | None = None

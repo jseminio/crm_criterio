@@ -74,11 +74,12 @@ PARCELAS_NO_ANO = 13
 """Parcelas que um serviço recorrente fatura no ano (09/10/2026). MRR = parcela × 13 ÷ 12."""
 
 
-def mensalizar(parcela: Decimal | None) -> Decimal | None:
-    """A parcela mensal do contrato em MRR: × 13 ÷ 12, ao centavo."""
+def mensalizar(parcela: Decimal | None, parcelas: int = PARCELAS_NO_ANO) -> Decimal | None:
+    """A parcela mensal do contrato em MRR: × parcelas ÷ 12, ao centavo. O padrão é 13; o contrato no formato antigo,
+    sem a 13ª (Menino da Ilha, decisão de Eduardo em 11/10/2026), tem 12 e o MRR é a própria parcela."""
     if parcela is None:
         return None
-    return (Decimal(parcela) * PARCELAS_NO_ANO / 12).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
+    return (Decimal(parcela) * parcelas / 12).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
 T = TipoDeEventoDeContrato
 
 
@@ -120,31 +121,34 @@ class _ContratoEmBruto:
     preco_mensal: Decimal | None
     data_inicio: date | None
     eventos: list[_EventoEmBruto] = field(default_factory=list)
+    parcelas_no_ano: int = PARCELAS_NO_ANO
 
 
 def em_bruto(contratos: Iterable[_Contrato], imposto: Decimal, *, em_mrr: bool = True) -> list[_ContratoEmBruto]:
     """Os contratos com os valores em bruto e em MRR: o marcado `base_do_valor == "liquido"` tem preço e
-    eventos divididos por (1 − imposto); depois, todo valor vira MRR (× 13 ÷ 12, `mensalizar`).
+    eventos divididos por (1 − imposto); depois, todo valor vira MRR (× parcelas ÷ 12, `mensalizar`; 13 por padrão).
 
     `em_mrr=False` fica na parcela em bruto, sem o 13 ÷ 12: é o que o caixa espera receber no mês
     (`crm.domain.recebimentos`)."""
     if not Decimal(0) <= imposto < 1:
         raise ValueError("o imposto precisa estar entre 0 e 100%")
 
-    def converter(v: Decimal | None, liquido: bool) -> Decimal | None:
+    def converter(v: Decimal | None, liquido: bool, parcelas: int) -> Decimal | None:
         if v is None:
             return None
         bruto = (Decimal(v) / (1 - imposto)).quantize(CENTAVOS, rounding=ROUND_HALF_UP) if liquido else Decimal(v)
-        return mensalizar(bruto) if em_mrr else bruto
+        return mensalizar(bruto, parcelas) if em_mrr else bruto
 
     lista = []
     for c in contratos:
         liq = getattr(c, "base_do_valor", None) == "liquido"
+        n = getattr(c, "parcelas_no_ano", None) or PARCELAS_NO_ANO
         lista.append(_ContratoEmBruto(
-            c.id, c.grupo_id, c.situacao, converter(c.preco_mensal, liq), c.data_inicio,
-            [_EventoEmBruto(e.tipo, e.data_do_evento, converter(e.preco_mensal_anterior, liq),
-                            converter(e.preco_mensal_novo, liq), e.iniciativa, e.id,
+            c.id, c.grupo_id, c.situacao, converter(c.preco_mensal, liq, n), c.data_inicio,
+            [_EventoEmBruto(e.tipo, e.data_do_evento, converter(e.preco_mensal_anterior, liq, n),
+                            converter(e.preco_mensal_novo, liq, n), e.iniciativa, e.id,
                             getattr(e, "data_da_saida", None)) for e in c.eventos],
+            n,
         ))
     return lista
 

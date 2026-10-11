@@ -340,6 +340,8 @@ export interface ContratoResumo {
   preco_anual: string | null;
   /** Se o preço já inclui o imposto (02/10/2026). Null = não informado. */
   base_do_valor: "bruto" | "liquido" | null;
+  /** 13 por padrão; 12 no formato antigo, sem 13ª (11/10/2026). */
+  parcelas_no_ano?: number;
   data_inicio: string | null;
   data_fim: string | null;
   situacao: string;

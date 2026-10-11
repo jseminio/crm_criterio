@@ -58,9 +58,12 @@ def avos(ano: int, inicio: date | None, fim: date | None) -> int:
     return conta
 
 
-def decima_terceira(parcela: Decimal, competencia: date, inicio: date | None, saida: date | None) -> Decimal:
+def decima_terceira(parcela: Decimal, competencia: date, inicio: date | None, saida: date | None,
+                    parcelas: int = 13) -> Decimal:
     """A 13ª que o caixa espera na competência: a proporcional no mês da saída; senão, em dezembro, os avos do
-    ano desde a assinatura. Zero nos outros meses."""
+    ano desde a assinatura. Zero nos outros meses e no contrato de 12 parcelas (formato antigo, sem 13ª)."""
+    if parcelas < 13:
+        return Decimal("0.00")
     ano = competencia.year
     if saida is not None and (saida.year, saida.month) == (ano, competencia.month):
         n = avos(ano, inicio, saida)
@@ -71,9 +74,10 @@ def decima_terceira(parcela: Decimal, competencia: date, inicio: date | None, sa
     return (parcela * n / 12).quantize(CENTAVOS, rounding=ROUND_HALF_UP)
 
 
-def esperado_no_mes(parcela: Decimal, competencia: date, inicio: date | None = None, saida: date | None = None) -> Decimal:
+def esperado_no_mes(parcela: Decimal, competencia: date, inicio: date | None = None, saida: date | None = None,
+                    parcelas: int = 13) -> Decimal:
     """A parcela em bruto que o caixa espera na competência, mais a 13ª quando cabe (`decima_terceira`)."""
-    return parcela + decima_terceira(parcela, competencia, inicio, saida)
+    return parcela + decima_terceira(parcela, competencia, inicio, saida, parcelas)
 
 
 def situacao(esperado: Decimal, recebido: Decimal, mes_importado: bool) -> str:

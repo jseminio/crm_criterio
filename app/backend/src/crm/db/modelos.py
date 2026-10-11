@@ -827,6 +827,9 @@ class Contrato(CarimboMixin, Base):
 
     data_inicio: Mapped[date | None] = mapped_column(sa.Date)
     data_fim: Mapped[date | None] = mapped_column(sa.Date)
+    parcelas_no_ano: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False, default=13, server_default="13")
+    """13 por padrão (contábil, fiscal, DP e BPO Financeiro: 13ª parcela, decisões de 09 e 11/10/2026); 12 no contrato no
+    formato antigo, sem 13ª (Menino da Ilha). O MRR é a parcela × parcelas ÷ 12."""
 
     situacao: Mapped[SituacaoContrato] = mapped_column(
         coluna_lista(SituacaoContrato),

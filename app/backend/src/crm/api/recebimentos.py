@@ -198,7 +198,7 @@ def carteira(sessao: Session, competencia: date, hoje: date | None = None) -> Ca
         if regras.fatura_entre(p, competencia, fim):
             preco = regras.preco_em(p, min(fim, saida) if saida else fim)
             if preco and preco > 0:
-                esperado = regra.esperado_no_mes(preco, competencia, p.data_inicio, saida)
+                esperado = regra.esperado_no_mes(preco, competencia, p.data_inicio, saida, p.parcelas_no_ano)
         item = partes.get(p.id)
         if item is None and esperado <= 0:
             continue

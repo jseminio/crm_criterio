@@ -543,6 +543,7 @@ class ContratoResumo(Base):
     signatario: str | None = None
     saida_em: date | None = None
     """Saída efetiva anunciada (10/10/2026): com o contrato Ativo, ele está em aviso de saída até esta data."""
+    parcelas_no_ano: int = 13
 
 
 class EventoDeContratoResposta(Base):
@@ -630,6 +631,8 @@ class ContratoEdicao(BaseModel):
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
     base_do_valor: Literal["bruto", "liquido"] | None = None
+    parcelas_no_ano: Literal[12, 13] | None = None
+    """13 por padrão; 12 no formato antigo, sem 13ª (11/10/2026)."""
     data_inicio: date | None = None
     data_fim: date | None = None
     situacao: SituacaoContrato | None = None

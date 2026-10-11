@@ -55,6 +55,7 @@ function EdicaoDeContrato({
     situacao: contrato.situacao,
     signatario: contrato.signatario ?? "",
     base_do_valor: contrato.base_do_valor ?? "",
+    parcelas_no_ano: String(contrato.parcelas_no_ano ?? 13),
   });
   // A alíquota vem do MRR (Parâmetros de cálculo), para mostrar quanto o líquido vale em bruto.
   const { dados: mrr } = usarDados<Mrr>(() => api.mrr(), []);
@@ -108,6 +109,7 @@ function EdicaoDeContrato({
       const mudancas: Record<string, unknown> = Object.fromEntries(
         Object.entries(rascunho).map(([k, v]) => [k, v === "" ? null : v]),
       );
+      mudancas.parcelas_no_ano = Number(rascunho.parcelas_no_ano);
       await api.editarContrato(contrato.id, mudancas);
       aoSalvar();
       aoFechar();
@@ -132,7 +134,7 @@ function EdicaoDeContrato({
             type="button"
             className="botao botao-primario"
             onClick={salvar}
-            disabled={salvando || semAssinatura || (encerrado && rascunho.base_do_valor === (contrato.base_do_valor ?? ""))}
+            disabled={salvando || semAssinatura || (encerrado && rascunho.base_do_valor === (contrato.base_do_valor ?? "") && rascunho.parcelas_no_ano === String(contrato.parcelas_no_ano ?? 13))}
           >
             {salvando ? "Salvando…" : "Salvar alterações"}
           </button>
@@ -232,8 +234,24 @@ function EdicaoDeContrato({
                 : "⚠ Não informado: o MRR soma como está. Vale também para contrato assinado ou encerrado."}
           </p>
         </fieldset>
+        <fieldset className="campo-bloco base-do-valor">
+          <legend className="campo-rotulo">Parcelas no ano</legend>
+          <div className="base-do-valor-opcoes">
+            {(["13", "12"] as const).map((n) => (
+              <label key={n}>
+                <input type="radio" name="c-parcelas" value={n} checked={rascunho.parcelas_no_ano === n}
+                  onChange={() => mudar("parcelas_no_ano", n)} />
+                {n === "13" ? "13 (com a 13ª, padrão)" : "12 (formato antigo, sem a 13ª)"}
+              </label>
+            ))}
+          </div>
+          <p className="campo-ajuda">
+            O MRR é a parcela × {rascunho.parcelas_no_ano} ÷ 12.{" "}
+            {rascunho.parcelas_no_ano === "12" ? "Sem a 13ª: o MRR é a própria parcela, e dezembro não espera a 13ª no caixa." : "Em dezembro (ou na saída, proporcional) o caixa espera a 13ª."}
+          </p>
+        </fieldset>
         {encerrado && (
-          <p className="campo-ajuda">Contrato encerrado: nada mais muda, nem por evento nem aqui (só o bruto ou líquido).</p>
+          <p className="campo-ajuda">Contrato encerrado: nada mais muda, nem por evento nem aqui (só o bruto ou líquido e as parcelas).</p>
         )}
         {assinado && (
           <p className="campo-ajuda">

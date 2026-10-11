@@ -109,6 +109,12 @@ precisam estar na mesma versão do banco: a prévia recusa e diz por quê. Rotas
   o contrato passa a Encerrado sozinho (`crm.db.saidas`: ao subir a API, a cada hora e antes das contas de MRR).
   Migração `b8d4f2a6c1e9` (`evento_de_contrato.data_da_saida`); a tarefa `2026_10_10_saida_dos_encerramentos_antigos`
   põe a saída = data do evento nos encerramentos antigos (nada muda).
+- **Parcelas no ano por contrato** (decisão de Eduardo em 11/10/2026): todo contrato recorrente tem **13** parcelas
+  (BPO Financeiro confirmado), menos a **Menino da Ilha**, no formato antigo, sem 13ª: **12**. Campo "Parcelas no ano"
+  no painel do contrato (13 padrão); o MRR é a parcela × parcelas ÷ 12, e o esperado de dezembro (ou da saída) só soma
+  a 13ª nos de 13. Migração `f2b6d8a4c0e1`; a tarefa `2026_10_11_menino_da_ilha_em_12_parcelas` põe 12 no contrato de
+  BPO Financeiro dela no Redeploy. O card do MRR em Oportunidades ficou do tamanho dos outros: os 10 indicadores em duas
+  linhas.
 - **Prazo até o envio da proposta** (amostra aprovada por Eduardo em 11/10/2026): card em Funil › Oportunidades com a
   média e a mediana de dias entre a originação e o envio, de todas as propostas enviadas (aceitas ou não), com os
   filtros da tela. As da planilha de 2026 **ficam fora** (lá o envio foi gravado igual à originação, por regra); quem

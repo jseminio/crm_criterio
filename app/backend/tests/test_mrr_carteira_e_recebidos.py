@@ -10,6 +10,7 @@ from decimal import Decimal as D
 import pytest
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
+import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from crm.acesso.entrada import ConfiguracaoDeEntrada
@@ -261,3 +262,39 @@ def test_meta_mudada_na_tela_fica_como_esta(engine):
 def test_sem_linha_vale_o_padrao_ja_em_13_parcelas(engine):
     with Session(engine) as s:
         assert "padrão do código" in meta_de_mrr_em_13_parcelas.executar(s)
+
+
+# ── Parcelas no ano por contrato (11/10/2026) ───────────────────────────────────────────────────────
+
+def test_contrato_de_12_parcelas_tem_mrr_igual_a_parcela_e_sem_13a(cliente, engine):
+    """A Menino da Ilha está no formato antigo, sem 13ª: MRR = parcela; em dezembro, o esperado não soma a 13ª."""
+    with Session(engine) as s:
+        b1 = s.scalars(sa.select(Contrato).where(Contrato.escopo == "Contábil", Contrato.preco_mensal == D("3600"))).one()
+        b1.parcelas_no_ano = 12
+        s.commit()
+    carteira = cliente.get("/api/mrr/carteira", params={"hoje": HOJE}, headers=ADMIN).json()
+    beta = next(g for g in carteira["itens"] if g["grupo"] == "Beta")
+    assert D(beta["mrr"]) == D("3600.00")  # e não 3.900 (× 13 ÷ 12)
+    assert D(carteira["mrr"]) == _mrr("12000") + _mrr("2400") + D("3600.00")
+    dez = cliente.get("/api/mrr/carteira", params={"hoje": "2026-12-20", "competencia": "2026-12"}, headers=ADMIN).json()
+    beta = next(g for g in dez["itens"] if g["grupo"] == "Beta")
+    assert D(beta["esperado"]) == D("3600")  # sem a 13ª
+
+
+def test_tarefa_poe_12_parcelas_so_na_menino_da_ilha(engine):
+    from crm.manutencao.tarefas import menino_da_ilha_em_12_parcelas
+
+    with Session(engine) as s:
+        g = GrupoEconomico(nome="Menino da Ilha")
+        s.add(g)
+        s.flush()
+        bpo = Contrato(grupo_id=g.id, situacao=SituacaoContrato.ATIVO, preco_mensal=D("2000"), escopo="BPO Financeiro")
+        s.add(bpo)
+        s.commit()
+        assert "1 contrato" in menino_da_ilha_em_12_parcelas.executar(s)
+        s.commit()
+        s.refresh(bpo)
+        assert bpo.parcelas_no_ano == 12
+        outros = s.scalars(sa.select(Contrato).where(Contrato.id != bpo.id)).all()
+        assert all(c.parcelas_no_ano == 13 for c in outros)
+        assert "nada a mudar" in menino_da_ilha_em_12_parcelas.executar(s)

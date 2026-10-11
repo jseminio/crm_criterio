@@ -1538,7 +1538,8 @@ def _registrar(api: FastAPI) -> None:
         # salvar voltava a situação para Ativo e destravava preço e data de fim.
         # Bruto ou líquido é como o valor se lê, não uma mudança no contrato: vale até no encerrado
         # (o churn dele também entra no MRR em bruto).
-        if contrato.situacao is SituacaoContrato.ENCERRADO and set(reais) - {"base_do_valor"}:
+        # Parcelas no ano (11/10/2026), como o bruto ou líquido, é como o valor se lê: vale também no encerrado.
+        if contrato.situacao is SituacaoContrato.ENCERRADO and set(reais) - {"base_do_valor", "parcelas_no_ano"}:
             raise HTTPException(422, "contrato encerrado não se mexe mais")
         if mudancas.get("situacao") is SituacaoContrato.ENCERRADO and contrato.situacao is not SituacaoContrato.ENCERRADO:
             raise HTTPException(422, "para encerrar, registre um evento de Encerramento com o motivo")

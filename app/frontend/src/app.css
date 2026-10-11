@@ -1464,7 +1464,8 @@ td > .celula-fonte { display: block; }
 }
 
 .acoes-da-tela { display: flex; justify-content: flex-end; gap: var(--e2); margin: var(--e2) 0 var(--e3); }
-.ind-mrr { grid-column: span 2; }
+/* MRR do tamanho dos outros cards (11/10/2026): os 10 indicadores de Oportunidades cabem em duas linhas de 5. */
+.ind-mrr { grid-column: auto; }
 @media (max-width: 720px) { .ind-mrr { grid-column: 1 / -1; } }
 
 .composicao-fora td { color: var(--texto-medio); }

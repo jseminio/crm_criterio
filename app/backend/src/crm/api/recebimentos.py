@@ -113,10 +113,25 @@ class ItemDoMovimentoResposta(BaseModel):
     iniciativa: str | None = None
 
 
+class SaidaAnunciadaResposta(BaseModel):
+    categoria: str
+    grupo_id: int
+    grupo: str
+    contrato_id: int
+    escopo: str | None
+    valor: Decimal
+    anuncio: date
+    saida: date
+    motivo: str | None = None
+    iniciativa: str | None = None
+
+
 class MovimentoResposta(BaseModel):
     de: date
     ate: date
     itens: list[ItemDoMovimentoResposta]
+    churn_anunciado: list[SaidaAnunciadaResposta] = []
+    """Os encerramentos anunciados no período (11/10/2026): os indicadores de churn contam aqui; o MRR, na saída."""
 
 
 class Planilha(BaseModel):
@@ -350,6 +365,9 @@ def roteador_de_recebimentos(obter_sessao: Callable[[], Iterator[Session]]) -> A
         contratos = regras.em_bruto(registrados, parametros_vigentes(sessao)[1].imposto)
         itens = regras.itens_do_movimento(contratos, de, fim)
         eventos = {ev.id: ev for c in registrados for ev in c.eventos}
+        anunciadas = regras.saidas_anunciadas(contratos, de, fim)
+        nomes_anunciados = dict(sessao.execute(sa.select(GrupoEconomico.id, GrupoEconomico.nome)
+                                               .where(GrupoEconomico.id.in_({a.grupo_id for a in anunciadas} or {0}))).all())
         nomes = dict(sessao.execute(sa.select(GrupoEconomico.id, GrupoEconomico.nome)
                                     .where(GrupoEconomico.id.in_({i.grupo_id for i in itens} or {0}))).all())
         return MovimentoResposta(de=de, ate=fim, itens=[
@@ -360,6 +378,14 @@ def roteador_de_recebimentos(obter_sessao: Callable[[], Iterator[Session]]) -> A
                 iniciativa=(ev.iniciativa.value if ev and ev.iniciativa else None),
             )
             for i in sorted(itens, key=lambda i: (regras.CATEGORIAS_DO_MOVIMENTO.index(i.categoria), -i.valor))
+        ], churn_anunciado=[
+            SaidaAnunciadaResposta(
+                categoria=a.categoria, grupo_id=a.grupo_id, grupo=nomes_anunciados.get(a.grupo_id, f"Grupo {a.grupo_id}"),
+                contrato_id=a.contrato_id, escopo=por_id[a.contrato_id].escopo, valor=a.valor, anuncio=a.anuncio, saida=a.saida,
+                motivo=(ev.motivo_categoria.value if (ev := eventos.get(a.evento_id)) and ev.motivo_categoria else None),
+                iniciativa=(ev.iniciativa.value if ev and ev.iniciativa else None),
+            )
+            for a in sorted(anunciadas, key=lambda a: (a.anuncio, -a.valor))
         ])
 
     @r.post("/api/recebimentos/previa", response_model=PreviaResposta)

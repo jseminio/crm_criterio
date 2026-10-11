@@ -917,9 +917,13 @@ def _montar_fases(sessao: Session, mes: date, hoje: date) -> tuple[FasesResposta
                                data=i.data, valor=i.valor * sinal[i.categoria])
                    for i in (regras_de_mrr.itens_do_movimento(em_bruto, ini, fim, so_existentes_em=ini) if passou else [])
                    if i.categoria in sinal]
-    comp["churn"] = [LinhaDaFase(titulo=nome_do_grupo.get(i.grupo_id, "?"), detalhe=f"{escopo.get(i.contrato_id) or 'contrato'} · {i.categoria}",
-                                 data=i.data, valor=i.valor)
-                     for linha, i in (regras.itens_do_realizado(por_motor, ini, fim) if passou else []) if linha == "perdas"]
+    # Churn anunciado (decisão de Eduardo em 11/10/2026): conta no mês em que o cliente pediu para sair, pelo MRR do
+    # contrato, mesmo com o MRR seguindo até a saída efetiva.
+    anunciadas = regras_de_mrr.saidas_anunciadas(em_bruto, ini, fim) if passou else []
+    churn_anunciado = sum((a.valor for a in anunciadas), D("0")) if passou else None
+    comp["churn"] = [LinhaDaFase(titulo=nome_do_grupo.get(a.grupo_id, "?"),
+                                 detalhe=f"{escopo.get(a.contrato_id) or 'contrato'} · anunciou em {a.anuncio:%d/%m} · sai em {a.saida:%d/%m}",
+                                 data=a.anuncio, valor=a.valor) for a in anunciadas]
     comp["upgrades"] = [LinhaDaFase(titulo=nome_do_grupo.get(c.grupo_id, "?"), detalhe=f"{ev.tipo.value} de BPO", data=ev.data_do_evento,
                                     valor=ev.preco_mensal_novo - ev.preco_mensal_anterior)
                         for c in por_motor[regras.MOTOR_BPO] for ev in c.eventos
@@ -929,8 +933,9 @@ def _montar_fases(sessao: Session, mes: date, hoje: date) -> tuple[FasesResposta
     comp["reunioes_em_dia"] = [LinhaDaFase(titulo=n, detalhe=f"classe {cl} · {'em dia' if ok else 'reunião vencida'}", entra=ok)
                                for n, cl, ok in (sucesso.reunioes_em_dia_por_grupo(sessao, hoje) if corrente else [])]
     partes = []
-    if lr is not None and lp is not None and lr.perdas > lp.churn:
-        partes.append(f"Perdas de {_reais(lr.perdas)} acima da premissa de churn ({_reais(lp.churn)}): veja os encerramentos na Carteira.")
+    if churn_anunciado is not None and lp is not None and churn_anunciado > lp.churn:
+        partes.append(f"Churn anunciado de {_reais(churn_anunciado)} acima da premissa ({_reais(lp.churn)}): veja os encerramentos "
+                      "em Gestão de contratos.")
     if em_dia_total and em_dia_total[0] < em_dia_total[1]:
         vencidas = em_dia_total[1] - em_dia_total[0]
         partes.append(f"{vencidas} {'cliente está' if vencidas == 1 else 'clientes estão'} com reunião de resultado vencida: "
@@ -938,8 +943,9 @@ def _montar_fases(sessao: Session, mes: date, hoje: date) -> tuple[FasesResposta
     pos_venda = FaseResposta(
         chave="pos_venda", titulo="Pós-venda", pergunta="O cliente fica, cresce e indica?", kpi=k_pos,
         apoio=[
-            IndicadorDaFase(rotulo="Churn no mês", unidade="reais", previsto=lp.churn if lp else None, realizado=lr.perdas if lr else None,
-                            chave="churn", explicacao="MRR perdido no mês: churn (cliente e Critério) e contração, na saída efetiva."),
+            IndicadorDaFase(rotulo="Churn anunciado no mês", unidade="reais", previsto=lp.churn if lp else None, realizado=churn_anunciado,
+                            chave="churn", explicacao="MRR dos contratos cujo encerramento foi anunciado no mês (cliente e Critério). "
+                            "Conta no anúncio; o MRR só cai na saída efetiva, depois da transição e da multa."),
             IndicadorDaFase(rotulo="Upgrades na escada", unidade="numero", previsto=upg_prev, realizado=upgrades, chave="upgrades",
                             explicacao="Expansões e aditivos que aumentaram o preço de contratos de BPO no mês."),
             IndicadorDaFase(rotulo="Reuniões de resultado em dia", unidade="pct", previsto=D(100) if corrente else None, realizado=pct_em_dia,

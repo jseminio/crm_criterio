@@ -37,7 +37,7 @@ from crm.api import sucesso
 from crm.api.classificacao import parametros_vigentes
 from crm.db.modelos import Contrato, GrupoEconomico, Oportunidade
 from crm.domain import mrr as regras_de_mrr
-from crm.domain.eventos_de_contrato import saida_vigente
+from crm.domain.eventos_de_contrato import encerramento_vigente, saida_vigente
 from crm.domain import sucesso as regras_do_sucesso
 from crm.domain.listas import LinhaServico, Situacao, SituacaoContrato, TipoDeEventoDeContrato
 
@@ -95,19 +95,24 @@ def _reais(v: Decimal) -> str:
     return "R$ " + f"{v:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
 
 
-def _encerramento(c) -> date | None:
-    """A saída efetiva do encerramento que vale (10/10/2026): o cliente conta como perdido na saída, não no anúncio."""
+def _encerramento(c, pelo_anuncio: bool = False) -> date | None:
+    """A data do encerramento que vale: a saída efetiva (o MRR cai nela) ou, com `pelo_anuncio`, o dia em que o
+    cliente pediu para sair — o indicador de churn conta no anúncio (decisão de Eduardo em 11/10/2026)."""
+    if pelo_anuncio:
+        ev = encerramento_vigente(c)
+        return ev.data_do_evento if ev is not None else None
     return saida_vigente(c)
 
 
-def _valendo_em(c, dia: date) -> bool:
+def _valendo_em(c, dia: date, pelo_anuncio: bool = False) -> bool:
     """O contrato estava valendo ao fim de `dia`: começou até ali (ou é da carteira anterior, sem data) e
-    não tinha sido encerrado. Aguardando assinatura não vale."""
+    não tinha sido encerrado. Aguardando assinatura não vale. Com `pelo_anuncio`, o contrato em aviso de saída já
+    não vale: é o que o churn de clientes usa."""
     if c.situacao is SituacaoContrato.AGUARDANDO_ASSINATURA:
         return False
     if c.data_inicio is not None and c.data_inicio > dia:
         return False
-    fim = _encerramento(c)
+    fim = _encerramento(c, pelo_anuncio)
     if fim is not None:
         return fim > dia
     return c.situacao is not SituacaoContrato.ENCERRADO
@@ -237,36 +242,49 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
     )
 
     # ------------------------------------------------ 17: churn de clientes
+    # Conta no **anúncio** (decisão de Eduardo em 11/10/2026): o cliente pediu para sair, apesar de o MRR seguir até a
+    # saída efetiva (transição e multa contratual). O MRR, o movimento e o NRR/GRR seguem pela saída.
+    churn_valendo = lambda c, dia: _valendo_em(c, dia, pelo_anuncio=True)
     base_dia = date(de.year - 1, 12, 31)
     grupos = {c.grupo_id for c in originais}
-    base = {g for g in grupos if any(c.grupo_id == g and _valendo_em(c, base_dia) for c in originais)}
+    base = {g for g in grupos if any(c.grupo_id == g and churn_valendo(c, base_dia) for c in originais)}
 
     def perdidos_entre(a: date, b: date) -> list[int]:
         saidas = []
         for g in grupos:
-            if not any(c.grupo_id == g and _valendo_em(c, a - timedelta(days=1)) for c in originais):
+            if not any(c.grupo_id == g and churn_valendo(c, a - timedelta(days=1)) for c in originais):
                 continue  # não era cliente no começo
-            if any(c.grupo_id == g and _valendo_em(c, b) for c in originais):
+            if any(c.grupo_id == g and churn_valendo(c, b) for c in originais):
                 continue  # ainda é
             saidas.append(g)
         return saidas
 
     perdidos = perdidos_entre(de, ate)
     perdidos_ano = perdidos_entre(date(de.year, 1, 1), ate)
-    ano_anterior = [c for c in originais if (d := _encerramento(c)) and d.year == de.year - 1]
+    ano_anterior = [c for c in originais if (d := _encerramento(c, pelo_anuncio=True)) and d.year == de.year - 1]
+
+    def detalhe_da_saida(g: int) -> str:
+        """Do último contrato do grupo: quando o cliente pediu e quando sai de fato."""
+        datas = [(ev.data_do_evento, ev.data_da_saida or ev.data_do_evento)
+                 for c in originais if c.grupo_id == g and (ev := encerramento_vigente(c)) is not None]
+        if not datas:
+            return "perdeu o último contrato no mês"
+        anuncio, saida = max(datas)
+        return f"anunciou em {anuncio:%d/%m/%Y} · sai em {saida:%d/%m/%Y}"
     kpi17 = Kpi(
         chave="churn", titulo="17 · Churn de clientes", valor=_pct(Decimal(len(perdidos)), Decimal(len(base))) if base else None,
         unidade="%",
-        resumo=f"{len(perdidos)} cliente(s) perdido(s) no mês · base de {base_dia:%d/%m/%Y}: {len(base)} cliente(s) · "
+        resumo=f"{len(perdidos)} cliente(s) anunciaram a saída no mês · base de {base_dia:%d/%m/%Y}: {len(base)} cliente(s) · "
                f"{len(perdidos_ano)} no ano",
         falta=([] if ano_anterior else [f"Os clientes perdidos em {de.year - 1}, para o baseline (contrato encerrado com a data)"]),
         meta=f"Abaixo do baseline de {de.year - 1} em 20%",
         extras={"perdidos": len(perdidos), "base": len(base), "perdidos_no_ano": len(perdidos_ano)},
-        itens=[Item(grupo=nomes.get(g, "?"), detalhe="perdeu o último contrato no mês", valor=ZERO) for g in perdidos]
+        itens=[Item(grupo=nomes.get(g, "?"), detalhe=detalhe_da_saida(g), valor=ZERO) for g in perdidos]
         + [Item(grupo=nomes.get(g, "?"), detalhe=f"na base de {base_dia:%d/%m/%Y}", valor=ZERO, entra=False)
            for g in sorted(base - set(perdidos), key=lambda g: nomes.get(g, ""))],
-        explicacao=f"Clientes (grupos) que perderam o último contrato no mês ÷ clientes com contrato valendo em "
-                   f"{base_dia:%d/%m/%Y}. Encerrar um contrato de quem tem outro não conta: é contração do MRR.",
+        explicacao=f"Churn anunciado: clientes (grupos) que pediram para encerrar o último contrato no mês ÷ clientes com "
+                   f"contrato valendo em {base_dia:%d/%m/%Y}. Conta no anúncio, mesmo com o MRR seguindo até a saída "
+                   "efetiva. Encerrar um contrato de quem tem outro não conta: é contração do MRR.",
     )
 
     # ------------------------------------------------ 21: cobertura de relacionamento

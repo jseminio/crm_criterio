@@ -49,7 +49,7 @@ from crm.domain.listas import IniciativaDoEncerramento, SituacaoContrato, TipoDe
 
 __all__ = [
     "ALERTA_DE_MRR", "CATEGORIAS_DO_MOVIMENTO", "ItemDoMovimento", "ItemDoMrr", "META_DE_MRR", "MrrAtual", "Movimento",
-    "fatura_entre", "saida_vigente", "contra_a_meta", "em_bruto", "itens_do_movimento", "itens_do_mrr", "mrr_atual", "movimento", "mrr_em",
+    "SaidaAnunciada", "fatura_entre", "saida_vigente", "saidas_anunciadas", "contra_a_meta", "em_bruto", "itens_do_movimento", "itens_do_mrr", "mrr_atual", "movimento", "mrr_em",
     "preco_em",
 ]
 
@@ -369,3 +369,32 @@ def preco_em(c: _Contrato, dia: date) -> Decimal | None:
         if ev.preco_mensal_novo is not None and ev.preco_mensal_anterior is not None:
             preco -= ev.preco_mensal_novo - ev.preco_mensal_anterior
     return preco
+
+
+@dataclass(frozen=True)
+class SaidaAnunciada:
+    """Um encerramento pelo **anúncio**: o cliente pediu para sair no período (decisão de Eduardo em 11/10/2026).
+    É o que os indicadores de churn contam; o MRR só cai na `saida` (o movimento e o NRR/GRR seguem por ela)."""
+
+    categoria: str
+    """"churn_cliente" ou "churn_criterio", por quem decidiu."""
+    contrato_id: int
+    grupo_id: int
+    valor: Decimal
+    """O MRR que o contrato tinha (o que vai sair)."""
+    anuncio: date
+    saida: date
+    evento_id: int
+
+
+def saidas_anunciadas(contratos: Iterable[_Contrato], de: date, ate: date) -> list[SaidaAnunciada]:
+    """Os encerramentos que valem (sem desistência depois) anunciados em [de, ate]."""
+    itens = []
+    for c in contratos:
+        ev = encerramento_vigente(c)
+        if ev is None or not (de <= ev.data_do_evento <= ate) or not c.preco_mensal or c.preco_mensal <= 0:
+            continue
+        cat = "churn_criterio" if ev.iniciativa is IniciativaDoEncerramento.CRITERIO else "churn_cliente"
+        saida = getattr(ev, "data_da_saida", None) or ev.data_do_evento
+        itens.append(SaidaAnunciada(cat, c.id, c.grupo_id, c.preco_mensal, ev.data_do_evento, saida, ev.id))
+    return itens

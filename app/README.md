@@ -109,6 +109,10 @@ precisam estar na mesma versão do banco: a prévia recusa e diz por quê. Rotas
   o contrato passa a Encerrado sozinho (`crm.db.saidas`: ao subir a API, a cada hora e antes das contas de MRR).
   Migração `b8d4f2a6c1e9` (`evento_de_contrato.data_da_saida`); a tarefa `2026_10_10_saida_dos_encerramentos_antigos`
   põe a saída = data do evento nos encerramentos antigos (nada muda).
+- **Prazo até o envio da proposta** (amostra aprovada por Eduardo em 11/10/2026): card em Funil › Oportunidades com a
+  média e a mediana de dias entre a originação e o envio, de todas as propostas enviadas (aceitas ou não), com os
+  filtros da tela. As da planilha de 2026 **ficam fora** (lá o envio foi gravado igual à originação, por regra); quem
+  saiu de "Enviar proposta" sem a data aparece na composição como "preencher". `indicadores.PrazoAteOEnvio`.
 - **Churn no anúncio** (decisão de Eduardo em 11/10/2026, ajusta a de 10/10): os **indicadores de churn** contam
   quando o cliente pede para sair — KPI 17 (churn de clientes), Motivos de churn em Gestão de contratos e "Churn
   anunciado no mês" no Pós-venda das quatro fases —, mesmo com o MRR seguindo até a saída efetiva (transição e multa).

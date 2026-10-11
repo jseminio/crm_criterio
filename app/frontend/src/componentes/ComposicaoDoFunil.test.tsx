@@ -51,6 +51,16 @@ describe("Composição do funil", () => {
     expect(await screen.findByText("falta: empregados CLT, pagamentos")).toBeInTheDocument();
   });
 
+  it("prazo até o envio: lista originação, envio e dias, e quem está sem a data (11/10/2026)", async () => {
+    vi.mocked(api.composicaoDoFunil).mockResolvedValue({ indicador: "prazo_ate_o_envio", itens: [
+      item({ data_colocacao: "2026-10-01", data_envio_proposta: "2026-10-15", valor: "14", parte: "originação → envio" }),
+      item({ id: 2, nome: "Sem envio", data_envio_proposta: null, valor: null, entra: false, parte: "sem data de envio: preencher" }),
+    ] });
+    render(<ComposicaoDoFunil indicador="prazo_ate_o_envio" filtros={{}} />);
+    expect(await screen.findByText(/1 proposta na média · 14 dias · 1 sem data de envio/)).toBeInTheDocument();
+    expect(screen.getByText("sem data de envio: preencher")).toBeInTheDocument();
+  });
+
   it("o card Em aberto abre a composição no painel", async () => {
     vi.mocked(api.indicadores).mockResolvedValue({
       em_aberto: { quantas: 2, valor_mensal: "6200", valor_anual: "65000", sem_preco_mensal: 0, com_preco_mensal: 2 },

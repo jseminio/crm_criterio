@@ -73,6 +73,7 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
   } = dados;
 
   const consulta = paraConsulta(filtros);
+  const prazo = dados.prazo_ate_o_envio ?? null;
   // O primeiro motivo de verdade vai em destaque; "Sem motivo informado" só se for o único.
   const todosOsMotivos = dados.motivos_de_perda ?? [];
   const totalPerdidas = todosOsMotivos.reduce((t, [, n]) => t + n, 0);
@@ -189,6 +190,28 @@ export function Numeros({ filtros }: { filtros: EstadoDosFiltros }) {
             Não calculável — nenhuma aceita com data de originação e de aceite ainda.
           </p>
         )}
+      </Cartao>
+
+      <Cartao
+        rotulo="Prazo até o envio da proposta"
+        tom="ambar"
+        destaque={prazo?.calculavel ? `${dias(prazo.dias)} dias` : undefined}
+        apoio={prazo?.calculavel
+          ? `mediana ${dias(prazo.mediana)} dias · ${prazo.amostra} proposta${prazo.amostra === 1 ? "" : "s"}`
+          : "sem dado ainda"}
+        pendente={!prazo?.calculavel}
+        composicao={prazo && (prazo.amostra + prazo.sem_data_de_envio) > 0
+          ? lista("prazo_ate_o_envio", "Prazo até o envio da proposta", prazo.amostra + prazo.sem_data_de_envio) : undefined}
+      >
+        <p>
+          Dias corridos entre a data de originação e a data de envio da proposta, nas oportunidades com as duas datas,
+          aceitas ou não. Segue os filtros da tela.
+        </p>
+        <p className="numero-nota">
+          As da planilha de 2026 ficam fora: lá o envio foi gravado igual à originação, por regra.
+          {prazo && prazo.sem_data_de_envio > 0 &&
+            ` ${prazo.sem_data_de_envio} já saíram de "Enviar proposta" sem a data de envio: preencha na ficha para entrarem.`}
+        </p>
       </Cartao>
 
       <Cartao

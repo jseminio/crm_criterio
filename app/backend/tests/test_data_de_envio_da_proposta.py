@@ -97,3 +97,23 @@ def test_roda_com_recusada_ainda_no_banco(engine, ids):
         s.commit()
         assert s.execute(sa.text("SELECT data_envio_proposta FROM oportunidade WHERE id = :i"),
                          {"i": ids["planilha"]}).scalar() in (date(2026, 5, 4), "2026-05-04")
+
+
+def test_prazo_ate_o_envio_sem_a_planilha_e_com_quem_falta_a_data(cliente, ids, engine):
+    """Indicador de 11/10/2026: originação → envio de todas as enviadas; a planilha de 2026 fica fora (lá envio =
+    originação, por regra); quem saiu de "Enviar proposta" sem a data aparece fora da conta, para preencher."""
+    with Session(engine) as s:
+        g = s.get(Oportunidade, ids["nova"]).grupo_id
+        s.add_all([
+            Oportunidade(grupo_id=g, nome="enviada 4", situacao=Situacao.EM_AVALIACAO, origem=Origem.CRM, chave_origem="e4",
+                         data_colocacao=date(2026, 9, 1), data_envio_proposta=date(2026, 9, 5)),
+            Oportunidade(grupo_id=g, nome="sem envio", situacao=Situacao.EM_AVALIACAO, origem=Origem.QUESTIONARIO,
+                         chave_origem="se", data_colocacao=date(2026, 9, 2)),
+        ])
+        s.commit()
+    p = cliente.get("/api/indicadores").json()["prazo_ate_o_envio"]
+    # "aceita" (CRM): 12 dias; "enviada 4": 4 dias; a da planilha (envio = originação) fica fora
+    assert (D(p["dias"]), D(p["mediana"]), p["amostra"], p["sem_data_de_envio"]) == (D("8.0"), D("8.0"), 2, 1)
+    itens = cliente.get("/api/indicadores/composicao", params={"indicador": "prazo_ate_o_envio"}).json()["itens"]
+    assert sorted(D(i["valor"]) for i in itens if i["entra"]) == [D("4"), D("12")]
+    assert [i["nome"] for i in itens if not i["entra"]] == ["sem envio"]

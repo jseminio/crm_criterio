@@ -13,11 +13,11 @@ import { api, baixarArquivo, entradaLigada, ErroDaApi } from "../api/cliente";
 import type { AbaDaProposta, EntradaDaProposta, PropostaResumo, TipoDeMatriz } from "../api/tipos";
 import { data, dataHora, dinheiro, fracaoEmPercentual } from "../formato";
 import { brutoPrevio, horasDeConsulta } from "../proposta";
+import { apagarRascunho, guardarRascunho, lerRascunho } from "../rascunhoDaProposta";
 import { CampoDeValor } from "./CampoDeValor";
 import { Etiqueta } from "./Etiqueta";
 import { Carregando, Erro } from "./estados";
 import { LinkDeArquivo } from "./LinkDeArquivo";
-import { ReuniaoComLeadNaProposta } from "./ReuniaoComLeadNaProposta";
 import { SEM_PERMISSAO, usarAcesso } from "../entrada";
 
 const virgula = (v: string | number) => String(v).replace(".", ",");
@@ -58,46 +58,18 @@ function baixar(proposta: PropostaResumo, aoFalhar: (mensagem: string) => void) 
   setTimeout(() => a.remove(), 1000);
 }
 
-/** O que foi digitado e ainda não virou PowerPoint fica guardado neste navegador, por oportunidade:
- * trocar de aba, salvar a oportunidade (que fecha o painel) ou recarregar a página não perde nada.
- * Some ao gerar. Navegador sem armazenamento (janela anônima) só não guarda: a tela funciona igual. */
-type Guardado = { entrada: EntradaDaProposta; salvo_em: string };
-const chaveDoRascunho = (id: number) => `crm.proposta.rascunho.${id}`;
-
-function lerRascunho(id: number): Guardado | null {
-  try {
-    const bruto = localStorage.getItem(chaveDoRascunho(id));
-    return bruto ? (JSON.parse(bruto) as Guardado) : null;
-  } catch {
-    return null;
-  }
-}
-
-function guardarRascunho(id: number, entrada: EntradaDaProposta) {
-  try {
-    localStorage.setItem(chaveDoRascunho(id), JSON.stringify({ entrada, salvo_em: new Date().toISOString() }));
-  } catch {
-    /* sem armazenamento: segue sem guardar */
-  }
-}
-
-function apagarRascunho(id: number) {
-  try {
-    localStorage.removeItem(chaveDoRascunho(id));
-  } catch {
-    /* idem */
-  }
-}
-
 export function PropostaDaOportunidade({
   oportunidadeId,
   aoEnviar,
   aoGerar,
+  aoAbrirGranola,
 }: {
   oportunidadeId: number;
   aoEnviar: () => void;
   /** Gerar fecha o item "Proposta ainda não gerada" do que falta (E4). */
   aoGerar?: () => void;
+  /** O aviso "Da reunião com o lead" leva à aba Granola (11/10/2026). */
+  aoAbrirGranola?: () => void;
 }) {
   const { pode } = usarAcesso();
   const [aba, definirAba] = useState<AbaDaProposta | null>(null);
@@ -356,14 +328,22 @@ export function PropostaDaOportunidade({
         <span className="campo-rotulo">Tratamento</span>
         <input className="entrada" value={entrada.tratamento} onChange={(e) => mudar("tratamento", e.target.value)} />
       </label>
-      <ReuniaoComLeadNaProposta
-        oportunidadeId={oportunidadeId} matriz={matriz} aba={aba} contextualizacaoAtual={entrada.contextualizacao}
-        podeEditar={pode("funil.proposta")}
-        aoAplicar={(nova, contextualizacao) => {
-          definirAba(nova);
-          if (contextualizacao !== null) mudar("contextualizacao", contextualizacao);
-        }}
-      />
+      {(reuniaoAplicada || daReuniao.size > 0) && (
+        <p className="aviso-granola" role="note">
+          <span className="etiqueta etiqueta-andamento">Granola</span>
+          <span>
+            Da reunião com o lead:{" "}
+            {[
+              reuniaoAplicada ? "a contextualização" : null,
+              daReuniao.size > 0 ? `${daReuniao.size} campo${daReuniao.size === 1 ? "" : "s"} do perfil` : null,
+            ].filter(Boolean).join(" e ")}
+            .
+          </span>
+          {aoAbrirGranola && (
+            <button type="button" className="link-de-tabela" onClick={aoAbrirGranola}>Abrir a aba Granola</button>
+          )}
+        </p>
+      )}
       <label className="campo">
         <span className="campo-rotulo">
           Contextualização ({reuniaoAplicada ? `da reunião de ${data(reuniaoAplicada.data)}` : "rascunho a partir do questionário"}; ajuste aqui ou no PowerPoint)

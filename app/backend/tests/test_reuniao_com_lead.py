@@ -197,3 +197,10 @@ def test_excluir_a_oportunidade_leva_a_reuniao(cliente, oid, engine):
         excluir(s, s.get(Oportunidade, oid), "duplicada")
         s.commit()
         assert s.scalar(sa.select(sa.func.count(ReuniaoComLead.id))) == 0
+
+
+def test_detalhe_da_oportunidade_conta_as_reunioes_para_a_aba_granola(cliente, oid):
+    assert cliente.get(f"/api/oportunidades/{oid}").json()["reunioes_com_o_lead"] == 0
+    _guardar(cliente, oid)
+    _guardar(cliente, oid, perfil={"sistema": "Omie"})
+    assert cliente.get(f"/api/oportunidades/{oid}").json()["reunioes_com_o_lead"] == 2

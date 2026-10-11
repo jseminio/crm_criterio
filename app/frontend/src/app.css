@@ -804,7 +804,6 @@
 .reuniao-lead-colar .campo-ajuda { margin: 0; }
 .reuniao-lead-ciencia { display: flex; gap: var(--e2); align-items: flex-start; font-size: 13px; }
 .reuniao-lead-ciencia input { margin-top: 4px; }
-.reuniao-lead-guardada { background: var(--surface-sunken); border-radius: var(--raio-md); padding: var(--e3) var(--e4); }
 .reuniao-lead-linha { display: flex; gap: var(--e3); align-items: center; flex-wrap: wrap; font-size: 13px; }
 .reuniao-lead-resumo { white-space: pre-wrap; font-family: var(--fonte-ui); font-size: 13px; margin: var(--e3) 0 0;
   background: var(--surface-card); border: 1px solid var(--borda); border-radius: var(--raio-sm); padding: var(--e3);
@@ -821,6 +820,10 @@
 .reuniao-lead-perfil { background: var(--surface-card); font-size: 13px; }
 .reuniao-lead-carta { margin: 0; padding-left: var(--e5); font-size: 13px; color: var(--texto-medio); }
 .proposta-perfil .proposta-da-reuniao { color: var(--andamento); }
+.aviso-granola { display: flex; gap: var(--e3); align-items: center; flex-wrap: wrap; background: var(--surface-ai-soft);
+  border: 1px solid var(--azul-neve); border-radius: var(--raio-md); padding: var(--e2) var(--e4); font-size: 13px; margin: 0 0 var(--e3); }
+.granola-historico { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e2); }
+.granola-reuniao { border: 1px solid var(--borda); border-radius: var(--raio-md); padding: var(--e3) var(--e4); background: var(--surface-card); }
 .marcador-falta { color: var(--perda); }
 .marcador-ok { color: var(--ganho); }
 

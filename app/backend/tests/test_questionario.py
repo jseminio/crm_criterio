@@ -424,3 +424,71 @@ class TestPainel:
         vol = next(s for s in secoes if s["numero"] == 3)
         assert {"rotulo": "Notas fiscais emitidas (serviço / produto)", "valor": "40"} in vol["respostas"]
         assert all(r["valor"] for s in secoes for r in s["respostas"])
+
+
+class TestComoConheceu:
+    """"Como conheceu a Critério?" (v7, lista aprovada por Eduardo em 12/10/2026) vira a origem da oportunidade."""
+
+    @pytest.mark.parametrize("escolha, detalhe_chave, detalhe, tipo, canal", [
+        ("Indicação de parceiro (contador, consultor, banco)", "quem_indicou", "Escritório Beta",
+         "PARCEIROS", "Questionário: Indicação de parceiro (contador, consultor, banco) — Escritório Beta"),
+        ("Anúncio (Google, Instagram, LinkedIn)", None, None, "TRAFEGO_PAGO", "Questionário: Anúncio (Google, Instagram, LinkedIn)"),
+        ("Evento, palestra ou associação empresarial", None, None, None, "Questionário: Evento, palestra ou associação empresarial"),
+        ("Outros", "como_conheceu_outros", "Podcast", None, "Questionário: Outros — Podcast"),
+    ])
+    def test_traducao_para_o_canal(self, escolha, detalhe_chave, detalhe, tipo, canal):
+        from crm.domain.listas import TipoCanal
+        from crm.questionario.importacao import origem_declarada
+        respostas = {"como_conheceu": escolha, **({detalhe_chave: detalhe} if detalhe_chave else {})}
+        assert origem_declarada(respostas) == (TipoCanal[tipo] if tipo else None, canal)
+
+    def test_questionario_anterior_a_pergunta_nao_inventa_origem(self):
+        from crm.questionario.importacao import origem_declarada
+        assert origem_declarada(RESPOSTAS_ALFA) == (None, None)
+
+    def test_lista_do_crm_e_a_do_formulario(self):
+        import re
+        from pathlib import Path
+        from crm.questionario.importacao import CANAL_DE_COMO_CONHECEU
+        html = (Path(__file__).resolve().parents[2] / "site" / "questionario" / "index.html").read_text(encoding="utf-8")
+        bloco = re.search(r"const COMO_CONHECEU = \[(.*?)\];", html, re.S).group(1)
+        assert re.findall(r"'([^']+)'", bloco) == list(CANAL_DE_COMO_CONHECEU)
+
+    def test_importacao_preenche_a_origem(self, sessao):
+        from crm.domain.listas import TipoCanal
+        from crm.questionario.importacao import importar
+        respostas = {**RESPOSTAS_ALFA, "como_conheceu": "Indicação de advogado", "quem_indicou": "Dra. Gama"}
+        q = importar(sessao, linha(id_="q-cc", cnpj="98.765.432/0001-10", respostas=respostas))
+        op = sessao.get(Oportunidade, q.oportunidade_id)
+        assert op.tipo_canal is TipoCanal.ADVOGADOS
+        assert op.canal == "Questionário: Indicação de advogado — Dra. Gama"
+
+
+class TestEmpresasNoEscopo:
+    """v7: a tabela por CNPJ deriva os campos que o CRM já lê (aprovada por Eduardo em 12/10/2026)."""
+
+    RESPOSTAS_V7 = {
+        **RESPOSTAS_ALFA,
+        "empresas": [
+            {"cnpj": "11.222.333/0001-81", "faturamento": "R$ 12.000.000,00", "regime": "Lucro Presumido"},
+            {"cnpj": "11.444.777/0001-61", "faturamento": "R$ 3.500.000,00", "regime": "Simples Nacional"},
+        ],
+        # o que o formulário deriva da tabela
+        "regime_tributario": ["Lucro Presumido", "Simples Nacional"],
+        "faturamento_anual": "R$ 15.500.000,00",
+        "cnpjs_escopo": "11.222.333/0001-81 — R$ 12.000.000,00 — Lucro Presumido\n"
+                        "11.444.777/0001-61 — R$ 3.500.000,00 — Simples Nacional",
+        "vol": {**RESPOSTAS_ALFA["vol"], "cnpjs": "2"},
+    }
+
+    def test_dois_regimes_contam_na_complexidade_e_os_cnpjs_no_porte(self):
+        leitura = ler(self.RESPOSTAS_V7, recebido_em=date(2026, 10, 12))
+        assert leitura.regimes == ["Lucro Presumido", "Simples Nacional"]
+        assert "regimes" in leitura.fatores_complexidade
+        assert leitura.volumetria["cnpjs_no_escopo"] == 2
+
+    def test_formulario_deriva_os_campos_que_o_crm_le(self):
+        from pathlib import Path
+        html = (Path(__file__).resolve().parents[2] / "site" / "questionario" / "index.html").read_text(encoding="utf-8")
+        for derivado in ("A.regime_tributario =", "A.faturamento_anual =", "A.cnpjs_escopo =", "A.vol.cnpjs ="):
+            assert derivado in html

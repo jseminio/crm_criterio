@@ -1,7 +1,7 @@
 """A ficha da oportunidade (E4, 02/10/2026): as nove seções do questionário do site, cada resposta
 dizendo de onde veio.
 
-A definição espelha o formulário publicado ("BPO Full 2026 v6", `app/site/questionario/index.html`,
+A definição espelha o formulário publicado ("BPO Full 2026 v7", `app/site/questionario/index.html`,
 constante `SECOES`): mudou o formulário, muda esta lista. Quem responde primeiro é o cliente, no
 questionário; o que se corrige no CRM vale como **Entrevista**, com quem e quando, e a resposta
 original continua guardada no questionário recebido.
@@ -18,6 +18,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable
+
+from crm.questionario.importacao import CANAL_DE_COMO_CONHECEU
 
 __all__ = ["CAMPOS", "SECOES", "Campo", "CampoMontado", "Ficha", "SecaoMontada", "campo", "montar", "valor_do_questionario"]
 
@@ -58,6 +60,7 @@ SECOES: dict[int, str] = {
 }
 
 _TERCEIRIZADA = _tem("operacao", "Terceirizada", "Mista")
+_INDICACAO = _tem("como_conheceu", *(o for o in CANAL_DE_COMO_CONHECEU if o.startswith("Indicação")))
 _VOLUMES = (
     ("notas_emitidas", "Notas fiscais emitidas (serviço / produto)"), ("notas_recebidas", "Notas fiscais recebidas"),
     ("lancamentos", "Lançamentos contábeis"), ("pagamentos", "Pagamentos efetuados"),
@@ -75,10 +78,10 @@ CAMPOS: tuple[Campo, ...] = (
     Campo("cnpj", 1, "CNPJ principal"),
     Campo("nome_fantasia", 1, "Nome fantasia"),
     Campo("atividade", 1, "Atividade / segmento"),
-    Campo("faturamento_anual", 1, "Faturamento anual"),
+    Campo("faturamento_anual", 1, "Faturamento anual (v7: soma das empresas no escopo)"),
     Campo("regime_tributario", 1, "Regime tributário", "varias",
           ("Simples Nacional", "Lucro Presumido", "Lucro Real", "MEI", "Outro")),
-    Campo("cnpjs_escopo", 1, "CNPJs no escopo", "texto_longo"),
+    Campo("cnpjs_escopo", 1, "Empresas no escopo (CNPJ — faturamento anual — regime)", "texto_longo"),
     Campo("filiais_localidades", 1, "Filiais / localidades"),
     Campo("contato_nome", 1, "Contato"),
     Campo("contato_cargo", 1, "Cargo"),
@@ -89,6 +92,9 @@ CAMPOS: tuple[Campo, ...] = (
     Campo("fornecedor_atual", 1, "Fornecedor atual / prazo de aviso prévio", mostra=_TERCEIRIZADA),
     Campo("equipe_interna", 1, "Equipe interna dedicada hoje (nº de pessoas)", "numero"),
     Campo("valor_fornecedor", 1, "Valor mensal pago ao fornecedor atual", mostra=_TERCEIRIZADA),
+    Campo("como_conheceu", 1, "Como conheceu a Critério?", "uma", tuple(CANAL_DE_COMO_CONHECEU)),
+    Campo("quem_indicou", 1, "Quem indicou?", mostra=_INDICACAO, sub=True),
+    Campo("como_conheceu_outros", 1, "Conte como conheceu a Critério", mostra=_tem("como_conheceu", "Outros"), sub=True),
     # 2 · Sistemas, dados e integrações
     *(Campo(f"sistemas.{k}", 2, f"Sistema {nome} (e como troca dados)") for k, nome in _SISTEMAS),
     Campo("implantacao_historico", 2, "Implantação / histórico", "texto_longo"),

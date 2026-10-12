@@ -21,13 +21,43 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from crm.db.modelos import Empresa, GrupoEconomico, Oportunidade, PessoaContato, QuestionarioRecebido, VinculoDeContato
-from crm.domain.listas import Origem, OrigemDoDado, Situacao, SituacaoDoQuestionario, SituacaoGrupo
+from crm.domain.listas import Origem, OrigemDoDado, Situacao, SituacaoDoQuestionario, SituacaoGrupo, TipoCanal
 from crm.questionario.endereco import BuscaDeEndereco
 from crm.questionario.leitura import Leitura, ler
 
-__all__ = ["LinhaInvalida", "importar", "anexar", "criar_nova", "leitura_de", "EM_ABERTO"]
+__all__ = ["LinhaInvalida", "importar", "anexar", "criar_nova", "leitura_de", "origem_declarada", "EM_ABERTO",
+           "CANAL_DE_COMO_CONHECEU"]
 
 EM_ABERTO = (Situacao.ENVIAR_PROPOSTA, Situacao.EM_AVALIACAO, Situacao.ON_HOLD)
+
+
+CANAL_DE_COMO_CONHECEU: dict[str, TipoCanal | None] = {
+    "Indicação de cliente da Critério": TipoCanal.CARTEIRA,
+    "Indicação de parceiro (contador, consultor, banco)": TipoCanal.PARCEIROS,
+    "Indicação de advogado": TipoCanal.ADVOGADOS,
+    "Indicação de sócio ou colaborador da Critério": None,  # Sócios ou Colaboradores: a pessoa escolhe
+    "Contato da equipe Critério (ligação, WhatsApp, e-mail)": TipoCanal.PROSPECCAO_ATIVA,
+    "Anúncio (Google, Instagram, LinkedIn)": TipoCanal.TRAFEGO_PAGO,
+    "Pesquisa no Google ou site da Critério": None,  # sem canal "Orgânico" no CRM (pendência, 12/10/2026)
+    "LinkedIn ou Instagram (sem ser anúncio)": None,
+    "Evento, palestra ou associação empresarial": None,  # sem canal "Eventos" no CRM (pendência)
+    "Outros": None,
+}
+"""Pergunta "Como conheceu a Critério?" do site (lista aprovada por Eduardo em 12/10/2026), na ordem
+do formulário. A escolha vira o tipo de canal da oportunidade quando a tradução é única; nas demais o
+tipo fica vazio para a pessoa escolher, e o texto do cliente vai sempre para `canal`."""
+
+
+def origem_declarada(respostas: dict[str, Any]) -> tuple[TipoCanal | None, str | None]:
+    """(tipo de canal, texto do canal) a partir do que o cliente respondeu. Questionário anterior à
+    pergunta (v6) devolve (None, None)."""
+    escolha = str(respostas.get("como_conheceu") or "").strip()
+    if not escolha:
+        return None, None
+    detalhe = respostas.get("como_conheceu_outros") if escolha == "Outros" else respostas.get("quem_indicou")
+    detalhe = str(detalhe or "").strip()
+    texto = f"Questionário: {escolha}" + (f" — {detalhe}" if detalhe else "")
+    return CANAL_DE_COMO_CONHECEU.get(escolha), texto[:120]
 
 
 class LinhaInvalida(ValueError):
@@ -67,6 +97,7 @@ def _nova_oportunidade(sessao: Session, q: QuestionarioRecebido, grupo: GrupoEco
         origem_da_volumetria={k: OrigemDoDado.QUESTIONARIO.value for k in preenchidos},
         **leitura.volumetria,
     )
+    oportunidade.tipo_canal, oportunidade.canal = origem_declarada(q.respostas or {})
     sessao.add(oportunidade)
     sessao.flush()
     return oportunidade
@@ -205,6 +236,13 @@ def anexar(sessao: Session, q: QuestionarioRecebido) -> int:
             setattr(oportunidade, campo, valor)
             preenchidos += 1
     oportunidade.origem_da_volumetria = origem  # dict novo: o JSON só grava se o objeto muda
+    tipo_canal, canal = origem_declarada(q.respostas or {})
+    if oportunidade.tipo_canal is None and tipo_canal is not None:
+        oportunidade.tipo_canal = tipo_canal
+        preenchidos += 1
+    if not oportunidade.canal and canal:
+        oportunidade.canal = canal
+        preenchidos += 1
     empresa = sessao.scalar(sa.select(Empresa).where(Empresa.cnpj == q.cnpj))
     if oportunidade.empresa_id is None and empresa is not None:
         oportunidade.empresa_id = empresa.id  # só preenche o vazio

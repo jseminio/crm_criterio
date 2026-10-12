@@ -205,6 +205,27 @@ WhatsApp, o e-mail do Microsoft 365, o questionário e o disparo se cadastram, t
   fato respondeu (tabela da OpenAI consultada em 07/10/2026). O ensaio do SDR (`scripts/ensaio_sdr.py`)
   segue só com a Anthropic.
 
+## "Como conheceu a Critério?" no questionário (v7, 12/10/2026)
+
+- **Pergunta nova**, obrigatória, no fim da seção 1 do site (`app/site/questionario/index.html`,
+  constante `COMO_CONHECEU`; lista aprovada por Eduardo em 12/10/2026). Nas indicações aparece
+  "Quem indicou?" (opcional); em "Outros", um campo de texto obrigatório. Versão do formulário: **v7**.
+- **Na importação** a escolha vira a origem da oportunidade (`crm.questionario.importacao.origem_declarada`):
+  `tipo_canal` quando a tradução é única (cliente → Carteira, parceiro → Parceiros, advogado → Advogados,
+  contato da equipe → Prospecção ativa, anúncio → Tráfego pago) e o texto do cliente sempre em `canal`
+  ("Questionário: … — quem indicou"). Sócio/colaborador, Google/site, redes sem anúncio, evento e
+  "Outros" deixam o tipo vazio para a pessoa escolher: **o CRM não tem canal "Orgânico" nem "Eventos"**
+  (pendência com o Bruno). Ao anexar a uma oportunidade existente, só preenche se estiver vazio.
+- **Empresas no escopo** (mesma v7, aprovada em 12/10/2026): a seção 1 troca "Faturamento anual",
+  "Regime tributário" e "CNPJs no escopo" por uma tabela com uma linha por CNPJ — CNPJ, faturamento anual
+  e regime, todos obrigatórios; a 1ª linha é o CNPJ principal; CNPJ repetido ou inválido é recusado. O
+  formulário **deriva** dela os campos que o CRM já lê: `regime_tributario` (regimes distintos),
+  `faturamento_anual` (soma), `cnpjs_escopo` (uma linha "CNPJ — faturamento — regime" por empresa) e
+  `vol.cnpjs` (quantidade). A tabela vai crua em `respostas.empresas`. Por isso a régua de porte, o
+  fator "mais de um regime" e a ficha seguem sem mudança de código; os questionários v6 continuam legíveis.
+- A ficha da oportunidade mostra as três perguntas na seção 1. Questionário v6 (sem a pergunta) não
+  inventa origem. Um teste confere que a lista do CRM é a mesma do formulário.
+
 ## Disparo do lembrete e do agradecimento do questionário (06/10/2026)
 
 O CRM mesmo envia o lembrete e o agradecimento do questionário (seção abaixo), sem chamar a IA: o

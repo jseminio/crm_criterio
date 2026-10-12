@@ -4,7 +4,7 @@ pontos de atenção.
 As regras de **porte e de nota** são as do CRM (`crm.domain.porte`, `crm.domain.avaliacao`): o
 questionário traz um cálculo próprio em JavaScript, que fica só para comparação. As regras de
 **leitura** (qual resposta acende qual fator) são as do formulário publicado, versão "BPO Full 2026
-v6", copiadas daqui: mudou o formulário, muda este módulo.
+v7", copiadas daqui: mudou o formulário, muda este módulo.
 """
 
 from __future__ import annotations

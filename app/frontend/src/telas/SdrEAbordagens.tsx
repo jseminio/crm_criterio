@@ -1,11 +1,12 @@
 /** SDR · Abordagens e conhecimento (aprovado por Eduardo em 02/10/2026): o agente SDR de prospecção
  * ativa (Abordagens), a SDR de IA que qualifica leads e, desde 03/10/2026, a base de conhecimento
- * que essa SDR consulta, em abas. */
+ * que essa SDR consulta, em abas. Desde 13/10/2026, as Campanhas de tráfego pago. */
 
 import type { Listas } from "../api/tipos";
 import { MenuComAbas } from "../componentes/MenuComAbas";
 import { Abordagens } from "./Abordagens";
 import { BaseDeConhecimento } from "./BaseDeConhecimento";
+import { Campanhas } from "./Campanhas";
 import { Sdr } from "./Sdr";
 
 export function SdrEAbordagens({ listas }: { listas: Listas | null }) {
@@ -23,6 +24,11 @@ export function SdrEAbordagens({ listas }: { listas: Listas | null }) {
           chave: "sdr", rotulo: "SDR da IA", permissoes: ["sdr.ver"],
           explicacao: "Leads de tráfego pago e frios: quantos a IA qualificou, descartou ou passou para a equipe.",
           conteudo: () => <Sdr listas={listas} />,
+        },
+        {
+          chave: "campanhas", rotulo: "Campanhas", permissoes: ["sdr.ver"],
+          explicacao: "Meta Ads e Google Ads, do formulário ao contrato: em qual campanha pôr o próximo real.",
+          conteudo: () => <Campanhas />,
         },
         {
           chave: "base", rotulo: "Base de conhecimento", permissoes: ["sdr.ver"],

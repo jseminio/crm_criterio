@@ -16,6 +16,27 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## SDR · Campanhas: funil de tráfego pago e decisão por campanha (13/10/2026)
+
+Amostra aprovada por Eduardo em 13/10/2026. Nova aba **Campanhas** em SDR · Abordagens e conhecimento
+(permissão `sdr.ver`), para decidir em qual campanha pôr o próximo real.
+
+- **Coorte do mês:** os leads de tráfego pago que chegaram no mês, cada um contado até a etapa mais funda
+  que alcançou: leads → no ICP → qualificados → reuniões → propostas enviadas → contratos (oportunidade Aceita).
+- **Funil por canal** (`Lead.canal`: Meta Ads, Google Ads…) e o total, com o % que passa de uma etapa para
+  a seguinte, o custo de cada etapa (investimento do canal ÷ quantidade), CAC e MRR novo (parcela × 13 ÷ 12).
+  A pior passagem de cada canal é marcada com palavra. A largura das etapas é fixa: o número é o que vale.
+- **Decisão por campanha** (`Lead.campanha`), régua **provisória** em `crm.domain.campanhas`: menos de 20
+  leads → Aguardar volume; % no ICP abaixo do ICP alvo do Plano de MRR, com descarte de perfil dominante →
+  Refazer público; "esperava outra coisa" dominante → Ajustar criativo; qualificados na meta do SDR (20%) →
+  Escalar; abaixo do alerta (10%) → Rever campanha; entre os dois → Manter e observar.
+- **Sucesso da busca:** primeira resposta, quem respondeu e qualificados, do painel do SDR em tráfego pago.
+- **Prontidão dos dados:** investimento lançado por canal, lead sem campanha, ICP alvo definido.
+- **O que ainda não faz:** o investimento continua digitado em SDR da IA › Custos e mídia, por canal e mês;
+  não há custo por campanha nem leitura automática do Meta Ads e do Google Ads (próximo incremento).
+- Rota: `GET /api/sdr/campanhas?mes=AAAA-MM`. A lista de motivos fora do ICP (`FORA_DO_ICP`) passou a viver
+  em `crm.domain.campanhas` e é a mesma das quatro fases da Inteligência de Conversão.
+
 ## Migrar do CRM local para a nuvem (10/10/2026)
 
 Decisão de Eduardo: **o CRM oficial passa a ser a nuvem** (`www.crmcs.criterioconsultores.com.br`); o local era o oficial

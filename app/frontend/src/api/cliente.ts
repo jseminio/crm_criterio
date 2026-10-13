@@ -50,6 +50,7 @@ import type {
   ColunaDoFunil,
   ConversaDoSdr,
   InvestimentoEmMidia,
+  PainelDeCampanhas,
   PainelDoSdr,
   ParametrosDoSdr,
   PedidoDeServicoNovo,
@@ -660,6 +661,8 @@ export const api = {
     pedir<ItemDoPainelDoSdr[]>(comParametros("/api/sdr/painel/composicao", { ...filtros })),
   painelDoSdr: (filtros: { mes: string; origem?: string }) =>
     pedir<PainelDoSdr>(comParametros("/api/sdr/painel", filtros)),
+
+  campanhas: (mes: string) => pedir<PainelDeCampanhas>(comParametros("/api/sdr/campanhas", { mes })),
 
   conversasDoLead: (leadId: number) =>
     pedir<ConversaDoSdr[]>(`/api/sdr/leads/${leadId}/conversas`),

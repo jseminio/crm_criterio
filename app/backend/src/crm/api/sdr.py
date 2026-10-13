@@ -16,7 +16,8 @@ resposta, em horário comercial) ou agradecer (respondeu), e o servidor recusa l
 agradecimento fora do passo (409). Regras em `crm.domain.questionario_do_lead`.
 
 O painel (`GET /api/sdr/painel`) só lê: é `crm.domain.sdr.calcular_painel`
-sobre os leads do mês.
+sobre os leads do mês. As campanhas (`GET /api/sdr/campanhas`, 13/10/2026) também só
+leem: `crm.domain.campanhas.calcular_campanhas` sobre os leads de tráfego pago do mês.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from crm.agente.config import ler_configuracao
 from crm.agente.disparo_do_questionario import Canais, disparar
 from crm.api import esquemas as e
 from crm.api.disparo_do_questionario import ESTADO_DO_DISPARO, canais_reais
+from crm.api.inteligencia import premissas_vigentes
 from crm.db import leads as regras_do_lead
 from crm.db import questionario_do_lead as do_lead
 from crm.db.base import agora
@@ -44,9 +46,10 @@ from crm.db.modelos import (
     MensagemDoSdr,
     ParametrosDoSdr,
 )
+from crm.domain import campanhas as regras_de_campanhas
 from crm.domain import questionario_do_lead as questionario
 from crm.domain import sdr as regras
-from crm.domain.listas import AutorDaMensagem, DesfechoDaConversa, SituacaoLead
+from crm.domain.listas import AutorDaMensagem, DesfechoDaConversa, SituacaoLead, TipoCanal
 from crm.domain.servicos import problema_no_tema
 
 __all__ = ["roteador"]
@@ -378,5 +381,27 @@ def roteador(
         """Os números da coorte do mês e o resumo do mês anterior, para a variação."""
         anterior = regras.resumir(_calcular(sessao, regras.mes_anterior(mes), origem, None))
         return asdict(_calcular(sessao, mes, origem, anterior))
+
+    # ---------------------------------------------------------- campanhas
+    @r.get("/campanhas")
+    def campanhas(
+        mes: str = Query(pattern=regras.MES.pattern), sessao: Session = Depends(obter_sessao, scope="function")
+    ) -> dict:
+        """Funil por canal e decisão por campanha dos leads de tráfego pago do mês (13/10/2026).
+        Regras em `crm.domain.campanhas`; o ICP alvo vem do Plano de MRR."""
+        inicio, fim = regras.intervalo_do_mes(mes)
+        leads = sessao.scalars(
+            sa.select(Lead)
+            .where(Lead.tipo_canal == TipoCanal.TRAFEGO_PAGO, Lead.criado_em >= inicio, Lead.criado_em < fim)
+            .options(selectinload(Lead.convertido_em))
+        ).all()
+        midia = {
+            i.canal: Decimal(i.valor)
+            for i in sessao.scalars(sa.select(InvestimentoEmMidia).where(InvestimentoEmMidia.mes == mes))
+        }
+        premissas, _ = premissas_vigentes(sessao)
+        return asdict(regras_de_campanhas.calcular_campanhas(
+            mes=mes, leads=leads, midia=midia, icp_alvo_pct=premissas.icp_alvo_pct,
+        ))
 
     return r

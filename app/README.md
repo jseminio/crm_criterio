@@ -888,6 +888,19 @@ Conferência e Configurações (resumo do backup). Fora do escopo, de propósito
 MRR é uma sequência contábil, não uma lista), Cenários de ticket (três cenários fixos), o histórico de
 preço de uma oportunidade (é uma linha do tempo) e a tela Leads (fora do menu desde 27/09/2026).
 
+Desde 13/10/2026 a seta de toda coluna fica visível (⇅) e a da coluna ativa, em destaque (▲ ou ▼).
+
+**Pesquisa da Gestão de contratos** (amostra aprovada por Eduardo em 13/10/2026): um campo só, que procura por
+grupo, empresa ou CNPJ (com ou sem pontuação), escopo, situação, signatário, valor ("6.538" ou "6538") e data
+("28/05/2026" ou "05/2026"), sem acento e sem diferença de maiúscula. Várias palavras: o contrato precisa ter todas.
+O trecho achado fica marcado, e acima da grade aparecem quantos contratos e a soma do preço mensal deles.
+`telas/pesquisaDeContratos.tsx`; a lista (`GET /api/contratos`) traz `empresa_nome` e `empresa_cnpj`.
+
+**Mensal no kanban de Oportunidades** (13/10/2026): abaixo do "ao ano", cada coluna mostra o **mensal recorrente**,
+parcela × 13 ÷ 12 (com a 13ª), dos serviços C1; consultoria e legalização (C2) são valor único e aparecem ao lado
+como "+ pontual". O "ao ano" segue somando tudo. `ColunaDoFunil.mensal_recorrente`, `pontual` e
+`recorrentes_sem_parcela` (recorrentes sem parcela mensal, fora da projeção, citados na explicação).
+
 ## Estado
 
 Atualizado em 05/10/2026.

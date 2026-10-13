@@ -157,3 +157,65 @@ describe("Contratos — mudanças de situação permitidas (01/10/2026)", () => 
     await waitFor(() => expect(screen.getByLabelText("Fim da vigência")).toBeDisabled());
   });
 });
+
+describe("Contratos — pesquisa (13/10/2026)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.mrr).mockResolvedValue(null as never);
+    vi.mocked(api.contratos).mockResolvedValue({ total: 3, itens: [
+      resumo({ id: 1, grupo_nome: "Sentire", escopo: "BPO Financeiro", preco_mensal: "6538.46", situacao: "Ativo",
+        data_inicio: "2026-05-28", empresa_nome: "Sentire Saúde Ltda", empresa_cnpj: "12345678000190" }),
+      resumo({ id: 2, grupo_nome: "Lattoog", escopo: "Contábil", preco_mensal: "2104.73", situacao: "Encerrado" }),
+      resumo({ id: 3, grupo_nome: "Mainô", escopo: "BPO Contábil", preco_mensal: "12000.00", situacao: "Ativo",
+        signatario: "Conceição" }),
+    ] } as never);
+  });
+
+  const linhas = () => screen.getAllByRole("row").slice(1).map((r) => r.querySelector("td")!.textContent);
+  const pesquisar = async (texto: string) => {
+    const campo = await screen.findByLabelText("Pesquisar");
+    await userEvent.clear(campo);
+    if (texto) await userEvent.type(campo, texto);
+  };
+
+  it("procura por nome, escopo, valor, data, CNPJ e sem acento, e soma o que achou", async () => {
+    render(<Contratos listas={null} />);
+    await screen.findByText("Lattoog");
+    await pesquisar("bpo");
+    expect(linhas()).toEqual(["Sentire" + "Sentire Saúde Ltda", "Mainô"]);
+    expect(screen.getByRole("status")).toHaveTextContent("2 de 3 contratos · soma do preço mensal: R$ 18.538,46");
+    await pesquisar("6.538");
+    expect(linhas()).toEqual(["Sentire" + "Sentire Saúde Ltda"]);
+    await pesquisar("2104");
+    expect(linhas()).toEqual(["Lattoog"]);
+    await pesquisar("05/2026");
+    expect(linhas()).toEqual(["Sentire" + "Sentire Saúde Ltda"]);
+    await pesquisar("12.345.678/0001");
+    expect(linhas()).toEqual(["Sentire" + "Sentire Saúde Ltda"]);
+    await pesquisar("conceicao");
+    expect(linhas()).toEqual(["Mainô"]);
+    await pesquisar("ativo bpo financeiro");
+    expect(linhas()).toEqual(["Sentire" + "Sentire Saúde Ltda"]);
+  });
+
+  it("marca o trecho achado e, sem resultado, oferece limpar", async () => {
+    render(<Contratos listas={null} />);
+    await screen.findByText("Lattoog");
+    await pesquisar("latt");
+    expect(screen.getByText("Latt", { selector: "mark" })).toBeInTheDocument();
+    await pesquisar("nada disso");
+    expect(screen.queryByRole("table")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /limpar/i }));
+    expect(linhas()).toHaveLength(3);
+  });
+
+  it("ordena pelo título: crescente, decrescente e volta", async () => {
+    render(<Contratos listas={null} />);
+    await screen.findByText("Lattoog");
+    const preco = screen.getByRole("button", { name: /Preço mensal/ });
+    await userEvent.click(preco);
+    expect(linhas()).toEqual(["Lattoog", "Sentire", "Mainô"]);
+    await userEvent.click(preco);
+    expect(linhas()).toEqual(["Mainô", "Sentire", "Lattoog"]);
+  });
+});

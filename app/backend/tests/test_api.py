@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
 from crm.api.app import criar_app
-from crm.db.modelos import GrupoEconomico, Lead, Oportunidade
+from crm.db.modelos import Contrato, Empresa, GrupoEconomico, Lead, Oportunidade
 from crm.domain.listas import Origem, Situacao, SituacaoGrupo, SituacaoLead, Temperatura, TipoCanal
 
 
@@ -95,6 +95,17 @@ class TestFunil:
 
         assert Decimal(colunas["Enviar proposta"]["valor_anual"]) == Decimal("65000.00")
         assert Decimal(colunas["Perdida"]["valor_anual"]) == Decimal("30000.00")
+
+    def test_projeta_o_mensal_recorrente_com_a_13a_e_separa_o_pontual(self, cliente: TestClient, carteira):
+        """Decisão de Eduardo em 13/10/2026: abaixo do "ao ano", o mensal dos recorrentes (parcela × 13 ÷ 12);
+        consultoria e legalização são valor único e ficam ao lado, fora do mensal."""
+        colunas = {c["situacao"]: c for c in cliente.get("/api/funil").json()}
+
+        assert Decimal(colunas["Enviar proposta"]["mensal_recorrente"]) == Decimal("5416.67")  # 5.000 × 13 ÷ 12
+        assert Decimal(colunas["Enviar proposta"]["pontual"]) == 0
+        assert Decimal(colunas["Aceita"]["mensal_recorrente"]) == Decimal("8666.67")
+        assert Decimal(colunas["Perdida"]["mensal_recorrente"]) == 0
+        assert Decimal(colunas["Perdida"]["pontual"]) == Decimal("30000.00")  # a consultoria
 
     def test_o_cartao_traz_o_nome_do_grupo(self, cliente: TestClient, carteira):
         """Sem ele o cartão mostra a oportunidade e esconde o cliente."""
@@ -672,6 +683,21 @@ class TestContratos:
         # A vigência começa na assinatura (decisão de 25/09/2026), não no aceite:
         # o contrato nasce sem data de início.
         assert corpo["data_inicio"] is None
+
+    def test_a_lista_traz_a_empresa_e_o_cnpj_para_a_pesquisa(self, cliente: TestClient, sessao: Session, carteira):
+        """A pesquisa da Gestão de contratos (13/10/2026) também procura pela empresa e pelo CNPJ."""
+        empresa = Empresa(grupo_id=carteira["beta"], razao_social="Beta Serviços Ltda", nome_fantasia="Beta",
+                          cnpj="12345678000190")
+        sessao.add(empresa)
+        sessao.commit()
+        id_ = cliente.post(f"/api/oportunidades/{carteira['aceita']}/converter-em-contrato", json={}).json()["id"]
+        sessao.get(Contrato, id_).empresa_id = empresa.id
+        sessao.commit()
+
+        item = cliente.get("/api/contratos").json()["itens"][0]
+
+        assert item["empresa_nome"] == "Beta Serviços Ltda · Beta"
+        assert item["empresa_cnpj"] == "12345678000190"
 
     def test_ajustes_no_corpo_sobrepoem_o_que_vem_da_oportunidade(
         self, cliente: TestClient, carteira

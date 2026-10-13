@@ -19,6 +19,7 @@ import { CampoDeData } from "../componentes/CampoDeData";
 import { AlteracoesDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 import { ImportarRecebimentos } from "../componentes/ImportarRecebimentos";
 import { usarAcesso } from "../entrada";
+import { contratoCombina, Destaque } from "./pesquisaDeContratos";
 
 const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "Encerrado"];
 
@@ -312,6 +313,7 @@ function EdicaoDeContrato({
 
 export function Contratos({ listas }: { listas: Listas | null }) {
   const [situacao, definirSituacao] = useState("");
+  const [busca, definirBusca] = useState("");
   const [editando, definirEditando] = useState<ContratoResumo | null>(null);
   const [versaoDoMrr, definirVersaoDoMrr] = useState(0);
   const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
@@ -322,8 +324,14 @@ export function Contratos({ listas }: { listas: Listas | null }) {
     [situacao],
   );
 
+  const achados = (dados?.itens ?? []).filter((c) => contratoCombina(c, busca));
+  const somaDosAchados = achados.reduce((t, c) => t + (c.preco_mensal ? Number(c.preco_mensal) : 0), 0);
   const semDadosNenhuns = !carregando && !erro && dados?.total === 0 && situacao === "";
-  const vazioPorFiltro = !carregando && !erro && dados?.total === 0 && situacao !== "";
+  const vazioPorFiltro = !carregando && !erro && !semDadosNenhuns && achados.length === 0;
+  const limpar = () => {
+    definirSituacao("");
+    definirBusca("");
+  };
 
   return (
     <>
@@ -335,6 +343,23 @@ export function Contratos({ listas }: { listas: Listas | null }) {
       )}
 
       <div className="filtros">
+        <div className="campo" style={{ flex: 1, minWidth: 260 }}>
+          <label className="campo-rotulo" htmlFor="ct-busca">
+            Pesquisar
+          </label>
+          <input
+            id="ct-busca"
+            className="entrada entrada-busca"
+            type="search"
+            value={busca}
+            onChange={(e) => definirBusca(e.target.value)}
+            placeholder="Grupo, CNPJ, escopo, valor ou data"
+            aria-describedby="ct-busca-ajuda"
+          />
+          <p className="campo-ajuda" id="ct-busca-ajuda" style={{ margin: 0 }}>
+            Grupo, empresa ou CNPJ, escopo, situação, signatário, valor (6.538 ou 6538) ou data (05/2026).
+          </p>
+        </div>
         <div className="campo">
           <label className="campo-rotulo" htmlFor="ct-situacao">
             Situação
@@ -364,9 +389,15 @@ export function Contratos({ listas }: { listas: Listas | null }) {
           explicacao="O contrato nasce da conversão de uma oportunidade aceita — abra a oportunidade e converta."
         />
       )}
-      {vazioPorFiltro && <VazioPorFiltro aoLimpar={() => definirSituacao("")} />}
+      {vazioPorFiltro && <VazioPorFiltro aoLimpar={limpar} />}
 
-      {!carregando && !erro && (dados?.total ?? 0) > 0 && (
+      {!carregando && !erro && achados.length > 0 && (
+        <p className="campo-ajuda" role="status" style={{ margin: "var(--e2) 0" }}>
+          {busca.trim() ? `${achados.length} de ${dados!.itens.length}` : achados.length} contrato{achados.length === 1 ? "" : "s"}
+          {" "}· soma do preço mensal: {dinheiro(somaDosAchados)}
+        </p>
+      )}
+      {!carregando && !erro && achados.length > 0 && (
         <table className="tabela">
           <thead>
             <tr>
@@ -380,7 +411,7 @@ export function Contratos({ listas }: { listas: Listas | null }) {
             </tr>
           </thead>
           <tbody>
-            {ordenar(dados!.itens, ordenacao, {
+            {ordenar(achados, ordenacao, {
               grupo: (c) => c.grupo_nome,
               escopo: (c) => c.escopo,
               situacao: (c) => c.situacao,
@@ -389,8 +420,15 @@ export function Contratos({ listas }: { listas: Listas | null }) {
               signatario: (c) => c.signatario,
             }).map((contrato) => (
               <tr key={contrato.id}>
-                <td>{contrato.grupo_nome ?? "—"}</td>
-                <td>{contrato.escopo ?? "—"}</td>
+                <td>
+                  <Destaque texto={contrato.grupo_nome} termo={busca} />
+                  {busca.trim() && contrato.empresa_nome && (
+                    <span className="campo-ajuda" style={{ display: "block", margin: 0 }}>
+                      <Destaque texto={contrato.empresa_nome} termo={busca} />
+                    </span>
+                  )}
+                </td>
+                <td><Destaque texto={contrato.escopo} termo={busca} /></td>
                 <td>
                   <Etiqueta texto={contrato.situacao} />
                   {contrato.situacao === "Ativo" && contrato.saida_em && (
@@ -410,7 +448,7 @@ export function Contratos({ listas }: { listas: Listas | null }) {
                       ? <span className="numero-nota">anterior ao CRM</span>
                       : "—"}
                 </td>
-                <td>{contrato.signatario ?? "—"}</td>
+                <td><Destaque texto={contrato.signatario} termo={busca} /></td>
                 <td style={{ whiteSpace: "nowrap" }}>
                   <button
                     type="button"

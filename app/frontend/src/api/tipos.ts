@@ -134,6 +134,11 @@ export interface ColunaDoFunil {
   quantas: number;
   valor_mensal: string;
   valor_anual: string;
+  /** Recorrentes (C1): parcela × 13 ÷ 12, com a 13ª (13/10/2026). */
+  mensal_recorrente?: string;
+  /** Consultoria e legalização (C2): valor único, fora do mensal. */
+  pontual?: string;
+  recorrentes_sem_parcela?: number;
   oportunidades: OportunidadeResumo[];
 }
 
@@ -348,6 +353,9 @@ export interface ContratoResumo {
   signatario: string | null;
   /** Saída efetiva anunciada (10/10/2026): Ativo com esta data = em aviso de saída. */
   saida_em?: string | null;
+  /** Razão social e nome fantasia do CNPJ, para a pesquisa (13/10/2026). */
+  empresa_nome?: string | null;
+  empresa_cnpj?: string | null;
 }
 
 /** Um fato do contrato depois de assinado, com o antes e o depois. Só cresce. */

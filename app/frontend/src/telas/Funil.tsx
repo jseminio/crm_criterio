@@ -396,6 +396,15 @@ export function Funil({ listas }: { listas: Listas | null }) {
                 <p className="coluna-valor">
                   {dinheiroCurto(coluna.valor_anual)} ao ano
                 </p>
+                <p
+                  className="coluna-mensal"
+                  title={"Projeção mensal dos serviços recorrentes: parcela × 13 ÷ 12, com a 13ª. Consultoria e "
+                    + "legalização são valor único e ficam fora do mensal (aparecem como pontual)."
+                    + (coluna.recorrentes_sem_parcela ? ` ${coluna.recorrentes_sem_parcela} recorrente(s) sem parcela mensal ficaram fora.` : "")}
+                >
+                  {dinheiroCurto(coluna.mensal_recorrente ?? "0")}/mês recorrente
+                  {Number(coluna.pontual ?? 0) > 0 && <> · + {dinheiroCurto(coluna.pontual!)} pontual</>}
+                </p>
               </header>
               <div className="coluna-cartoes">
                 {ordenar(coluna.oportunidades, ordenacaoDoKanban, {

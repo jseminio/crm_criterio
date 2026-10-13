@@ -129,8 +129,8 @@
   cursor: pointer; font: inherit; color: inherit; }
 .th-ordenar:hover, .th-ordenar-ativa { color: var(--texto-forte); }
 .th-ordenar:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
-.th-seta { font-size: 9px; opacity: .45; }
-.th-ordenar-ativa .th-seta { opacity: 1; }
+.th-seta { font-size: 11px; opacity: .7; }
+.th-ordenar-ativa .th-seta { opacity: 1; color: var(--azul-destaque); }
 
 .tabela-clicavel { cursor: pointer; }
 
@@ -1499,3 +1499,7 @@ td > .celula-fonte { display: block; }
     scroll-behavior: auto !important;
   }
 }
+
+/* Pesquisa da Gestão de contratos (13/10/2026): o trecho achado fica marcado na linha. */
+.busca-achado { background: var(--espera-suave); color: inherit; border-radius: 2px; padding: 0 1px; }
+.coluna-mensal { margin: 0; font-size: 12px; color: var(--azul-noturno); }

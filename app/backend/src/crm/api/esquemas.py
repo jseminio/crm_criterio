@@ -544,6 +544,9 @@ class ContratoResumo(Base):
     saida_em: date | None = None
     """Saída efetiva anunciada (10/10/2026): com o contrato Ativo, ele está em aviso de saída até esta data."""
     parcelas_no_ano: int = 13
+    empresa_nome: str | None = None
+    """Razão social e nome fantasia do CNPJ do contrato, para a pesquisa da Gestão de contratos (13/10/2026)."""
+    empresa_cnpj: str | None = None
 
 
 class EventoDeContratoResposta(Base):
@@ -681,6 +684,12 @@ class ColunaDoFunil(BaseModel):
     quantas: int
     valor_mensal: Decimal
     valor_anual: Decimal
+    mensal_recorrente: Decimal = Decimal("0")
+    """Projeção mensal dos serviços recorrentes (C1): parcela × 13 ÷ 12, com a 13ª (13/10/2026)."""
+    pontual: Decimal = Decimal("0")
+    """Consultoria e legalização (C2): valor único, fora do mensal, mostrado ao lado."""
+    recorrentes_sem_parcela: int = 0
+    """Recorrentes sem preço mensal: ficam fora da projeção mensal."""
     oportunidades: list[OportunidadeResumo]
 
 

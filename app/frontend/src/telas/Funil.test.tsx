@@ -266,6 +266,19 @@ describe("arrasto no kanban", () => {
 describe("fusão Kanban/Grade (27/09/2026)", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("o topo da coluna mostra o ano e o mensal recorrente com a 13ª, e o pontual à parte (13/10/2026)", async () => {
+    await abrir([
+      { ...coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")]), valor_anual: "410000", mensal_recorrente: "31200", pontual: "36000" },
+      { ...coluna("On hold", []), mensal_recorrente: "0", pontual: "0" },
+    ]);
+    const enviar = encontrarColuna("Enviar proposta") as HTMLElement;
+    expect(within(enviar).getByText("R$ 410 mil ao ano")).toBeInTheDocument();
+    const mensal = within(enviar).getByText(/\/mês recorrente/);
+    expect(mensal).toHaveTextContent("R$ 31 mil/mês recorrente · + R$ 36 mil pontual");
+    expect(mensal).toHaveAttribute("title", expect.stringMatching(/parcela × 13 ÷ 12/));
+    expect(within(encontrarColuna("On hold") as HTMLElement).getByText(/\/mês recorrente/)).not.toHaveTextContent("pontual");
+  });
+
   it("abre no Kanban por padrão, sem o filtro Situação", async () => {
     await abrir([coluna("Enviar proposta", [oportunidade(1, "Alfa BPO")])]);
     expect(screen.getByRole("button", { name: "▦ Kanban" })).toHaveAttribute("aria-pressed", "true");

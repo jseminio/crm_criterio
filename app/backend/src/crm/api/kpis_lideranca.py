@@ -4,20 +4,21 @@
 Todo valor é MRR: a parcela × 13 ÷ 12, em bruto (`crm.domain.mrr.em_bruto`). Cada KPI diz o que
 entrou na conta e, quando falta registro para ele valer, o que falta — nunca um zero inventado.
 
-- **20 · MRR novo no mês:** soma do MRR dos contratos recorrentes que começaram no mês, da carteira
+- **MRR novo no mês** (linha 20 da planilha): soma do MRR dos contratos recorrentes que começaram no mês, da carteira
   inteira (inclusive os carregados da carteira anterior). É o "novo" do movimento de MRR.
-- **19 · Ticket:** o MRR novo do mês dividido por **grupo** e por **CNPJ**; o acumulado do ano vai junto.
+- **Ticket** (19): o MRR novo do mês dividido por **grupo** e por **CNPJ**; o acumulado do ano vai junto.
   As propostas recorrentes aceitas no mês sem contrato aparecem como pendência, fora da conta.
-- **18 · Upsell sobre o MRR:** recorrente (expansão e aditivo + contrato novo de quem já era cliente) e
+- **Upsell sobre o MRR** (18): recorrente (expansão e aditivo + contrato novo de quem já era cliente) e
   não recorrente (consultoria e legalização aceitas por quem já era cliente), cada um sobre o MRR do
   fim do mês anterior. Meta: 10% (09/10/2026).
-- **17 · Churn da base no ano** (coorte, decisão de Eduardo em 13/10/2026): clientes (grupos) da base de
-  31/12 do ano anterior que pediram para encerrar o último contrato no ano, até o fim do mês, sobre a
-  base; ao lado, o MRR que eles tinham sobre o MRR da base. O baseline é o churn do ano anterior — sem
-  encerramentos daquele ano no CRM, fica "sem dado".
-- **17b · Churn de novos no ano:** quem entrou no ano (fora da base) e já pediu para sair. À parte, para
-  não distorcer a coorte, e sem sumir: é sinal de venda ou implantação.
-- **21 · Cobertura de relacionamento:** clientes com classe que tiveram a reunião **realizada** dentro da
+- **Churn da base no ano** (17; coorte, decisão de Eduardo em 13/10/2026): da carteira de 31/12 do ano
+  anterior, até o fim do mês, por **grupos** (os que pediram para encerrar o último contrato ÷ a base) e por
+  **faturamento** (o MRR perdido, com a contração, ÷ o MRR da base, como 1 − GRR). O baseline é o churn do
+  ano anterior — sem encerramentos daquele ano no CRM, fica "sem dado".
+- **Churn de quem entrou no ano:** as mesmas duas visões para quem entrou no ano (fora da base), à parte
+  para não distorcer a coorte, e sem sumir: é sinal de venda ou implantação.
+- Os títulos não levam o número da linha da planilha (pedido de Eduardo, 13/10/2026).
+- **Cobertura de relacionamento** (21): clientes com classe que tiveram a reunião **realizada** dentro da
   janela da cadência da classe (A: 1 mês, B: 3 meses, C: 6 meses) até o fim do mês. Diferente do "em dia"
   do Funil do Sucesso, que dá carência a quem entrou no funil: aqui só conta reunião registrada.
 """
@@ -36,7 +37,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
 from crm.acesso.auditoria import usuario_atual
-from crm.api import sucesso
+from crm.api import integralidade, sucesso
 from crm.api.classificacao import parametros_vigentes
 from crm.db.modelos import Contrato, GrupoEconomico, Oportunidade
 from crm.domain import mrr as regras_de_mrr
@@ -171,7 +172,7 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
     )
 
     kpi20 = Kpi(
-        chave="mrr_novo", titulo="20 · MRR novo no mês", valor=total_novo, unidade="R$",
+        chave="mrr_novo", titulo="MRR novo no mês", valor=total_novo, unidade="R$",
         resumo=f"{len(novos)} contrato(s) recorrente(s) começaram no mês, já com a 13ª parcela",
         falta=falta_contrato, meta="Fixar após o baseline", itens=itens_novos,
         explicacao="Soma do MRR (parcela × 13 ÷ 12, em bruto) dos contratos recorrentes com início no mês, da carteira "
@@ -198,7 +199,7 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
     do_ano = ticket(novos_entre(date(de.year, 1, 1), ate))
     sem_cnpj = sum(1 for c, _ in novos if not c.empresa_id)
     kpi19 = Kpi(
-        chave="ticket", titulo="19 · Ticket médio mensal", valor=do_mes["por_grupo"], unidade="R$",
+        chave="ticket", titulo="Ticket médio mensal", valor=do_mes["por_grupo"], unidade="R$",
         resumo=f"Por grupo, no mês ({do_mes['grupos']} grupo(s), {do_mes['cnpjs']} CNPJ(s))",
         falta=falta_contrato + ([f"{sem_cnpj} contrato(s) sem CNPJ: contam como um CNPJ cada"] if sem_cnpj else []),
         meta="Crescendo sem elevar a concentração",
@@ -229,7 +230,7 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
     eventos_no_mes = sum(1 for c in originais for e in c.eventos
                          if de <= e.data_do_evento <= ate and e.tipo is not TipoDeEventoDeContrato.CORRECAO)
     kpi18 = Kpi(
-        chave="upsell", titulo="18 · Upsell sobre o MRR", valor=_pct(total_upsell, mrr_anterior), unidade="%",
+        chave="upsell", titulo="Upsell sobre o MRR", valor=_pct(total_upsell, mrr_anterior), unidade="%",
         resumo=f"Sobre o MRR do fim do mês anterior ({_reais(mrr_anterior)})",
         falta=([] if eventos_no_mes else ["Nenhum aditivo ou expansão registrado no mês (Contratos › eventos)"]),
         meta=f"{META_DE_UPSELL}% do MRR do mês anterior",
@@ -246,12 +247,12 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
                    "Cada um sobre o MRR do fim do mês anterior.",
     )
 
-    # ------------------------------------------------ 17 e 17b: churn no ano
-    # Por coorte (decisão de Eduardo em 13/10/2026): a base é a carteira de 31/12 do ano anterior e o churn é o que
-    # dela saiu no ano, até o fim do mês. Quem entrou e saiu no mesmo ano não some: vai para o 17b, à parte.
-    # Conta no **anúncio** (11/10/2026): o cliente pediu para sair, apesar de o MRR seguir até a saída efetiva. O MRR,
-    # o movimento e o NRR/GRR seguem pela saída. Encerrar um contrato de quem tem outro não é churn de cliente: é
-    # contração, que fica no GRR e no Plano de MRR.
+    # ------------------------------------------------ churn no ano: a base de 31/12 e quem entrou no ano
+    # Por coorte (decisão de Eduardo em 13/10/2026): a base é a carteira de 31/12 do ano anterior; quem entrou no ano
+    # tem o seu card, à parte. Cada card mostra duas visões: por **grupos** (os que pediram para encerrar o último
+    # contrato) e por **faturamento** (o MRR perdido ÷ o MRR de partida, com a contração incluída, como 1 − GRR:
+    # aprovado no mesmo dia). Conta no **anúncio** (11/10/2026); o MRR e o movimento seguem pela saída. Reajuste e
+    # expansão não compensam a perda.
     churn_valendo = lambda c, dia: _valendo_em(c, dia, pelo_anuncio=True)
     base_dia = date(de.year - 1, 12, 31)
     inicio_do_ano = date(de.year, 1, 1)
@@ -262,100 +263,134 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
     def cliente_em(g: int, dia: date) -> bool:
         return any(churn_valendo(c, dia) for c in por_grupo[g])
 
-    def mrr_do_grupo(g: int, dia: date) -> Decimal:
-        return sum(((regras_de_mrr.preco_em(bruto[c.id], dia) or ZERO) for c in por_grupo[g] if churn_valendo(c, dia)),
-                   ZERO)
-
     def anuncio_e_saida(g: int) -> tuple[date, date] | None:
         """Do último contrato do grupo: quando o cliente pediu e quando sai de fato."""
         datas = [(ev.data_do_evento, ev.data_da_saida or ev.data_do_evento)
                  for c in por_grupo[g] if (ev := encerramento_vigente(c)) is not None and ev.data_do_evento <= ate]
         return max(datas) if datas else None
 
-    def mrr_que_saiu(g: int) -> Decimal:
-        """O MRR do grupo na véspera do pedido de saída (o que vai sair)."""
-        datas = anuncio_e_saida(g)
-        if datas is None:
-            return ZERO
-        valor = mrr_do_grupo(g, datas[0] - timedelta(days=1))
-        if valor == 0:  # pediu no dia em que começou: vale o preço do contrato
-            valor = sum(((regras_de_mrr.preco_em(bruto[c.id], datas[0]) or ZERO) for c in por_grupo[g]
-                         if encerramento_vigente(c) is not None), ZERO)
-        return valor.quantize(CENTAVOS)
-
-    def no_mes(g: int) -> bool:
-        datas = anuncio_e_saida(g)
-        return datas is not None and de <= datas[0] <= ate
+    def no_mes(dia: date) -> bool:
+        return de <= dia <= ate
 
     def detalhe_da_saida(g: int) -> str:
         datas = anuncio_e_saida(g)
         if datas is None:
             return "perdeu o último contrato"
-        return f"anunciou em {datas[0]:%d/%m/%Y} · sai em {datas[1]:%d/%m/%Y}" + (" · no mês" if no_mes(g) else "")
+        return f"anunciou em {datas[0]:%d/%m/%Y} · sai em {datas[1]:%d/%m/%Y}" + (" · no mês" if no_mes(datas[0]) else "")
+
+    def perdas_do_contrato(c: Contrato, partida: Decimal) -> list[tuple[date, Decimal]]:
+        """O que o contrato perdeu no ano, em MRR, a partir do valor de partida: o pedido de encerramento leva o que
+        sobrava; a contração (evento que baixa o preço), a diferença."""
+        vigente = encerramento_vigente(c)
+        restante, perdas = partida, []
+        for ev in sorted(bruto[c.id].eventos, key=lambda x: (x.data_do_evento, x.id)):
+            if restante <= 0 or not (inicio_do_ano <= ev.data_do_evento <= ate):
+                continue
+            if vigente is not None and ev.id == vigente.id:
+                perdas.append((ev.data_do_evento, restante))
+                restante = ZERO
+            elif (ev.tipo not in (TipoDeEventoDeContrato.CORRECAO, TipoDeEventoDeContrato.ENCERRAMENTO,
+                                  TipoDeEventoDeContrato.DESISTENCIA)
+                  and ev.preco_mensal_novo is not None and ev.preco_mensal_anterior is not None
+                  and ev.preco_mensal_novo < ev.preco_mensal_anterior):
+                queda = min(ev.preco_mensal_anterior - ev.preco_mensal_novo, restante)
+                perdas.append((ev.data_do_evento, queda))
+                restante -= queda
+        return perdas
+
+    def coorte(contratos: dict[int, list[tuple[Contrato, Decimal]]]):
+        """Para cada grupo da coorte: o MRR de partida, as perdas no ano (data, valor) e se saiu por inteiro."""
+        linhas = {}
+        for g, lista in contratos.items():
+            perdas = [p for c, partida in lista for p in perdas_do_contrato(c, partida)]
+            linhas[g] = (sum((partida for _, partida in lista), ZERO), perdas,
+                         not cliente_em(g, ate) and anuncio_e_saida(g) is not None)
+        return linhas
+
+    def totais(linhas) -> dict:
+        partida = sum((p for p, _, _ in linhas.values()), ZERO).quantize(CENTAVOS)
+        perdido = sum((v for _, perdas, _ in linhas.values() for _, v in perdas), ZERO).quantize(CENTAVOS)
+        perdido_mes = sum((v for _, perdas, _ in linhas.values() for d, v in perdas if no_mes(d)), ZERO).quantize(CENTAVOS)
+        return {"mrr_de_partida": partida, "mrr_perdido": perdido, "faturamento_pct": _pct(perdido, partida),
+                "mrr_perdido_no_mes": perdido_mes}
+
+    def itens_da_coorte(linhas, saiu: str, contraiu: str, demais: str, detalhe_dos_demais) -> list[Item]:
+        def perdido(g):
+            return sum((v for _, v in linhas[g][1]), ZERO).quantize(CENTAVOS)
+        saidas = [g for g in linhas if linhas[g][2]]
+        contracoes = [g for g in linhas if not linhas[g][2] and linhas[g][1]]
+        resto = [g for g in linhas if not linhas[g][2] and not linhas[g][1]]
+        return ([Item(grupo=nome(g), detalhe=detalhe_dos_demais(g, prefixo=True) + detalhe_da_saida(g), valor=perdido(g),
+                      secao=saiu) for g in saidas]
+                + [Item(grupo=nome(g), detalhe="contração em " + ", ".join(f"{d:%d/%m/%Y}" for d, _ in linhas[g][1]),
+                        valor=perdido(g), secao=contraiu) for g in contracoes]
+                + [Item(grupo=nome(g), detalhe=detalhe_dos_demais(g, prefixo=False), valor=linhas[g][0].quantize(CENTAVOS),
+                        entra=False, secao=demais) for g in resto])
 
     nome = lambda g: nomes.get(g, "?")
     base = sorted((g for g in por_grupo if cliente_em(g, base_dia)), key=nome)
-    perdidos_base = [g for g in base if not cliente_em(g, ate)]
-    perdidos_base_mes = [g for g in perdidos_base if cliente_em(g, de - timedelta(days=1))]
-    mrr_da_base = sum((mrr_do_grupo(g, base_dia) for g in base), ZERO).quantize(CENTAVOS)
-    mrr_perdido = sum((mrr_que_saiu(g) for g in perdidos_base), ZERO)
-    mrr_perdido_mes = sum((mrr_que_saiu(g) for g in perdidos_base_mes), ZERO)
+    da_base = coorte({g: [(c, regras_de_mrr.preco_em(bruto[c.id], base_dia) or ZERO)
+                          for c in por_grupo[g] if churn_valendo(c, base_dia)] for g in base})
+    perdidos_base = [g for g in base if da_base[g][2]]
+    perdidos_base_mes = [g for g in perdidos_base if no_mes(anuncio_e_saida(g)[0])]
+    t_base = totais(da_base)
     ano_anterior = [c for c in originais if (d := _encerramento(c, pelo_anuncio=True)) and d.year == de.year - 1]
 
-    secao_saiu = f"Base de {base_dia:%d/%m/%Y} que saiu em {de.year}"
-    secao_ficou = "Os demais clientes da base"
-    kpi17 = Kpi(
-        chave="churn", titulo="17 · Churn da base no ano",
+    kpi_churn = Kpi(
+        chave="churn", titulo="Churn da base no ano",
         valor=_pct(Decimal(len(perdidos_base)), Decimal(len(base))) if base else None,
         unidade="%",
-        resumo=f"{len(perdidos_base)} de {len(base)} cliente(s) da base de {base_dia:%d/%m/%Y} anunciaram a saída em "
-               f"{de.year}",
+        resumo=f"Base de {base_dia:%d/%m/%Y} · no mês: {len(perdidos_base_mes)} grupo(s) · "
+               f"{_reais(t_base['mrr_perdido_no_mes'])}/mês",
         falta=([] if ano_anterior else [f"Os clientes perdidos em {de.year - 1}, para o baseline (contrato encerrado com a data)"]),
         meta=f"Abaixo do baseline de {de.year - 1} em 20%",
-        extras={"perdidos_no_ano": len(perdidos_base), "base": len(base), "perdidos_no_mes": len(perdidos_base_mes),
-                "mrr_perdido": mrr_perdido, "mrr_perdido_pct": _pct(mrr_perdido, mrr_da_base),
-                "mrr_da_base": mrr_da_base, "mrr_perdido_no_mes": mrr_perdido_mes},
-        itens=[Item(grupo=nome(g), detalhe=detalhe_da_saida(g), valor=mrr_que_saiu(g), secao=secao_saiu)
-               for g in perdidos_base]
-        + [Item(grupo=nome(g), detalhe=f"na base de {base_dia:%d/%m/%Y}", valor=mrr_do_grupo(g, base_dia).quantize(CENTAVOS),
-                entra=False, secao=secao_ficou)
-           for g in base if g not in perdidos_base],
-        explicacao=f"Churn da base: clientes (grupos) com contrato valendo em {base_dia:%d/%m/%Y} que pediram para encerrar "
-                   f"o último contrato entre 01/01/{de.year} e o fim do mês ÷ clientes da base. Ao lado, o MRR que eles "
-                   f"tinham ÷ o MRR da base em {base_dia:%d/%m/%Y}. Conta no anúncio, mesmo com o MRR seguindo até a "
-                   "saída efetiva. Encerrar um contrato de quem tem outro não conta: é contração, que fica no GRR e no "
-                   f"Plano de MRR. Quem entrou e saiu em {de.year} está no 17b.",
+        extras={"grupos": len(base), "grupos_perdidos": len(perdidos_base), "grupos_perdidos_no_mes": len(perdidos_base_mes),
+                **t_base},
+        itens=itens_da_coorte(da_base, f"Base de {base_dia:%d/%m/%Y} que saiu em {de.year}",
+                              "Contração na base (o grupo ficou)", "Os demais clientes da base",
+                              lambda g, prefixo: "" if prefixo else f"na base de {base_dia:%d/%m/%Y}"),
+        explicacao=f"Duas visões da carteira de {base_dia:%d/%m/%Y}, de 01/01/{de.year} até o fim do mês. Por grupos: "
+                   "os que pediram para encerrar o último contrato ÷ os grupos da base. Por faturamento: o MRR perdido "
+                   "÷ o MRR da base, com a contração incluída (o grupo que fica mas cancela um serviço ou baixa o "
+                   "preço), como 1 − GRR; reajuste e expansão não compensam. Conta no anúncio, mesmo com o MRR seguindo "
+                   f"até a saída efetiva. Quem entrou em {de.year} está no card ao lado.",
     )
 
-    # 17b: quem virou cliente no ano (fora da base) e já pediu para sair. Sinal de venda ou implantação.
+    # Quem entrou no ano (fora da base): sair no mesmo ano é sinal de venda ou implantação.
     def inicio_no_ano(g: int) -> date | None:
-        datas = [c.data_inicio for c in por_grupo[g] if c.data_inicio is not None and inicio_do_ano <= c.data_inicio <= ate
-                 and c.situacao is not SituacaoContrato.AGUARDANDO_ASSINATURA]
+        datas = [c.data_inicio for c in novos_contratos(g)]
         return min(datas) if datas else None
 
-    novos = sorted((g for g in por_grupo if g not in set(base) and inicio_no_ano(g) is not None), key=nome)
-    perdidos_novos = [g for g in novos if not cliente_em(g, ate) and anuncio_e_saida(g) is not None]
-    perdidos_novos_mes = [g for g in perdidos_novos if no_mes(g)]
-    mrr_dos_novos_perdidos = sum((mrr_que_saiu(g) for g in perdidos_novos), ZERO)
-    meses_como_cliente = [Decimal((anuncio_e_saida(g)[0] - inicio_no_ano(g)).days) / Decimal("30.44") for g in perdidos_novos]
-    tempo_medio = (sum(meses_como_cliente, Decimal(0)) / len(meses_como_cliente)).quantize(Decimal("0.1")) if meses_como_cliente else None
+    def novos_contratos(g: int) -> list[Contrato]:
+        return [c for c in por_grupo[g] if c.data_inicio is not None and inicio_do_ano <= c.data_inicio <= ate
+                and c.situacao is not SituacaoContrato.AGUARDANDO_ASSINATURA]
 
-    kpi17b = Kpi(
-        chave="churn_novos", titulo="17b · Churn de novos no ano", valor=Decimal(len(perdidos_novos)), unidade="clientes",
-        resumo=f"de {len(novos)} cliente(s) que entraram em {de.year}"
-               + (f" · {_pct(Decimal(len(perdidos_novos)), Decimal(len(novos)))}%".replace(".", ",") if novos else ""),
+    base_set = set(base)
+    novos = sorted((g for g in por_grupo if g not in base_set and novos_contratos(g)), key=nome)
+    dos_novos = coorte({g: [(c, regras_de_mrr._preco_inicial(bruto[c.id]) or ZERO) for c in novos_contratos(g)]
+                        for g in novos})
+    perdidos_novos = [g for g in novos if dos_novos[g][2]]
+    perdidos_novos_mes = [g for g in perdidos_novos if no_mes(anuncio_e_saida(g)[0])]
+    t_novos = totais(dos_novos)
+    meses = [Decimal((anuncio_e_saida(g)[0] - inicio_no_ano(g)).days) / Decimal("30.44") for g in perdidos_novos]
+    tempo_medio = (sum(meses, Decimal(0)) / len(meses)).quantize(Decimal("0.1")) if meses else None
+
+    kpi_churn_novos = Kpi(
+        chave="churn_novos", titulo=f"Churn de quem entrou em {de.year}",
+        valor=_pct(Decimal(len(perdidos_novos)), Decimal(len(novos))) if novos else None, unidade="%",
+        resumo=f"Entraram em {de.year} · no mês: {len(perdidos_novos_mes)} grupo(s) · "
+               f"{_reais(t_novos['mrr_perdido_no_mes'])}/mês",
         falta=[],
-        extras={"perdidos": len(perdidos_novos), "novos": len(novos), "perdidos_no_mes": len(perdidos_novos_mes),
-                "perdidos_pct": _pct(Decimal(len(perdidos_novos)), Decimal(len(novos))),
-                "mrr_perdido": mrr_dos_novos_perdidos, "tempo_medio_meses": tempo_medio},
-        itens=[Item(grupo=nome(g), detalhe=f"entrou em {inicio_no_ano(g):%m/%Y} · {detalhe_da_saida(g)}",
-                    valor=mrr_que_saiu(g), secao=f"Entraram e saíram em {de.year}") for g in perdidos_novos]
-        + [Item(grupo=nome(g), detalhe=f"entrou em {inicio_no_ano(g):%m/%Y}", valor=mrr_do_grupo(g, ate).quantize(CENTAVOS),
-                entra=False, secao=f"Os demais novos de {de.year}") for g in novos if g not in perdidos_novos],
-        explicacao=f"Clientes (grupos) que não estavam na base de {base_dia:%d/%m/%Y}, começaram um contrato em {de.year} e "
-                   "já pediram para encerrar o último, até o fim do mês. Ficam fora do churn da base (17) para não "
-                   "distorcer a coorte, mas não somem: sair no mesmo ano em que entrou é sinal de venda (cliente fora do "
-                   "ICP, expectativa mal vendida) ou de implantação, não de retenção. Conta no anúncio.",
+        extras={"grupos": len(novos), "grupos_perdidos": len(perdidos_novos), "grupos_perdidos_no_mes": len(perdidos_novos_mes),
+                "tempo_medio_meses": tempo_medio, **t_novos},
+        itens=itens_da_coorte(dos_novos, f"Entraram e saíram em {de.year}", "Contração (o grupo ficou)",
+                              f"Os demais que entraram em {de.year}",
+                              lambda g, prefixo: f"entrou em {inicio_no_ano(g):%m/%Y}" + (" · " if prefixo else "")),
+        explicacao=f"Os grupos que não estavam na base de {base_dia:%d/%m/%Y} e começaram um contrato em {de.year}, até o "
+                   "fim do mês. Por grupos: os que já pediram para encerrar o último contrato ÷ os que entraram. Por "
+                   "faturamento: o MRR perdido (contração incluída) ÷ o MRR que eles trouxeram ao entrar. Fica fora "
+                   "do churn da base para não distorcer a coorte, mas não some: sair no mesmo ano em que entrou é "
+                   "sinal de venda (cliente fora do ICP, expectativa mal vendida) ou de implantação, não de retenção.",
     )
 
     # ------------------------------------------------ 21: cobertura de relacionamento
@@ -378,7 +413,7 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         else:
             sem_reuniao.append(f"{g.nome} (classe {classe})")
     kpi21 = Kpi(
-        chave="cobertura", titulo="21 · Cobertura de relacionamento",
+        chave="cobertura", titulo="Cobertura de relacionamento",
         valor=_pct(Decimal(em_dia), Decimal(total)) if total else None, unidade="%",
         resumo=f"{em_dia} de {total} cliente(s) com a reunião da classe realizada (A mensal, B trimestral, C semestral)",
         falta=([] if em_dia else ["Nenhuma reunião de resultado registrada na janela (Sucesso do Cliente)"]),
@@ -390,7 +425,49 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
                    "C: 6 meses) até o fim do mês ÷ clientes com classe. Só conta reunião registrada no Sucesso do Cliente.",
     )
 
-    return KpisResposta(mes=mes, de=de, ate=ate, kpis=[kpi20, kpi19, kpi18, kpi17, kpi17b, kpi21])
+    # ------------------------------------------------ integralidade do cadastro (situação de hoje)
+    cadastro = integralidade.calcular(sessao)
+    novos_campos, pendentes = cadastro.novos, [c for c in cadastro.novos if not c.preenchido]
+    corte = f"{integralidade.DATA_DE_CORTE:%d/%m/%Y}"
+    por_responsavel: dict[str, list] = {}
+    for c in novos_campos:
+        por_responsavel.setdefault(c.responsavel or "Sem responsável", []).append(c)
+    ordem = sorted(por_responsavel, key=lambda r: (r == "Sem responsável", -sum(not c.preenchido for c in por_responsavel[r]), r))
+    itens_do_cadastro = []
+    for r in ordem:
+        dele = por_responsavel[r]
+        faltam = [c for c in dele if not c.preenchido]
+        if not faltam:
+            continue
+        pct = integralidade.Resultado.pendente_pct(dele)
+        secao = f"{r} · {len(faltam)} pendência(s) · {str(pct).replace('.', ',')}% pendente"
+        itens_do_cadastro += [Item(grupo=f"{c.cadastro} · {c.registro}",
+                                   detalhe=f"{c.campo} · {'Obrigatório' if c.obrigatorio else 'Prioritário'}",
+                                   valor=ZERO, secao=secao) for c in sorted(faltam, key=lambda c: (not c.obrigatorio, c.cadastro))]
+    kpi_integralidade = Kpi(
+        chave="integralidade", titulo="Integralidade do cadastro",
+        valor=integralidade.Resultado.pendente_pct(novos_campos), unidade="%",
+        resumo=f"Registros criados desde {corte} · situação de hoje",
+        falta=([] if novos_campos else [f"Nenhum registro criado desde {corte} ainda: o número começa com o primeiro"]),
+        meta="A definir",
+        extras={"pontos_devidos": sum(c.pontos for c in novos_campos),
+                "pontos_pendentes": sum(c.pontos for c in pendentes),
+                "obrigatorios_em_falta": sum(c.obrigatorio for c in pendentes),
+                "prioritarios_em_falta": sum(not c.obrigatorio for c in pendentes),
+                "legado_pct": integralidade.Resultado.pendente_pct(cadastro.legado),
+                **{f"pendente_{nome.lower()}": integralidade.Resultado.pendente_pct([c for c in novos_campos if c.cadastro == nome])
+                   for nome in integralidade.CADASTROS}},
+        itens=itens_do_cadastro,
+        explicacao="Os campos que alimentam um indicador ou uma decisão, em oportunidade, contrato, encerramento, cliente, "
+                   "empresa e contato. Pendente = pontos dos campos devidos e vazios ÷ pontos de todos os devidos; "
+                   "obrigatório vale 2, prioritário vale 1. Campo condicional só conta quando se aplica (a data de "
+                   "envio depois de \"Enviar proposta\", o motivo na Perdida). Conta só o que foi criado desde "
+                   f"{corte}; o legado vem à parte. Quem responde: na oportunidade, o captador; no resto, o responsável "
+                   "de CS do grupo (ou o captador, enquanto o grupo não é cliente). Não muda com o mês escolhido.",
+    )
+
+    return KpisResposta(mes=mes, de=de, ate=ate,
+                        kpis=[kpi20, kpi19, kpi18, kpi_churn, kpi_churn_novos, kpi21, kpi_integralidade])
 
 
 def roteador_de_kpis(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:

@@ -23,10 +23,6 @@ export function ultimosMeses(hoje = new Date()): { valor: string; rotulo: string
 
 function valorDoKpi(k: KpiDaLideranca): string {
   if (k.valor === null) return "sem dado";
-  if (k.unidade === "clientes") {
-    const n = Number(k.valor);
-    return `${n} ${n === 1 ? "cliente" : "clientes"}`;
-  }
   return k.unidade === "R$" ? dinheiro(k.valor) : percentual(k.valor);
 }
 
@@ -60,15 +56,29 @@ function Detalhe({ k }: { k: KpiDaLideranca }) {
       </div>
     );
   }
-  if (k.chave === "churn") {
+  if (k.chave === "integralidade") {
+    const cadastros = [["Oportunidade", "oportunidade"], ["Contrato", "contrato"], ["Encerramento", "encerramento"],
+      ["Cliente", "cliente"], ["Empresa (CNPJ)", "empresa"], ["Contato", "contato"]] as const;
     return (
       <div style={{ display: "grid", gap: "var(--e1)" }}>
+        <ul className="integralidade-barras" aria-label="Pendente por cadastro">
+          {cadastros.map(([rotulo, chave]) => {
+            const v = x[`pendente_${chave}`];
+            const n = v === null || v === undefined ? null : Number(v);
+            return (
+              <li key={chave}>
+                <span>{rotulo}</span>
+                <span className="integralidade-trilho" aria-hidden="true">
+                  <span className="integralidade-barra" style={{ width: `${n ?? 0}%` }} />
+                </span>
+                <span className="tabela-numero">{n === null ? "—" : percentual(String(v))}</span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="campo-ajuda" style={{ margin: 0 }}>Obrigatório vale 2, prioritário vale 1.</p>
         <p className="campo-ajuda" style={{ margin: 0 }}>
-          MRR perdido da base: <strong>{dinheiro(texto(x.mrr_perdido))}</strong> ({percentual(x.mrr_perdido_pct as string | null)})
-          {" "}de {dinheiro(texto(x.mrr_da_base))}
-        </p>
-        <p className="campo-ajuda" style={{ margin: 0 }}>
-          No mês: <strong>{texto(x.perdidos_no_mes)}</strong> cliente(s) · {dinheiro(texto(x.mrr_perdido_no_mes))}
+          Legado (antes do corte): {x.legado_pct === null || x.legado_pct === undefined ? "—" : percentual(String(x.legado_pct))} pendente
         </p>
       </div>
     );
@@ -77,10 +87,8 @@ function Detalhe({ k }: { k: KpiDaLideranca }) {
     return (
       <div style={{ display: "grid", gap: "var(--e1)" }}>
         <p className="campo-ajuda" style={{ margin: 0 }}>
-          MRR que saiu: <strong>{dinheiro(texto(x.mrr_perdido))}</strong> · no mês: {texto(x.perdidos_no_mes)} cliente(s)
-        </p>
-        <p className="campo-ajuda" style={{ margin: 0 }}>
-          Tempo médio como cliente: {x.tempo_medio_meses === null ? "—" : `${String(x.tempo_medio_meses).replace(".", ",")} meses`}
+          Tempo médio como cliente: {x.tempo_medio_meses === null || x.tempo_medio_meses === undefined
+            ? "—" : `${String(x.tempo_medio_meses).replace(".", ",")} meses`}
         </p>
         <p className="campo-ajuda" style={{ margin: 0 }}>Sinal de venda ou implantação, não de retenção.</p>
       </div>
@@ -90,7 +98,7 @@ function Detalhe({ k }: { k: KpiDaLideranca }) {
 }
 
 const TOM: Record<string, Tom> = {
-  mrr_novo: "verde", ticket: "dourado", upsell: "violeta", churn: "vermelho", churn_novos: "vermelho", cobertura: "azul",
+  mrr_novo: "verde", ticket: "dourado", upsell: "violeta", churn: "vermelho", churn_novos: "vermelho", cobertura: "azul", integralidade: "marinho",
 };
 const NO_ANO = new Set(["churn", "churn_novos"]);
 
@@ -118,7 +126,12 @@ function ComposicaoDoKpi({ k }: { k: KpiDaLideranca }) {
   if (secoes.length > 0) {
     return (
       <>
-        <p className="composicao-linha-resumo"><strong>{valorDoKpi(k)}</strong> · {k.resumo}</p>
+        <p className="composicao-linha-resumo">
+          {visoesDoChurn(k)
+            ? visoesDoChurn(k)!.map((v) => <span key={v.rotulo}>{v.rotulo}: <strong>{v.valor}</strong> ({v.apoio}) · </span>)
+            : <><strong>{valorDoKpi(k)}</strong> · </>}
+          {k.resumo}
+        </p>
         {secoes.map((secao) => {
           const itens = k.itens.filter((i) => i.secao === secao);
           return (
@@ -146,12 +159,31 @@ function ComposicaoDoKpi({ k }: { k: KpiDaLideranca }) {
   );
 }
 
+/** Duas visões no mesmo card (13/10/2026): o churn por grupos e por faturamento; a integralidade do cadastro,
+ * o pendente e os obrigatórios em falta. */
+function visoesDoChurn(k: KpiDaLideranca) {
+  const x = k.extras;
+  if (k.chave === "integralidade") {
+    return [
+      { rotulo: "Pendente", valor: valorDoKpi(k), apoio: `${texto(x.pontos_pendentes)} de ${texto(x.pontos_devidos)} pontos` },
+      { rotulo: "Obrigatórios em falta", valor: texto(x.obrigatorios_em_falta), apoio: `e ${texto(x.prioritarios_em_falta)} prioritários` },
+    ];
+  }
+  if (!NO_ANO.has(k.chave)) return undefined;
+  return [
+    { rotulo: "Por grupos", valor: valorDoKpi(k), apoio: `${texto(x.grupos_perdidos)} de ${texto(x.grupos)} grupos` },
+    { rotulo: "Por faturamento", valor: x.faturamento_pct === null || x.faturamento_pct === undefined ? "sem dado" : percentual(String(x.faturamento_pct)),
+      apoio: `${dinheiro(texto(x.mrr_perdido))} de ${dinheiro(texto(x.mrr_de_partida))}/mês` },
+  ];
+}
+
 function Cartao({ k }: { k: KpiDaLideranca }) {
   return (
     <Indicador
       rotulo={k.titulo}
       tom={TOM[k.chave] ?? "marinho"}
       destaque={valorDoKpi(k)}
+      valores={visoesDoChurn(k)}
       pendente={k.valor === null}
       apoio={<>{k.resumo}{k.meta && <><br />Meta: {k.meta}</>}</>}
       etiqueta={

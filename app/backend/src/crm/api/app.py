@@ -64,6 +64,8 @@ from crm.agente.disparo_do_questionario import Canais
 from crm.api.disparo_do_questionario import canais_reais, laco_do_disparo
 from crm.api.integracoes import Testadores, roteador_de_integracoes
 from crm.api.kpis_lideranca import roteador_de_kpis
+from crm.api.reajustes import roteador_de_reajustes
+from crm.indices.ipca import BuscarIpca
 from crm.api.recebimentos import roteador_de_recebimentos
 from crm.db.saidas import efetivar_saidas, laco_das_saidas
 from crm import configuracao
@@ -166,10 +168,11 @@ def criar_app(
     disparo_automatico: bool | None = None,
     saidas_automaticas: bool | None = None,
     testadores: Testadores | None = None,
+    buscar_ipca: BuscarIpca | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede; `tentativas`, para o
-    teste controlar o relógio do bloqueio de login."""
+    teste controlar o relógio do bloqueio de login; `buscar_ipca`, para o teste não ir ao Banco Central."""
 
     @asynccontextmanager
     async def ciclo_de_vida(_: FastAPI):
@@ -296,6 +299,7 @@ def criar_app(
         roteador_de_abordagens(obter_sessao, lambda: _fabrica, servicos or servicos_reais)
     )
     api.include_router(roteador_de_contatos(obter_sessao))
+    api.include_router(roteador_de_reajustes(obter_sessao, buscar_ipca))
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
     api.include_router(roteador_do_sdr(obter_sessao, canais_do_disparo or canais_reais))

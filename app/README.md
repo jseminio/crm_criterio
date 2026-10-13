@@ -16,6 +16,28 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Reajuste anual de julho pelo IPCA (13/10/2026)
+
+Decisões de Eduardo em 13/10/2026, amostra aprovada. Em **Sucesso do Cliente › Reajuste anual**:
+
+- **Julho, pelo IPCA**, uma vez por ano. O IPCA conta desde a última vez que o preço foi definido (a assinatura ou o
+  último Reajuste) até **junho**: no ano normal, os últimos 12 meses; no primeiro reajuste de quem foi adiado, o
+  acumulado desde a assinatura (entrou em jan/2026 → jan/2026 a jun/2027, 18 meses).
+- **Menos de 12 meses em julho → Adiado** para o julho seguinte (Lei 10.192/2001, art. 2º). Renegociação no meio do
+  ano (evento de Reajuste) reinicia a contagem.
+- **O CRM não aplica sozinho.** A tabela sugere o valor; quem tem *Contratos: aprovar eventos acima da alçada* confirma
+  ou altera e aprova. Cada um vira um evento de **Reajuste em 01/07**, com o IPCA, o sugerido, o aprovado, se foi
+  alterado à mão e **quem autorizou** (com login, quem entrou; sem login, o nome digitado). Tudo ou nada.
+- **Você decide** (vem desmarcado): não recorrente que passa de 12 meses (cronograma longo) e contrato em IGP-M.
+  *Sem reajuste* no contrato fica listado, sem ação. Contrato em aviso de saída não entra.
+- **Carteira anterior ao CRM** sem data de assinatura: presumido o julho anterior (12 meses), e a linha diz isso.
+- Antes de junho sair, a tabela é **prévia** e não aprova.
+- **IPCA guardado no CRM** (tabela `ipca_do_mes`, série 433 do Banco Central, desde 2016). Completa sozinho ao abrir a
+  tela quando falta o mês anterior (no máximo uma busca a cada 12 horas); com o Banco Central fora, segue com o que
+  está guardado e avisa. Histórico e "Atualizar agora" no fim da tela. Nada a configurar no servidor.
+- Rotas: `GET /api/reajustes?ano=`, `POST /api/reajustes/aprovar`, `GET /api/ipca`, `POST /api/ipca/atualizar`.
+  Regras em `crm.domain.reajuste`; busca em `crm.indices`.
+
 ## Migrar do CRM local para a nuvem (10/10/2026)
 
 Decisão de Eduardo: **o CRM oficial passa a ser a nuvem** (`www.crmcs.criterioconsultores.com.br`); o local era o oficial

@@ -2300,3 +2300,50 @@ export interface SaidaAnunciada {
   motivo: string | null;
   iniciativa: string | null;
 }
+
+/** Reajuste anual de julho pelo IPCA (13/10/2026). */
+export type SituacaoDoReajuste = "Reajustar" | "Você decide" | "Adiado" | "Reajustado" | "Sem reajuste" | "Sem preço";
+
+export interface LinhaDoReajuste {
+  contrato_id: number;
+  grupo: string;
+  empresa: string | null;
+  escopo: string | null;
+  recorrente: boolean;
+  situacao: SituacaoDoReajuste;
+  observacao: string | null;
+  base: string | null;
+  base_presumida: boolean;
+  /** Primeiro e último mês do IPCA usado (dia 1). */
+  de: string | null;
+  ate: string | null;
+  meses: number | null;
+  /** Acumulado em %, "6.1043". */
+  ipca: string | null;
+  meses_faltando: string[];
+  preco_mensal: string | null;
+  preco_anual: string | null;
+  mensal_sugerido: string | null;
+  anual_sugerido: string | null;
+  adiado_para: number | null;
+  aprovavel: boolean;
+  reajustado: string | null;
+}
+
+export interface ReajusteDoAno {
+  ano: number;
+  ipca: { ultimo_mes: string | null; buscado_em: string | null; aviso: string | null };
+  ipca_completo: boolean;
+  linhas: LinhaDoReajuste[];
+}
+
+export interface MesDoIpca {
+  mes: string;
+  variacao: string;
+}
+
+export interface ItemDoReajuste {
+  contrato_id: number;
+  preco_mensal_novo?: string | null;
+  preco_anual_novo?: string | null;
+}

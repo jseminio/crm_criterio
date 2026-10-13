@@ -142,6 +142,9 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("POST", r"/api/contratos/\d+/eventos", ("contratos.eventos",)),
     ("GET", r"/api/aprovacoes", ("contratos.aprovar",)),
     ("POST", r"/api/aprovacoes/\d+/(aprovar|recusar)", ("contratos.aprovar",)),
+    ("GET", r"/api/(reajustes|ipca)", ("contratos.ver",)),
+    ("POST", r"/api/reajustes/aprovar", ("contratos.aprovar",)),
+    ("POST", r"/api/ipca/atualizar", ("contratos.ver",)),
     # carteira
     ("GET", r"/api/carteira/exportar", ("carteira.exportar",)),
     ("GET", r"/api/carteira/.+", ("carteira.ver",)),

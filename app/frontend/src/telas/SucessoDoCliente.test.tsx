@@ -6,6 +6,7 @@ import { SucessoDoCliente } from "./SucessoDoCliente";
 
 vi.mock("./Carteira", () => ({ Carteira: () => <p>tela da saúde da carteira</p> }));
 vi.mock("./Contratos", () => ({ Contratos: () => <p>tela de contratos</p> }));
+vi.mock("./ReajusteAnual", () => ({ ReajusteAnual: () => <p>tela do reajuste anual</p> }));
 vi.mock("./FunilDoSucesso", () => ({ FunilDoSucesso: () => <p>tela do funil do sucesso</p> }));
 vi.mock("./Funil", () => ({ Funil: () => <p>tela do funil</p> }));
 vi.mock("./Questionarios", () => ({ Questionarios: () => <p>tela de questionários</p> }));
@@ -17,13 +18,15 @@ const eu = (permissoes: string[]) => ({
 describe("Sucesso do Cliente (02/10/2026)", () => {
   beforeEach(() => localStorage.clear());
 
-  it("junta Saúde da carteira, Gestão de contratos e o Funil do Sucesso em abas, nessa ordem", () => {
+  it("junta Saúde da carteira, Gestão de contratos, Reajuste anual e o Funil do Sucesso em abas, nessa ordem", () => {
     render(<SucessoDoCliente listas={null} />);
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(
-      ["Saúde da carteira", "Gestão de contratos", "Funil do Sucesso do Cliente"]);
+      ["Saúde da carteira", "Gestão de contratos", "Reajuste anual", "Funil do Sucesso do Cliente"]);
     expect(screen.getByText("tela da saúde da carteira")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Gestão de contratos" }));
     expect(screen.getByText("tela de contratos")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Reajuste anual" }));
+    expect(screen.getByText("tela do reajuste anual")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Funil do Sucesso do Cliente" }));
     expect(screen.getByText("tela do funil do sucesso")).toBeInTheDocument();
   });
@@ -33,13 +36,13 @@ describe("Sucesso do Cliente (02/10/2026)", () => {
     expect(screen.getByRole("tab", { name: "Gestão de contratos" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("quem vê contratos mas não a carteira vê só Gestão de contratos", () => {
+  it("quem vê contratos mas não a carteira vê só Gestão de contratos e o Reajuste anual", () => {
     render(
       <ProvedorDeAcesso eu={eu(["contratos.ver", "funil.ver"])}>
         <SucessoDoCliente listas={null} />
       </ProvedorDeAcesso>,
     );
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Gestão de contratos"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Gestão de contratos", "Reajuste anual"]);
   });
 });
 

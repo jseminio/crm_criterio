@@ -110,6 +110,9 @@ import type {
   NovaReuniaoDeResultado,
   ReuniaoDeResultado,
   SessaoAberta,
+  ItemDoReajuste,
+  MesDoIpca,
+  ReajusteDoAno,
 } from "./tipos";
 
 export class ErroDaApi extends Error {
@@ -743,6 +746,15 @@ export const api = {
   reunioesDaCarteira: () => pedir<CarteiraComReunioes>("/api/sucesso/carteira"),
   registrarReuniaoDaCarteira: (reuniao: { data: string; participantes?: string; resumo?: string; correcoes_de_rota?: string }) =>
     pedir<CarteiraComReunioes>("/api/sucesso/carteira/reunioes", { method: "POST", body: JSON.stringify(reuniao) }),
+  reajuste: (ano: number) => pedir<ReajusteDoAno>(`/api/reajustes?ano=${ano}`),
+  aprovarReajuste: (ano: number, itens: ItemDoReajuste[], autorizador?: string) =>
+    pedir<{ aplicados: number; autorizado_por: string }>("/api/reajustes/aprovar", {
+      method: "POST",
+      body: JSON.stringify({ ano, itens, autorizador: autorizador || null }),
+    }),
+  ipca: (desde?: string) => pedir<MesDoIpca[]>(`/api/ipca${desde ? `?desde=${desde}` : ""}`),
+  atualizarIpca: () =>
+    pedir<ReajusteDoAno["ipca"]>("/api/ipca/atualizar", { method: "POST" }),
   aprovacoes: () => pedir<Aprovacao[]>("/api/aprovacoes"),
   aprovar: (id: number) => pedir<Aprovacao>(`/api/aprovacoes/${id}/aprovar`, { method: "POST" }),
   recusar: (id: number, motivo: string) =>

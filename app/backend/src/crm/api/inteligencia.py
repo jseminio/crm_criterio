@@ -564,10 +564,6 @@ def _dia_local(v: datetime | date | None) -> date | None:
     return v
 
 
-def _num(v: int | Decimal | None) -> Decimal | None:
-    return None if v is None else Decimal(v)
-
-
 def _texto_num(v: Decimal) -> str:
     return f"{v.quantize(D('0.1'), rounding=ROUND_HALF_UP)}".replace(".", ",").removesuffix(",0")
 

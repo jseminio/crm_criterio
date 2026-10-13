@@ -27,7 +27,7 @@ from typing import Callable, Iterator, Literal
 import sqlalchemy as sa
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session, object_session, sessionmaker
+from sqlalchemy.orm import Session, object_session, selectinload, sessionmaker
 
 from dataclasses import replace
 
@@ -377,6 +377,9 @@ def _detalhe_de(oportunidade: Oportunidade, nome_do_grupo: str | None) -> e.Opor
 def _resumo_de_contrato(contrato: Contrato, nome_do_grupo: str | None) -> e.ContratoResumo:
     resumo = e.ContratoResumo.model_validate(contrato)
     resumo.grupo_nome = nome_do_grupo
+    if contrato.empresa is not None:
+        resumo.empresa_nome = " · ".join(n for n in (contrato.empresa.razao_social, contrato.empresa.nome_fantasia) if n)
+        resumo.empresa_cnpj = contrato.empresa.cnpj
     return resumo
 
 
@@ -925,6 +928,10 @@ def _registrar(api: FastAPI) -> None:
         for oportunidade, nome in linhas:
             por_situacao[oportunidade.situacao].append((oportunidade, nome))
 
+        def pontual(o: Oportunidade) -> bool:
+            """C2: consultoria e legalização, valor único (a linha vem do serviço quando não foi gravada)."""
+            return (o.linha_servico or linha_do_servico(o.servico)) is LinhaServico.C2
+
         colunas = []
         for situacao, itens in por_situacao.items():
             colunas.append(
@@ -933,6 +940,11 @@ def _registrar(api: FastAPI) -> None:
                     quantas=len(itens),
                     valor_mensal=sum((o.preco_mensal or 0) for o, _ in itens),
                     valor_anual=sum((o.preco_anual or 0) for o, _ in itens),
+                    mensal_recorrente=sum(
+                        (regras_de_mrr.mensalizar(o.preco_mensal) for o, _ in itens
+                         if not pontual(o) and o.preco_mensal), Decimal("0")),
+                    pontual=sum(((o.preco_anual or 0) for o, _ in itens if pontual(o)), Decimal("0")),
+                    recorrentes_sem_parcela=sum(1 for o, _ in itens if not pontual(o) and not o.preco_mensal and o.preco_anual),
                     oportunidades=[_resumo_de(o, nome) for o, nome in itens],
                 )
             )
@@ -1498,7 +1510,8 @@ def _registrar(api: FastAPI) -> None:
 
         total = sessao.scalar(sa.select(sa.func.count()).select_from(consulta.subquery()))
         linhas = sessao.execute(
-            consulta.order_by(Contrato.data_inicio.desc().nulls_last(), Contrato.id.desc())
+            consulta.options(selectinload(Contrato.empresa))
+            .order_by(Contrato.data_inicio.desc().nulls_last(), Contrato.id.desc())
             .offset(salto)
             .limit(limite)
         ).all()

@@ -129,8 +129,8 @@
   cursor: pointer; font: inherit; color: inherit; }
 .th-ordenar:hover, .th-ordenar-ativa { color: var(--texto-forte); }
 .th-ordenar:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
-.th-seta { font-size: 9px; opacity: .45; }
-.th-ordenar-ativa .th-seta { opacity: 1; }
+.th-seta { font-size: 11px; opacity: .7; }
+.th-ordenar-ativa .th-seta { opacity: 1; color: var(--azul-destaque); }
 
 .tabela-clicavel { cursor: pointer; }
 
@@ -1474,8 +1474,7 @@ td > .celula-fonte { display: block; }
 .recortes .ind-composicao-solto { --cor: var(--foco); }
 
 /* KPIs da liderança no padrão dos indicadores (10/10/2026): cinco por linha. */
-.numeros-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-@media (max-width: 1280px) { .numeros-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.numeros-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 720px) { .numeros-kpis { grid-template-columns: minmax(0, 1fr); } }
 .numeros-kpis .ind .campo-ajuda, .numeros-kpis .ind .aviso-de-movimento { font-size: 11px; }
 
@@ -1490,6 +1489,10 @@ td > .celula-fonte { display: block; }
 /* Prazo do aviso de saída (10/10/2026): 30 dias, 60 dias ou outra data. */
 .opcoes-em-linha { display: flex; gap: var(--e3); flex-wrap: wrap; margin: var(--e1) 0; }
 .opcao-em-linha { display: inline-flex; gap: var(--e1); align-items: center; font-size: 13px; }
+
+/* Pesquisa da Gestão de contratos (13/10/2026): o trecho achado fica marcado na linha. */
+.busca-achado { background: var(--espera-suave); color: inherit; border-radius: 2px; padding: 0 1px; }
+.coluna-mensal { margin: 0; font-size: 12px; color: var(--azul-noturno); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

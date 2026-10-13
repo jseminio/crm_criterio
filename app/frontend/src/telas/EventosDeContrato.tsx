@@ -22,7 +22,7 @@ const TIPOS: { valor: Tipo; ajuda: string }[] = [
   { valor: "Aditivo", ajuda: "Qualquer alteração contratual. Descreva o que mudou; escopo e preço são opcionais." },
   { valor: "Renovação", ajuda: "Estende a vigência: informe a nova data de fim." },
   { valor: "Correção", ajuda: "Corrige um valor lançado errado, com o motivo. Não conta como expansão nem contração no MRR." },
-  { valor: "Encerramento", ajuda: "O cliente anunciou a saída. Até a saída efetiva o contrato segue ativo, faturando e no MRR; na saída o MRR cai, o churn conta e ele paga a 13ª proporcional." },
+  { valor: "Encerramento", ajuda: "O cliente anunciou a saída: o churn conta na data do anúncio. Até a saída efetiva o contrato segue ativo, faturando e no MRR; na saída o MRR cai e ele paga a 13ª proporcional." },
   { valor: "Desistência da saída", ajuda: "O cliente em aviso de saída decidiu ficar: desfaz o encerramento anunciado." },
 ];
 
@@ -203,7 +203,7 @@ export function EventosDeContrato({
               ) : null}
               <p className="campo-ajuda">
                 {saida && saida >= anuncio
-                  ? <>Saída efetiva em <strong>{data(saida)}</strong>. Até lá o contrato segue ativo, faturando e no MRR; na saída o MRR cai, o churn conta e o cliente paga a 13ª proporcional.</>
+                  ? <>Saída efetiva em <strong>{data(saida)}</strong>. O churn já conta no anúncio; até a saída o contrato segue ativo, faturando e no MRR; na saída o MRR cai e o cliente paga a 13ª proporcional.</>
                   : "A saída efetiva não pode ser antes do anúncio."}
               </p>
             </div>

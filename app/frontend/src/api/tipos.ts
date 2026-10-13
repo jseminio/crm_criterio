@@ -2300,3 +2300,46 @@ export interface SaidaAnunciada {
   motivo: string | null;
   iniciativa: string | null;
 }
+
+/** Campanhas de tráfego pago (13/10/2026): `GET /api/sdr/campanhas`, regras em `crm.domain.campanhas`. */
+export interface EtapaDoCanal {
+  chave: string;
+  rotulo: string;
+  quantidade: number;
+  passagem: Taxa | null;
+  custo: string | null;
+}
+
+export interface FunilDoCanal {
+  canal: string;
+  investimento: string | null;
+  etapas: EtapaDoCanal[];
+  mrr_novo: string;
+  contratos_sem_preco: number;
+  cac: string | null;
+  lead_a_contrato: Taxa;
+}
+
+export interface LinhaDaCampanha {
+  canal: string;
+  campanha: string;
+  leads: number;
+  no_icp: Taxa;
+  qualificados: Taxa;
+  reunioes: number;
+  contratos: number;
+  mrr_novo: string;
+  descartes: Contagem[];
+  decisao: string;
+  porque: string;
+}
+
+export interface PainelDeCampanhas {
+  mes: string;
+  leads: number;
+  total: FunilDoCanal | null;
+  canais: FunilDoCanal[];
+  campanhas: LinhaDaCampanha[];
+  regua: { volume_minimo: number; icp_alvo_pct: string | null; qualificados_meta_pct: number; qualificados_alerta_pct: number };
+  prontidao: { ok: boolean; texto: string }[];
+}

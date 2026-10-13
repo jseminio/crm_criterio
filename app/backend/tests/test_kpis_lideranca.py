@@ -111,11 +111,62 @@ def test_upsell_recorrente_e_nao_recorrente_sobre_o_mrr_anterior(cliente):
     assert D(u["valor"]) == D("136.4") and u["falta"] == []
 
 
-def test_churn_de_clientes_sobre_a_base_do_fim_do_ano(cliente):
+def test_churn_da_base_no_ano_sobre_a_carteira_do_fim_do_ano(cliente):
     c = _kpis(cliente)["churn"]
     assert D(c["valor"]) == D("50.0")  # Saiu, de uma base de 2 (Antigo e Saiu) em 31/12/2025
-    assert c["extras"]["base"] == 2 and c["extras"]["perdidos"] == 1
+    x = c["extras"]
+    assert x["base"] == 2 and x["perdidos_no_ano"] == 1 and x["perdidos_no_mes"] == 1
+    # MRR da base em 31/12: Antigo 12.000 (antes da expansão) + Saiu 6.000, × 13 ÷ 12; o Saiu levou 6.500
+    assert D(x["mrr_da_base"]) == D("19500.00") and D(x["mrr_perdido"]) == D("6500.00") and D(x["mrr_perdido_pct"]) == D("33.3")
     assert "perdidos em 2025" in c["falta"][0]  # sem encerramento em 2025: sem baseline
+
+
+def _grupo_com_contrato(engine, nome, inicio, anuncio, saida, preco, anterior=False):
+    with Session(engine) as s:
+        g = GrupoEconomico(nome=nome)
+        s.add(g)
+        s.flush()
+        ct = Contrato(grupo_id=g.id, situacao=SituacaoContrato.ATIVO, preco_mensal=D(preco), data_inicio=inicio,
+                      anterior_ao_crm=anterior)
+        s.add(ct)
+        s.flush()
+        if anuncio:
+            s.add(EventoDeContrato(contrato_id=ct.id, tipo=T.ENCERRAMENTO, data_do_evento=anuncio, data_da_saida=saida))
+        s.commit()
+
+
+def test_o_ano_acumula_a_base_e_quem_entrou_e_saiu_no_ano_vai_para_o_17b(engine, cliente):
+    """Decisão de Eduardo em 13/10/2026: churn por coorte (base de 31/12) e, à parte, o churn de novos no ano."""
+    _grupo_com_contrato(engine, "Maio", date(2025, 1, 1), date(2026, 5, 27), date(2026, 8, 31), "1200")
+    _grupo_com_contrato(engine, "Relâmpago", date(2026, 3, 2), date(2026, 8, 14), date(2026, 10, 13), "2400")
+    k = _kpis(cliente)
+    c = k["churn"]
+    assert c["extras"]["base"] == 3 and c["extras"]["perdidos_no_ano"] == 2 and c["extras"]["perdidos_no_mes"] == 1
+    assert D(c["valor"]) == D("66.7")
+    entram = {i["grupo"]: i for i in c["itens"] if i["entra"]}
+    assert set(entram) == {"Maio", "Saiu"}  # o Relâmpago não estava na base
+    assert entram["Maio"]["detalhe"] == "anunciou em 27/05/2026 · sai em 31/08/2026"
+    assert entram["Saiu"]["detalhe"].endswith("· no mês")
+    assert D(entram["Maio"]["valor"]) == D("1300.00")
+    assert [i["grupo"] for i in c["itens"] if not i["entra"]] == ["Antigo"]
+    assert {i["secao"] for i in c["itens"]} == {"Base de 31/12/2025 que saiu em 2026", "Os demais clientes da base"}
+
+    n = k["churn_novos"]
+    assert D(n["valor"]) == 1 and n["unidade"] == "clientes"
+    assert n["extras"]["novos"] == 2 and n["extras"]["perdidos_no_mes"] == 0  # Novo e Relâmpago; pediu em agosto
+    assert D(n["extras"]["mrr_perdido"]) == D("2600.00") and D(n["extras"]["tempo_medio_meses"]) == D("5.4")
+    assert [(i["grupo"], i["entra"]) for i in n["itens"]] == [("Relâmpago", True), ("Novo", False)]
+    assert n["itens"][0]["detalhe"] == "entrou em 03/2026 · anunciou em 14/08/2026 · sai em 13/10/2026"
+
+
+def test_encerrar_um_de_dois_contratos_e_contracao_e_nao_churn(engine, cliente):
+    with Session(engine) as s:
+        antigo = s.query(GrupoEconomico).filter_by(nome="Antigo").one()
+        cross = s.query(Contrato).filter_by(grupo_id=antigo.id, data_inicio=date(2026, 10, 5)).one()
+        s.add(EventoDeContrato(contrato_id=cross.id, tipo=T.ENCERRAMENTO, data_do_evento=date(2026, 10, 18)))
+        s.commit()
+    c = _kpis(cliente)["churn"]
+    assert c["extras"]["perdidos_no_ano"] == 1  # só o Saiu: o Antigo segue com o contrato da carteira anterior
 
 
 def test_cobertura_conta_so_reuniao_realizada_na_janela_da_classe(cliente):
@@ -134,8 +185,12 @@ def test_cada_kpi_tem_explicacao_e_a_lista_bate_com_o_numero(cliente):
     ups = k["upsell"]
     assert sum(D(i["valor"]) for i in ups["itens"]) == D(ups["extras"]["recorrente"]) + D(ups["extras"]["nao_recorrente"])
     churn = k["churn"]
-    assert sum(i["entra"] for i in churn["itens"]) == churn["extras"]["perdidos"]
+    assert sum(i["entra"] for i in churn["itens"]) == churn["extras"]["perdidos_no_ano"]
     assert len(churn["itens"]) == churn["extras"]["base"]  # os perdidos estavam na base
+    assert sum(D(i["valor"]) for i in churn["itens"] if i["entra"]) == D(churn["extras"]["mrr_perdido"])
+    novos = k["churn_novos"]
+    assert sum(i["entra"] for i in novos["itens"]) == novos["extras"]["perdidos"]
+    assert len(novos["itens"]) == novos["extras"]["novos"]
     cob = k["cobertura"]
     assert sum(i["entra"] for i in cob["itens"]) == cob["extras"]["em_dia"] and len(cob["itens"]) == cob["extras"]["total"]
 

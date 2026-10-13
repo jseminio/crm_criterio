@@ -1,4 +1,4 @@
-/** KPIs da liderança (amostra aprovada por Eduardo em 09/10/2026): os cinco indicadores da planilha
+/** KPIs da liderança (amostra aprovada por Eduardo em 09/10/2026; churn no ano em 13/10/2026): os indicadores da planilha
  * "CRITÉRIO — KPIs de mercado", mês a mês, em MRR com 13 parcelas. Só o Administrador vê. Cada card diz o
  * que entrou na conta e, quando falta registro, o que falta — "sem dado" nunca vira zero. */
 
@@ -23,6 +23,10 @@ export function ultimosMeses(hoje = new Date()): { valor: string; rotulo: string
 
 function valorDoKpi(k: KpiDaLideranca): string {
   if (k.valor === null) return "sem dado";
+  if (k.unidade === "clientes") {
+    const n = Number(k.valor);
+    return `${n} ${n === 1 ? "cliente" : "clientes"}`;
+  }
   return k.unidade === "R$" ? dinheiro(k.valor) : percentual(k.valor);
 }
 
@@ -56,17 +60,46 @@ function Detalhe({ k }: { k: KpiDaLideranca }) {
       </div>
     );
   }
+  if (k.chave === "churn") {
+    return (
+      <div style={{ display: "grid", gap: "var(--e1)" }}>
+        <p className="campo-ajuda" style={{ margin: 0 }}>
+          MRR perdido da base: <strong>{dinheiro(texto(x.mrr_perdido))}</strong> ({percentual(x.mrr_perdido_pct as string | null)})
+          {" "}de {dinheiro(texto(x.mrr_da_base))}
+        </p>
+        <p className="campo-ajuda" style={{ margin: 0 }}>
+          No mês: <strong>{texto(x.perdidos_no_mes)}</strong> cliente(s) · {dinheiro(texto(x.mrr_perdido_no_mes))}
+        </p>
+      </div>
+    );
+  }
+  if (k.chave === "churn_novos") {
+    return (
+      <div style={{ display: "grid", gap: "var(--e1)" }}>
+        <p className="campo-ajuda" style={{ margin: 0 }}>
+          MRR que saiu: <strong>{dinheiro(texto(x.mrr_perdido))}</strong> · no mês: {texto(x.perdidos_no_mes)} cliente(s)
+        </p>
+        <p className="campo-ajuda" style={{ margin: 0 }}>
+          Tempo médio como cliente: {x.tempo_medio_meses === null ? "—" : `${String(x.tempo_medio_meses).replace(".", ",")} meses`}
+        </p>
+        <p className="campo-ajuda" style={{ margin: 0 }}>Sinal de venda ou implantação, não de retenção.</p>
+      </div>
+    );
+  }
   return null;
 }
 
-const TOM: Record<string, Tom> = { mrr_novo: "verde", ticket: "dourado", upsell: "violeta", churn: "vermelho", cobertura: "azul" };
+const TOM: Record<string, Tom> = {
+  mrr_novo: "verde", ticket: "dourado", upsell: "violeta", churn: "vermelho", churn_novos: "vermelho", cobertura: "azul",
+};
+const NO_ANO = new Set(["churn", "churn_novos"]);
 
 /** A lista que compõe o KPI: quem entra na conta primeiro, quem ficou fora (a base, os sem reunião) depois. */
 function ComposicaoDoKpi({ k }: { k: KpiDaLideranca }) {
   const entram = k.itens.filter((i) => i.entra);
   const fora = k.itens.filter((i) => !i.entra);
   const comValor = k.itens.some((i) => Number(i.valor) > 0);
-  const total = entram.reduce((t, i) => t + Number(i.valor), 0);
+  const totalDe = (itens: ItemDoKpi[]) => itens.reduce((t, i) => t + Number(i.valor), 0);
   const tabela = (itens: ItemDoKpi[], rotulo: string) => (
     <table className="tabela" aria-label={rotulo}>
       <thead><tr><th>Cliente</th><th>O quê</th>{comValor && <th className="tabela-numero">Valor</th>}</tr></thead>
@@ -74,20 +107,38 @@ function ComposicaoDoKpi({ k }: { k: KpiDaLideranca }) {
         {itens.map((i, n) => (
           <tr key={n}><td>{i.grupo}</td><td>{i.detalhe}</td>{comValor && <td className="tabela-numero">{dinheiro(i.valor)}</td>}</tr>
         ))}
-        {comValor && itens === entram && (
+        {comValor && itens.length > 0 && itens.every((i) => i.entra) && (
           <tr className="composicao-total"><td>Total</td><td />
-            <td className="tabela-numero">{dinheiro(total)}</td></tr>
+            <td className="tabela-numero">{dinheiro(totalDe(itens))}</td></tr>
         )}
       </tbody>
     </table>
   );
+  const secoes = [...new Set(k.itens.map((i) => i.secao).filter((x): x is string => !!x))];
+  if (secoes.length > 0) {
+    return (
+      <>
+        <p className="composicao-linha-resumo"><strong>{valorDoKpi(k)}</strong> · {k.resumo}</p>
+        {secoes.map((secao) => {
+          const itens = k.itens.filter((i) => i.secao === secao);
+          return (
+            <div key={secao}>
+              <h3 className="numero-rotulo">{secao} ({itens.length})</h3>
+              {tabela(itens, secao)}
+            </div>
+          );
+        })}
+        {entram.length === 0 && <p className="numero-estado">Nada entrou na conta no ano.</p>}
+      </>
+    );
+  }
   return (
     <>
       <p className="composicao-linha-resumo"><strong>{valorDoKpi(k)}</strong> · {k.resumo}</p>
       {entram.length > 0 ? tabela(entram, "Entram na conta") : <p className="numero-estado">Nada entrou na conta no mês.</p>}
       {fora.length > 0 && (
         <>
-          <h3 className="numero-rotulo">{k.chave === "churn" ? "Os demais clientes da base" : "Ficaram fora da conta"} ({fora.length})</h3>
+          <h3 className="numero-rotulo">Ficaram fora da conta ({fora.length})</h3>
           {tabela(fora, "Ficaram fora da conta")}
         </>
       )}
@@ -112,7 +163,7 @@ function Cartao({ k }: { k: KpiDaLideranca }) {
         </>
       }
       composicao={k.itens.length > 0 ? {
-        titulo: k.titulo, subtitulo: "O que compõe o indicador no mês", quantos: k.itens.length,
+        titulo: k.titulo, subtitulo: NO_ANO.has(k.chave) ? "O que compõe o indicador no ano, até o fim do mês" : "O que compõe o indicador no mês", quantos: k.itens.length,
         conteudo: () => <ComposicaoDoKpi k={k} />,
       } : undefined}
     >

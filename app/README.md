@@ -125,6 +125,12 @@ precisam estar na mesma versão do banco: a prévia recusa e diz por quê. Rotas
   O **MRR**, o movimento do MRR (a linha de churn), o NRR/GRR e o plano de MRR seguem **pela saída**, para a conta do
   MRR fechar. As listas mostram "anunciou em · sai em". `mrr.saidas_anunciadas`; `GET /api/mrr/movimento` traz
   `churn_anunciado`.
+- **Churn no ano, por coorte** (decisão de Eduardo em 13/10/2026): o KPI **17 · Churn da base no ano** é o que saiu
+  da carteira de 31/12 do ano anterior entre 01/01 e o fim do mês, em clientes (grupos que pediram para encerrar o
+  último contrato) e em MRR (o que eles tinham na véspera do pedido ÷ o MRR da base em 31/12), com o número do mês ao
+  lado. Quem entrou e saiu no mesmo ano não some: vai para o **17b · Churn de novos no ano** (clientes, MRR e tempo
+  médio como cliente), sinal de venda ou implantação. Encerrar um de dois contratos é contração, fora dos dois. A
+  composição vem em blocos (`Item.secao`): a base que saiu, os demais da base; os novos que saíram, os demais novos.
 - **13ª no esperado do caixa** (confirmado por Eduardo, 10/10/2026): parcela × avos ÷ 12, um avo por mês do ano com
   15 dias ou mais de serviço, contados da assinatura; cobrada em dezembro, ou **na saída**, proporcional, junto com a
   última parcela (o mês da saída tem parcela). O MRR não muda: já tem a 13ª no × 13 ÷ 12.
@@ -148,7 +154,7 @@ Decisões de Eduardo:
   **20 MRR novo** (contratos recorrentes que começaram no mês, carteira inteira) · **19 ticket** por grupo
   e por CNPJ, no mês e no ano · **18 upsell** recorrente (expansão e contrato novo de quem já era cliente)
   e não recorrente (consultoria e legalização aceitas por cliente), sobre o MRR do fim do mês anterior,
-  meta 10% · **17 churn** de clientes sobre a base de 31/12 do ano anterior · **21 cobertura** de
+  meta 10% · **17 churn da base no ano** (coorte de 31/12, em clientes e MRR) e **17b churn de novos no ano** · **21 cobertura** de
   relacionamento: clientes com a reunião da classe realizada na janela (A 1 mês, B 3, C 6). Cada KPI diz
   o que falta registrar; "sem dado" nunca vira zero.
 

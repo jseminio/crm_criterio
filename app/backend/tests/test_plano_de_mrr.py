@@ -3,6 +3,7 @@ realizado por motor, ajuste — e as premissas, que só o Administrador muda."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from datetime import date, datetime, timezone
 from decimal import Decimal as D
@@ -154,6 +155,8 @@ def test_quem_ve_o_funil_ve_o_plano_com_o_realizado_por_motor(cliente):
     motores = {m["motor"]: m for m in plano["motores"]}
     assert D(motores["bpo"]["realizado"]) == D("7583.33")
     assert "contratos/mês" in motores["bpo"]["ajuste"]
+    # Arredondado a uma casa (13/10/2026: a tela mostrava "3.969903762721966837831351357 contratos/mês").
+    assert all(re.search(r": \d+(,\d)? contratos/mês", m["ajuste"]) for m in motores.values() if "contratos/mês" in m["ajuste"])
     assert [c["nome"] for c in plano["cenarios"]] == ["alerta", "previsto", "otimista"]
 
 

@@ -1474,8 +1474,7 @@ td > .celula-fonte { display: block; }
 .recortes .ind-composicao-solto { --cor: var(--foco); }
 
 /* KPIs da liderança no padrão dos indicadores (10/10/2026): cinco por linha. */
-.numeros-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-@media (max-width: 1280px) { .numeros-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.numeros-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 720px) { .numeros-kpis { grid-template-columns: minmax(0, 1fr); } }
 .numeros-kpis .ind .campo-ajuda, .numeros-kpis .ind .aviso-de-movimento { font-size: 11px; }
 

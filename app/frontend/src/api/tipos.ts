@@ -2196,6 +2196,8 @@ export interface ItemDoKpi {
   valor: string;
   /** Conta no numerador; fora: a base do churn, quem ficou sem reunião na cobertura. */
   entra: boolean;
+  /** O bloco da composição (13/10/2026): no churn, "saiu no ano" e "os demais da base". */
+  secao?: string | null;
 }
 
 export interface KpiDaLideranca {

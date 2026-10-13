@@ -143,7 +143,7 @@ def test_kpi17_conta_o_cliente_no_mes_do_anuncio(engine, ids):
         s.commit()
         kpis = {k.chave: k for k in calcular(s, "2026-10", date(2026, 10, 20)).kpis}
         churn = kpis["churn"]
-        assert churn.extras["perdidos_no_mes"] == 1 and churn.valor == D("100.0")
+        assert churn.extras["grupos_perdidos_no_mes"] == 1 and churn.valor == D("100.0")
         assert churn.itens[0].detalhe == "anunciou em 05/10/2026 · sai em 04/12/2026 · no mês"
         dezembro = {k.chave: k for k in calcular(s, "2026-12", date(2026, 12, 20)).kpis}["churn"].extras
-        assert dezembro["perdidos_no_mes"] == 0 and dezembro["perdidos_no_ano"] == 1  # na saída, só no acumulado do ano
+        assert dezembro["grupos_perdidos_no_mes"] == 0 and dezembro["grupos_perdidos"] == 1  # na saída, só no acumulado do ano

@@ -32,10 +32,14 @@ export function Indicador({
   children,
   pendente = false,
   composicao,
+  valores,
   className = "",
 }: {
   rotulo: string;
   destaque?: string;
+  /** Duas (ou mais) visões do mesmo indicador lado a lado, no lugar do destaque único (13/10/2026: o churn por
+   * grupos e por faturamento). */
+  valores?: { rotulo: string; valor: string; apoio?: string }[];
   apoio?: ReactNode;
   etiqueta?: ReactNode;
   tom: Tom;
@@ -54,7 +58,17 @@ export function Indicador({
       aria-describedby={children ? id : undefined}
     >
       <h3 className="numero-rotulo ind-rotulo">{rotulo}</h3>
-      {destaque ? <p className="numero-valor ind-valor">{destaque}</p> : <p className="ind-valor ind-valor-pendente">Não calculável</p>}
+      {valores ? (
+        <div className="ind-valores">
+          {valores.map((v) => (
+            <div className="ind-valores-item" key={v.rotulo}>
+              <p className="ind-valores-rotulo">{v.rotulo}</p>
+              <p className="numero-valor ind-valor">{v.valor}</p>
+              {v.apoio && <p className="ind-valores-apoio">{v.apoio}</p>}
+            </div>
+          ))}
+        </div>
+      ) : destaque ? <p className="numero-valor ind-valor">{destaque}</p> : <p className="ind-valor ind-valor-pendente">Não calculável</p>}
       {apoio && <p className="ind-apoio">{apoio}</p>}
       {etiqueta}
       {composicao && (

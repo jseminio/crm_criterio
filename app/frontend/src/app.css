@@ -1494,6 +1494,12 @@ td > .celula-fonte { display: block; }
 .busca-achado { background: var(--espera-suave); color: inherit; border-radius: 2px; padding: 0 1px; }
 .coluna-mensal { margin: 0; font-size: 12px; color: var(--azul-noturno); }
 
+/* Duas visões no mesmo card (13/10/2026): o churn por grupos e por faturamento, lado a lado. */
+.ind-valores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e2); margin: var(--e1) 0; }
+.ind-valores-item { background: var(--surface-sunken); border-radius: var(--raio-sm); padding: var(--e2) var(--e3); }
+.ind-valores-rotulo, .ind-valores-apoio { margin: 0; font-size: 11px; color: var(--texto-medio); }
+.ind-valores .ind-valor { margin: 0; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

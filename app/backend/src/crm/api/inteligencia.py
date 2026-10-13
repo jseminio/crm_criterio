@@ -30,6 +30,7 @@ from crm.db.modelos import (
 from crm.domain import fases_do_cliente as fases
 from crm.domain import mrr as regras_de_mrr
 from crm.domain import plano_de_mrr as regras
+from crm.domain.campanhas import FORA_DO_ICP
 from crm.domain.listas import AderenciaDaPromessa, MotivoDeDescarte, MotivoRecusa, TipoCanal, TipoDeEventoDeContrato
 from crm.domain.indicadores import e_recorrente
 from crm.domain.recortes import cenarios_de_ticket
@@ -486,9 +487,6 @@ def roteador_de_inteligencia(obter_sessao: Callable[[], Iterator[Session]]) -> A
 # ---------------------------------------------------------------- as quatro fases (04/10/2026)
 
 FUSO = ZoneInfo("America/Sao_Paulo")
-FORA_DO_ICP = {MotivoDeDescarte.PORTE_ABAIXO, MotivoDeDescarte.SEGMENTO, MotivoDeDescarte.ORCAMENTO,
-               MotivoDeDescarte.SERVICO_PONTUAL}
-"""Descartado por estes motivos = lead fora do perfil (ICP). Os demais leads do mês contam como no ICP."""
 INDICACAO = {TipoCanal.SOCIOS, TipoCanal.PARCEIROS, TipoCanal.ADVOGADOS, TipoCanal.CARTEIRA, TipoCanal.COLABORADORES}
 """Canais que são indicação: alguém de dentro ou de fora trouxe o lead."""
 

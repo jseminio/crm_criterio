@@ -16,6 +16,27 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Campanhas: custo por campanha, leitura do Meta Ads e origem do clique (13/10/2026)
+
+Amostra aprovada por Eduardo em 13/10/2026.
+
+- **Meta Ads pela tela:** Configurações › Integrações › Meta Ads (leitura ligada, token com `ads_read`, ID da
+  conta, versão da API), com Testar. Na aba Campanhas, **Atualizar do Meta Ads** lê o gasto de cada campanha
+  do mês (`POST /api/sdr/campanhas/atualizar?mes=`) e grava como "lido" em `investimento_por_campanha`.
+  A leitura **nunca sobrescreve** um valor digitado; campanhas com o mesmo nome somam.
+- **Google Ads digitado por campanha** em SDR da IA › Custos e mídia (`PUT /api/sdr/midia/campanha`;
+  tirar pede confirmação, `DELETE /api/sdr/midia/campanha/{id}`). A leitura automática do Google espera o
+  token de desenvolvedor.
+- **Com campanhas lançadas, o investimento do canal no mês é a soma delas**; sem elas, vale o valor do canal.
+- A tabela de campanhas ganha investimento, R$/lead no ICP e R$/reunião. Campanha com gasto e sem lead aparece
+  (o nome no anúncio e no lead precisa ser o mesmo; a ligação ignora maiúsculas e espaços).
+- **Régua:** "Rever custo" quando o R$/reunião da campanha passa de **1,5 ×** o do canal no mês, ou quando ela
+  gasta sem nenhuma reunião e o canal tem (hipótese aprovada em 13/10/2026, `TETO_DE_CUSTO`).
+- **Origem do clique no lead:** `POST /api/leads` aceita `utm_source`, `utm_medium`, `utm_campaign`, `gclid` e
+  `fbclid`. Sem campanha digitada, a campanha do lead vem do `utm_campaign`. É a base para devolver as
+  conversões ao Meta e ao Google (próximo passo, depende do pixel da conta Meta).
+- Migração `a7c3e9d1b5f2`: tabela `investimento_por_campanha` e as cinco colunas no lead. Só acrescenta.
+
 ## SDR · Campanhas: funil de tráfego pago e decisão por campanha (13/10/2026)
 
 Amostra aprovada por Eduardo em 13/10/2026. Nova aba **Campanhas** em SDR · Abordagens e conhecimento
@@ -32,8 +53,7 @@ Amostra aprovada por Eduardo em 13/10/2026. Nova aba **Campanhas** em SDR · Abo
   Escalar; abaixo do alerta (10%) → Rever campanha; entre os dois → Manter e observar.
 - **Sucesso da busca:** primeira resposta, quem respondeu e qualificados, do painel do SDR em tráfego pago.
 - **Prontidão dos dados:** investimento lançado por canal, lead sem campanha, ICP alvo definido.
-- **O que ainda não faz:** o investimento continua digitado em SDR da IA › Custos e mídia, por canal e mês;
-  não há custo por campanha nem leitura automática do Meta Ads e do Google Ads (próximo incremento).
+- O custo por campanha e a leitura do Meta Ads chegaram no incremento seguinte (ver acima).
 - Rota: `GET /api/sdr/campanhas?mes=AAAA-MM`. A lista de motivos fora do ICP (`FORA_DO_ICP`) passou a viver
   em `crm.domain.campanhas` e é a mesma das quatro fases da Inteligência de Conversão.
 

@@ -332,6 +332,15 @@ class Lead(CarimboMixin, Base):
     de sócios desde o primeiro lead.
     """
 
+    # --- Origem do clique (13/10/2026): o anúncio que trouxe o lead ----------
+    utm_source: Mapped[str | None] = mapped_column(sa.String(120))
+    utm_medium: Mapped[str | None] = mapped_column(sa.String(120))
+    utm_campaign: Mapped[str | None] = mapped_column(sa.String(200))
+    gclid: Mapped[str | None] = mapped_column(sa.String(255))
+    """Identificador do clique no Google Ads: é o que permite devolver a conversão ao Google."""
+    fbclid: Mapped[str | None] = mapped_column(sa.String(255))
+    """Identificador do clique no Meta: é o que permite devolver a conversão ao Meta."""
+
     proxima_acao: Mapped[str | None] = mapped_column(sa.String(200))
     proxima_acao_em: Mapped[date | None] = mapped_column(sa.Date, index=True)
     observacao: Mapped[str | None] = mapped_column(sa.Text)
@@ -1303,6 +1312,33 @@ class InvestimentoEmMidia(CarimboMixin, Base):
     __table_args__ = (
         sa.UniqueConstraint("mes", "canal", name="uq_investimento_mes_canal"),
         sa.CheckConstraint("valor >= 0", name="valor_nao_negativo"),
+    )
+
+
+class InvestimentoPorCampanha(CarimboMixin, Base):
+    """Quanto se investiu numa campanha num mês (13/10/2026).
+
+    `fonte` diz de onde veio: "lido" (a leitura do Meta Ads pela tela) ou "digitado" (Custos e mídia,
+    enquanto o Google Ads não tem leitura). A leitura nunca sobrescreve um valor digitado. Quando um
+    canal tem campanhas aqui, o investimento do canal no mês é a soma delas.
+    """
+
+    __tablename__ = "investimento_por_campanha"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mes: Mapped[str] = mapped_column(sa.String(7), nullable=False, index=True)
+    canal: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    campanha: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    """O nome da campanha como está no anúncio: liga com `Lead.campanha` pelo nome."""
+    valor: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    fonte: Mapped[str] = mapped_column(sa.String(10), nullable=False, default="digitado")
+    id_externo: Mapped[str | None] = mapped_column(sa.String(60))
+    lido_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+    __table_args__ = (
+        sa.UniqueConstraint("mes", "canal", "campanha", name="uq_investimento_mes_canal_campanha"),
+        sa.CheckConstraint("valor >= 0", name="valor_nao_negativo"),
+        sa.CheckConstraint("fonte IN ('lido', 'digitado')", name="fonte_lido_ou_digitado"),
     )
 
 

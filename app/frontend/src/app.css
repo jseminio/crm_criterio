@@ -647,6 +647,13 @@
 .camp-ok > span:first-child { color: var(--ganho); }
 .camp-falta > span:first-child { color: var(--espera); }
 
+/* Campanhas · leitura do Meta Ads e custo por campanha (13/10/2026) */
+.camp-leitura { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3);
+  font-size: 12px; color: var(--texto-medio); }
+.camp-aviso { margin: 0; width: 100%; font-size: 12px; color: var(--ganho); }
+.camp-aviso-falha { color: var(--perda); }
+.camp-confirmar { display: inline-flex; gap: var(--e2); align-items: center; font-size: 12px; }
+
 .sdr-tabela td, .sdr-tabela th { font-size: 13px; }
 .sdr-tabela .tabela-numero { text-align: right; font-variant-numeric: tabular-nums; }
 .sdr-kpi .etiqueta { white-space: normal; }
@@ -1542,3 +1549,4 @@ td > .celula-fonte { display: block; }
     scroll-behavior: auto !important;
   }
 }
+

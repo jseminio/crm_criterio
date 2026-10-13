@@ -26,6 +26,7 @@ from dataclasses import asdict
 from datetime import datetime
 from decimal import Decimal
 from typing import Callable, Iterator
+from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -39,9 +40,11 @@ from crm.api.inteligencia import premissas_vigentes
 from crm.db import leads as regras_do_lead
 from crm.db import questionario_do_lead as do_lead
 from crm.db.base import agora
+from crm.anuncios import meta as meta_ads
 from crm.db.modelos import (
     ConversaDoSdr,
     InvestimentoEmMidia,
+    InvestimentoPorCampanha,
     Lead,
     MensagemDoSdr,
     ParametrosDoSdr,
@@ -70,9 +73,18 @@ def _situacao(lead: Lead, recebidos: list, momento: datetime) -> e.QuestionarioD
     )
 
 
+def gastos_reais_do_meta(mes: str) -> list[meta_ads.GastoDaCampanha] | None:
+    """O gasto de cada campanha no Meta Ads, ou `None` com a leitura desligada na tela."""
+    config = meta_ads.ler_configuracao()
+    if config is None:
+        return None
+    return meta_ads.gasto_por_campanha(config, mes, agora().astimezone(ZoneInfo("America/Sao_Paulo")).date())
+
+
 def roteador(
     obter_sessao: Callable[[], Iterator[Session]],
     canais_do_disparo: Callable[[], Canais | None] = canais_reais,
+    gastos_do_meta: Callable[[str], list[meta_ads.GastoDaCampanha] | None] = gastos_reais_do_meta,
 ) -> APIRouter:
     r = APIRouter(prefix="/api/sdr", tags=["sdr"])
 
@@ -400,8 +412,81 @@ def roteador(
             for i in sessao.scalars(sa.select(InvestimentoEmMidia).where(InvestimentoEmMidia.mes == mes))
         }
         premissas, _ = premissas_vigentes(sessao)
+        linhas = _por_campanha(sessao, mes)
+        lidos = [l.lido_em for l in linhas if l.fonte == "lido" and l.lido_em]
         return asdict(regras_de_campanhas.calcular_campanhas(
             mes=mes, leads=leads, midia=midia, icp_alvo_pct=premissas.icp_alvo_pct,
+            por_campanha=[regras_de_campanhas.Investido(l.canal, l.campanha, Decimal(l.valor), l.fonte) for l in linhas],
+            meta_ads=regras_de_campanhas.LeituraDoMeta(meta_ads.ler_configuracao() is not None, max(lidos, default=None)),
         ))
+
+    def _por_campanha(sessao: Session, mes: str) -> list[InvestimentoPorCampanha]:
+        return list(sessao.scalars(
+            sa.select(InvestimentoPorCampanha).where(InvestimentoPorCampanha.mes == mes)
+            .order_by(InvestimentoPorCampanha.canal, InvestimentoPorCampanha.campanha)
+        ))
+
+    @r.post("/campanhas/atualizar", response_model=e.LeituraDoMetaResposta)
+    def atualizar_do_meta(
+        mes: str = Query(pattern=regras.MES.pattern), sessao: Session = Depends(obter_sessao, scope="function")
+    ):
+        """Lê o gasto de cada campanha do mês no Meta Ads e grava como "lido". Valor digitado fica como está."""
+        try:
+            gastos = gastos_do_meta(mes)
+        except meta_ads.LeituraFalhou as falha:
+            raise HTTPException(502, str(falha)) from falha
+        if gastos is None:
+            raise HTTPException(409, "a leitura do Meta Ads está desligada: ligue em Configurações › Integrações")
+        momento = agora()
+        atuais = {(l.canal, " ".join(l.campanha.split()).casefold()): l
+                  for l in _por_campanha(sessao, mes) if l.canal == meta_ads.CANAL}
+        somados: dict[str, meta_ads.GastoDaCampanha] = {}
+        for g in gastos:  # duas campanhas com o mesmo nome somam: o lead só tem o nome
+            chave = " ".join(g.nome.split()).casefold()
+            antes = somados.get(chave)
+            somados[chave] = g if antes is None else meta_ads.GastoDaCampanha(antes.id, antes.nome, antes.valor + g.valor)
+        gravadas, mantidas = 0, []
+        for chave, g in somados.items():
+            linha = atuais.get((meta_ads.CANAL, chave))
+            if linha is not None and linha.fonte == "digitado":
+                mantidas.append(linha.campanha)
+                continue
+            if linha is None:
+                linha = InvestimentoPorCampanha(mes=mes, canal=meta_ads.CANAL, campanha=g.nome, fonte="lido", valor=g.valor)
+                sessao.add(linha)
+            linha.valor, linha.id_externo, linha.lido_em = g.valor, g.id[:60] or None, momento
+            gravadas += 1
+        sessao.flush()
+        return e.LeituraDoMetaResposta(lidas=len(gastos), gravadas=gravadas, digitadas_mantidas=mantidas, lido_em=momento)
+
+    @r.get("/midia/campanhas", response_model=list[e.InvestimentoPorCampanhaResposta])
+    def listar_midia_por_campanha(
+        mes: str = Query(pattern=regras.MES.pattern), sessao: Session = Depends(obter_sessao, scope="function")
+    ):
+        return [e.InvestimentoPorCampanhaResposta.model_validate(l) for l in _por_campanha(sessao, mes)]
+
+    @r.put("/midia/campanha", response_model=e.InvestimentoPorCampanhaResposta)
+    def gravar_midia_por_campanha(
+        corpo: e.InvestimentoPorCampanhaEdicao, sessao: Session = Depends(obter_sessao, scope="function")
+    ):
+        canal, campanha = " ".join(corpo.canal.split()), " ".join(corpo.campanha.split())
+        chave = campanha.casefold()
+        linha = next((l for l in _por_campanha(sessao, corpo.mes)
+                      if l.canal.casefold() == canal.casefold() and " ".join(l.campanha.split()).casefold() == chave), None)
+        if linha is None:
+            linha = InvestimentoPorCampanha(mes=corpo.mes, canal=canal, campanha=campanha, valor=corpo.valor)
+            sessao.add(linha)
+        linha.valor, linha.fonte, linha.lido_em, linha.id_externo = corpo.valor, "digitado", None, None
+        sessao.flush()
+        return e.InvestimentoPorCampanhaResposta.model_validate(linha)
+
+    @r.delete("/midia/campanha/{linha_id}", status_code=204)
+    def apagar_midia_por_campanha(linha_id: int, sessao: Session = Depends(obter_sessao, scope="function")):
+        """Tira um investimento por campanha. A tela pede confirmação antes."""
+        linha = sessao.get(InvestimentoPorCampanha, linha_id)
+        if linha is None:
+            raise HTTPException(404, "investimento não encontrado")
+        sessao.delete(linha)
+        sessao.flush()
 
     return r

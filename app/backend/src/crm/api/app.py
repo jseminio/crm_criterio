@@ -65,6 +65,7 @@ from crm.api.disparo_do_questionario import canais_reais, laco_do_disparo
 from crm.api.integracoes import Testadores, roteador_de_integracoes
 from crm.api.kpis_lideranca import roteador_de_kpis
 from crm.api.reajustes import roteador_de_reajustes
+from crm.api.servicos_e_contratos import roteador_de_servicos_e_contratos
 from crm.indices.ipca import BuscarIpca
 from crm.api.recebimentos import roteador_de_recebimentos
 from crm.db.saidas import efetivar_saidas, laco_das_saidas
@@ -300,6 +301,7 @@ def criar_app(
     )
     api.include_router(roteador_de_contatos(obter_sessao))
     api.include_router(roteador_de_reajustes(obter_sessao, buscar_ipca))
+    api.include_router(roteador_de_servicos_e_contratos(obter_sessao))
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
     api.include_router(roteador_do_sdr(obter_sessao, canais_do_disparo or canais_reais))
@@ -1472,10 +1474,19 @@ def _registrar(api: FastAPI) -> None:
         if contrato_existente is not None:
             raise HTTPException(409, "esta oportunidade já tem contrato")
 
+        # Recorrente ou não (13/10/2026): a tela pergunta, com o tipo do serviço como sugestão. Sem resposta, vale a
+        # sugestão; serviço sem tipo ("Outro") exige a resposta.
+        sugestao = linha_do_servico(oportunidade.servico) or oportunidade.linha_servico
+        recorrente = corpo.recorrente if corpo.recorrente is not None else (
+            sugestao is LinhaServico.C1 if sugestao is not None else None)
+        if recorrente is None:
+            raise HTTPException(422, "informe se o contrato é recorrente ou não recorrente: o serviço não define")
+
         contrato = Contrato(
             grupo_id=oportunidade.grupo_id,
             empresa_id=oportunidade.empresa_id,
             oportunidade_id=oportunidade.id,
+            recorrente=recorrente,
             escopo=corpo.escopo or oportunidade.servico,
             preco_mensal=corpo.preco_mensal or oportunidade.preco_mensal,
             preco_anual=corpo.preco_anual or oportunidade.preco_anual,

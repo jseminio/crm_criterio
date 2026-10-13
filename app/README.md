@@ -16,6 +16,26 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Serviços e contratos: o tipo do contrato sai do serviço (13/10/2026)
+
+Amostra aprovada por Eduardo em 13/10/2026.
+
+- **Configurações › Serviços e contratos** (permissão *Configurações: serviços e contratos*): os 12 serviços do catálogo
+  com o tipo (recorrente ou não, pela linha C1/C2), as parcelas, o **modelo de contrato** e o **reajuste**. Tipo,
+  nome, parcelas e roteiro do SDR seguem o catálogo de 27/09/2026 e não se editam na tela.
+- **Modelos:** "Recorrente padrão" (aguardando o arquivo) e "Não recorrente v1.1" (minuta v1.1, falta a revisão do
+  advogado). O modelo tem de ser do mesmo tipo do serviço.
+- **Reajuste por serviço:** recorrente aceita "IPCA em julho" (padrão), "Caso a caso" ou "Sem reajuste"; não
+  recorrente, só "Caso a caso" (padrão) ou "Sem reajuste". Vale na tabela do Reajuste anual: "Caso a caso" vira
+  "Você decide" e "Sem reajuste" fica de fora.
+- **Endereço Fiscal e Representante Legal** passam a 13 parcelas, como os demais recorrentes.
+- **Converter em contrato pergunta o tipo:** recorrente ou não recorrente, com o tipo do serviço como sugestão e o
+  modelo, as parcelas e o reajuste à vista. Serviço sem tipo ("Outro") exige a escolha (a API responde 422 sem ela).
+  O tipo fica no contrato (`contrato.recorrente`); os contratos de antes recebem o tipo pela tarefa
+  `2026_10_13_tipo_dos_contratos` (pelo serviço, pela linha, pelo escopo ou pelo preço).
+- CFO as a Service e BPO Plus **não** entram no catálogo: esperam a Descoberta do Cliente.
+- Rotas: `GET` e `PUT /api/servicos/contratos`. Regras em `crm.domain.contrato_do_servico`.
+
 ## Reajuste anual de julho pelo IPCA (13/10/2026)
 
 Decisões de Eduardo em 13/10/2026, amostra aprovada. Em **Sucesso do Cliente › Reajuste anual**:

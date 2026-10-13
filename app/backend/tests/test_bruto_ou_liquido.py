@@ -78,10 +78,10 @@ def test_mrr_soma_em_bruto_e_conta_os_convertidos(cliente):
 
 
 def test_contrato_da_proposta_nasce_liquido_e_sem_proposta_nasce_vazio(cliente, ids):
-    r = cliente.post(f"/api/oportunidades/{ids['com_proposta']}/converter-em-contrato", json={})
+    r = cliente.post(f"/api/oportunidades/{ids['com_proposta']}/converter-em-contrato", json={"recorrente": True})
     assert r.status_code == 201, r.text
     assert r.json()["base_do_valor"] == "liquido"
-    r = cliente.post(f"/api/oportunidades/{ids['sem_proposta']}/converter-em-contrato", json={})
+    r = cliente.post(f"/api/oportunidades/{ids['sem_proposta']}/converter-em-contrato", json={"recorrente": True})
     assert r.json()["base_do_valor"] is None
 
 

@@ -25,7 +25,7 @@ from __future__ import annotations
 from crm.manutencao.executor import Tarefa
 from crm.manutencao.tarefas import (
     configuracao_para_a_tela, data_de_envio_da_proposta, menino_da_ilha_em_12_parcelas, meta_de_mrr_em_13_parcelas,
-    perdida_e_motivos, premissas_em_13_parcelas, saida_dos_encerramentos_antigos,
+    perdida_e_motivos, premissas_em_13_parcelas, saida_dos_encerramentos_antigos, tipo_dos_contratos,
 )
 
 TAREFAS: list[Tarefa] = [
@@ -50,5 +50,8 @@ TAREFAS: list[Tarefa] = [
     Tarefa("2026_10_11_menino_da_ilha_em_12_parcelas",
            "Põe 12 parcelas no contrato de BPO Financeiro da Menino da Ilha (formato antigo, sem 13ª)",
            menino_da_ilha_em_12_parcelas.executar),
+    Tarefa("2026_10_13_tipo_dos_contratos",
+           "Preenche se cada contrato é recorrente ou não: pelo serviço, pela linha, pelo escopo ou pelo preço",
+           tipo_dos_contratos.executar),
     # Acrescente no fim. Ex.: Tarefa("2026_10_06_assunto", "o que faz", modulo.executar),
 ]

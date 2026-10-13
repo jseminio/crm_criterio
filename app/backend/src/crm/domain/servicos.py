@@ -132,6 +132,7 @@ CATALOGO: tuple[Servico, ...] = (
         ),
         (),
         BPO,
+        meses_no_ano=13,  # 13 parcelas (decisão de Eduardo, 13/10/2026)
     ),
     Servico(
         "Representante Legal", C1,
@@ -140,6 +141,7 @@ CATALOGO: tuple[Servico, ...] = (
         (),
         DestinoDoTransbordo.SOCIOS,
         nomes_antigos=("Representação",),
+        meses_no_ano=13,  # 13 parcelas (decisão de Eduardo, 13/10/2026)
     ),
     Servico(
         "Consultoria", C2,

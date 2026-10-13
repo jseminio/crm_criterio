@@ -78,7 +78,7 @@ class TestEdicaoDeNomeEEmpresa:
     def test_quem_virou_contrato_nao_troca_de_empresa(self, cliente, base):
         oid = self._nova(cliente, base)
         assert cliente.patch(f"/api/oportunidades/{oid}", json={"situacao": "Aceita", "data_aceite": "2026-09-01"}).status_code == 200
-        contrato = cliente.post(f"/api/oportunidades/{oid}/converter-em-contrato", json={})
+        contrato = cliente.post(f"/api/oportunidades/{oid}/converter-em-contrato", json={"recorrente": True})
         assert contrato.status_code in (200, 201), contrato.text
         assert contrato.json().get("empresa_id", base["e1"]) == base["e1"]  # o contrato nasce com a empresa
         detalhe = cliente.get(f"/api/oportunidades/{oid}").json()

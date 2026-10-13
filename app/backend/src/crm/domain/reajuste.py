@@ -59,6 +59,8 @@ class ContratoParaReajuste:
     saida_em: date | None
     reajustes: tuple[date, ...] = ()
     """Datas dos eventos de Reajuste já registrados."""
+    caso_a_caso: bool = False
+    """O serviço está com reajuste "Caso a caso" na tabela de serviços (13/10/2026): a pessoa decide."""
 
 
 @dataclass(frozen=True)
@@ -160,6 +162,9 @@ def linha_do_reajuste(c: ContratoParaReajuste, ano: int, ipca: dict[date, Decima
     if not c.recorrente:
         situacao = SituacaoDoReajuste.DECIDIR
         observacoes.append("Não recorrente com mais de 12 meses: você decide se reajusta as parcelas que faltam.")
+    if c.caso_a_caso and c.recorrente:
+        situacao = SituacaoDoReajuste.DECIDIR
+        observacoes.append("O serviço está com reajuste caso a caso.")
     if c.indice is IndiceDeReajuste.IGPM:
         situacao = SituacaoDoReajuste.DECIDIR
         observacoes.append("O contrato prevê IGP-M; a sugestão usa o IPCA.")

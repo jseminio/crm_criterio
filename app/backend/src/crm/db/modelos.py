@@ -827,6 +827,9 @@ class Contrato(CarimboMixin, Base):
 
     data_inicio: Mapped[date | None] = mapped_column(sa.Date)
     data_fim: Mapped[date | None] = mapped_column(sa.Date)
+    recorrente: Mapped[bool | None] = mapped_column(sa.Boolean)
+    """Recorrente ou não (13/10/2026): perguntado na conversão, com o tipo do serviço como sugestão. Nos contratos
+    de antes, a tarefa `2026_10_13_tipo_dos_contratos` preencheu pelo serviço ou, sem ele, pelo preço mensal."""
     parcelas_no_ano: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False, default=13, server_default="13")
     """13 por padrão (contábil, fiscal, DP e BPO Financeiro: 13ª parcela, decisões de 09 e 11/10/2026); 12 no contrato no
     formato antigo, sem 13ª (Menino da Ilha). O MRR é a parcela × parcelas ÷ 12."""
@@ -1865,3 +1868,18 @@ class IpcaDoMes(Base):
     variacao: Mapped[Decimal] = mapped_column(sa.Numeric(7, 4), nullable=False)
     """Em % no mês, como a série publica (0,42 = 0,42%)."""
     buscado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+
+
+class ContratoDoServico(CarimboMixin, Base):
+    """O modelo de contrato e o reajuste escolhidos para um serviço do catálogo (13/10/2026).
+
+    Só guarda o que alguém mudou na tela: serviço sem linha aqui segue o padrão do tipo
+    (`crm.domain.contrato_do_servico.padrao`).
+    """
+
+    __tablename__ = "contrato_do_servico"
+
+    servico: Mapped[str] = mapped_column(sa.String(120), primary_key=True)
+    """O nome do serviço no catálogo."""
+    modelo: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    reajuste: Mapped[str] = mapped_column(sa.String(40), nullable=False)

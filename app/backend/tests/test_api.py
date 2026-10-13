@@ -352,15 +352,20 @@ class TestParcelasDaOportunidadeNova:
                   "quantidade_parcelas": 6, "preco_anual": "99999"},
         ).json()
 
-        assert Decimal(corpo["preco_anual"]) == Decimal("6000")
+        # 13 parcelas pelo catálogo desde 13/10/2026: nem as 6 pedidas nem o anual digitado valem
+        assert corpo["quantidade_parcelas"] == 13
+        assert Decimal(corpo["preco_anual"]) == Decimal("13000")
 
-    def test_parcelas_sem_mensal_da_422(self, cliente: TestClient):
-        resposta = cliente.post(
+    def test_parcelas_do_catalogo_sem_mensal_deixam_o_anual_vazio(self, cliente: TestClient):
+        # Até 13/10/2026 o Endereço Fiscal não tinha parcelas no catálogo, e parcelas sem mensal davam 422. Desde então
+        # todo serviço recorrente tem as parcelas no catálogo: elas valem, e sem mensal não há anual.
+        corpo = cliente.post(
             "/api/oportunidades",
             json={"nome": "Delta", "servico": "Endereço Fiscal", "quantidade_parcelas": 12},
-        )
+        ).json()
 
-        assert resposta.status_code == 422
+        assert corpo["quantidade_parcelas"] == 13
+        assert corpo["preco_anual"] is None
 
     def test_nao_recorrente_descarta_as_parcelas(self, cliente: TestClient):
         corpo = cliente.post(
@@ -408,7 +413,9 @@ class TestAnualPeloServico:
 
         assert meses["BPO Contábil e Fiscal"] == 13
         assert meses["BPO Financeiro"] == 13  # 13 parcelas desde 09/10/2026
-        assert meses["Endereço Fiscal"] is None
+        # Endereço Fiscal e Representante Legal: 13 parcelas (decisão de Eduardo em 13/10/2026)
+        assert meses["Endereço Fiscal"] == 13 and meses["Representante Legal"] == 13
+        assert meses["Consultoria"] is None  # não recorrente segue as parcelas do projeto
 
     def test_editar_o_mensal_recalcula_o_anual_e_ignora_o_digitado(self, cliente: TestClient):
         o = cliente.post(

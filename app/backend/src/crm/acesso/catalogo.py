@@ -48,6 +48,7 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         ("propostas", "matrizes e numeração das propostas"), ("backup", "backup"),
         ("perfis", "perfis e acesso"), ("historico", "histórico de alterações"), ("metas", "metas dos indicadores"),
         ("integracoes", "integrações: chaves, testes e envio de teste"),
+        ("servicos", "serviços e contratos: modelo e reajuste por serviço"),
     )),
 )
 PERMISSOES: frozenset[str] = frozenset(f"{m}.{f}" for m, _, fs in MENUS for f, _ in fs)
@@ -143,6 +144,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/aprovacoes", ("contratos.aprovar",)),
     ("POST", r"/api/aprovacoes/\d+/(aprovar|recusar)", ("contratos.aprovar",)),
     ("GET", r"/api/(reajustes|ipca)", ("contratos.ver",)),
+    ("GET", r"/api/servicos/contratos", ("configuracoes.servicos", "contratos.ver", "funil.converter")),
+    ("PUT", r"/api/servicos/contratos", ("configuracoes.servicos",)),
     ("POST", r"/api/reajustes/aprovar", ("contratos.aprovar",)),
     ("POST", r"/api/ipca/atualizar", ("contratos.ver",)),
     # carteira

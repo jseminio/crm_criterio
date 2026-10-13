@@ -347,6 +347,8 @@ export interface ContratoResumo {
   base_do_valor: "bruto" | "liquido" | null;
   /** 13 por padrão; 12 no formato antigo, sem 13ª (11/10/2026). */
   parcelas_no_ano?: number;
+  /** Recorrente ou não (13/10/2026); vazio só em contrato antigo sem serviço nem preço. */
+  recorrente?: boolean | null;
   data_inicio: string | null;
   data_fim: string | null;
   situacao: string;
@@ -2389,4 +2391,22 @@ export interface PainelDeCampanhas {
   campanhas: LinhaDaCampanha[];
   regua: { volume_minimo: number; icp_alvo_pct: string | null; qualificados_meta_pct: number; qualificados_alerta_pct: number };
   prontidao: { ok: boolean; texto: string }[];
+}
+
+/** Configurações › Serviços e contratos (13/10/2026): o contrato de cada serviço do catálogo. */
+export type ModeloDeContrato = "Recorrente padrão" | "Não recorrente v1.1";
+export type ReajusteDoServico = "IPCA em julho" | "Caso a caso" | "Sem reajuste";
+
+export interface ServicoNoContrato {
+  servico: string;
+  linha: "C1" | "C2";
+  tipo: "Recorrente" | "Não recorrente";
+  parcelas: number | null;
+  temas: number;
+  modelo: ModeloDeContrato;
+  situacao_do_modelo: string;
+  reajuste: ReajusteDoServico;
+  modelos_possiveis: ModeloDeContrato[];
+  reajustes_possiveis: ReajusteDoServico[];
+  padrao: boolean;
 }

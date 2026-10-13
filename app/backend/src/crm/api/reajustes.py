@@ -24,7 +24,9 @@ from crm.api.acesso import quem_fez
 from crm.db.modelos import Contrato, IpcaDoMes
 from crm.domain import eventos_de_contrato as regras_de_eventos
 from crm.domain import reajuste as regra
-from crm.domain.listas import LinhaServico, SituacaoContrato, TipoDeEventoDeContrato
+from crm.api.servicos_e_contratos import contrato_do_servico
+from crm.domain.contrato_do_servico import ReajusteDoServico
+from crm.domain.listas import IndiceDeReajuste, LinhaServico, SituacaoContrato, TipoDeEventoDeContrato
 from crm.indices import ipca as indice
 from crm.indices.bcb import buscar_ipca
 
@@ -116,6 +118,8 @@ class Aplicados(BaseModel):
 # ── Montagem ─────────────────────────────────────────────────────────────────────────────────────────
 
 def _recorrente(c: Contrato) -> bool:
+    if c.recorrente is not None:
+        return c.recorrente
     linha = c.oportunidade.linha_servico if c.oportunidade is not None else None
     if linha is not None:
         return linha is LinhaServico.C1
@@ -123,9 +127,16 @@ def _recorrente(c: Contrato) -> bool:
 
 
 def _para_regra(c: Contrato) -> regra.ContratoParaReajuste:
+    # O reajuste escolhido para o serviço (Configurações › Serviços e contratos, 13/10/2026): "Sem reajuste" vale
+    # como o índice do contrato; "Caso a caso" passa a linha para "Você decide".
+    escolha = contrato_do_servico(Session.object_session(c), c.oportunidade.servico) if c.oportunidade is not None else None
+    reajuste_do_servico = escolha[1] if escolha is not None else None
+    indice = c.oportunidade.reajuste if c.oportunidade is not None else None
+    if reajuste_do_servico is ReajusteDoServico.SEM_REAJUSTE:
+        indice = IndiceDeReajuste.SEM_REAJUSTE
     return regra.ContratoParaReajuste(
-        id=c.id, situacao=c.situacao, recorrente=_recorrente(c),
-        indice=c.oportunidade.reajuste if c.oportunidade is not None else None,
+        id=c.id, situacao=c.situacao, recorrente=_recorrente(c), indice=indice,
+        caso_a_caso=reajuste_do_servico is ReajusteDoServico.CASO_A_CASO,
         preco_mensal=c.preco_mensal, preco_anual=c.preco_anual, parcelas_no_ano=c.parcelas_no_ano,
         data_inicio=c.data_inicio, anterior_ao_crm=c.anterior_ao_crm, data_fim=c.data_fim, saida_em=c.saida_em,
         reajustes=tuple(ev.data_do_evento for ev in c.eventos if ev.tipo is T.REAJUSTE),

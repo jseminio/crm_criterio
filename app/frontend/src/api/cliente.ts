@@ -113,7 +113,10 @@ import type {
   SessaoAberta,
   ItemDoReajuste,
   MesDoIpca,
+  ModeloDeContrato,
   ReajusteDoAno,
+  ReajusteDoServico,
+  ServicoNoContrato,
 } from "./tipos";
 
 export class ErroDaApi extends Error {
@@ -755,6 +758,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ ano, itens, autorizador: autorizador || null }),
     }),
+  servicosEContratos: () => pedir<ServicoNoContrato[]>("/api/servicos/contratos"),
+  gravarServicosEContratos: (itens: { servico: string; modelo: ModeloDeContrato; reajuste: ReajusteDoServico }[]) =>
+    pedir<ServicoNoContrato[]>("/api/servicos/contratos", { method: "PUT", body: JSON.stringify({ itens }) }),
   ipca: (desde?: string) => pedir<MesDoIpca[]>(`/api/ipca${desde ? `?desde=${desde}` : ""}`),
   atualizarIpca: () =>
     pedir<ReajusteDoAno["ipca"]>("/api/ipca/atualizar", { method: "POST" }),

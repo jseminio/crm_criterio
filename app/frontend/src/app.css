@@ -1500,6 +1500,12 @@ td > .celula-fonte { display: block; }
 .ind-valores-rotulo, .ind-valores-apoio { margin: 0; font-size: 11px; color: var(--texto-medio); }
 .ind-valores .ind-valor { margin: 0; }
 
+/* Integralidade do cadastro (13/10/2026): o pendente de cada cadastro, em barra com o número ao lado. */
+.integralidade-barras { list-style: none; margin: var(--e1) 0 0; padding: 0; display: grid; gap: 3px; font-size: 11px; }
+.integralidade-barras li { display: grid; grid-template-columns: 92px 1fr 40px; gap: var(--e2); align-items: center; }
+.integralidade-trilho { height: 6px; background: var(--surface-sunken); border-radius: 3px; overflow: hidden; }
+.integralidade-barra { display: block; height: 100%; background: var(--perda); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

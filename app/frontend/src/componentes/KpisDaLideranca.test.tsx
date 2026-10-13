@@ -41,6 +41,17 @@ const KPIS: Kpis = {
       itens: [{ grupo: "SENTIRE", detalhe: "entrou em 05/2026 · anunciou em 14/08/2026 · sai em 13/10/2026", valor: "7458.33",
         entra: true, secao: "Entraram e saíram em 2026" }] }),
     kpi("cobertura", "Cobertura de relacionamento", { valor: null }),
+    kpi("integralidade", "Integralidade do cadastro", { valor: "40.0", resumo: "Registros criados desde 14/10/2026 · situação de hoje",
+      meta: "A definir",
+      extras: { pontos_devidos: 40, pontos_pendentes: 16, obrigatorios_em_falta: 4, prioritarios_em_falta: 8, legado_pct: "61.2",
+        pendente_oportunidade: "20.0", pendente_contrato: "40.0", pendente_encerramento: null, pendente_cliente: "60.0",
+        pendente_empresa: "50.0", pendente_contato: "66.7" },
+      itens: [
+        { grupo: "Contrato · Cliente X · BPO Contábil", detalhe: "Bruto ou líquido · Obrigatório", valor: "0", entra: true,
+          secao: "KN · 7 pendência(s) · 46,7% pendente" },
+        { grupo: "Contato · Fulana", detalhe: "Cargo · Prioritário", valor: "0", entra: true,
+          secao: "Sem responsável · 3 pendência(s) · 66,7% pendente" },
+      ] }),
   ],
 };
 
@@ -71,6 +82,23 @@ describe("KPIs da liderança (09/10/2026)", () => {
     expect(within(novos).getByText("11,1%")).toBeInTheDocument();
     expect(within(novos).getByText("12,5%")).toBeInTheDocument();
     expect(within(novos).getByText(/Tempo médio como cliente: 1,3 meses/)).toBeInTheDocument();
+  });
+
+  it("integralidade do cadastro: pendente, obrigatórios em falta, barras por cadastro e pendências por responsável", async () => {
+    render(<KpisDaLideranca />);
+    const card = (await screen.findByText("Integralidade do cadastro")).closest("section")!;
+    const [pendente, obrigatorios] = Array.from(card.querySelectorAll(".ind-valores-item"));
+    expect(pendente).toHaveTextContent("Pendente40,0%16 de 40 pontos");
+    expect(obrigatorios).toHaveTextContent("Obrigatórios em falta4e 8 prioritários");
+    const barras = within(card).getByRole("list", { name: "Pendente por cadastro" });
+    expect(within(barras).getAllByRole("listitem").map((l) => l.textContent)).toEqual([
+      "Oportunidade20,0%", "Contrato40,0%", "Encerramento—", "Cliente60,0%", "Empresa (CNPJ)50,0%", "Contato66,7%"]);
+    expect(within(card).getByText(/Legado \(antes do corte\): 61,2% pendente/)).toBeInTheDocument();
+    fireEvent.click(within(card).getByRole("button", { name: /Ver composição/ }));
+    const painel = await screen.findByRole("dialog", { name: "Integralidade do cadastro" });
+    expect(within(painel).getByText("KN · 7 pendência(s) · 46,7% pendente (1)")).toBeInTheDocument();
+    expect(within(painel).getByText("Bruto ou líquido · Obrigatório")).toBeInTheDocument();
+    expect(within(painel).queryByText(/R\$/)).toBeNull();  // pendência não tem valor em dinheiro
   });
 
   it("nenhum indicador tem número na frente do nome", async () => {

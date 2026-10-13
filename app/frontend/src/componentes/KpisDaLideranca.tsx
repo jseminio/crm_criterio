@@ -56,6 +56,33 @@ function Detalhe({ k }: { k: KpiDaLideranca }) {
       </div>
     );
   }
+  if (k.chave === "integralidade") {
+    const cadastros = [["Oportunidade", "oportunidade"], ["Contrato", "contrato"], ["Encerramento", "encerramento"],
+      ["Cliente", "cliente"], ["Empresa (CNPJ)", "empresa"], ["Contato", "contato"]] as const;
+    return (
+      <div style={{ display: "grid", gap: "var(--e1)" }}>
+        <ul className="integralidade-barras" aria-label="Pendente por cadastro">
+          {cadastros.map(([rotulo, chave]) => {
+            const v = x[`pendente_${chave}`];
+            const n = v === null || v === undefined ? null : Number(v);
+            return (
+              <li key={chave}>
+                <span>{rotulo}</span>
+                <span className="integralidade-trilho" aria-hidden="true">
+                  <span className="integralidade-barra" style={{ width: `${n ?? 0}%` }} />
+                </span>
+                <span className="tabela-numero">{n === null ? "—" : percentual(String(v))}</span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="campo-ajuda" style={{ margin: 0 }}>Obrigatório vale 2, prioritário vale 1.</p>
+        <p className="campo-ajuda" style={{ margin: 0 }}>
+          Legado (antes do corte): {x.legado_pct === null || x.legado_pct === undefined ? "—" : percentual(String(x.legado_pct))} pendente
+        </p>
+      </div>
+    );
+  }
   if (k.chave === "churn_novos") {
     return (
       <div style={{ display: "grid", gap: "var(--e1)" }}>
@@ -71,7 +98,7 @@ function Detalhe({ k }: { k: KpiDaLideranca }) {
 }
 
 const TOM: Record<string, Tom> = {
-  mrr_novo: "verde", ticket: "dourado", upsell: "violeta", churn: "vermelho", churn_novos: "vermelho", cobertura: "azul",
+  mrr_novo: "verde", ticket: "dourado", upsell: "violeta", churn: "vermelho", churn_novos: "vermelho", cobertura: "azul", integralidade: "marinho",
 };
 const NO_ANO = new Set(["churn", "churn_novos"]);
 
@@ -132,10 +159,17 @@ function ComposicaoDoKpi({ k }: { k: KpiDaLideranca }) {
   );
 }
 
-/** O churn traz duas visões no mesmo card (13/10/2026): por grupos e por faturamento. */
+/** Duas visões no mesmo card (13/10/2026): o churn por grupos e por faturamento; a integralidade do cadastro,
+ * o pendente e os obrigatórios em falta. */
 function visoesDoChurn(k: KpiDaLideranca) {
-  if (!NO_ANO.has(k.chave)) return undefined;
   const x = k.extras;
+  if (k.chave === "integralidade") {
+    return [
+      { rotulo: "Pendente", valor: valorDoKpi(k), apoio: `${texto(x.pontos_pendentes)} de ${texto(x.pontos_devidos)} pontos` },
+      { rotulo: "Obrigatórios em falta", valor: texto(x.obrigatorios_em_falta), apoio: `e ${texto(x.prioritarios_em_falta)} prioritários` },
+    ];
+  }
+  if (!NO_ANO.has(k.chave)) return undefined;
   return [
     { rotulo: "Por grupos", valor: valorDoKpi(k), apoio: `${texto(x.grupos_perdidos)} de ${texto(x.grupos)} grupos` },
     { rotulo: "Por faturamento", valor: x.faturamento_pct === null || x.faturamento_pct === undefined ? "sem dado" : percentual(String(x.faturamento_pct)),

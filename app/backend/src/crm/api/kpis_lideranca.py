@@ -37,7 +37,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
 from crm.acesso.auditoria import usuario_atual
-from crm.api import sucesso
+from crm.api import integralidade, sucesso
 from crm.api.classificacao import parametros_vigentes
 from crm.db.modelos import Contrato, GrupoEconomico, Oportunidade
 from crm.domain import mrr as regras_de_mrr
@@ -425,7 +425,49 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
                    "C: 6 meses) até o fim do mês ÷ clientes com classe. Só conta reunião registrada no Sucesso do Cliente.",
     )
 
-    return KpisResposta(mes=mes, de=de, ate=ate, kpis=[kpi20, kpi19, kpi18, kpi_churn, kpi_churn_novos, kpi21])
+    # ------------------------------------------------ integralidade do cadastro (situação de hoje)
+    cadastro = integralidade.calcular(sessao)
+    novos_campos, pendentes = cadastro.novos, [c for c in cadastro.novos if not c.preenchido]
+    corte = f"{integralidade.DATA_DE_CORTE:%d/%m/%Y}"
+    por_responsavel: dict[str, list] = {}
+    for c in novos_campos:
+        por_responsavel.setdefault(c.responsavel or "Sem responsável", []).append(c)
+    ordem = sorted(por_responsavel, key=lambda r: (r == "Sem responsável", -sum(not c.preenchido for c in por_responsavel[r]), r))
+    itens_do_cadastro = []
+    for r in ordem:
+        dele = por_responsavel[r]
+        faltam = [c for c in dele if not c.preenchido]
+        if not faltam:
+            continue
+        pct = integralidade.Resultado.pendente_pct(dele)
+        secao = f"{r} · {len(faltam)} pendência(s) · {str(pct).replace('.', ',')}% pendente"
+        itens_do_cadastro += [Item(grupo=f"{c.cadastro} · {c.registro}",
+                                   detalhe=f"{c.campo} · {'Obrigatório' if c.obrigatorio else 'Prioritário'}",
+                                   valor=ZERO, secao=secao) for c in sorted(faltam, key=lambda c: (not c.obrigatorio, c.cadastro))]
+    kpi_integralidade = Kpi(
+        chave="integralidade", titulo="Integralidade do cadastro",
+        valor=integralidade.Resultado.pendente_pct(novos_campos), unidade="%",
+        resumo=f"Registros criados desde {corte} · situação de hoje",
+        falta=([] if novos_campos else [f"Nenhum registro criado desde {corte} ainda: o número começa com o primeiro"]),
+        meta="A definir",
+        extras={"pontos_devidos": sum(c.pontos for c in novos_campos),
+                "pontos_pendentes": sum(c.pontos for c in pendentes),
+                "obrigatorios_em_falta": sum(c.obrigatorio for c in pendentes),
+                "prioritarios_em_falta": sum(not c.obrigatorio for c in pendentes),
+                "legado_pct": integralidade.Resultado.pendente_pct(cadastro.legado),
+                **{f"pendente_{nome.lower()}": integralidade.Resultado.pendente_pct([c for c in novos_campos if c.cadastro == nome])
+                   for nome in integralidade.CADASTROS}},
+        itens=itens_do_cadastro,
+        explicacao="Os campos que alimentam um indicador ou uma decisão, em oportunidade, contrato, encerramento, cliente, "
+                   "empresa e contato. Pendente = pontos dos campos devidos e vazios ÷ pontos de todos os devidos; "
+                   "obrigatório vale 2, prioritário vale 1. Campo condicional só conta quando se aplica (a data de "
+                   "envio depois de \"Enviar proposta\", o motivo na Perdida). Conta só o que foi criado desde "
+                   f"{corte}; o legado vem à parte. Quem responde: na oportunidade, o captador; no resto, o responsável "
+                   "de CS do grupo (ou o captador, enquanto o grupo não é cliente). Não muda com o mês escolhido.",
+    )
+
+    return KpisResposta(mes=mes, de=de, ate=ate,
+                        kpis=[kpi20, kpi19, kpi18, kpi_churn, kpi_churn_novos, kpi21, kpi_integralidade])
 
 
 def roteador_de_kpis(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:

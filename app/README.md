@@ -132,6 +132,16 @@ precisam estar na mesma versão do banco: a prévia recusa e diz por quê. Rotas
   que os novos trouxeram ao entrar —, **com a contração incluída**, como 1 − GRR; reajuste e expansão não
   compensam). Conta no anúncio. A composição vem em blocos (`Item.secao`): quem saiu, a contração (o grupo ficou)
   e os demais. Os KPIs da liderança não levam mais o número da linha da planilha no nome.
+- **Integralidade do cadastro** (amostra e lista de campos aprovadas por Eduardo em 13/10/2026), nos KPIs da
+  liderança: pontos dos campos devidos e vazios ÷ pontos de todos os devidos, **obrigatório vale 2 e prioritário 1**.
+  Só entram campos que alimentam um indicador ou uma decisão, em oportunidade (serviço, valor, captador, tipo de
+  canal, originação; envio depois de "Enviar proposta"; motivo na Perdida; contrato cadastrado na aceita
+  recorrente · prioritários: temperatura e próxima ação nas abertas, porte), contrato (assinatura quando assinado,
+  valor, bruto ou líquido, CNPJ · signatário, fim), encerramento (saída, motivo, iniciativa · descrição), cliente
+  (responsável de CS, classificação · porte), empresa (CNPJ · regime, endereço) e contato (telefone ou e-mail,
+  vínculo · cargo, papel). Conta só o que foi criado desde 14/10/2026 (`integralidade.DATA_DE_CORTE`); o legado
+  vem num número à parte. Responde o captador, na oportunidade, e o responsável de CS do grupo no resto (o captador
+  mais recente enquanto o grupo não é cliente). A composição lista cada pendência, por responsável.
 - **13ª no esperado do caixa** (confirmado por Eduardo, 10/10/2026): parcela × avos ÷ 12, um avo por mês do ano com
   15 dias ou mais de serviço, contados da assinatura; cobrada em dezembro, ou **na saída**, proporcional, junto com a
   última parcela (o mês da saída tem parcela). O MRR não muda: já tem a 13ª no × 13 ÷ 12.

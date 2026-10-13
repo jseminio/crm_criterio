@@ -126,7 +126,7 @@ def test_churn_da_base_no_ano_por_grupos_e_por_faturamento(cliente):
 def test_nenhum_indicador_tem_numero_no_nome(cliente):
     titulos = [k["titulo"] for k in _kpis(cliente).values()]
     assert titulos == ["MRR novo no mês", "Ticket médio mensal", "Upsell sobre o MRR", "Churn da base no ano",
-                       "Churn de quem entrou em 2026", "Cobertura de relacionamento"]
+                       "Churn de quem entrou em 2026", "Cobertura de relacionamento", "Integralidade do cadastro"]
 
 
 def _grupo_com_contrato(engine, nome, inicio, anuncio, saida, preco, anterior=False):

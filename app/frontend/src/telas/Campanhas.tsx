@@ -72,7 +72,7 @@ function Conteudo({ p, sdr }: { p: PainelDeCampanhas; sdr: PainelDoSdr | null })
       <section className="sdr-secao" aria-labelledby="camp-s1">
         <div className="sdr-secao-topo">
           <h2 id="camp-s1">Tráfego pago em {nomeDoMes(p.mes)}</h2>
-          <p>{numero(p.leads)} leads de tráfego pago chegaram no mês</p>
+          <p>{numero(p.leads)} {p.leads === 1 ? "lead de tráfego pago chegou" : "leads de tráfego pago chegaram"} no mês</p>
         </div>
         <div className="sdr-kpis">
           <Kpi rotulo="Investimento" valor={t.investimento ? dinheiro(t.investimento) : null}

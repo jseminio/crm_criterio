@@ -213,7 +213,7 @@ def _decidir(leads: int, no_icp: Taxa, qualificados: Taxa, descartes: list[Conta
              icp_alvo: Decimal | None) -> tuple[str, str]:
     """A régua provisória (hipótese de 13/10/2026). Devolve a decisão e o porquê, em palavras."""
     if leads < VOLUME_MINIMO:
-        return "Aguardar volume", f"{leads} leads no mês; a régua pede {VOLUME_MINIMO} para decidir."
+        return "Aguardar volume", f"{leads} lead{'s' if leads != 1 else ''} no mês; a régua pede {VOLUME_MINIMO} para decidir."
     principal = descartes[0].nome if descartes else None
     icp = no_icp.valor or 0.0
     texto_icp = f"{icp:.0f}% no ICP".replace(".", ",")

@@ -65,7 +65,7 @@ GRUPOS: tuple[Grupo, ...] = (
               exemplo="v24.0"),
         # Receber as mensagens dos leads (fase 0 do SDR de IA, amostra aprovada em 14/10/2026).
         Campo("whatsapp.recebimento", "Recebimento ligado", padrao="false", opcoes=("true", "false"),
-              ajuda="Desligado, o CRM recusa o que chegar. Nesta fase o CRM só recebe e mostra: ninguém responde sozinho."),
+              ajuda="Desligado, o CRM recusa o que chegar."),
         Campo("whatsapp.token_verificacao", "Token de verificação", segredo=True,
               ajuda="Gere, cole o mesmo valor na Meta em “Verificar token” e salve aqui."),
         Campo("whatsapp.app_secret", "Chave secreta do aplicativo (App Secret)", segredo=True,

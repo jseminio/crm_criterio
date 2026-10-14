@@ -278,3 +278,26 @@ class TestTela:
         conversas = cliente.get(f"/api/sdr/leads/{lead_id}/conversas").json()
         assert conversas[0]["mensagens"][0]["texto"] == "oi"
         assert conversas[0]["ultima_do_lead_em"] is not None
+
+    def test_mensagens_na_ordem_do_horario_mesmo_entregues_fora_de_ordem(self, cliente, fabrica):
+        _configurar(fabrica)
+        _enviar(cliente, _payload(mensagens=[_texto("w2", "5511987654321", "segunda", ts=1760450100)]))
+        _enviar(cliente, _payload(mensagens=[_texto("w1", "5511987654321", "primeira", ts=1760450000)]))
+        with fabrica() as s:
+            lead_id = s.scalar(sa.select(Lead.id))
+        textos = [m["texto"] for m in cliente.get(f"/api/sdr/leads/{lead_id}/conversas").json()[0]["mensagens"]]
+        assert textos == ["primeira", "segunda"]
+
+    def test_falha_ao_gravar_nao_vaza_conteudo_no_log(self, cliente, fabrica, caplog, monkeypatch):
+        import crm.api.whatsapp_recebido as rota
+
+        def quebra(*_a, **_k):
+            raise sa.exc.IntegrityError("INSERT ... 'meu faturamento' '5511987654321'", {}, Exception("x"))
+
+        monkeypatch.setattr(rota, "processar", quebra)
+        _configurar(fabrica)
+        with caplog.at_level(logging.INFO):
+            r = _enviar(cliente, _payload(mensagens=[_texto("w1", "5511987654321", "meu faturamento")]))
+        assert r.status_code == 500 and r.content == b""
+        assert "IntegrityError" in caplog.text and "faturamento" not in caplog.text and "987654321" not in caplog.text
+        assert _contar(fabrica, MensagemDoSdr) == 0

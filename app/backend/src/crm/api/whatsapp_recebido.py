@@ -137,7 +137,12 @@ def roteador_do_whatsapp_recebido(obter_sessao: Callable[[], Iterator[Session]])
         if not isinstance(payload, dict) or payload.get("object") != "whatsapp_business_account":
             return _recusar("entrega que não é do WhatsApp", 400)
         numero = configuracao.valor("whatsapp.numero_id")
-        await run_in_threadpool(processar, sessao, payload, numero, agora())
+        try:
+            await run_in_threadpool(processar, sessao, payload, numero, agora())
+        except Exception as falha:  # noqa: BLE001 — o erro do banco traz os valores: no log, só o tipo
+            sessao.rollback()
+            _log.error("WhatsApp: falha ao gravar a entrega (%s); a Meta vai reenviar", type(falha).__name__)
+            return Response(status_code=500)
         return Response(status_code=200)
 
     return r

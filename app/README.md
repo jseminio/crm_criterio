@@ -16,6 +16,45 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## SDR de IA, fase 0: o CRM recebe as mensagens do WhatsApp (14/10/2026)
+
+Amostra aprovada por Eduardo em 14/10/2026. A Meta entrega cada mensagem do lead no webhook do CRM;
+**nesta fase o CRM só recebe e mostra: ninguém responde sozinho.** As respostas automáticas, o
+roteador de custo (modelo pequeno para a qualificação) e o transbordo de dúvida técnica para um
+especialista humano são a fase 1, sem mudar as regras de `sdr-ia-limites-de-atuacao.md`.
+
+- **Onde liga:** Configurações › Integrações › WhatsApp › "Receber as mensagens dos leads":
+  recebimento ligado, token de verificação (gerado no navegador; depois de salvo, só os 4 últimos
+  caracteres) e a chave secreta do aplicativo (App Secret). A tela mostra o endereço para colar na Meta
+  e a situação em texto: última mensagem recebida e última entrega recusada, com o motivo.
+- **Do lado da Meta** (Meta for Developers › o app do WhatsApp › WhatsApp › Configuração › Webhook):
+  URL de retorno = o endereço da tela (`https://<endereço do CRM>/api/whatsapp/webhook`), "Verificar
+  token" = o token gerado na tela; depois, assinar o campo **messages**. A chave secreta fica em
+  Configurações do app › Básico.
+- **Segurança** (`crm.api.whatsapp_recebido`, o único endereço sem login):
+  - desligado por padrão: desligado, responde 404 e não grava nada;
+  - verificação da Meta só com o token salvo (comparação em tempo constante) e desafio só numérico;
+  - entrega só com a assinatura `X-Hub-Signature-256` (HMAC-SHA256 do corpo com a chave secreta);
+    sem a chave salva, recusa tudo;
+  - limite de 1 MB por entrega; só o número configurado; a resposta não leva dado;
+  - no log, só contagens e o motivo da recusa: nem texto, nem telefone, nem nome. Falha ao gravar
+    registra só o tipo do erro, e a Meta reenvia.
+- **O que grava** (`crm.agente.recebimento`):
+  - a mensagem do lead entra na conversa de WhatsApp aberta do lead (ou numa nova), na ordem do horário;
+  - a Meta repete entregas: o ID da mensagem faz cada uma gravar uma vez;
+  - número que não está em nenhum lead vira **lead novo**, canal "WhatsApp", com o nome do perfil
+    (decisão de Eduardo). O telefone casa com e sem o nono dígito do celular;
+  - mensagem que é só "SAIR", "PARAR", "não quero mais receber" e parecidas marca o lead como **não
+    contatar** (decisão de Eduardo); "quero sair do Simples" não marca;
+  - foto, áudio, documento: só o tipo ("[áudio]", "[foto] legenda"), sem baixar o arquivo;
+  - a situação de entrega (enviada, entregue, lida, falhou) atualiza a mensagem da Critério com o
+    mesmo ID, sem voltar atrás. Os modelos do disparo do questionário ainda não entram na conversa,
+    então a situação aparece nas mensagens que passarem pela conversa (fase 1).
+- **Na tela do lead:** a conversa mostra a janela de 24 horas do WhatsApp (aberta até quando, ou
+  fechada: só modelo aprovado) e a entrega das mensagens da Critério.
+- Migração `a8d2c6e4f0b1`, só aditiva: `mensagem_do_sdr.externo_id` e `.entrega`,
+  `conversa_do_sdr.ultima_do_lead_em`. Sem variável de ambiente nova: tudo pela tela.
+
 ## Contrato recorrente gerado em Word (14/10/2026)
 
 Amostra aprovada por Eduardo em 14/10/2026. O contrato recorrente sai de uma **matriz em Word** com marcadores

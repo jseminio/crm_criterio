@@ -1237,7 +1237,7 @@ class ConversaDoSdr(CarimboMixin, Base):
 
     lead: Mapped[Lead] = relationship(back_populates="conversas")
     mensagens: Mapped[list["MensagemDoSdr"]] = relationship(
-        back_populates="conversa", order_by="MensagemDoSdr.id"
+        back_populates="conversa", order_by="(MensagemDoSdr.enviada_em, MensagemDoSdr.id)"
     )
 
     __table_args__ = (

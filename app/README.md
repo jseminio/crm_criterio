@@ -38,6 +38,47 @@ Decisões de Eduardo em 13/10/2026, amostra aprovada. Em **Sucesso do Cliente �
 - Rotas: `GET /api/reajustes?ano=`, `POST /api/reajustes/aprovar`, `GET /api/ipca`, `POST /api/ipca/atualizar`.
   Regras em `crm.domain.reajuste`; busca em `crm.indices`.
 
+## Campanhas: custo por campanha, leitura do Meta Ads e origem do clique (13/10/2026)
+
+Amostra aprovada por Eduardo em 13/10/2026.
+
+- **Meta Ads pela tela:** Configurações › Integrações › Meta Ads (leitura ligada, token com `ads_read`, ID da
+  conta, versão da API), com Testar. Na aba Campanhas, **Atualizar do Meta Ads** lê o gasto de cada campanha
+  do mês (`POST /api/sdr/campanhas/atualizar?mes=`) e grava como "lido" em `investimento_por_campanha`.
+  A leitura **nunca sobrescreve** um valor digitado; campanhas com o mesmo nome somam.
+- **Google Ads digitado por campanha** em SDR da IA › Custos e mídia (`PUT /api/sdr/midia/campanha`;
+  tirar pede confirmação, `DELETE /api/sdr/midia/campanha/{id}`). A leitura automática do Google espera o
+  token de desenvolvedor.
+- **Com campanhas lançadas, o investimento do canal no mês é a soma delas**; sem elas, vale o valor do canal.
+- A tabela de campanhas ganha investimento, R$/lead no ICP e R$/reunião. Campanha com gasto e sem lead aparece
+  (o nome no anúncio e no lead precisa ser o mesmo; a ligação ignora maiúsculas e espaços).
+- **Régua:** "Rever custo" quando o R$/reunião da campanha passa de **1,5 ×** o do canal no mês, ou quando ela
+  gasta sem nenhuma reunião e o canal tem (hipótese aprovada em 13/10/2026, `TETO_DE_CUSTO`).
+- **Origem do clique no lead:** `POST /api/leads` aceita `utm_source`, `utm_medium`, `utm_campaign`, `gclid` e
+  `fbclid`. Sem campanha digitada, a campanha do lead vem do `utm_campaign`. É a base para devolver as
+  conversões ao Meta e ao Google (próximo passo, depende do pixel da conta Meta).
+- Migração `a7c3e9d1b5f2`: tabela `investimento_por_campanha` e as cinco colunas no lead. Só acrescenta.
+
+## SDR · Campanhas: funil de tráfego pago e decisão por campanha (13/10/2026)
+
+Amostra aprovada por Eduardo em 13/10/2026. Nova aba **Campanhas** em SDR · Abordagens e conhecimento
+(permissão `sdr.ver`), para decidir em qual campanha pôr o próximo real.
+
+- **Coorte do mês:** os leads de tráfego pago que chegaram no mês, cada um contado até a etapa mais funda
+  que alcançou: leads → no ICP → qualificados → reuniões → propostas enviadas → contratos (oportunidade Aceita).
+- **Funil por canal** (`Lead.canal`: Meta Ads, Google Ads…) e o total, com o % que passa de uma etapa para
+  a seguinte, o custo de cada etapa (investimento do canal ÷ quantidade), CAC e MRR novo (parcela × 13 ÷ 12).
+  A pior passagem de cada canal é marcada com palavra. A largura das etapas é fixa: o número é o que vale.
+- **Decisão por campanha** (`Lead.campanha`), régua **provisória** em `crm.domain.campanhas`: menos de 20
+  leads → Aguardar volume; % no ICP abaixo do ICP alvo do Plano de MRR, com descarte de perfil dominante →
+  Refazer público; "esperava outra coisa" dominante → Ajustar criativo; qualificados na meta do SDR (20%) →
+  Escalar; abaixo do alerta (10%) → Rever campanha; entre os dois → Manter e observar.
+- **Sucesso da busca:** primeira resposta, quem respondeu e qualificados, do painel do SDR em tráfego pago.
+- **Prontidão dos dados:** investimento lançado por canal, lead sem campanha, ICP alvo definido.
+- O custo por campanha e a leitura do Meta Ads chegaram no incremento seguinte (ver acima).
+- Rota: `GET /api/sdr/campanhas?mes=AAAA-MM`. A lista de motivos fora do ICP (`FORA_DO_ICP`) passou a viver
+  em `crm.domain.campanhas` e é a mesma das quatro fases da Inteligência de Conversão.
+
 ## Migrar do CRM local para a nuvem (10/10/2026)
 
 Decisão de Eduardo: **o CRM oficial passa a ser a nuvem** (`www.crmcs.criterioconsultores.com.br`); o local era o oficial

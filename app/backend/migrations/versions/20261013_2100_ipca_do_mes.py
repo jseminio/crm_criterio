@@ -5,7 +5,7 @@ guardada no CRM. A tabela `ipca_do_mes` guarda a variação mensal (série 433 d
 a tabela se preenche sozinha na primeira vez que o reajuste é aberto.
 
 Revisão: a7c3e9b5d2f4
-Revisão anterior: f2b6d8a4c0e1
+Revisão anterior: a7c3e9d1b5f2
 Criada em: 2026-10-13 12:00:00
 """
 
@@ -15,7 +15,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = 'a7c3e9b5d2f4'
-down_revision: str | None = 'f2b6d8a4c0e1'
+down_revision: str | None = 'a7c3e9d1b5f2'
 branch_labels: str | None = None
 depends_on: str | None = None
 

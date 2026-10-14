@@ -484,6 +484,12 @@ class LeadNovo(BaseModel):
     proxima_acao_em: date | None = None
     observacao: str | None = None
     cnpj: str | None = Field(default=None, max_length=18)
+    # Origem do clique (13/10/2026): o formulário do site ou do anúncio manda o que veio na URL.
+    utm_source: str | None = Field(default=None, max_length=120)
+    utm_medium: str | None = Field(default=None, max_length=120)
+    utm_campaign: str | None = Field(default=None, max_length=200)
+    gclid: str | None = Field(default=None, max_length=255)
+    fbclid: str | None = Field(default=None, max_length=255)
 
 
 class LeadEdicao(BaseModel):
@@ -1194,6 +1200,33 @@ class InvestimentoEdicao(BaseModel):
     mes: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
     canal: str = Field(min_length=1, max_length=120)
     valor: Decimal = Field(ge=0)
+
+
+class InvestimentoPorCampanhaResposta(Base):
+    id: int
+    mes: str
+    canal: str
+    campanha: str
+    valor: Decimal
+    fonte: str
+    lido_em: datetime | None
+
+
+class InvestimentoPorCampanhaEdicao(BaseModel):
+    """Digitado em Custos e mídia (Google Ads, até ter leitura). Substitui um valor lido, se houver."""
+
+    mes: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+    canal: str = Field(min_length=1, max_length=120)
+    campanha: str = Field(min_length=1, max_length=200)
+    valor: Decimal = Field(ge=0)
+
+
+class LeituraDoMetaResposta(BaseModel):
+    lidas: int
+    gravadas: int
+    digitadas_mantidas: list[str]
+    """Campanhas que já tinham valor digitado: a leitura não sobrescreve."""
+    lido_em: datetime
 
 
 

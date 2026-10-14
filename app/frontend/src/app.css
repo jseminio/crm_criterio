@@ -619,6 +619,41 @@
 .sdr-legenda i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 .sdr-legenda b { font-variant-numeric: tabular-nums; }
 
+/* ------------------------------------------------------------ Campanhas */
+/* Amostra aprovada por Eduardo em 13/10/2026: um funil por canal, largura fixa
+   por etapa (a forma de funil); o número dentro da etapa é o que vale. */
+.camp-kpi-valor { font-size: 24px; }
+.camp-funis { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--e4); }
+.camp-funil { margin: 0; background: var(--surface-card); border: 1px solid var(--borda); border-radius: var(--raio-md);
+  padding: var(--e4); --camp-fundo: var(--andamento-suave); --camp-texto: var(--andamento); }
+.camp-funil-total { --camp-fundo: var(--azul-noturno); --camp-texto: var(--azul-gelo); }
+.camp-funil-cab { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--e3); }
+.camp-funil-cab strong { font-size: 14px; font-weight: 600; }
+.camp-funil-cab span { font-size: 12px; color: var(--texto-medio); font-variant-numeric: tabular-nums; }
+.camp-etapas { list-style: none; margin: 0; padding: 0; }
+.camp-etapa { margin: 0 auto; height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--camp-fundo); color: var(--camp-texto); font-variant-numeric: tabular-nums; }
+.camp-etapa b { font-size: 16px; font-weight: 600; line-height: 1.1; }
+.camp-etapa span { font-size: 11px; }
+.camp-custo { margin: 2px 0 0; text-align: center; font-size: 11px; color: var(--texto-fraco); font-variant-numeric: tabular-nums; }
+.camp-passagem { margin: 0; height: 22px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--texto-medio); font-variant-numeric: tabular-nums; }
+.camp-pior { color: var(--espera); font-weight: 600; }
+.camp-pior span { font-weight: 500; }
+.camp-prontidao { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--e2) var(--e4); font-size: 13px; }
+.camp-prontidao li { display: flex; gap: var(--e2); align-items: baseline; }
+.camp-prontidao li > span:first-child { font-weight: 700; width: 12px; }
+.camp-ok > span:first-child { color: var(--ganho); }
+.camp-falta > span:first-child { color: var(--espera); }
+
+/* Campanhas · leitura do Meta Ads e custo por campanha (13/10/2026) */
+.camp-leitura { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3);
+  font-size: 12px; color: var(--texto-medio); }
+.camp-aviso { margin: 0; width: 100%; font-size: 12px; color: var(--ganho); }
+.camp-aviso-falha { color: var(--perda); }
+.camp-confirmar { display: inline-flex; gap: var(--e2); align-items: center; font-size: 12px; }
+
 .sdr-tabela td, .sdr-tabela th { font-size: 13px; }
 .sdr-tabela .tabela-numero { text-align: right; font-variant-numeric: tabular-nums; }
 .sdr-kpi .etiqueta { white-space: normal; }
@@ -1522,3 +1557,4 @@ td > .celula-fonte { display: block; }
     scroll-behavior: auto !important;
   }
 }
+

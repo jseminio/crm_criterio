@@ -23,6 +23,9 @@ vi.mock("../api/cliente", async () => {
       gravarParametrosDoSdr: vi.fn(),
       midia: vi.fn(),
       gravarMidia: vi.fn(),
+      midiaPorCampanha: vi.fn(),
+      gravarMidiaPorCampanha: vi.fn(),
+      apagarMidiaPorCampanha: vi.fn(),
       leads: vi.fn(),
     },
   };
@@ -251,6 +254,7 @@ describe("custos e mídia", () => {
       atualizado_por: null, atualizado_em: null,
     });
     vi.mocked(api.midia).mockResolvedValue([]);
+    vi.mocked(api.midiaPorCampanha).mockResolvedValue([]);
   });
 
   async function abrirCustos() {
@@ -282,8 +286,9 @@ describe("custos e mídia", () => {
     const lancar = screen.getByRole("button", { name: "Lançar investimento" });
     expect(lancar).toBeDisabled();
 
-    await userEvent.type(screen.getByLabelText("Canal"), "Meta Ads");
-    await userEvent.type(screen.getByLabelText("Valor (R$)"), "6800");
+    const midia = screen.getByRole("region", { name: "Investimento em mídia" });
+    await userEvent.type(within(midia).getByLabelText("Canal"), "Meta Ads");
+    await userEvent.type(within(midia).getByLabelText("Valor (R$)"), "6800");
     await userEvent.click(lancar);
 
     await waitFor(() => expect(api.gravarMidia).toHaveBeenCalledOnce());
@@ -297,5 +302,37 @@ describe("custos e mídia", () => {
     const midia = screen.getByRole("region", { name: "Investimento em mídia" });
     expect(parametros.querySelectorAll(".botao-primario")).toHaveLength(1);
     expect(midia.querySelectorAll(".botao-primario")).toHaveLength(1);
+    const porCampanha = await screen.findByRole("region", { name: /Investimento por campanha/ });
+    expect(porCampanha.querySelectorAll(".botao-primario")).toHaveLength(1);
+  });
+
+  it("lança o investimento por campanha, com o Google Ads já no canal", async () => {
+    vi.mocked(api.gravarMidiaPorCampanha).mockResolvedValue({} as never);
+    await abrirCustos();
+    const painel = await screen.findByRole("region", { name: /Investimento por campanha/ });
+    const lancar = within(painel).getByRole("button", { name: "Lançar por campanha" });
+    expect(lancar).toBeDisabled();
+    expect(within(painel).getByLabelText("Canal")).toHaveValue("Google Ads");
+    await userEvent.type(within(painel).getByLabelText("Campanha"), "BPO financeiro RJ");
+    await userEvent.type(within(painel).getByLabelText("Valor do mês (R$)"), "3500");
+    await userEvent.click(lancar);
+    await waitFor(() => expect(api.gravarMidiaPorCampanha).toHaveBeenCalledOnce());
+    expect(vi.mocked(api.gravarMidiaPorCampanha).mock.calls[0][0]).toMatchObject({
+      canal: "Google Ads", campanha: "BPO financeiro RJ", valor: "3500",
+    });
+  });
+
+  it("tirar uma campanha pede confirmação", async () => {
+    vi.mocked(api.midiaPorCampanha).mockResolvedValue([
+      { id: 7, mes: "2026-10", canal: "Meta Ads", campanha: "Vale", valor: "300.00", fonte: "lido", lido_em: null },
+    ]);
+    vi.mocked(api.apagarMidiaPorCampanha).mockResolvedValue(undefined);
+    await abrirCustos();
+    const painel = await screen.findByRole("region", { name: /Investimento por campanha/ });
+    expect(await within(painel).findByText("Meta Ads · lido")).toBeInTheDocument();
+    await userEvent.click(within(painel).getByRole("button", { name: "Tirar Vale" }));
+    expect(api.apagarMidiaPorCampanha).not.toHaveBeenCalled();
+    await userEvent.click(within(painel).getByRole("button", { name: "Tirar de vez" }));
+    await waitFor(() => expect(api.apagarMidiaPorCampanha).toHaveBeenCalledWith(7));
   });
 });

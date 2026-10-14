@@ -11,6 +11,7 @@ import type {
   Contagem,
   IndicadorDoSdr,
   InvestimentoEmMidia,
+  InvestimentoPorCampanha,
   Listas,
   PainelDoSdr,
   ParametrosDoSdr,
@@ -842,6 +843,7 @@ function Custos() {
     <div className="sdr-grade sdr-grade-2 sdr-custos">
       <Parametros />
       <Midia mes={mes} aoTrocarMes={definirMes} />
+      <MidiaPorCampanha mes={mes} />
     </div>
   );
 }
@@ -1005,6 +1007,115 @@ function Midia({ mes, aoTrocarMes }: { mes: string; aoTrocarMes: (mes: string) =
       <button type="button" className="botao botao-primario" onClick={salvar}
         disabled={salvando || !canal.trim() || !valor.trim()}>
         {salvando ? "Salvando…" : "Lançar investimento"}
+      </button>
+    </section>
+  );
+}
+
+/** Investimento por campanha (13/10/2026): o Google Ads se digita aqui até ter leitura; o Meta Ads vem do
+ * botão da aba Campanhas. Com campanhas lançadas, o investimento do canal no mês é a soma delas. */
+function MidiaPorCampanha({ mes }: { mes: string }) {
+  const { dados, carregando, erro, recarregar } = usarDados<InvestimentoPorCampanha[]>(() => api.midiaPorCampanha(mes), [mes]);
+  const [canal, definirCanal] = useState("Google Ads");
+  const [campanha, definirCampanha] = useState("");
+  const [valor, definirValor] = useState("");
+  const [falha, definirFalha] = useState<string | null>(null);
+  const [salvando, definirSalvando] = useState(false);
+  const [tirando, definirTirando] = useState<number | null>(null);
+
+  const salvar = async () => {
+    definirSalvando(true);
+    definirFalha(null);
+    try {
+      await api.gravarMidiaPorCampanha({ mes, canal: canal.trim(), campanha: campanha.trim(), valor });
+      definirCampanha("");
+      definirValor("");
+      recarregar();
+    } catch (e) {
+      definirFalha(e instanceof ErroDaApi ? e.message : "Falha ao salvar.");
+    } finally {
+      definirSalvando(false);
+    }
+  };
+  const tirar = async (id: number) => {
+    definirFalha(null);
+    try {
+      await api.apagarMidiaPorCampanha(id);
+      definirTirando(null);
+      recarregar();
+    } catch (e) {
+      definirFalha(e instanceof ErroDaApi ? e.message : "Falha ao tirar.");
+    }
+  };
+
+  return (
+    <section className="sdr-bloco" aria-labelledby="sdr-midia-campanha">
+      <div>
+        <h3 className="sdr-bloco-titulo" id="sdr-midia-campanha">Investimento por campanha · {nomeDoMes(mes)}</h3>
+        <p className="sdr-bloco-sub">
+          O nome da campanha precisa ser igual ao do anúncio e ao "Campanha" dos leads. Com campanhas lançadas, o
+          investimento do canal no mês passa a ser a soma delas. O Meta Ads vem do botão da aba Campanhas; digitar
+          aqui uma campanha do Meta substitui o valor lido.
+        </p>
+      </div>
+      {carregando && <Carregando rotulo="Carregando as campanhas" />}
+      {erro && !carregando && <Erro mensagem={erro} aoTentarDeNovo={recarregar} />}
+      {!carregando && !erro && dados?.length === 0 && (
+        <p className="campo-ajuda">Nenhuma campanha com investimento em {nomeDoMes(mes)}.</p>
+      )}
+      {!carregando && !erro && (dados?.length ?? 0) > 0 && (
+        <table className="tabela sdr-tabela" aria-label="Investimento por campanha">
+          <thead>
+            <tr>
+              <th scope="col">Campanha</th>
+              <th scope="col" className="tabela-numero">Valor</th>
+              <th scope="col"><span className="sr">Ações</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {dados!.map((i) => (
+              <tr key={i.id}>
+                <td>{i.campanha}<br /><span className="sdr-fraco">{i.canal} · {i.fonte}</span></td>
+                <td className="tabela-numero">{dinheiro(i.valor)}</td>
+                <td>
+                  {tirando === i.id ? (
+                    <span className="camp-confirmar">
+                      Tirar este valor?
+                      <button type="button" className="botao botao-secundario" onClick={() => tirar(i.id)}>Tirar de vez</button>
+                      <button type="button" className="botao botao-secundario" onClick={() => definirTirando(null)}>Cancelar</button>
+                    </span>
+                  ) : (
+                    <button type="button" className="botao botao-secundario" onClick={() => definirTirando(i.id)}
+                      aria-label={`Tirar ${i.campanha}`}>Tirar</button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {falha && (
+        <div className="estado estado-erro" role="alert">
+          <p className="estado-texto">{falha}</p>
+        </div>
+      )}
+      <div className="formulario-duplo">
+        <div className="campo-bloco">
+          <label className="campo-rotulo" htmlFor="mc-canal">Canal</label>
+          <input id="mc-canal" className="entrada" value={canal} onChange={(e) => definirCanal(e.target.value)} placeholder="Google Ads" />
+        </div>
+        <div className="campo-bloco">
+          <label className="campo-rotulo" htmlFor="mc-campanha">Campanha</label>
+          <input id="mc-campanha" className="entrada" value={campanha} onChange={(e) => definirCampanha(e.target.value)} placeholder="BPO financeiro RJ" />
+        </div>
+        <div className="campo-bloco">
+          <label className="campo-rotulo" htmlFor="mc-valor">Valor do mês (R$)</label>
+          <input id="mc-valor" className="entrada" inputMode="decimal" value={valor} onChange={(e) => definirValor(e.target.value)} placeholder="3500.00" />
+        </div>
+      </div>
+      <button type="button" className="botao botao-primario" onClick={salvar}
+        disabled={salvando || !canal.trim() || !campanha.trim() || !valor.trim()}>
+        {salvando ? "Salvando…" : "Lançar por campanha"}
       </button>
     </section>
   );

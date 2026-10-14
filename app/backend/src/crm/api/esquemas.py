@@ -1225,13 +1225,21 @@ class InvestimentoPorCampanhaEdicao(BaseModel):
     valor: Decimal = Field(ge=0)
 
 
-class LeituraDoMetaResposta(BaseModel):
-    lidas: int
-    gravadas: int
-    digitadas_mantidas: list[str]
-    """Campanhas que já tinham valor digitado: a leitura não sobrescreve."""
-    lido_em: datetime
+class ResultadoDaLeitura(BaseModel):
+    """O que uma plataforma de anúncio devolveu no "Atualizar dos anúncios" (14/10/2026)."""
 
+    canal: str
+    ok: bool
+    lidas: int = 0
+    gravadas: int = 0
+    digitadas_mantidas: list[str] = []
+    """Campanhas que já tinham valor digitado: a leitura não sobrescreve."""
+    erro: str | None = None
+
+
+class LeituraDosAnunciosResposta(BaseModel):
+    plataformas: list[ResultadoDaLeitura]
+    lido_em: datetime
 
 
 class ItemDaComposicaoResposta(Base):

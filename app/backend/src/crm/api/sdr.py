@@ -22,7 +22,7 @@ leem: `crm.domain.campanhas.calcular_campanhas` sobre os leads de tráfego pago 
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Callable, Iterator
@@ -40,6 +40,8 @@ from crm.api.inteligencia import premissas_vigentes
 from crm.db import leads as regras_do_lead
 from crm.db import questionario_do_lead as do_lead
 from crm.db.base import agora
+from crm.anuncios import GastoDaCampanha, LeituraFalhou
+from crm.anuncios import google as google_ads
 from crm.anuncios import meta as meta_ads
 from crm.db.modelos import (
     ConversaDoSdr,
@@ -73,18 +75,32 @@ def _situacao(lead: Lead, recebidos: list, momento: datetime) -> e.QuestionarioD
     )
 
 
-def gastos_reais_do_meta(mes: str) -> list[meta_ads.GastoDaCampanha] | None:
-    """O gasto de cada campanha no Meta Ads, ou `None` com a leitura desligada na tela."""
-    config = meta_ads.ler_configuracao()
-    if config is None:
-        return None
-    return meta_ads.gasto_por_campanha(config, mes, agora().astimezone(ZoneInfo("America/Sao_Paulo")).date())
+@dataclass(frozen=True)
+class Leitor:
+    """Uma plataforma de anúncio que o "Atualizar dos anúncios" lê (14/10/2026). O teste troca por falsos."""
+
+    canal: str
+    configurada: Callable[[], bool]
+    ler: Callable[[str], list[GastoDaCampanha]]
+
+
+def _hoje():
+    return agora().astimezone(ZoneInfo("America/Sao_Paulo")).date()
+
+
+def leitores_reais() -> list[Leitor]:
+    return [
+        Leitor(meta_ads.CANAL, lambda: meta_ads.ler_configuracao() is not None,
+               lambda mes: meta_ads.gasto_por_campanha(meta_ads.ler_configuracao(), mes, _hoje())),
+        Leitor(google_ads.CANAL, lambda: google_ads.ler_configuracao() is not None,
+               lambda mes: google_ads.gasto_por_campanha(google_ads.ler_configuracao(), mes, _hoje())),
+    ]
 
 
 def roteador(
     obter_sessao: Callable[[], Iterator[Session]],
     canais_do_disparo: Callable[[], Canais | None] = canais_reais,
-    gastos_do_meta: Callable[[str], list[meta_ads.GastoDaCampanha] | None] = gastos_reais_do_meta,
+    leitores: Callable[[], list[Leitor]] = leitores_reais,
 ) -> APIRouter:
     r = APIRouter(prefix="/api/sdr", tags=["sdr"])
 
@@ -413,11 +429,13 @@ def roteador(
         }
         premissas, _ = premissas_vigentes(sessao)
         linhas = _por_campanha(sessao, mes)
-        lidos = [l.lido_em for l in linhas if l.fonte == "lido" and l.lido_em]
         return asdict(regras_de_campanhas.calcular_campanhas(
             mes=mes, leads=leads, midia=midia, icp_alvo_pct=premissas.icp_alvo_pct,
             por_campanha=[regras_de_campanhas.Investido(l.canal, l.campanha, Decimal(l.valor), l.fonte) for l in linhas],
-            meta_ads=regras_de_campanhas.LeituraDoMeta(meta_ads.ler_configuracao() is not None, max(lidos, default=None)),
+            anuncios=[regras_de_campanhas.LeituraDaPlataforma(
+                p.canal, p.configurada(),
+                max((l.lido_em for l in linhas if l.canal == p.canal and l.fonte == "lido" and l.lido_em), default=None),
+            ) for p in leitores()],
         ))
 
     def _por_campanha(sessao: Session, mes: str) -> list[InvestimentoPorCampanha]:
@@ -426,38 +444,48 @@ def roteador(
             .order_by(InvestimentoPorCampanha.canal, InvestimentoPorCampanha.campanha)
         ))
 
-    @r.post("/campanhas/atualizar", response_model=e.LeituraDoMetaResposta)
-    def atualizar_do_meta(
+    @r.post("/campanhas/atualizar", response_model=e.LeituraDosAnunciosResposta)
+    def atualizar_dos_anuncios(
         mes: str = Query(pattern=regras.MES.pattern), sessao: Session = Depends(obter_sessao, scope="function")
     ):
-        """Lê o gasto de cada campanha do mês no Meta Ads e grava como "lido". Valor digitado fica como está."""
-        try:
-            gastos = gastos_do_meta(mes)
-        except meta_ads.LeituraFalhou as falha:
-            raise HTTPException(502, str(falha)) from falha
-        if gastos is None:
-            raise HTTPException(409, "a leitura do Meta Ads está desligada: ligue em Configurações › Integrações")
+        """Lê o gasto de cada campanha do mês em cada plataforma ligada e grava como "lido". Valor digitado
+        fica como está. Uma plataforma que falha não impede a outra: cada uma volta com o seu resultado."""
+        ligados = [p for p in leitores() if p.configurada()]
+        if not ligados:
+            raise HTTPException(409, "nenhuma leitura de anúncios está ligada: ligue em Configurações › Integrações")
         momento = agora()
-        atuais = {(l.canal, " ".join(l.campanha.split()).casefold()): l
-                  for l in _por_campanha(sessao, mes) if l.canal == meta_ads.CANAL}
-        somados: dict[str, meta_ads.GastoDaCampanha] = {}
+        resultados = []
+        for p in ligados:
+            try:
+                gastos = p.ler(mes)
+            except LeituraFalhou as falha:
+                resultados.append(e.ResultadoDaLeitura(canal=p.canal, ok=False, erro=str(falha)))
+                continue
+            gravadas, mantidas = _gravar_lidos(sessao, mes, p.canal, gastos, momento)
+            resultados.append(e.ResultadoDaLeitura(canal=p.canal, ok=True, lidas=len(gastos), gravadas=gravadas,
+                                                   digitadas_mantidas=mantidas))
+        sessao.flush()
+        return e.LeituraDosAnunciosResposta(plataformas=resultados, lido_em=momento)
+
+    def _gravar_lidos(sessao: Session, mes: str, canal: str, gastos: list[GastoDaCampanha], momento):
+        atuais = {" ".join(l.campanha.split()).casefold(): l for l in _por_campanha(sessao, mes) if l.canal == canal}
+        somados: dict[str, GastoDaCampanha] = {}
         for g in gastos:  # duas campanhas com o mesmo nome somam: o lead só tem o nome
             chave = " ".join(g.nome.split()).casefold()
             antes = somados.get(chave)
-            somados[chave] = g if antes is None else meta_ads.GastoDaCampanha(antes.id, antes.nome, antes.valor + g.valor)
+            somados[chave] = g if antes is None else GastoDaCampanha(antes.id, antes.nome, antes.valor + g.valor)
         gravadas, mantidas = 0, []
         for chave, g in somados.items():
-            linha = atuais.get((meta_ads.CANAL, chave))
+            linha = atuais.get(chave)
             if linha is not None and linha.fonte == "digitado":
                 mantidas.append(linha.campanha)
                 continue
             if linha is None:
-                linha = InvestimentoPorCampanha(mes=mes, canal=meta_ads.CANAL, campanha=g.nome, fonte="lido", valor=g.valor)
+                linha = InvestimentoPorCampanha(mes=mes, canal=canal, campanha=g.nome, fonte="lido", valor=g.valor)
                 sessao.add(linha)
             linha.valor, linha.id_externo, linha.lido_em = g.valor, g.id[:60] or None, momento
             gravadas += 1
-        sessao.flush()
-        return e.LeituraDoMetaResposta(lidas=len(gastos), gravadas=gravadas, digitadas_mantidas=mantidas, lido_em=momento)
+        return gravadas, mantidas
 
     @r.get("/midia/campanhas", response_model=list[e.InvestimentoPorCampanhaResposta])
     def listar_midia_por_campanha(

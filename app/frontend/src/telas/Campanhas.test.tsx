@@ -8,7 +8,7 @@ import { Campanhas } from "./Campanhas";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { campanhas: vi.fn(), painelDoSdr: vi.fn(), atualizarDoMeta: vi.fn() } };
+  return { ...real, api: { campanhas: vi.fn(), painelDoSdr: vi.fn(), atualizarDosAnuncios: vi.fn() } };
 });
 
 const taxa = (numerador: number, denominador: number) => ({
@@ -45,7 +45,10 @@ function painel(extra: Partial<PainelDeCampanhas> = {}): PainelDeCampanhas {
       investimento: "3000.00", fonte: "lido", custo_por_lead_icp: "136.36", custo_por_reuniao: "750.00",
     }],
     regua: { volume_minimo: 20, icp_alvo_pct: "40", qualificados_meta_pct: 20, qualificados_alerta_pct: 10, teto_de_custo: "1.5" },
-    meta_ads: { configurada: true, lido_em: "2026-10-13T22:40:00Z" },
+    anuncios: [
+      { canal: "Meta Ads", configurada: true, lido_em: "2026-10-13T22:40:00Z" },
+      { canal: "Google Ads", configurada: true, lido_em: null },
+    ],
     prontidao: [
       { ok: true, texto: "Investimento do mês lançado em todos os canais" },
       { ok: false, texto: "Leitura automática do Meta Ads e do Google Ads ainda não ligada" },
@@ -124,26 +127,37 @@ describe("Campanhas", () => {
     expect(screen.getByText(/rever custo acima de 1,5 ×/)).toBeInTheDocument();
   });
 
-  it("atualiza do Meta Ads, conta o que ficou digitado e recarrega", async () => {
+  it("um botão lê as duas plataformas e diz o resultado de cada uma", async () => {
     vi.mocked(api.campanhas).mockResolvedValue(painel());
-    vi.mocked(api.atualizarDoMeta).mockResolvedValue({ lidas: 3, gravadas: 2, digitadas_mantidas: ["Vale"], lido_em: "2026-10-13T23:00:00Z" });
+    vi.mocked(api.atualizarDosAnuncios).mockResolvedValue({
+      plataformas: [
+        { canal: "Meta Ads", ok: true, lidas: 3, gravadas: 2, digitadas_mantidas: ["Vale"], erro: null },
+        { canal: "Google Ads", ok: false, lidas: 0, gravadas: 0, digitadas_mantidas: [],
+          erro: "O Google Ads recusou o acesso (HTTP 403): token de teste" },
+      ],
+      lido_em: "2026-10-14T12:00:00Z",
+    });
     render(<Campanhas />);
-    expect(await screen.findByText(/Meta Ads lido em/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Atualizar do Meta Ads" }));
-    expect(await screen.findByRole("status")).toHaveTextContent("2 campanha(s) atualizada(s) do Meta Ads. Valor digitado mantido em: Vale.");
+    expect(await screen.findByText(/Meta Ads lido em .* · Google Ads ainda não lido neste mês/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Atualizar do Meta Ads" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Atualizar dos anúncios" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Meta Ads: 2 campanha(s) atualizada(s). Valor digitado mantido em: Vale.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Google Ads: O Google Ads recusou o acesso");
     expect(api.campanhas).toHaveBeenCalledTimes(2);
   });
 
-  it("falha do Meta vira frase, e sem leitura ligada não há botão", async () => {
+  it("falha geral vira frase, e sem nenhuma leitura ligada não há botão", async () => {
     vi.mocked(api.campanhas).mockResolvedValue(painel());
-    vi.mocked(api.atualizarDoMeta).mockRejectedValue(new ErroDaApi(502, "A Meta recusou o token do Meta Ads (HTTP 401)."));
+    vi.mocked(api.atualizarDosAnuncios).mockRejectedValue(new ErroDaApi(409, "nenhuma leitura de anúncios está ligada"));
     const { unmount } = render(<Campanhas />);
-    fireEvent.click(await screen.findByRole("button", { name: "Atualizar do Meta Ads" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("recusou o token");
+    fireEvent.click(await screen.findByRole("button", { name: "Atualizar dos anúncios" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("nenhuma leitura de anúncios está ligada");
     unmount();
-    vi.mocked(api.campanhas).mockResolvedValue(painel({ meta_ads: { configurada: false, lido_em: null } }));
+    vi.mocked(api.campanhas).mockResolvedValue(painel({ anuncios: [
+      { canal: "Meta Ads", configurada: false, lido_em: null }, { canal: "Google Ads", configurada: false, lido_em: null },
+    ] }));
     render(<Campanhas />);
-    expect(await screen.findByText(/Leitura do Meta Ads desligada/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Atualizar do Meta Ads" })).not.toBeInTheDocument();
+    expect(await screen.findByText(/Google Ads: leitura desligada/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Atualizar dos anúncios" })).not.toBeInTheDocument();
   });
 });

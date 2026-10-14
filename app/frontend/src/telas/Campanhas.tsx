@@ -3,7 +3,7 @@
  * Responde a uma pergunta: em qual campanha pôr o próximo real. Um funil por canal,
  * com a passagem entre etapas e o custo de cada uma, e a decisão por campanha pela
  * régua provisória de `crm.domain.campanhas`. Desde 13/10/2026, o custo por campanha: lido do Meta
- * Ads (botão "Atualizar do Meta Ads") ou digitado em Custos e mídia. O sucesso da busca (primeira resposta,
+ * Ads e, desde 14/10/2026, do Google Ads (botão único "Atualizar dos anúncios"), ou digitado em Custos e mídia. O sucesso da busca (primeira resposta,
  * quem respondeu) vem do painel do SDR, filtrado em tráfego pago.
  *
  * A largura de cada etapa é fixa, para dar a forma de funil: o número é o que vale.
@@ -59,7 +59,7 @@ export function Campanhas() {
           explicacao="O painel acompanha os leads de tráfego pago que chegaram no mês, do formulário ao contrato. Cadastre o lead com o tipo de canal Tráfego pago, o canal (Meta Ads, Google Ads) e a campanha, e lance o investimento do mês em SDR da IA › Custos e mídia."
         />
       )}
-      {!erro && dados && <LeituraDoMetaAds mes={mes} p={dados} aoLer={recarregar} />}
+      {!erro && dados && <LeituraDosAnunciosBarra mes={mes} p={dados} aoLer={recarregar} />}
       {!erro && dados?.total && <Conteudo p={dados} sdr={sdr.dados} />}
       {!erro && dados && <Prontidao p={dados} />}
     </div>
@@ -133,37 +133,44 @@ function Conteudo({ p, sdr }: { p: PainelDeCampanhas; sdr: PainelDoSdr | null })
   );
 }
 
-/** "Meta Ads lido em … · Atualizar do Meta Ads": a leitura só grava valor lido; o digitado fica. */
-function LeituraDoMetaAds({ mes, p, aoLer }: { mes: string; p: PainelDeCampanhas; aoLer: () => void }) {
+/** "Atualizar dos anúncios" (14/10/2026): lê toda plataforma ligada; a leitura só grava valor lido, o digitado
+ * fica. Uma plataforma que falha não impede a outra, e cada uma diz o seu resultado. */
+function LeituraDosAnunciosBarra({ mes, p, aoLer }: { mes: string; p: PainelDeCampanhas; aoLer: () => void }) {
   const [lendo, definirLendo] = useState(false);
-  const [aviso, definirAviso] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [avisos, definirAvisos] = useState<{ ok: boolean; texto: string }[]>([]);
   const ler = async () => {
     definirLendo(true);
-    definirAviso(null);
+    definirAvisos([]);
     try {
-      const r = await api.atualizarDoMeta(mes);
-      const mantidas = r.digitadas_mantidas.length
-        ? ` Valor digitado mantido em: ${r.digitadas_mantidas.join(", ")}.` : "";
-      definirAviso({ ok: true, texto: `${r.gravadas} campanha(s) atualizada(s) do Meta Ads.${mantidas}` });
+      const r = await api.atualizarDosAnuncios(mes);
+      definirAvisos(r.plataformas.map((x) => x.ok
+        ? { ok: true, texto: `${x.canal}: ${x.gravadas} campanha(s) atualizada(s).${x.digitadas_mantidas.length
+            ? ` Valor digitado mantido em: ${x.digitadas_mantidas.join(", ")}.` : ""}` }
+        : { ok: false, texto: `${x.canal}: ${x.erro}` }));
       aoLer();
     } catch (falha) {
-      definirAviso({ ok: false, texto: falha instanceof ErroDaApi ? falha.message : "Não consegui ler o Meta Ads." });
+      definirAvisos([{ ok: false, texto: falha instanceof ErroDaApi ? falha.message : "Não consegui ler os anúncios." }]);
     } finally {
       definirLendo(false);
     }
   };
-  const quando = p.meta_ads.lido_em
-    ? `Meta Ads lido em ${new Date(p.meta_ads.lido_em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`
-    : p.meta_ads.configurada ? "Meta Ads ainda não lido neste mês" : "Leitura do Meta Ads desligada em Configurações › Integrações";
+  const quando = (a: PainelDeCampanhas["anuncios"][number]) => !a.configurada
+    ? `${a.canal}: leitura desligada em Configurações › Integrações`
+    : a.lido_em
+      ? `${a.canal} lido em ${new Date(a.lido_em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`
+      : `${a.canal} ainda não lido neste mês`;
+  const algumaLigada = p.anuncios.some((a) => a.configurada);
   return (
     <div className="camp-leitura">
-      <span>{quando} · Google Ads digitado em Custos e mídia</span>
-      {p.meta_ads.configurada && (
+      <span>{p.anuncios.map(quando).join(" · ")}</span>
+      {algumaLigada && (
         <button type="button" className="botao botao-secundario" onClick={ler} disabled={lendo}>
-          {lendo ? "Lendo o Meta Ads…" : "Atualizar do Meta Ads"}
+          {lendo ? "Lendo os anúncios…" : "Atualizar dos anúncios"}
         </button>
       )}
-      {aviso && <p role={aviso.ok ? "status" : "alert"} className={aviso.ok ? "camp-aviso" : "camp-aviso camp-aviso-falha"}>{aviso.texto}</p>}
+      {avisos.map((a) => (
+        <p key={a.texto} role={a.ok ? "status" : "alert"} className={a.ok ? "camp-aviso" : "camp-aviso camp-aviso-falha"}>{a.texto}</p>
+      ))}
     </div>
   );
 }

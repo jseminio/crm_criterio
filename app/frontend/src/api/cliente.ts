@@ -51,7 +51,7 @@ import type {
   ConversaDoSdr,
   InvestimentoEmMidia,
   InvestimentoPorCampanha,
-  LeituraDoMeta,
+  LeituraDosAnuncios,
   PainelDeCampanhas,
   PainelDoSdr,
   ParametrosDoSdr,
@@ -676,8 +676,8 @@ export const api = {
 
   campanhas: (mes: string) => pedir<PainelDeCampanhas>(comParametros("/api/sdr/campanhas", { mes })),
 
-  atualizarDoMeta: (mes: string) =>
-    pedir<LeituraDoMeta>(comParametros("/api/sdr/campanhas/atualizar", { mes }), { method: "POST" }),
+  atualizarDosAnuncios: (mes: string) =>
+    pedir<LeituraDosAnuncios>(comParametros("/api/sdr/campanhas/atualizar", { mes }), { method: "POST" }),
 
   midiaPorCampanha: (mes: string) =>
     pedir<InvestimentoPorCampanha[]>(comParametros("/api/sdr/midia/campanhas", { mes })),

@@ -9,12 +9,13 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 import httpx2 as httpx
 
 from crm import configuracao
+from crm.anuncios import GastoDaCampanha, LeituraFalhou, intervalo
 
 __all__ = ["ConfiguracaoDoMetaAds", "GastoDaCampanha", "LeituraFalhou", "conferir_conta", "gasto_por_campanha",
            "ler_configuracao"]
@@ -25,22 +26,11 @@ CANAL = "Meta Ads"
 _CONTA = re.compile(r"^\d{5,20}$")
 
 
-class LeituraFalhou(RuntimeError):
-    """A leitura não deu certo. A mensagem é para a pessoa ler; nunca leva o token."""
-
-
 @dataclass(frozen=True)
 class ConfiguracaoDoMetaAds:
     token: str
     conta: str
     versao: str
-
-
-@dataclass(frozen=True)
-class GastoDaCampanha:
-    id: str
-    nome: str
-    valor: Decimal
 
 
 def ler_configuracao() -> ConfiguracaoDoMetaAds | None:
@@ -93,16 +83,6 @@ def conferir_conta(config: ConfiguracaoDoMetaAds, *, http: httpx.Client | None =
             cliente.close()
     situacao = "ativa" if dados.get("account_status") == 1 else f"situação {dados.get('account_status')}"
     return f"A Meta reconheceu a conta {dados.get('name') or config.conta}: {situacao}, moeda {dados.get('currency') or '?'}."
-
-
-def intervalo(mes: str, hoje: date) -> tuple[date, date] | None:
-    """Do dia 1 ao último dia do mês, ou até hoje no mês corrente. `None` para mês futuro."""
-    ano, numero = (int(p) for p in mes.split("-"))
-    inicio = date(ano, numero, 1)
-    if inicio > hoje:
-        return None
-    fim = date(ano + (numero == 12), numero % 12 + 1, 1) - timedelta(days=1)
-    return inicio, min(fim, hoje)
 
 
 def gasto_por_campanha(config: ConfiguracaoDoMetaAds, mes: str, hoje: date, *,

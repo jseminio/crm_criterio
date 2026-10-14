@@ -172,7 +172,10 @@ def test_mes_invalido(cliente):
 
 
 # ------------------------------------------------- custo por campanha (13/10/2026)
+from crm.anuncios import GastoDaCampanha, LeituraFalhou  # noqa: E402
+from crm.anuncios import google as google_ads  # noqa: E402
 from crm.anuncios import meta as meta_ads  # noqa: E402
+from crm.api.sdr import Leitor  # noqa: E402
 
 import httpx2 as httpx  # noqa: E402
 
@@ -277,7 +280,8 @@ def cliente_com_meta(engine: sa.Engine):
     gastos: dict = {"valor": [meta_ads.GastoDaCampanha("1", "Vale", Decimal("300")),
                               meta_ads.GastoDaCampanha("2", "Google digitado", Decimal("1"))]}
     fabrica = sessionmaker(bind=engine, expire_on_commit=False, future=True)
-    with TestClient(criar_app(fabrica, gastos_do_meta=lambda mes: gastos["valor"])) as aberto:
+    leitores = lambda: [Leitor("Meta Ads", lambda: True, lambda mes: gastos["valor"])]
+    with TestClient(criar_app(fabrica, leitores_de_anuncios=leitores)) as aberto:
         yield aberto, gastos
 
 
@@ -294,7 +298,9 @@ class TestRotasDeCustoPorCampanha:
         assert r.status_code == 200 and r.json()["fonte"] == "digitado" and r.json()["campanha"] == "google DIGITADO"
         r = cliente.post("/api/sdr/campanhas/atualizar", params={"mes": mes})
         assert r.status_code == 200, r.text
-        assert r.json()["gravadas"] == 1 and r.json()["digitadas_mantidas"] == ["google DIGITADO"]
+        meta = r.json()["plataformas"][0]
+        assert meta["canal"] == "Meta Ads" and meta["ok"] is True
+        assert meta["gravadas"] == 1 and meta["digitadas_mantidas"] == ["google DIGITADO"]
         linhas = {l["campanha"]: l for l in cliente.get("/api/sdr/midia/campanhas", params={"mes": mes}).json()}
         assert linhas["Vale"]["fonte"] == "lido" and linhas["Vale"]["valor"] == "300.00"
         assert linhas["google DIGITADO"]["valor"] == "50.00"
@@ -318,21 +324,36 @@ class TestRotasDeCustoPorCampanha:
         p = cliente.get("/api/sdr/campanhas", params={"mes": mes}).json()
         vale = next(x for x in p["campanhas"] if x["campanha"] == "Vale")
         assert vale["leads"] == 1 and vale["investimento"] == "300.00" and vale["fonte"] == "lido"
-        assert p["meta_ads"]["lido_em"] is not None
+        assert p["anuncios"] == [{"canal": "Meta Ads", "configurada": True, "lido_em": p["anuncios"][0]["lido_em"]}]
+        assert p["anuncios"][0]["lido_em"] is not None
 
-    def test_desligado_responde_409(self, engine):
+    def test_nenhuma_ligada_responde_409(self, engine):
         fabrica = sessionmaker(bind=engine, expire_on_commit=False, future=True)
-        with TestClient(criar_app(fabrica, gastos_do_meta=lambda mes: None)) as cliente:
+        desligados = lambda: [Leitor("Meta Ads", lambda: False, lambda mes: []), Leitor("Google Ads", lambda: False, lambda mes: [])]
+        with TestClient(criar_app(fabrica, leitores_de_anuncios=desligados)) as cliente:
             r = cliente.post("/api/sdr/campanhas/atualizar", params={"mes": _mes()})
+            p = cliente.get("/api/sdr/campanhas", params={"mes": _mes()}).json()
         assert r.status_code == 409 and "Integrações" in r.json()["detail"]
+        assert [a["configurada"] for a in p["anuncios"]] == [False, False]
+        assert any("Google Ads desligada" in x["texto"] for x in p["prontidao"])
 
-    def test_falha_da_meta_responde_502_com_a_frase(self, engine):
+    def test_uma_plataforma_falhando_nao_impede_a_outra(self, engine):
         def falhar(mes):
-            raise meta_ads.LeituraFalhou("A Meta recusou o token do Meta Ads (HTTP 401).")
+            raise LeituraFalhou("A Meta recusou o token do Meta Ads (HTTP 401).")
+        leitores = lambda: [
+            Leitor("Meta Ads", lambda: True, falhar),
+            Leitor("Google Ads", lambda: True, lambda mes: [GastoDaCampanha("9", "BPO RJ", Decimal("12.5"))]),
+            Leitor("Outra", lambda: False, falhar),
+        ]
         fabrica = sessionmaker(bind=engine, expire_on_commit=False, future=True)
-        with TestClient(criar_app(fabrica, gastos_do_meta=falhar)) as cliente:
+        with TestClient(criar_app(fabrica, leitores_de_anuncios=leitores)) as cliente:
             r = cliente.post("/api/sdr/campanhas/atualizar", params={"mes": _mes()})
-        assert r.status_code == 502 and "recusou o token" in r.json()["detail"]
+            linhas = cliente.get("/api/sdr/midia/campanhas", params={"mes": _mes()}).json()
+        assert r.status_code == 200, r.text
+        meta, google = r.json()["plataformas"]
+        assert (meta["ok"], google["ok"]) == (False, True)
+        assert "recusou o token" in meta["erro"]
+        assert [(l["canal"], l["campanha"], l["valor"], l["fonte"]) for l in linhas] == [("Google Ads", "BPO RJ", "12.50", "lido")]
 
     def test_apagar(self, cliente_com_meta):
         cliente, _ = cliente_com_meta
@@ -379,3 +400,104 @@ class TestMetaAdsPelaTela:
     def test_conta_com_letras_nao_salva(self, cliente):
         r = cliente.put("/api/configuracoes/integracoes/meta_ads", json={"valores": {"meta_ads.conta": "minha conta"}})
         assert r.status_code == 422 and "só os números" in r.json()["detail"]
+
+
+# ------------------------------------------------------- Google Ads (14/10/2026)
+def _google(respostas: dict[str, list[tuple[int, dict]]]):
+    """Responde por endereço: o token do OAuth e o googleAds:search, em fila."""
+    chamadas = []
+
+    def tratar(pedido: httpx.Request) -> httpx.Response:
+        chamadas.append(pedido)
+        chave = "token" if "oauth2" in str(pedido.url) else "search"
+        status, corpo = respostas[chave].pop(0) if len(respostas[chave]) > 1 else respostas[chave][0]
+        return httpx.Response(status, json=corpo)
+
+    return httpx.Client(transport=httpx.MockTransport(tratar)), chamadas
+
+
+class TestLeituraDoGoogle:
+    config = google_ads.ConfiguracaoDoGoogleAds("dev", "cli", "seg", "rt", "1234567890", "9876543210", "v25")
+    token = [(200, {"access_token": "ya29"})]
+
+    def test_le_o_gasto_em_micros_com_paginas(self):
+        http, chamadas = _google({"token": self.token, "search": [
+            (200, {"results": [{"campaign": {"id": "1", "name": "BPO RJ"}, "metrics": {"costMicros": "3500000000"}}],
+                   "nextPageToken": "p2"}),
+            (200, {"results": [{"campaign": {"id": "2", "name": "Contador"}, "metrics": {"costMicros": "1250000"}}]}),
+        ]})
+        gastos = google_ads.gasto_por_campanha(self.config, "2026-10", date(2026, 10, 14), http=http)
+        assert [(g.nome, g.valor) for g in gastos] == [("BPO RJ", Decimal("3500")), ("Contador", Decimal("1.25"))]
+        busca = [c for c in chamadas if "googleAds:search" in str(c.url)]
+        assert "/v25/customers/1234567890/googleAds:search" in str(busca[0].url)
+        assert busca[0].headers["developer-token"] == "dev" and busca[0].headers["login-customer-id"] == "9876543210"
+        assert busca[0].headers["Authorization"] == "Bearer ya29"
+        assert "BETWEEN '2026-10-01' AND '2026-10-14'" in busca[0].content.decode()
+        assert '"pageToken": "p2"' in busca[1].content.decode() or '"pageToken":"p2"' in busca[1].content.decode()
+
+    def test_sem_conta_admin_nao_manda_o_cabecalho(self):
+        http, chamadas = _google({"token": self.token, "search": [(200, {"results": []})]})
+        config = google_ads.ConfiguracaoDoGoogleAds("dev", "cli", "seg", "rt", "1234567890", None, "v25")
+        google_ads.gasto_por_campanha(config, "2026-10", date(2026, 10, 14), http=http)
+        assert "login-customer-id" not in chamadas[-1].headers
+
+    def test_refresh_token_recusado_vira_frase_sem_segredo(self):
+        http, _ = _google({"token": [(400, {"error": "invalid_grant"})], "search": [(200, {})]})
+        with pytest.raises(LeituraFalhou) as falha:
+            google_ads.gasto_por_campanha(self.config, "2026-10", date(2026, 10, 14), http=http)
+        texto = str(falha.value)
+        assert "refresh token" in texto and "rt" not in texto.split() and "seg" not in texto
+
+    def test_versao_vencida_diz_para_trocar(self):
+        http, _ = _google({"token": self.token, "search": [(404, {})]})
+        with pytest.raises(LeituraFalhou) as falha:
+            google_ads.conferir_conta(self.config, http=http)
+        assert "versão v25" in str(falha.value)
+
+    def test_acesso_negado_traz_a_mensagem_do_google(self):
+        http, _ = _google({"token": self.token, "search": [
+            (403, [{"error": {"message": "The developer token is only approved for test accounts."}}])]})
+        with pytest.raises(LeituraFalhou) as falha:
+            google_ads.gasto_por_campanha(self.config, "2026-10", date(2026, 10, 14), http=http)
+        assert "only approved for test accounts" in str(falha.value)
+
+    def test_conferir_conta(self):
+        http, _ = _google({"token": self.token, "search": [
+            (200, {"results": [{"customer": {"descriptiveName": "Critério", "currencyCode": "BRL"}}]})]})
+        assert google_ads.conferir_conta(self.config, http=http) == "O Google Ads reconheceu a conta Critério, moeda BRL."
+
+    def test_mes_futuro_nao_pergunta(self):
+        http, chamadas = _google({"token": self.token, "search": [(200, {})]})
+        assert google_ads.gasto_por_campanha(self.config, "2026-11", date(2026, 10, 14), http=http) == []
+        assert chamadas == []
+
+    def test_conta_com_formato_errado(self):
+        errada = google_ads.ConfiguracaoDoGoogleAds("dev", "cli", "seg", "rt", "123", None, "v25")
+        with pytest.raises(LeituraFalhou):
+            google_ads.conferir_conta(errada)
+
+
+class TestGoogleAdsPelaTela:
+    def test_salva_testa_e_conta_admin_e_opcional(self, cliente, monkeypatch):
+        vistos = []
+        monkeypatch.setattr(google_ads, "conferir_conta",
+                            lambda config, http=None: vistos.append(config) or "O Google Ads reconheceu a conta Critério, moeda BRL.")
+        r = cliente.post("/api/configuracoes/integracoes/google_ads/testar")
+        assert r.json()["ok"] is False and "Ligue a leitura" in r.json()["mensagem"]
+        r = cliente.put("/api/configuracoes/integracoes/google_ads", json={"valores": {
+            "google_ads.ligado": "true", "google_ads.token_dev": "DEVsegredo", "google_ads.cliente_id": "1-a.apps",
+            "google_ads.cliente_segredo": "SEGsegredo", "google_ads.refresh_token": "RTsegredo",
+            "google_ads.conta": "123-456-7890"}})
+        assert r.status_code == 200, r.text
+        assert not any(x in r.text for x in ("DEVsegredo", "SEGsegredo", "RTsegredo"))
+        grupo = next(g for g in r.json()["grupos"] if g["chave"] == "google_ads")
+        assert grupo["configurado"] is True
+        r = cliente.post("/api/configuracoes/integracoes/google_ads/testar")
+        assert r.json()["ok"] is True
+        assert vistos[0].conta == "1234567890" and vistos[0].conta_admin is None and vistos[0].versao == "v25"
+
+    def test_formatos_recusados(self, cliente):
+        r = cliente.put("/api/configuracoes/integracoes/google_ads", json={"valores": {"google_ads.conta": "12345"}})
+        assert r.status_code == 422 and "10 dígitos" in r.json()["detail"]
+        r = cliente.put("/api/configuracoes/integracoes/google_ads", json={"valores": {"google_ads.versao": "v24.0"}})
+        assert r.status_code == 422 and "v25" in r.json()["detail"]

@@ -81,6 +81,23 @@ Decisões de Eduardo em 13/10/2026, amostra aprovada. Em **Sucesso do Cliente �
 - Rotas: `GET /api/reajustes?ano=`, `POST /api/reajustes/aprovar`, `GET /api/ipca`, `POST /api/ipca/atualizar`.
   Regras em `crm.domain.reajuste`; busca em `crm.indices`.
 
+## Campanhas: leitura do Google Ads e botão único "Atualizar dos anúncios" (14/10/2026)
+
+Amostra aprovada por Eduardo em 14/10/2026.
+
+- **Google Ads pela tela:** Configurações › Integrações › Google Ads — leitura ligada, token de desenvolvedor,
+  cliente OAuth (ID e segredo), refresh token, ID da conta e, se houver, da conta de administrador (opcional), e a
+  versão da API (padrão **v25**, a mais nova em 14/10/2026). Com Testar. Segredos cifrados, nunca voltam à tela.
+- **Botão único** na aba Campanhas: "Atualizar dos anúncios" lê toda plataforma ligada
+  (`POST /api/sdr/campanhas/atualizar?mes=`) e devolve o resultado de cada uma; uma que falha não impede a outra.
+  A leitura nunca sobrescreve valor digitado. Sem nenhuma ligada, responde 409.
+- O Google informa o custo em micros (÷ 1.000.000), na moeda da conta. Consulta GAQL por campanha no mês, só
+  campanhas com gasto. O refresh token vira token de acesso a cada leitura.
+- Leitores em `crm.anuncios` (`meta`, `google`); a rota recebe a lista de plataformas (`Leitor`), que o teste
+  troca por falsas. A prontidão da aba mostra cada plataforma ligada ou desligada.
+- **Para ligar:** o Google precisa aprovar o acesso Básico do token de desenvolvedor; o refresh token se gera uma
+  vez, com a conta Google que acessa o Google Ads (escopo `adwords`).
+
 ## Campanhas: custo por campanha, leitura do Meta Ads e origem do clique (13/10/2026)
 
 Amostra aprovada por Eduardo em 13/10/2026.

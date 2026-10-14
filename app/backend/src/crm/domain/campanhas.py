@@ -32,7 +32,7 @@ __all__ = [
     "VOLUME_MINIMO",
     "TETO_DE_CUSTO",
     "Investido",
-    "LeituraDoMeta",
+    "LeituraDaPlataforma",
     "ETAPAS",
     "PainelDeCampanhas",
     "calcular_campanhas",
@@ -152,7 +152,10 @@ class Investido:
 
 
 @dataclass(frozen=True)
-class LeituraDoMeta:
+class LeituraDaPlataforma:
+    """A leitura automática de uma plataforma de anúncio (Meta Ads, Google Ads): ligada e quando leu."""
+
+    canal: str
     configurada: bool
     lido_em: datetime | None
 
@@ -172,7 +175,7 @@ class PainelDeCampanhas:
     campanhas: list[LinhaDaCampanha]
     regua: Regua
     prontidao: list[Pendencia]
-    meta_ads: LeituraDoMeta
+    anuncios: list[LeituraDaPlataforma]
 
 
 # ------------------------------------------------------------------ cálculo
@@ -314,7 +317,7 @@ def calcular_campanhas(
     midia: dict[str, Decimal] | None = None,
     icp_alvo_pct: Decimal | None = None,
     por_campanha: Iterable[Investido] = (),
-    meta_ads: LeituraDoMeta | None = None,
+    anuncios: Iterable[LeituraDaPlataforma] = (),
 ) -> PainelDeCampanhas:
     """O painel de campanhas da coorte do mês. `leads` pode trazer outros meses e outras
     origens: só entram os de tráfego pago que chegaram no mês.
@@ -322,7 +325,7 @@ def calcular_campanhas(
     `midia` é o investimento digitado por canal; `por_campanha`, o de cada campanha (lido ou digitado).
     Canal com campanhas investidas usa a soma delas; sem campanhas, vale o valor do canal.
     """
-    meta_ads = meta_ads or LeituraDoMeta(False, None)
+    anuncios = list(anuncios)
     inicio, fim = intervalo_do_mes(mes)
     coorte = [
         l for l in leads
@@ -373,15 +376,15 @@ def calcular_campanhas(
         Pendencia(icp_alvo_pct is not None,
                   "ICP alvo definido no Plano de MRR" if icp_alvo_pct is not None
                   else "Sem ICP alvo no Plano de MRR: a régua não julga o % no ICP"),
-        Pendencia(meta_ads.configurada,
-                  "Leitura do Meta Ads ligada em Configurações › Integrações" if meta_ads.configurada
-                  else "Leitura do Meta Ads desligada: ligue em Configurações › Integrações"),
-        Pendencia(False, "Google Ads sem leitura automática (falta o token de desenvolvedor): "
-                         "digite o investimento por campanha em Custos e mídia"),
+        *(Pendencia(a.configurada,
+                    f"Leitura do {a.canal} ligada em Configurações › Integrações" if a.configurada
+                    else f"Leitura do {a.canal} desligada: ligue em Configurações › Integrações "
+                         "ou digite o investimento por campanha em Custos e mídia")
+          for a in anuncios),
     ]
     return PainelDeCampanhas(
         mes=mes, leads=len(coorte), total=total, canais=canais, campanhas=campanhas,
         regua=Regua(VOLUME_MINIMO, icp_alvo_pct, METAS["qualificados_pago"].alvo, METAS["qualificados_pago"].alerta,
                     TETO_DE_CUSTO),
-        prontidao=prontidao, meta_ads=meta_ads,
+        prontidao=prontidao, anuncios=anuncios,
     )

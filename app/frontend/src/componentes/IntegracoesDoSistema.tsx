@@ -163,7 +163,10 @@ function BotaoCopiar({ texto, rotulo }: { texto: string; rotulo: string }) {
   return (
     <button type="button" className="botao" aria-label={rotulo} disabled={!texto}
       onClick={() => {
-        void navigator.clipboard?.writeText(texto).then(() => definirCopiado(true), () => definirCopiado(false));
+        void navigator.clipboard?.writeText(texto).then(() => {
+          definirCopiado(true);
+          setTimeout(() => definirCopiado(false), 2000);
+        }, () => definirCopiado(false));
       }}>
       {copiado ? "Copiado" : "Copiar"}
     </button>

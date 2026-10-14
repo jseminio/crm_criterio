@@ -41,7 +41,12 @@ LIMITE_DO_TEXTO = 4096
 
 CANAL_DO_LEAD_NOVO = "WhatsApp"
 
-_SAIDA = re.compile(r"^\s*(sair|parar|pare|stop|cancelar|descadastrar|n[ãa]o quero mais receber)\s*[.!]*\s*$", re.IGNORECASE)
+_SAIDA = re.compile(
+    r"^\s*(sair|parar|pare|stop|cancelar|descadastrar|n[ãa]o quero mais receber|parar de receber( mensagens)?"
+    r"|parar promo[çc][õo]es|stop promotions)\s*[.!]*\s*$",
+    re.IGNORECASE,
+)
+"""Inclui o botão de descadastro dos modelos de marketing ("Parar promoções")."""
 
 _TIPOS = {
     "image": "[foto]", "audio": "[áudio]", "video": "[vídeo]", "document": "[documento]",
@@ -187,7 +192,7 @@ def _gravar_mensagem(sessao: Session, m: dict[str, Any], nomes: dict[str, str | 
                              texto=texto, externo_id=externo[:128]))
     conversa.ultima_do_lead_em = _depois(conversa.ultima_do_lead_em, quando)
     resumo.recebidas += 1
-    if m.get("type") == "text" and eh_pedido_de_saida(texto) and not lead.nao_contatar:
+    if m.get("type") in ("text", "button", "interactive") and eh_pedido_de_saida(texto) and not lead.nao_contatar:
         lead.nao_contatar, lead.nao_contatar_em = True, quando
         resumo.saidas += 1
     sessao.flush()

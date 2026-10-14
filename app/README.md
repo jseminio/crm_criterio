@@ -44,8 +44,9 @@ especialista humano são a fase 1, sem mudar as regras de `sdr-ia-limites-de-atu
   - a Meta repete entregas: o ID da mensagem faz cada uma gravar uma vez;
   - número que não está em nenhum lead vira **lead novo**, canal "WhatsApp", com o nome do perfil
     (decisão de Eduardo). O telefone casa com e sem o nono dígito do celular;
-  - mensagem que é só "SAIR", "PARAR", "não quero mais receber" e parecidas marca o lead como **não
-    contatar** (decisão de Eduardo); "quero sair do Simples" não marca;
+  - mensagem que é só "SAIR", "PARAR", "não quero mais receber" e parecidas, ou o botão de descadastro
+    dos modelos de marketing ("Parar promoções"), marca o lead como **não contatar** (decisão de
+    Eduardo); "quero sair do Simples" não marca;
   - foto, áudio, documento: só o tipo ("[áudio]", "[foto] legenda"), sem baixar o arquivo;
   - a situação de entrega (enviada, entregue, lida, falhou) atualiza a mensagem da Critério com o
     mesmo ID, sem voltar atrás. Os modelos do disparo do questionário ainda não entram na conversa,

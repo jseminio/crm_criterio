@@ -92,7 +92,8 @@ class TestRegras:
     def test_numeros_diferentes_nao_casam(self):
         assert chave_do_telefone("+55 11 98765-4321") != chave_do_telefone("+55 21 98765-4321")
 
-    @pytest.mark.parametrize("texto", ["SAIR", "sair", " Parar. ", "pare!", "Não quero mais receber", "STOP", "descadastrar"])
+    @pytest.mark.parametrize("texto", ["SAIR", "sair", " Parar. ", "pare!", "Não quero mais receber", "STOP", "descadastrar",
+                                       "Parar promoções", "parar de receber mensagens", "Stop promotions"])
     def test_pedido_de_saida(self, texto):
         assert eh_pedido_de_saida(texto)
 
@@ -301,3 +302,11 @@ class TestTela:
         assert r.status_code == 500 and r.content == b""
         assert "IntegrityError" in caplog.text and "faturamento" not in caplog.text and "987654321" not in caplog.text
         assert _contar(fabrica, MensagemDoSdr) == 0
+
+
+    def test_botao_de_descadastro_do_modelo_marca_nao_contatar(self, cliente, fabrica):
+        _configurar(fabrica)
+        _enviar(cliente, _payload(mensagens=[{"from": "5511987654321", "id": "w1", "timestamp": "1760450040",
+                                              "type": "button", "button": {"text": "Parar promoções", "payload": "x"}}]))
+        with fabrica() as s:
+            assert s.scalar(sa.select(Lead)).nao_contatar is True

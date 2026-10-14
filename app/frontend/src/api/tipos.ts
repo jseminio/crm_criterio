@@ -2399,7 +2399,8 @@ export interface PainelDeCampanhas {
     teto_de_custo: string;
   };
   prontidao: { ok: boolean; texto: string }[];
-  meta_ads: { configurada: boolean; lido_em: string | null };
+  /** A leitura automática de cada plataforma de anúncio (14/10/2026). */
+  anuncios: { canal: string; configurada: boolean; lido_em: string | null }[];
 }
 
 /** Investimento de uma campanha no mês (13/10/2026): lido do Meta Ads ou digitado. */
@@ -2413,10 +2414,18 @@ export interface InvestimentoPorCampanha {
   lido_em: string | null;
 }
 
-export interface LeituraDoMeta {
+/** O que cada plataforma devolveu no "Atualizar dos anúncios" (14/10/2026). */
+export interface ResultadoDaLeitura {
+  canal: string;
+  ok: boolean;
   lidas: number;
   gravadas: number;
   digitadas_mantidas: string[];
+  erro: string | null;
+}
+
+export interface LeituraDosAnuncios {
+  plataformas: ResultadoDaLeitura[];
   lido_em: string;
 }
 

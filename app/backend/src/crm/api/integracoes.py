@@ -1,6 +1,6 @@
 """Configurações › Integrações (amostra aprovada por Eduardo em 07/10/2026).
 
-Chave de IA, WhatsApp, e-mail, questionário, disparo e Meta Ads (13/10/2026) se cadastram, trocam e testam pela tela, sem
+Chave de IA, WhatsApp, e-mail, questionário, disparo, Meta Ads (13/10/2026) e Google Ads (14/10/2026) se cadastram, trocam e testam pela tela, sem
 nada no painel do servidor. Regras:
 
 - vale primeiro o que está na tela; sem valor na tela, a variável de ambiente antiga; depois o padrão
@@ -94,6 +94,18 @@ def _testar_meta_ads(_: ConfiguracaoDoAgente) -> str:
         raise Falhou(str(falha)) from falha
 
 
+def _testar_google_ads(_: ConfiguracaoDoAgente) -> str:
+    from crm.anuncios import LeituraFalhou, google
+
+    config = google.ler_configuracao()
+    if config is None:
+        raise Falhou("Ligue a leitura e preencha o token de desenvolvedor, o cliente OAuth, o refresh token e a conta.")
+    try:
+        return google.conferir_conta(config)
+    except LeituraFalhou as falha:
+        raise Falhou(str(falha)) from falha
+
+
 def _enviar_whatsapp(config: ConfiguracaoDoAgente, para: str) -> str:
     if config.whatsapp is None:
         raise Falhou("Faltam o token e o ID do número.")
@@ -129,6 +141,7 @@ class Testadores:
     whatsapp: Callable[[ConfiguracaoDoAgente], str] = _testar_whatsapp
     email: Callable[[ConfiguracaoDoAgente], str] = _testar_email
     meta_ads: Callable[[ConfiguracaoDoAgente], str] = _testar_meta_ads
+    google_ads: Callable[[ConfiguracaoDoAgente], str] = _testar_google_ads
     enviar: dict[str, Callable[[ConfiguracaoDoAgente, str], str]] = field(
         default_factory=lambda: {"whatsapp": _enviar_whatsapp, "email": _enviar_email}
     )
@@ -194,6 +207,10 @@ def _problema(campo: configuracao.Campo, valor: str) -> str | None:
         return f"{campo.rotulo}: use {' ou '.join(campo.opcoes)}"
     if campo.chave in ("whatsapp.versao", "meta_ads.versao") and not _VERSAO.match(valor):
         return "Versão da API da Meta: use o formato v24.0"
+    if campo.chave == "google_ads.versao" and not re.match(r"^v\d{2,3}$", valor):
+        return "Versão da API do Google Ads: use o formato v25"
+    if campo.chave in ("google_ads.conta", "google_ads.conta_admin") and not re.fullmatch(r"\d{3}-?\d{3}-?\d{4}", valor):
+        return f"{campo.rotulo}: 10 dígitos, como 123-456-7890"
     if campo.chave == "meta_ads.conta" and not valor.removeprefix("act_").isdigit():
         return "ID da conta de anúncios: só os números, como 1708029123631617"
     if campo.chave in ("questionario.link", "questionario.url") and not valor.startswith("https://"):
@@ -210,8 +227,9 @@ def _configurado(grupo: str, linhas: dict[str, configuracao.Linha]) -> bool:
 
         em_uso = {linhas["ia.principal"].valor, linhas["ia.reserva"].valor} - {NENHUMA, None}
         return all(linhas[f"{n.casefold()}.chave"].origem != "vazio" for n in em_uso)
+    opcionais = {"google_ads.conta_admin"}
     return all(l.origem != "vazio" for l in linhas.values() if configuracao.CAMPOS[l.campo.chave] in
-               configuracao.catalogo.grupo(grupo).campos)
+               configuracao.catalogo.grupo(grupo).campos and l.campo.chave not in opcionais)
 
 
 def roteador_de_integracoes(
@@ -298,7 +316,8 @@ def roteador_de_integracoes(
         configuracao.invalidar()
         if g.chave == "questionario":
             return _cronometrar(_questionario)
-        testador = {"ia": t.ia, "whatsapp": t.whatsapp, "email": t.email, "meta_ads": t.meta_ads}[g.chave]
+        testador = {"ia": t.ia, "whatsapp": t.whatsapp, "email": t.email, "meta_ads": t.meta_ads,
+                    "google_ads": t.google_ads}[g.chave]
         return _cronometrar(lambda: testador(ler_configuracao()))
 
     @r.post("/{chave}/enviar-teste", response_model=ResultadoDoTeste)

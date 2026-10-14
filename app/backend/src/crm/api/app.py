@@ -171,7 +171,7 @@ def criar_app(
     saidas_automaticas: bool | None = None,
     testadores: Testadores | None = None,
     buscar_ipca: BuscarIpca | None = None,
-    gastos_do_meta: Callable[[str], list | None] | None = None,
+    leitores_de_anuncios: Callable[[], list] | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede; `tentativas`, para o
@@ -308,7 +308,7 @@ def criar_app(
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
     api.include_router(roteador_do_sdr(obter_sessao, canais_do_disparo or canais_reais,
-                                       **({"gastos_do_meta": gastos_do_meta} if gastos_do_meta else {})))
+                                       **({"leitores": leitores_de_anuncios} if leitores_de_anuncios else {})))
     api.include_router(roteador_da_base(obter_sessao))
     # Endereço pelo CNPJ na importação do questionário: a BrasilAPI no uso real; no teste (que passa a
     # própria `fabrica`), só se o teste mandar uma busca — teste não sai para a rede.

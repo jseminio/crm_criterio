@@ -170,6 +170,10 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("POST", r"/api/sdr/conversas(/\d+/(encerrar|mensagens|nota))?", ("sdr.editar",)),
     # disparo do lembrete e do agradecimento do questionário (06/10/2026): envia mensagem de verdade
     ("POST", r"/api/sdr/questionario/disparar", ("sdr.parametros",)),
+    # custo por campanha (13/10/2026): ler o Meta Ads e lançar ou tirar o investimento de uma campanha
+    ("POST", r"/api/sdr/campanhas/atualizar", ("sdr.parametros",)),
+    ("PUT", r"/api/sdr/midia/campanha", ("sdr.parametros",)),
+    ("DELETE", r"/api/sdr/midia/campanha/\d+", ("sdr.parametros",)),
     # base de conhecimento do SDR de IA (03/10/2026); o GET está na linha "/api/sdr/.+"
     ("POST", r"/api/sdr/base/fichas/\d+/aprovar", ("sdr.base_aprovar",)),
     ("POST|PATCH", r"/api/sdr/base/(carga-inicial|fichas(/\d+(/(revisao|arquivar|reabrir))?)?)", ("sdr.base",)),

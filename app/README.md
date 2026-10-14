@@ -54,6 +54,9 @@ especialista humano são a fase 1, sem mudar as regras de `sdr-ia-limites-de-atu
     aparece neles desde já; as respostas da fase 1 seguem o mesmo caminho.
 - **Na tela do lead:** a conversa mostra a janela de 24 horas do WhatsApp (aberta até quando, ou
   fechada: só modelo aprovado) e a entrega das mensagens da Critério.
+- **Testar sem a Meta** (que não alcança o CRM do computador): `scripts/simular_whatsapp.py` monta uma
+  entrega no formato da Meta, assina com a chave secreta salva na tela e manda para o CRM local
+  (`--texto "SAIR"`, `--de`, `--nome`, `--assinatura-errada`). Só manda para 127.0.0.1 ou localhost.
 - Migração `a8d2c6e4f0b1`, só aditiva: `mensagem_do_sdr.externo_id` e `.entrega`,
   `conversa_do_sdr.ultima_do_lead_em`. Sem variável de ambiente nova: tudo pela tela.
 

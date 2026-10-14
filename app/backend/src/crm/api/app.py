@@ -66,6 +66,7 @@ from crm.api.integracoes import Testadores, roteador_de_integracoes
 from crm.api.kpis_lideranca import roteador_de_kpis
 from crm.api.reajustes import roteador_de_reajustes
 from crm.api.servicos_e_contratos import roteador_de_servicos_e_contratos
+from crm.api.documento_de_contrato import roteador_do_documento_de_contrato
 from crm.indices.ipca import BuscarIpca
 from crm.api.recebimentos import roteador_de_recebimentos
 from crm.db.saidas import efetivar_saidas, laco_das_saidas
@@ -303,6 +304,7 @@ def criar_app(
     api.include_router(roteador_de_contatos(obter_sessao))
     api.include_router(roteador_de_reajustes(obter_sessao, buscar_ipca))
     api.include_router(roteador_de_servicos_e_contratos(obter_sessao))
+    api.include_router(roteador_do_documento_de_contrato(obter_sessao))
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
     api.include_router(roteador_do_sdr(obter_sessao, canais_do_disparo or canais_reais,

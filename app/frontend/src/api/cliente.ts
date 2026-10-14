@@ -119,6 +119,10 @@ import type {
   ReajusteDoAno,
   ReajusteDoServico,
   ServicoNoContrato,
+  ConfiguracaoDoDocumento,
+  DocumentoDoContrato,
+  MatrizDeContratoResumo,
+  MatrizDoContrato,
 } from "./tipos";
 
 export class ErroDaApi extends Error {
@@ -771,6 +775,25 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ ano, itens, autorizador: autorizador || null }),
     }),
+  documentoDoContrato: (id: number) => pedir<DocumentoDoContrato>(`/api/contratos/${id}/documento`),
+  gerarDocumentoDoContrato: (id: number, valores: Record<string, string>, geradoPor?: string) =>
+    pedir<DocumentoDoContrato>(`/api/contratos/${id}/documento`, {
+      method: "POST",
+      body: JSON.stringify({ valores, gerado_por: geradoPor || null }),
+    }),
+  baixarDocumentoDoContrato: (documentoId: number) =>
+    baixarArquivo(`/api/documentos-de-contrato/${documentoId}/docx`, "contrato.docx"),
+  matrizDoContrato: () => pedir<MatrizDoContrato>("/api/documentos-de-contrato/matriz"),
+  subirMatrizDoContrato: (arquivo: File) =>
+    enviarArquivo<MatrizDeContratoResumo>(
+      comParametros("/api/documentos-de-contrato/matriz", { nome_arquivo: arquivo.name }),
+      arquivo,
+    ),
+  baixarMatrizDoContrato: (matrizId: number) =>
+    baixarArquivo(`/api/documentos-de-contrato/matriz/${matrizId}/docx`, "matriz.docx"),
+  configuracaoDoDocumento: () => pedir<ConfiguracaoDoDocumento>("/api/documentos-de-contrato/configuracao"),
+  editarConfiguracaoDoDocumento: (c: Omit<ConfiguracaoDoDocumento, "ultimo_usado">) =>
+    pedir<ConfiguracaoDoDocumento>("/api/documentos-de-contrato/configuracao", { method: "PUT", body: JSON.stringify(c) }),
   servicosEContratos: () => pedir<ServicoNoContrato[]>("/api/servicos/contratos"),
   gravarServicosEContratos: (itens: { servico: string; modelo: ModeloDeContrato; reajuste: ReajusteDoServico }[]) =>
     pedir<ServicoNoContrato[]>("/api/servicos/contratos", { method: "PUT", body: JSON.stringify({ itens }) }),

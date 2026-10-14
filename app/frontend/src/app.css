@@ -1548,6 +1548,7 @@ td > .celula-fonte { display: block; }
 .entrada-do-reajuste { width: 130px; text-align: right; font-variant-numeric: tabular-nums; }
 .historico-do-ipca { margin-top: var(--e4); }
 .texto-espera { color: var(--espera); }
+.gerar-contrato { margin: var(--e4) 0; padding-top: var(--e3); border-top: 1px solid var(--borda); }
 .botao-escolhido { background: var(--andamento-suave); border: 2px solid var(--andamento); color: var(--andamento); font-weight: 600; }
 .tipo-de-contrato { display: grid; gap: var(--e2); margin: var(--e2) 0 var(--e3); }
 .tipo-de-contrato-opcoes { display: flex; gap: var(--e2); flex-wrap: wrap; }

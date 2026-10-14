@@ -20,6 +20,7 @@ import { AlteracoesDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 import { ImportarRecebimentos } from "../componentes/ImportarRecebimentos";
 import { usarAcesso } from "../entrada";
 import { contratoCombina, Destaque } from "./pesquisaDeContratos";
+import { GerarContrato } from "../componentes/GerarContrato";
 
 const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "Encerrado"];
 
@@ -299,6 +300,8 @@ function EdicaoDeContrato({
           />
         </div>
       </div>
+
+      {contrato.recorrente !== false && contrato.situacao !== "Encerrado" && <GerarContrato contratoId={contrato.id} />}
 
       {detalhe && <EventosDeContrato contrato={detalhe} aoRegistrar={aoRegistrarEvento} motivos={motivos} iniciativas={iniciativas} />}
 

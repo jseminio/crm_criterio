@@ -1919,3 +1919,57 @@ class ContratoDoServico(CarimboMixin, Base):
     """O nome do serviço no catálogo."""
     modelo: Mapped[str] = mapped_column(sa.String(40), nullable=False)
     reajuste: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+
+
+class MatrizDeContrato(Base):
+    """Um Word de contrato subido em Configurações › Serviços e contratos (14/10/2026), por modelo de contrato.
+    Trocar a matriz é subir outra: a anterior fica, para que um contrato já gerado saia de novo igual.
+
+    **Imutável de propósito**, como `MatrizDeProposta`."""
+
+    __tablename__ = "matriz_de_contrato"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    modelo: Mapped[str] = mapped_column(sa.String(40), nullable=False, index=True)
+    """O modelo de contrato (`crm.domain.contrato_do_servico.ModeloDeContrato`)."""
+    nome_arquivo: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    conteudo_base64: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    enviada_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+    enviada_por: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    encontrados: Mapped[list[str]] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+    """Marcadores que estão no arquivo: na geração, cada um precisa de valor."""
+    faltando: Mapped[list[str]] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+    desconhecidos: Mapped[list[str]] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+
+
+class ConfiguracaoDeContrato(CarimboMixin, Base):
+    """Uma linha só (14/10/2026): o próximo número da sequência CONT CCE RJ1, quem assina pela Critério e os padrões
+    do contrato recorrente (dia do vencimento e valor por funcionário além do quadro do DP)."""
+
+    __tablename__ = "configuracao_de_contrato"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    proximo_numero: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=102)
+    signatario: Mapped[str | None] = mapped_column(sa.String(200))
+    cargo_signatario: Mapped[str | None] = mapped_column(sa.String(100))
+    cpf_signatario: Mapped[str | None] = mapped_column(sa.String(14))
+    """Dado pessoal: fica só aqui, no banco, nunca no código nem na matriz."""
+    vencimento: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False, default=25)
+    excedente_dp: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False, default=Decimal("50.00"))
+
+
+class DocumentoDeContrato(CarimboMixin, Base):
+    """Um contrato gerado em Word (14/10/2026). O número (CONT CCE RJ1 102.2026) é único e não volta: gerar de novo
+    enquanto o contrato aguarda assinatura regrava o mesmo documento, com o mesmo número. `valores` guarda tudo o que
+    foi preenchido, para baixar de novo exatamente igual."""
+
+    __tablename__ = "documento_de_contrato"
+    __table_args__ = (sa.UniqueConstraint("ano", "numero", name="uq_documento_de_contrato_ano_numero"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contrato_id: Mapped[int] = mapped_column(sa.ForeignKey("contrato.id"), nullable=False, index=True)
+    numero: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    ano: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False)
+    matriz_id: Mapped[int] = mapped_column(sa.ForeignKey("matriz_de_contrato.id"), nullable=False)
+    valores: Mapped[dict] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+    gerado_por: Mapped[str] = mapped_column(sa.String(200), nullable=False)

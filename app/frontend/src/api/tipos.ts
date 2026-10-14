@@ -2437,3 +2437,48 @@ export interface ServicoNoContrato {
   reajustes_possiveis: ReajusteDoServico[];
   padrao: boolean;
 }
+
+/** Contrato recorrente gerado em Word pela matriz (14/10/2026). */
+export interface MatrizDeContratoResumo {
+  id: number;
+  nome_arquivo: string;
+  enviada_em: string;
+  enviada_por: string;
+  encontrados: string[];
+  faltando: string[];
+  desconhecidos: string[];
+  em_condicao: boolean;
+}
+
+export interface MatrizDoContrato {
+  modelo: string;
+  em_uso: MatrizDeContratoResumo | null;
+  marcadores: { nome: string; descricao: string; obrigatorio: boolean }[];
+}
+
+export interface CampoDoDocumento {
+  nome: string;
+  descricao: string;
+  valor: string;
+  origem: string;
+}
+
+export interface DocumentoDoContrato {
+  modelo: string;
+  recorrente: boolean | null;
+  matriz: MatrizDeContratoResumo | null;
+  problema: string | null;
+  numero: string;
+  campos: CampoDoDocumento[];
+  gerado: { id: number; numero: string; gerado_em: string; gerado_por: string } | null;
+}
+
+export interface ConfiguracaoDoDocumento {
+  proximo_numero: number;
+  ultimo_usado: string | null;
+  signatario: string | null;
+  cargo_signatario: string | null;
+  cpf_signatario: string | null;
+  vencimento: number;
+  excedente_dp: string;
+}

@@ -10,6 +10,7 @@
  */
 
 import { ServicosEContratos } from "../componentes/ServicosEContratos";
+import { MatrizDoContrato } from "../componentes/MatrizDoContrato";
 import { HistoricoDeAlteracoes } from "../componentes/HistoricoDeAlteracoes";
 import { IntegracoesDoSistema } from "../componentes/IntegracoesDoSistema";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
@@ -214,7 +215,12 @@ export function Configuracoes({ listas = null }: { listas?: Listas | null }) {
         </>
       )}
       {aba === "historico" && <HistoricoDeAlteracoes />}
-      {aba === "servicos_e_contratos" && <ServicosEContratos />}
+      {aba === "servicos_e_contratos" && (
+        <>
+          <ServicosEContratos />
+          <MatrizDoContrato />
+        </>
+      )}
       {aba === "backup" && (
       <>
       {eu.administrador && <MigrarDoCrmLocal />}

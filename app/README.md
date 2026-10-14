@@ -16,6 +16,29 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Contrato recorrente gerado em Word (14/10/2026)
+
+Amostra aprovada por Eduardo em 14/10/2026. O contrato recorrente sai de uma **matriz em Word** com marcadores
+`{{campo}}`, do mesmo jeito que a proposta sai da matriz em PowerPoint.
+
+- **No contrato** (Gestão de contratos › Abrir), seção **Gerar contrato · CONT CCE RJ1 nº.ano**: cada marcador da
+  matriz com o valor sugerido e a origem. **Empresa:** razão social, CNPJ, endereço e regime. **Proposta:** honorários
+  de Contábil e DP, horas, faturamento, funcionários e lançamentos (a enviada mais recente). **Parâmetros:** o bruto
+  estimado, pelo imposto. **Configurações:** vencimento, excedente do DP e quem assina. **Hoje:** a data por extenso.
+  O resto se digita. Todo marcador da matriz precisa de valor. **Gerar Word** reserva o número e baixa o .docx.
+- **Número CONT CCE RJ1:** sequência própria, começando em **102** (os últimos no SharePoint são 99 a 101.2026).
+  Enquanto o contrato aguarda assinatura, gerar de novo regrava o mesmo documento, com o mesmo número; assinado, o
+  documento não muda. Número usado nunca volta.
+- **Configurações › Serviços e contratos › Contrato recorrente em Word:** subir e trocar a matriz (.docx), lista de
+  marcadores, próximo número, quem assina (nome, cargo e CPF, só no banco e fora do histórico de alterações),
+  dia do vencimento (25) e valor por funcionário além do quadro (R$ 50,00). Matriz com marcador obrigatório faltando
+  ou desconhecido fica gravada, mas não é usada.
+- **Primeira versão:** as marcas INCLUÍDO / N/A dos anexos se ajustam no Word. O não recorrente (minuta v1.1) entra
+  depois da revisão do advogado.
+- Rotas: `GET`/`POST /api/contratos/{id}/documento`, `GET /api/documentos-de-contrato/{id}/docx`,
+  `GET`/`POST /api/documentos-de-contrato/matriz`, `GET`/`PUT /api/documentos-de-contrato/configuracao`. Matriz em
+  `crm.contrato.matriz` (zip e XML, sem dependência nova).
+
 ## Serviços e contratos: o tipo do contrato sai do serviço (13/10/2026)
 
 Amostra aprovada por Eduardo em 13/10/2026.

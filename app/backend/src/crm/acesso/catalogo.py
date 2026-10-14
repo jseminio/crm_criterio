@@ -146,6 +146,14 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/(reajustes|ipca)", ("contratos.ver",)),
     ("GET", r"/api/servicos/contratos", ("configuracoes.servicos", "contratos.ver", "funil.converter")),
     ("PUT", r"/api/servicos/contratos", ("configuracoes.servicos",)),
+    # documento do contrato (14/10/2026)
+    ("GET", r"/api/contratos/\d+/documento", ("contratos.ver",)),
+    ("POST", r"/api/contratos/\d+/documento", ("contratos.editar",)),
+    ("GET", r"/api/documentos-de-contrato/\d+/docx", ("contratos.ver",)),
+    ("GET", r"/api/documentos-de-contrato/matriz(/\d+/docx)?", ("configuracoes.servicos", "contratos.ver")),
+    ("POST", r"/api/documentos-de-contrato/matriz", ("configuracoes.servicos",)),
+    ("GET", r"/api/documentos-de-contrato/configuracao", ("configuracoes.servicos", "contratos.ver")),
+    ("PUT", r"/api/documentos-de-contrato/configuracao", ("configuracoes.servicos",)),
     ("POST", r"/api/reajustes/aprovar", ("contratos.aprovar",)),
     ("POST", r"/api/ipca/atualizar", ("contratos.ver",)),
     # carteira

@@ -61,6 +61,7 @@ from crm.api.leads_do_meta import (
 )
 from crm.api.conversoes import enviadores_reais, laco_das_conversoes, roteador_de_conversoes
 from crm.api.sdr import roteador as roteador_do_sdr
+from crm.api.whatsapp_recebido import roteador_do_whatsapp_recebido
 from crm.api.ficha import pendencias_de, roteador_da_ficha
 from crm.api.propostas import roteador_de_propostas
 from crm.api.busca_automatica import laco_da_busca
@@ -345,6 +346,7 @@ def criar_app(
     endereco = busca_de_endereco or (None if fabrica is not None else endereco_pelo_cnpj)
     api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real, endereco))
     api.include_router(roteador_de_integracoes(obter_sessao, fonte_de_questionarios or fonte_real, testadores))
+    api.include_router(roteador_do_whatsapp_recebido(obter_sessao))
     api.include_router(roteador_de_kpis(obter_sessao))
     api.include_router(roteador_de_recebimentos(obter_sessao))
     api.include_router(roteador_de_propostas(obter_sessao, servicos_da_ata or servicos_da_ata_reais))

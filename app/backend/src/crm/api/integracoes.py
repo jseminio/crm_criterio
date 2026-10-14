@@ -29,6 +29,7 @@ from crm.agente.config import ConfiguracaoDoAgente, ler_configuracao
 from crm.agente.envio import EnvioFalhou, conferir_credenciais, enviar_email
 from crm.agente.whatsapp import conferir_numero, enviar_modelo
 from crm.api.acesso import quem_fez
+from crm.api.whatsapp_recebido import situacao_do_recebimento
 from crm.domain.abordagem import normalizar_destino
 from crm.domain.listas import CanalDeAbordagem
 from crm.questionario.fonte import BuscaFalhou, FonteDeQuestionarios
@@ -183,6 +184,8 @@ class GrupoResposta(BaseModel):
     envia_teste: bool
     configurado: bool
     """Tem valor (da tela ou do servidor) em todos os campos sem padrão."""
+    situacao: str | None = None
+    """Uma frase sobre o funcionamento, quando a integração tem (o recebimento do WhatsApp)."""
     campos: list[CampoResposta]
     alterado_por: str | None
     alterado_em: datetime | None
@@ -241,7 +244,7 @@ def _configurado(grupo: str, linhas: dict[str, configuracao.Linha]) -> bool:
 
         em_uso = {linhas["ia.principal"].valor, linhas["ia.reserva"].valor} - {NENHUMA, None}
         return all(linhas[f"{n.casefold()}.chave"].origem != "vazio" for n in em_uso)
-    opcionais = {"google_ads.conta_admin", "meta_ads.conjunto", "meta_ads.pagina", "meta_ads.token_pagina", "google_ads.acao_qualificado",
+    opcionais = {"whatsapp.recebimento", "whatsapp.token_verificacao", "whatsapp.app_secret", "google_ads.conta_admin", "meta_ads.conjunto", "meta_ads.pagina", "meta_ads.token_pagina", "google_ads.acao_qualificado",
                  "google_ads.acao_reuniao", "google_ads.acao_contrato"}
     return all(l.origem != "vazio" for l in linhas.values() if configuracao.CAMPOS[l.campo.chave] in
                configuracao.catalogo.grupo(grupo).campos and l.campo.chave not in opcionais)
@@ -271,6 +274,7 @@ def roteador_de_integracoes(
             grupos.append(GrupoResposta(
                 chave=g.chave, titulo=g.titulo, testavel=g.testavel, envia_teste=g.chave in t.enviar,
                 configurado=_configurado(g.chave, linhas),
+                situacao=situacao_do_recebimento(sessao) if g.chave == "whatsapp" else None,
                 campos=[CampoResposta(
                     chave=l.campo.chave, rotulo=l.campo.rotulo, segredo=l.campo.segredo, origem=l.origem,
                     valor=l.valor, final=l.final, ilegivel=l.ilegivel, padrao=l.campo.padrao,

@@ -12,6 +12,17 @@ import { usarDados } from "../usarDados";
 import { Etiqueta } from "./Etiqueta";
 import { Carregando, Erro } from "./estados";
 
+/** Receber as mensagens dos leads pelo WhatsApp (fase 0 do SDR de IA, amostra aprovada em 14/10/2026). */
+const DO_RECEBIMENTO = ["whatsapp.recebimento", "whatsapp.token_verificacao", "whatsapp.app_secret"];
+export const CAMINHO_DO_WEBHOOK = "/api/whatsapp/webhook";
+
+/** Um token novo, gerado no navegador: o servidor recebe ao salvar e nunca o devolve. */
+export function gerarToken(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return `crm-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
 const DE_ONDE: Record<string, string> = {
   tela: "salvo nesta tela",
   servidor: "vem do servidor; salve aqui para a tela valer",
@@ -96,11 +107,16 @@ function CartaoDeIntegracao({ grupo, aoSalvar }: { grupo: GrupoDeIntegracao; aoS
         <Etiqueta texto={grupo.configurado ? "Configurado" : "Falta configurar"} />
       </div>
       <div style={{ display: "grid", gap: "var(--e3)", marginTop: "var(--e3)" }}>
-        {grupo.campos.map((c) => (
+        {grupo.campos.filter((c) => !DO_RECEBIMENTO.includes(c.chave)).map((c) => (
           <Campo key={c.chave} campo={c} valor={valorDe(c)} aoMudar={(v) => mudar(c.chave, v)}
             vaiApagar={apagar.includes(c.chave)}
             aoApagar={() => { definirFeito(null); definirApagar([...apagar, c.chave]); }} />
         ))}
+        {grupo.campos.some((c) => DO_RECEBIMENTO.includes(c.chave)) && (
+          <Recebimento campos={grupo.campos.filter((c) => DO_RECEBIMENTO.includes(c.chave))} situacao={grupo.situacao}
+            valorDe={valorDe} aoMudar={mudar} apagar={apagar}
+            aoApagar={(chave) => { definirFeito(null); definirApagar([...apagar, chave]); }} />
+        )}
       </div>
       <div className="perfis-acoes">
         <button type="button" className="botao botao-primario" disabled={!mudou || salvando} onClick={() => void salvar()}>
@@ -139,6 +155,75 @@ function CartaoDeIntegracao({ grupo, aoSalvar }: { grupo: GrupoDeIntegracao; aoS
       {falha && <p className="estado estado-erro estado-texto" role="alert">✗ {falha}</p>}
       {feito && <p className="recado" role="status">✓ {feito}</p>}
     </section>
+  );
+}
+
+function BotaoCopiar({ texto, rotulo }: { texto: string; rotulo: string }) {
+  const [copiado, definirCopiado] = useState(false);
+  return (
+    <button type="button" className="botao" aria-label={rotulo} disabled={!texto}
+      onClick={() => {
+        void navigator.clipboard?.writeText(texto).then(() => {
+          definirCopiado(true);
+          setTimeout(() => definirCopiado(false), 2000);
+        }, () => definirCopiado(false));
+      }}>
+      {copiado ? "Copiado" : "Copiar"}
+    </button>
+  );
+}
+
+function Recebimento({ campos, situacao, valorDe, aoMudar, apagar, aoApagar }: {
+  campos: CampoDeIntegracao[]; situacao: string | null | undefined; valorDe: (c: CampoDeIntegracao) => string;
+  aoMudar: (chave: string, valor: string) => void; apagar: string[]; aoApagar: (chave: string) => void;
+}) {
+  const de = (chave: string) => campos.find((c) => c.chave === chave);
+  const ligado = de("whatsapp.recebimento");
+  const token = de("whatsapp.token_verificacao");
+  const segredo = de("whatsapp.app_secret");
+  const endereco = `${window.location.origin}${CAMINHO_DO_WEBHOOK}`;
+  return (
+    <div className="recebimento" role="group" aria-labelledby="t-recebimento">
+      <strong id="t-recebimento" className="recebimento-titulo">Receber as mensagens dos leads</strong>
+      <span className="campo-ajuda" style={{ margin: 0 }}>
+        A Meta entrega cada mensagem do lead neste endereço do CRM. Nesta fase o CRM só recebe e mostra:{" "}
+        <b>ninguém responde sozinho</b>.
+      </span>
+      {ligado && <Campo campo={ligado} valor={valorDe(ligado)} aoMudar={(v) => aoMudar(ligado.chave, v)}
+        vaiApagar={apagar.includes(ligado.chave)} aoApagar={() => aoApagar(ligado.chave)} />}
+      <div style={{ display: "grid", gap: "var(--e1)" }}>
+        <label htmlFor="campo-endereco-webhook">Endereço para colar na Meta (URL de retorno)</label>
+        <div className="recebimento-linha">
+          <input id="campo-endereco-webhook" className="entrada" readOnly value={endereco} />
+          <BotaoCopiar texto={endereco} rotulo="Copiar o endereço" />
+        </div>
+        <span className="campo-ajuda">
+          Meta for Developers › seu app › WhatsApp › Configuração › Webhook. Assine o campo <b>messages</b>.
+        </span>
+      </div>
+      {token && (
+        <div style={{ display: "grid", gap: "var(--e1)" }}>
+          <label htmlFor={`campo-${token.chave}`}>{token.rotulo}</label>
+          {token.final && !valorDe(token) && !apagar.includes(token.chave) && (
+            <span className="campo-ajuda">Salvo, termina em <strong>{token.final}</strong>. Gere outro só se for trocar na Meta também.</span>
+          )}
+          <div className="recebimento-linha">
+            <input id={`campo-${token.chave}`} className="entrada" type="text" autoComplete="off" value={valorDe(token)}
+              placeholder={token.final ? "Gere outro para trocar" : "Clique em Gerar"}
+              onChange={(e) => aoMudar(token.chave, e.target.value)} />
+            <button type="button" className="botao" onClick={() => aoMudar(token.chave, gerarToken())}>Gerar</button>
+            <BotaoCopiar texto={valorDe(token)} rotulo="Copiar o token" />
+          </div>
+          <span className="campo-ajuda">
+            Gere, cole o mesmo valor na Meta em “Verificar token” e salve aqui. Depois de salvo, o CRM mostra só os 4
+            últimos caracteres, como as outras chaves.
+          </span>
+        </div>
+      )}
+      {segredo && <Campo campo={segredo} valor={valorDe(segredo)} aoMudar={(v) => aoMudar(segredo.chave, v)}
+        vaiApagar={apagar.includes(segredo.chave)} aoApagar={() => aoApagar(segredo.chave)} />}
+      {situacao && <p className="campo-ajuda recebimento-situacao" role="status">{situacao}</p>}
+    </div>
   );
 }
 

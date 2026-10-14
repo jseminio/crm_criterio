@@ -9,8 +9,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
-import type { LeadResumo, Listas, Pagina } from "../api/tipos";
-import { Leads } from "./Leads";
+import type { ConversaDoSdr, LeadResumo, Listas, Pagina } from "../api/tipos";
+import { JanelaDoWhatsapp, Leads } from "./Leads";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
@@ -361,5 +361,47 @@ describe("conversão em oportunidade", () => {
     expect(mudancas.aderencia).toBe("Bate");
     expect(mudancas).not.toHaveProperty("aderencia_sobre");
     expect(mudancas).not.toHaveProperty("primeiro_contato_em");
+  });
+});
+
+describe("conversa do WhatsApp (14/10/2026)", () => {
+  const conversa = (extra: Partial<ConversaDoSdr> = {}): ConversaDoSdr => ({
+    id: 1, lead_id: 1, canal: "WhatsApp", iniciada_em: "2026-10-14T13:30:00Z", encerrada_em: null, desfecho: null,
+    motivo_transbordo: null, destino_transbordo: null, atendida_em: null, nota: null,
+    ultima_do_lead_em: "2026-10-14T13:34:00Z", mensagens: [], ...extra,
+  });
+
+  it("janela aberta: diz até quando e que ninguém responde sozinho", () => {
+    render(<JanelaDoWhatsapp conversa={conversa()} agora={new Date("2026-10-14T20:00:00Z")} />);
+    const aviso = screen.getByRole("status");
+    expect(aviso).toHaveTextContent("aberta até");
+    expect(aviso).toHaveTextContent("Respostas automáticas: desligadas até a fase 1");
+  });
+
+  it("janela fechada: avisa com sinal e texto, não só cor", () => {
+    render(<JanelaDoWhatsapp conversa={conversa()} agora={new Date("2026-10-16T10:00:00Z")} />);
+    expect(screen.getByRole("status")).toHaveTextContent("⚠ Janela do WhatsApp fechada desde");
+  });
+
+  it("e-mail, conversa encerrada ou sem mensagem do lead: sem aviso", () => {
+    const { container } = render(<>
+      <JanelaDoWhatsapp conversa={conversa({ canal: "E-mail" })} />
+      <JanelaDoWhatsapp conversa={conversa({ encerrada_em: "2026-10-14T14:00:00Z" })} />
+      <JanelaDoWhatsapp conversa={conversa({ ultima_do_lead_em: null })} />
+    </>);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("mostra a entrega das mensagens da Critério", async () => {
+    vi.mocked(api.conversasDoLead).mockResolvedValue([conversa({ mensagens: [
+      { id: 1, autor: "IA", enviada_em: "2026-10-14T13:30:00Z", texto: "Olá, Marina!", intencao: null, confianca: null,
+        fallback: false, termo_nao_reconhecido: null, tom: null, entrega: "lida" },
+      { id: 2, autor: "Lead", enviada_em: "2026-10-14T13:34:00Z", texto: "SAIR", intencao: null, confianca: null,
+        fallback: false, termo_nao_reconhecido: null, tom: null },
+    ] })]);
+    await abrir([lead()]);
+    await userEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    expect(await screen.findByText(/✓✓ lida/)).toBeInTheDocument();
+    expect(screen.getByText("SAIR")).toBeInTheDocument();
   });
 });

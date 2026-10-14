@@ -92,8 +92,8 @@ def texto(modelo: Modelo, lead: Lead, link: str) -> str:
 class Canais:
     """Como enviar. Canal `None` é canal não configurado: a pendência fica para depois, com aviso."""
 
-    whatsapp: Callable[[str, str, dict[str, str]], None] | None = None
-    """(número com 55, nome do modelo, parâmetros)"""
+    whatsapp: Callable[[str, str, dict[str, str]], str | None] | None = None
+    """(número com 55, nome do modelo, parâmetros) → o ID da mensagem na Meta, quando houver"""
     email: Callable[[str, str, str], None] | None = None
     """(e-mail, assunto, corpo)"""
 
@@ -125,6 +125,7 @@ def disparar(sessao: Session, canais: Canais, momento: datetime, link: str) -> R
         if problema:
             resultado.erros.append(f"{_rotulo(lead)}: {problema}.")
             continue
+        externo: str | None = None
         try:
             if conversa.canal is CanalDeAbordagem.WHATSAPP:
                 numero = normalizar_destino(CanalDeAbordagem.WHATSAPP, lead.telefone)
@@ -134,7 +135,8 @@ def disparar(sessao: Session, canais: Canais, momento: datetime, link: str) -> R
                 if len(numero) not in (12, 13):
                     resultado.avisos.append(f"{_rotulo(lead)}: sem celular válido no cadastro.")
                     continue
-                canais.whatsapp(numero, modelo.nome, parametros(lead))
+                devolvido = canais.whatsapp(numero, modelo.nome, parametros(lead))
+                externo = devolvido if isinstance(devolvido, str) and devolvido else None
             else:
                 if canais.email is None:
                     resultado.avisos.append(f"{_rotulo(lead)}: e-mail não configurado (Configurações › Integrações).")
@@ -147,7 +149,7 @@ def disparar(sessao: Session, canais: Canais, momento: datetime, link: str) -> R
             resultado.erros.append(f"{_rotulo(lead)}: {falha}")
             continue
 
-        do_lead.marcar(sessao, lead, conversa, corpo, mensagem, momento)
+        do_lead.marcar(sessao, lead, conversa, corpo, mensagem, momento, externo_id=externo)
         sessao.commit()
         resultado.enviados += 1
         _log.info("questionário: %s enviado ao lead %s", mensagem.value.lower(), lead.id)

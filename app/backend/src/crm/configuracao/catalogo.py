@@ -63,6 +63,14 @@ GRUPOS: tuple[Grupo, ...] = (
               ajuda="Gerenciador do WhatsApp › Números de telefone.", exemplo="123456789012345"),
         Campo("whatsapp.versao", "Versão da API da Meta", variavel="CRM_WHATSAPP_VERSAO", padrao="v24.0",
               exemplo="v24.0"),
+        # Receber as mensagens dos leads (fase 0 do SDR de IA, amostra aprovada em 14/10/2026).
+        Campo("whatsapp.recebimento", "Recebimento ligado", padrao="false", opcoes=("true", "false"),
+              ajuda="Desligado, o CRM recusa o que chegar."),
+        Campo("whatsapp.token_verificacao", "Token de verificação", segredo=True,
+              ajuda="Gere, cole o mesmo valor na Meta em “Verificar token” e salve aqui."),
+        Campo("whatsapp.app_secret", "Chave secreta do aplicativo (App Secret)", segredo=True,
+              ajuda="Meta for Developers › seu app › Configurações › Básico. Com ela o CRM confere a assinatura de "
+                    "cada entrega e recusa o que não veio da Meta."),
     )),
     Grupo("email", "E-mail (Microsoft 365)", (
         Campo("m365.tenant", "ID do diretório (tenant)", variavel="CRM_M365_TENANT_ID"),

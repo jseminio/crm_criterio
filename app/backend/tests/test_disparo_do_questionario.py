@@ -111,6 +111,7 @@ class Envios:
         if self.falhar:
             raise EnvioFalhou("A Meta não enviou o WhatsApp (HTTP 400): teste")
         self.whatsapp.append((para, modelo, parametros))
+        return f"wamid.teste{len(self.whatsapp)}"
 
     def _email(self, para, assunto, corpo):
         self.email.append((para, assunto, corpo))
@@ -157,7 +158,8 @@ def rodar(fabrica, canais: Canais, momento=TERCA_MEIO_DIA):
 
 def mensagens_da_ia(fabrica, lead_id: int) -> list[str]:
     with fabrica() as sessao:
-        return [m.texto for c in sessao.get(Lead, lead_id).conversas for m in c.mensagens][1:]
+        # Pela ordem de gravação: o disparo do teste roda numa data fixa, antes da mensagem do link.
+        return [m.texto for c in sessao.get(Lead, lead_id).conversas for m in sorted(c.mensagens, key=lambda m: m.id)][1:]
 
 
 class TestDisparo:
@@ -172,6 +174,14 @@ class TestDisparo:
         assert cliente.get(f"/api/sdr/leads/{lead_id}/questionario").json()["passo"] == "Lembrete enviado"
 
         assert rodar(fabrica, envios.canais()).enviados == 0 and len(envios.whatsapp) == 1
+
+    def test_o_lembrete_guarda_o_id_da_meta_para_a_entrega(self, cliente, fabrica, envios):
+        """14/10/2026: o recebimento do WhatsApp atualiza a entrega pela mensagem com este ID."""
+        lead_id = lead_com_link(cliente, fabrica)
+        rodar(fabrica, envios.canais())
+        with fabrica() as sessao:
+            (lembrete,) = [m for c in sessao.get(Lead, lead_id).conversas for m in c.mensagens if m.externo_id]
+            assert (lembrete.externo_id, lembrete.entrega) == ("wamid.teste1", "enviada")
 
     def test_agradece_por_e_mail_quem_respondeu(self, cliente, fabrica, envios):
         lead_id = lead_com_link(cliente, fabrica, canal="E-mail", dias=0)

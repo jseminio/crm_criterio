@@ -1,6 +1,6 @@
 /** A aba Campanhas (13/10/2026): funil por canal, decisão por campanha e os estados da tela. */
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ErroDaApi } from "../api/cliente";
 import type { EtapaDoCanal, FunilDoCanal, PainelDeCampanhas, PainelDoSdr } from "../api/tipos";
@@ -8,7 +8,7 @@ import { Campanhas } from "./Campanhas";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { campanhas: vi.fn(), painelDoSdr: vi.fn() } };
+  return { ...real, api: { campanhas: vi.fn(), painelDoSdr: vi.fn(), atualizarDoMeta: vi.fn() } };
 });
 
 const taxa = (numerador: number, denominador: number) => ({
@@ -42,8 +42,10 @@ function painel(extra: Partial<PainelDeCampanhas> = {}): PainelDeCampanhas {
       canal: "Meta Ads", campanha: "Tempo para Crescer", leads: 80, no_icp: taxa(22, 80), qualificados: taxa(10, 80),
       reunioes: 4, contratos: 0, mrr_novo: "0.00", descartes: [{ nome: "Porte abaixo do mínimo", quantidade: 22 }],
       decisao: "Refazer público", porque: "28% no ICP, abaixo do alvo de 40%; o que mais tira é “Porte abaixo do mínimo”.",
+      investimento: "3000.00", fonte: "lido", custo_por_lead_icp: "136.36", custo_por_reuniao: "750.00",
     }],
-    regua: { volume_minimo: 20, icp_alvo_pct: "40", qualificados_meta_pct: 20, qualificados_alerta_pct: 10 },
+    regua: { volume_minimo: 20, icp_alvo_pct: "40", qualificados_meta_pct: 20, qualificados_alerta_pct: 10, teto_de_custo: "1.5" },
+    meta_ads: { configurada: true, lido_em: "2026-10-13T22:40:00Z" },
     prontidao: [
       { ok: true, texto: "Investimento do mês lançado em todos os canais" },
       { ok: false, texto: "Leitura automática do Meta Ads e do Google Ads ainda não ligada" },
@@ -103,12 +105,45 @@ describe("Campanhas", () => {
     vi.mocked(api.campanhas).mockResolvedValue(painel({ leads: 0, total: null, canais: [], campanhas: [] }));
     render(<Campanhas />);
     expect(await screen.findByText(/Nenhum lead de tráfego pago/)).toBeInTheDocument();
-    expect(screen.getByText(/Custos e mídia/)).toBeInTheDocument();
+    expect(screen.getByText(/lance o investimento do mês em SDR da IA › Custos e mídia/)).toBeInTheDocument();
   });
 
   it("erro: oferece tentar de novo", async () => {
     vi.mocked(api.campanhas).mockRejectedValue(new ErroDaApi(500, "falhou"));
     render(<Campanhas />);
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+  });
+
+  it("mostra o custo por campanha e de onde veio", async () => {
+    vi.mocked(api.campanhas).mockResolvedValue(painel());
+    render(<Campanhas />);
+    const tabela = await screen.findByRole("table", { name: "Decisão por campanha" });
+    expect(within(tabela).getByText(/R\$\s?750,00/)).toBeInTheDocument();
+    expect(within(tabela).getByText(/R\$\s?136,36/)).toBeInTheDocument();
+    expect(within(tabela).getByText("Meta Ads · lido")).toBeInTheDocument();
+    expect(screen.getByText(/rever custo acima de 1,5 ×/)).toBeInTheDocument();
+  });
+
+  it("atualiza do Meta Ads, conta o que ficou digitado e recarrega", async () => {
+    vi.mocked(api.campanhas).mockResolvedValue(painel());
+    vi.mocked(api.atualizarDoMeta).mockResolvedValue({ lidas: 3, gravadas: 2, digitadas_mantidas: ["Vale"], lido_em: "2026-10-13T23:00:00Z" });
+    render(<Campanhas />);
+    expect(await screen.findByText(/Meta Ads lido em/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Atualizar do Meta Ads" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("2 campanha(s) atualizada(s) do Meta Ads. Valor digitado mantido em: Vale.");
+    expect(api.campanhas).toHaveBeenCalledTimes(2);
+  });
+
+  it("falha do Meta vira frase, e sem leitura ligada não há botão", async () => {
+    vi.mocked(api.campanhas).mockResolvedValue(painel());
+    vi.mocked(api.atualizarDoMeta).mockRejectedValue(new ErroDaApi(502, "A Meta recusou o token do Meta Ads (HTTP 401)."));
+    const { unmount } = render(<Campanhas />);
+    fireEvent.click(await screen.findByRole("button", { name: "Atualizar do Meta Ads" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("recusou o token");
+    unmount();
+    vi.mocked(api.campanhas).mockResolvedValue(painel({ meta_ads: { configurada: false, lido_em: null } }));
+    render(<Campanhas />);
+    expect(await screen.findByText(/Leitura do Meta Ads desligada/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Atualizar do Meta Ads" })).not.toBeInTheDocument();
   });
 });

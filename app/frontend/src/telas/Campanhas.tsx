@@ -2,14 +2,15 @@
  *
  * Responde a uma pergunta: em qual campanha pôr o próximo real. Um funil por canal,
  * com a passagem entre etapas e o custo de cada uma, e a decisão por campanha pela
- * régua provisória de `crm.domain.campanhas`. O sucesso da busca (primeira resposta,
+ * régua provisória de `crm.domain.campanhas`. Desde 13/10/2026, o custo por campanha: lido do Meta
+ * Ads (botão "Atualizar do Meta Ads") ou digitado em Custos e mídia. O sucesso da busca (primeira resposta,
  * quem respondeu) vem do painel do SDR, filtrado em tráfego pago.
  *
  * A largura de cada etapa é fixa, para dar a forma de funil: o número é o que vale.
  */
 
 import { useState } from "react";
-import { api } from "../api/cliente";
+import { api, ErroDaApi } from "../api/cliente";
 import type { FunilDoCanal, LinhaDaCampanha, PainelDeCampanhas, PainelDoSdr } from "../api/tipos";
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
 import { dinheiro } from "../formato";
@@ -30,6 +31,7 @@ const TOM_DA_DECISAO: Record<string, string> = {
   "Aguardar volume": "neutra",
   "Ajustar criativo": "espera",
   "Rever campanha": "espera",
+  "Rever custo": "espera",
   "Refazer público": "perda",
 };
 
@@ -57,6 +59,7 @@ export function Campanhas() {
           explicacao="O painel acompanha os leads de tráfego pago que chegaram no mês, do formulário ao contrato. Cadastre o lead com o tipo de canal Tráfego pago, o canal (Meta Ads, Google Ads) e a campanha, e lance o investimento do mês em SDR da IA › Custos e mídia."
         />
       )}
+      {!erro && dados && <LeituraDoMetaAds mes={mes} p={dados} aoLer={recarregar} />}
       {!erro && dados?.total && <Conteudo p={dados} sdr={sdr.dados} />}
       {!erro && dados && <Prontidao p={dados} />}
     </div>
@@ -107,7 +110,8 @@ function Conteudo({ p, sdr }: { p: PainelDeCampanhas; sdr: PainelDoSdr | null })
           <h2 id="camp-s3">Decisão por campanha</h2>
           <p>Régua provisória: decide com {p.regua.volume_minimo} leads ou mais · ICP alvo{" "}
             {p.regua.icp_alvo_pct ? `${numero(Number(p.regua.icp_alvo_pct))}%` : "não definido no Plano de MRR"}
-            {" "}· meta de {numero(p.regua.qualificados_meta_pct)}% qualificados</p>
+            {" "}· meta de {numero(p.regua.qualificados_meta_pct)}% qualificados
+            {" "}· rever custo acima de {numero(Number(p.regua.teto_de_custo), 1)} × o R$/reunião do canal</p>
         </div>
         <TabelaDeCampanhas linhas={p.campanhas} />
       </section>
@@ -126,6 +130,41 @@ function Conteudo({ p, sdr }: { p: PainelDeCampanhas; sdr: PainelDoSdr | null })
         ) : <p className="sdr-sem-dado">Sem o painel do SDR neste mês.</p>}
       </section>
     </>
+  );
+}
+
+/** "Meta Ads lido em … · Atualizar do Meta Ads": a leitura só grava valor lido; o digitado fica. */
+function LeituraDoMetaAds({ mes, p, aoLer }: { mes: string; p: PainelDeCampanhas; aoLer: () => void }) {
+  const [lendo, definirLendo] = useState(false);
+  const [aviso, definirAviso] = useState<{ ok: boolean; texto: string } | null>(null);
+  const ler = async () => {
+    definirLendo(true);
+    definirAviso(null);
+    try {
+      const r = await api.atualizarDoMeta(mes);
+      const mantidas = r.digitadas_mantidas.length
+        ? ` Valor digitado mantido em: ${r.digitadas_mantidas.join(", ")}.` : "";
+      definirAviso({ ok: true, texto: `${r.gravadas} campanha(s) atualizada(s) do Meta Ads.${mantidas}` });
+      aoLer();
+    } catch (falha) {
+      definirAviso({ ok: false, texto: falha instanceof ErroDaApi ? falha.message : "Não consegui ler o Meta Ads." });
+    } finally {
+      definirLendo(false);
+    }
+  };
+  const quando = p.meta_ads.lido_em
+    ? `Meta Ads lido em ${new Date(p.meta_ads.lido_em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`
+    : p.meta_ads.configurada ? "Meta Ads ainda não lido neste mês" : "Leitura do Meta Ads desligada em Configurações › Integrações";
+  return (
+    <div className="camp-leitura">
+      <span>{quando} · Google Ads digitado em Custos e mídia</span>
+      {p.meta_ads.configurada && (
+        <button type="button" className="botao botao-secundario" onClick={ler} disabled={lendo}>
+          {lendo ? "Lendo o Meta Ads…" : "Atualizar do Meta Ads"}
+        </button>
+      )}
+      {aviso && <p role={aviso.ok ? "status" : "alert"} className={aviso.ok ? "camp-aviso" : "camp-aviso camp-aviso-falha"}>{aviso.texto}</p>}
+    </div>
   );
 }
 
@@ -180,19 +219,24 @@ function TabelaDeCampanhas({ linhas }: { linhas: LinhaDaCampanha[] }) {
       <table className="tabela" aria-label="Decisão por campanha">
         <thead>
           <tr>
-            <th>Campanha</th><th className="tabela-numero">Leads</th><th className="tabela-numero">No ICP</th>
-            <th className="tabela-numero">Qualificados</th><th className="tabela-numero">Reuniões</th>
-            <th className="tabela-numero">Contratos</th><th>O que mais descarta</th><th>Decisão</th>
+            <th>Campanha</th><th className="tabela-numero">Invest.</th><th className="tabela-numero">Leads</th>
+            <th className="tabela-numero">No ICP</th><th className="tabela-numero">Qualificados</th>
+            <th className="tabela-numero">Reuniões</th><th className="tabela-numero">R$/lead ICP</th>
+            <th className="tabela-numero">R$/reunião</th><th className="tabela-numero">Contratos</th>
+            <th>O que mais descarta</th><th>Decisão</th>
           </tr>
         </thead>
         <tbody>
           {linhas.map((l) => (
             <tr key={`${l.canal}|${l.campanha}`}>
-              <td>{l.campanha}<br /><span className="sdr-fraco">{l.canal}</span></td>
+              <td>{l.campanha}<br /><span className="sdr-fraco">{l.canal}{l.fonte ? ` · ${l.fonte}` : ""}</span></td>
+              <td className="tabela-numero">{l.investimento ? dinheiro(l.investimento) : "—"}</td>
               <td className="tabela-numero">{numero(l.leads)}</td>
               <td className="tabela-numero">{pct(l.no_icp, 0) ?? "—"}</td>
               <td className="tabela-numero">{pct(l.qualificados, 0) ?? "—"}</td>
               <td className="tabela-numero">{numero(l.reunioes)}</td>
+              <td className="tabela-numero">{l.custo_por_lead_icp ? dinheiro(l.custo_por_lead_icp) : "—"}</td>
+              <td className="tabela-numero">{l.custo_por_reuniao ? dinheiro(l.custo_por_reuniao) : "—"}</td>
               <td className="tabela-numero">{numero(l.contratos)}</td>
               <td>{l.descartes[0] ? `${l.descartes[0].nome} (${l.descartes[0].quantidade})` : "—"}</td>
               <td>

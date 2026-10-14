@@ -30,6 +30,9 @@ from crm.domain.sdr import METAS, Contagem, Taxa, intervalo_do_mes
 __all__ = [
     "FORA_DO_ICP",
     "VOLUME_MINIMO",
+    "TETO_DE_CUSTO",
+    "Investido",
+    "LeituraDoMeta",
     "ETAPAS",
     "PainelDeCampanhas",
     "calcular_campanhas",
@@ -45,6 +48,10 @@ FORA_DO_ICP = {
 
 VOLUME_MINIMO = 20
 """Leads de uma campanha no mês antes de decidir por ela. Hipótese de 13/10/2026, a rever com dados."""
+
+TETO_DE_CUSTO = Decimal("1.5")
+"""Custo por reunião da campanha acima de 1,5 × o do canal no mês = "Rever custo". Aprovado por
+Eduardo em 13/10/2026 como hipótese, a rever com dados."""
 
 ETAPAS = [
     ("leads", "Leads"),
@@ -118,6 +125,11 @@ class LinhaDaCampanha:
     descartes: list[Contagem]
     decisao: str
     porque: str
+    investimento: Decimal | None = None
+    fonte: str | None = None
+    """"lido" (Meta Ads), "digitado" ou `None` sem investimento por campanha."""
+    custo_por_lead_icp: Decimal | None = None
+    custo_por_reuniao: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -126,6 +138,23 @@ class Regua:
     icp_alvo_pct: Decimal | None
     qualificados_meta_pct: float
     qualificados_alerta_pct: float
+    teto_de_custo: Decimal
+
+
+@dataclass(frozen=True)
+class Investido:
+    """O investimento de uma campanha no mês, como está em `InvestimentoPorCampanha`."""
+
+    canal: str
+    campanha: str
+    valor: Decimal
+    fonte: str
+
+
+@dataclass(frozen=True)
+class LeituraDoMeta:
+    configurada: bool
+    lido_em: datetime | None
 
 
 @dataclass(frozen=True)
@@ -143,6 +172,7 @@ class PainelDeCampanhas:
     campanhas: list[LinhaDaCampanha]
     regua: Regua
     prontidao: list[Pendencia]
+    meta_ads: LeituraDoMeta
 
 
 # ------------------------------------------------------------------ cálculo
@@ -156,6 +186,12 @@ def _reais(valor: Decimal) -> Decimal:
 
 def _nome_do_canal(lead: LeadLido) -> str:
     return (lead.canal or "").strip() or SEM_CANAL
+
+
+def _chave(canal: str, campanha: str) -> tuple[str, str]:
+    """Campanha do lead e do anúncio se ligam pelo nome, sem diferença de maiúsculas e espaços."""
+    junta = lambda t: " ".join(t.split()).casefold()
+    return junta(canal), junta(campanha)
 
 
 def _no_icp(lead: LeadLido) -> bool:
@@ -209,10 +245,13 @@ def _funil(canal: str, leads: list[LeadLido], investimento: Decimal | None) -> F
     )
 
 
-def _decidir(leads: int, no_icp: Taxa, qualificados: Taxa, descartes: list[Contagem],
-             icp_alvo: Decimal | None) -> tuple[str, str]:
+def _decidir(leads: int, no_icp: Taxa, qualificados: Taxa, descartes: list[Contagem], icp_alvo: Decimal | None,
+             custo_reuniao: Decimal | None, investimento: Decimal | None, reunioes: int,
+             custo_do_canal: Decimal | None) -> tuple[str, str]:
     """A régua provisória (hipótese de 13/10/2026). Devolve a decisão e o porquê, em palavras."""
     if leads < VOLUME_MINIMO:
+        if leads == 0 and investimento:
+            return "Aguardar volume", "Nenhum lead com este nome de campanha: confira se o nome no anúncio e no lead é o mesmo."
         return "Aguardar volume", f"{leads} lead{'s' if leads != 1 else ''} no mês; a régua pede {VOLUME_MINIMO} para decidir."
     principal = descartes[0].nome if descartes else None
     icp = no_icp.valor or 0.0
@@ -221,6 +260,13 @@ def _decidir(leads: int, no_icp: Taxa, qualificados: Taxa, descartes: list[Conta
         return "Refazer público", f"{texto_icp}, abaixo do alvo de {float(icp_alvo):.0f}%; o que mais tira é “{principal}”."
     if principal == MotivoDeDescarte.EXPECTATIVA.value:
         return "Ajustar criativo", "O descarte que mais aparece é “esperava outra coisa”: a promessa do anúncio não bate."
+    if custo_do_canal:
+        teto = custo_do_canal * TETO_DE_CUSTO
+        if custo_reuniao is not None and custo_reuniao > teto:
+            return "Rever custo", (f"R$ {_br(custo_reuniao)} por reunião, acima de 1,5 × a média do canal "
+                                   f"(R$ {_br(custo_do_canal)}).")
+        if investimento and reunioes == 0:
+            return "Rever custo", f"R$ {_br(investimento)} investidos sem nenhuma reunião; o canal tem."
     meta = METAS["qualificados_pago"]
     qual = qualificados.valor or 0.0
     icp_ok = icp_alvo is None or icp >= float(icp_alvo)
@@ -232,18 +278,32 @@ def _decidir(leads: int, no_icp: Taxa, qualificados: Taxa, descartes: list[Conta
     return "Manter e observar", f"Qualifica {qual:.0f}% dos leads, entre o alerta e a meta."
 
 
-def _campanha(canal: str, campanha: str, leads: list[LeadLido], icp_alvo: Decimal | None) -> LinhaDaCampanha:
+def _br(valor: Decimal) -> str:
+    """R$ no formato do PAD-002, sem o símbolo: 1.248,30."""
+    return f"{_reais(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _campanha(canal: str, campanha: str, leads: list[LeadLido], icp_alvo: Decimal | None,
+              investido: Investido | None, custo_do_canal: Decimal | None) -> LinhaDaCampanha:
     n = len(leads)
     niveis = [nivel(l) for l in leads]
-    no_icp = Taxa.de(sum(1 for x in niveis if x >= 1), n)
+    no_icp_n = sum(1 for x in niveis if x >= 1)
+    reunioes = sum(1 for x in niveis if x >= 3)
+    no_icp = Taxa.de(no_icp_n, n)
     qualificados = Taxa.de(sum(1 for x in niveis if x >= 2), n)
     contagem = Counter(l.motivo_descarte.value for l in leads if l.motivo_descarte is not None)
     descartes = [Contagem(nome, q) for nome, q in sorted(contagem.items(), key=lambda kv: (-kv[1], kv[0]))]
-    decisao, porque = _decidir(n, no_icp, qualificados, descartes, icp_alvo)
+    valor = investido.valor if investido else None
+    custo_icp = _reais(valor / no_icp_n) if valor is not None and no_icp_n else None
+    custo_reuniao = _reais(valor / reunioes) if valor is not None and reunioes else None
+    decisao, porque = _decidir(n, no_icp, qualificados, descartes, icp_alvo, custo_reuniao, valor, reunioes,
+                               custo_do_canal if valor is not None else None)
     return LinhaDaCampanha(
         canal=canal, campanha=campanha, leads=n, no_icp=no_icp, qualificados=qualificados,
-        reunioes=sum(1 for x in niveis if x >= 3), contratos=sum(1 for x in niveis if x >= 5),
+        reunioes=reunioes, contratos=sum(1 for x in niveis if x >= 5),
         mrr_novo=_mrr(leads)[0], descartes=descartes, decisao=decisao, porque=porque,
+        investimento=valor, fonte=investido.fonte if investido else None,
+        custo_por_lead_icp=custo_icp, custo_por_reuniao=custo_reuniao,
     )
 
 
@@ -253,15 +313,27 @@ def calcular_campanhas(
     leads: Iterable[LeadLido],
     midia: dict[str, Decimal] | None = None,
     icp_alvo_pct: Decimal | None = None,
+    por_campanha: Iterable[Investido] = (),
+    meta_ads: LeituraDoMeta | None = None,
 ) -> PainelDeCampanhas:
     """O painel de campanhas da coorte do mês. `leads` pode trazer outros meses e outras
-    origens: só entram os de tráfego pago que chegaram no mês."""
+    origens: só entram os de tráfego pago que chegaram no mês.
+
+    `midia` é o investimento digitado por canal; `por_campanha`, o de cada campanha (lido ou digitado).
+    Canal com campanhas investidas usa a soma delas; sem campanhas, vale o valor do canal.
+    """
+    meta_ads = meta_ads or LeituraDoMeta(False, None)
     inicio, fim = intervalo_do_mes(mes)
     coorte = [
         l for l in leads
         if l.tipo_canal is TipoCanal.TRAFEGO_PAGO and inicio <= _utc(l.criado_em) < fim
     ]
+    investidos = {_chave(i.canal, i.campanha): i for i in por_campanha}
     midia = {k.strip(): Decimal(v) for k, v in (midia or {}).items()}
+    for i in investidos.values():
+        midia[i.canal.strip()] = Decimal("0")
+    for i in investidos.values():
+        midia[i.canal.strip()] += Decimal(i.valor)
 
     por_canal: dict[str, list[LeadLido]] = {}
     for l in coorte:
@@ -272,16 +344,21 @@ def calcular_campanhas(
         _funil(c, por_canal[c], midia.get(c))
         for c in sorted(por_canal, key=lambda c: (-len(por_canal[c]), c))
     ]
+    custo_reuniao_do_canal = {_chave(f.canal, "")[0]: f.etapas[3].custo for f in canais}
     investimento_total = sum(midia.values(), Decimal("0")) if midia else None
     total = _funil(TOTAL, coorte, investimento_total) if coorte or midia else None
 
-    por_campanha: dict[tuple[str, str], list[LeadLido]] = {}
+    grupos: dict[tuple[str, str], tuple[str, str, list[LeadLido]]] = {}
     for l in coorte:
-        chave = (_nome_do_canal(l), (l.campanha or "").strip() or SEM_CAMPANHA)
-        por_campanha.setdefault(chave, []).append(l)
+        canal, nome = _nome_do_canal(l), (l.campanha or "").strip() or SEM_CAMPANHA
+        grupos.setdefault(_chave(canal, nome), (canal, nome, []))[2].append(l)
+    for chave, i in investidos.items():
+        grupos.setdefault(chave, (i.canal.strip(), i.campanha.strip(), []))
     campanhas = sorted(
-        (_campanha(c, n, ls, icp_alvo_pct) for (c, n), ls in por_campanha.items()),
-        key=lambda x: (-x.leads, x.canal, x.campanha),
+        (_campanha(c, n, ls, icp_alvo_pct, investidos.get(k) if n != SEM_CAMPANHA else None,
+                   custo_reuniao_do_canal.get(k[0]))
+         for k, (c, n, ls) in grupos.items()),
+        key=lambda x: (-x.leads, -(x.investimento or 0), x.canal, x.campanha),
     )
 
     sem_campanha = sum(1 for l in coorte if not (l.campanha or "").strip())
@@ -296,11 +373,15 @@ def calcular_campanhas(
         Pendencia(icp_alvo_pct is not None,
                   "ICP alvo definido no Plano de MRR" if icp_alvo_pct is not None
                   else "Sem ICP alvo no Plano de MRR: a régua não julga o % no ICP"),
-        Pendencia(False, "Leitura automática do Meta Ads e do Google Ads ainda não ligada: "
-                         "o investimento é digitado em Custos e mídia"),
+        Pendencia(meta_ads.configurada,
+                  "Leitura do Meta Ads ligada em Configurações › Integrações" if meta_ads.configurada
+                  else "Leitura do Meta Ads desligada: ligue em Configurações › Integrações"),
+        Pendencia(False, "Google Ads sem leitura automática (falta o token de desenvolvedor): "
+                         "digite o investimento por campanha em Custos e mídia"),
     ]
     return PainelDeCampanhas(
         mes=mes, leads=len(coorte), total=total, canais=canais, campanhas=campanhas,
-        regua=Regua(VOLUME_MINIMO, icp_alvo_pct, METAS["qualificados_pago"].alvo, METAS["qualificados_pago"].alerta),
-        prontidao=prontidao,
+        regua=Regua(VOLUME_MINIMO, icp_alvo_pct, METAS["qualificados_pago"].alvo, METAS["qualificados_pago"].alerta,
+                    TETO_DE_CUSTO),
+        prontidao=prontidao, meta_ads=meta_ads,
     )

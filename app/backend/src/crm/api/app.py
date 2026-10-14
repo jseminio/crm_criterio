@@ -68,6 +68,7 @@ from crm.api.busca_automatica import laco_da_busca
 from crm.agente.disparo_do_questionario import Canais
 from crm.api.disparo_do_questionario import canais_reais, laco_do_disparo
 from crm.api.integracoes import Testadores, roteador_de_integracoes
+from crm.api.propostas_em_aberto import roteador_de_propostas_em_aberto
 from crm.api.kpis_lideranca import roteador_de_kpis
 from crm.api.reajustes import roteador_de_reajustes
 from crm.api.servicos_e_contratos import roteador_de_servicos_e_contratos
@@ -353,6 +354,7 @@ def criar_app(
     api.include_router(roteador_da_ficha(obter_sessao))
     api.include_router(roteador_de_metas(obter_sessao))
     api.include_router(roteador_de_inteligencia(obter_sessao))
+    api.include_router(roteador_de_propostas_em_aberto(obter_sessao))
     api.include_router(roteador_do_sucesso(obter_sessao, servicos_da_ata or servicos_da_ata_reais))
     api.include_router(roteador_de_ajustes(obter_sessao))
     api.include_router(roteador_do_acesso(obter_sessao, lambda: config_de_entrada, tentativas))

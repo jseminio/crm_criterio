@@ -108,6 +108,7 @@ import type {
   CadenciaDeReunioes,
   Integracoes,
   KpisDaLideranca,
+  QuadroDePropostas,
   ResultadoDoTeste,
   EstadoDaBusca,
   FunilDoSucesso,
@@ -771,6 +772,8 @@ export const api = {
     pedir<{ acrescentadas: number; ja_existiam: number }>("/api/sdr/base/carga-inicial", { method: "POST" }),
   // KPIs da liderança (09/10/2026), só o Administrador
   kpisDaLideranca: (mes: string) => pedir<KpisDaLideranca>(`/api/inteligencia/kpis-lideranca?mes=${mes}`),
+  propostasEmAberto: () => pedir<QuadroDePropostas>("/api/inteligencia/propostas-em-aberto"),
+  baixarPropostasEmAberto: () => baixarArquivo("/api/inteligencia/propostas-em-aberto/planilha", "propostas-em-aberto.xlsx"),
   // Configurações › Integrações (07/10/2026)
   integracoes: () => pedir<Integracoes>("/api/configuracoes/integracoes"),
   salvarIntegracao: (chave: string, mudanca: { valores?: Record<string, string>; apagar?: string[] }) =>

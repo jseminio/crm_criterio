@@ -1562,6 +1562,20 @@ td > .celula-fonte { display: block; }
 .recebimento-situacao { margin: 0; }
 .sdr-janela { margin: 0 0 var(--e2); }
 
+/* Propostas em aberto · visão gerencial (14/10/2026): temperatura em cor e em texto (o cabeçalho diz qual é). */
+.quadro-propostas { display: grid; gap: var(--e3); margin-bottom: var(--e6); }
+.tabela-rolavel { overflow-x: auto; }
+.quadro-tabela { min-width: 760px; }
+.quadro-quente { color: var(--ganho); }
+.quadro-morno { color: var(--espera); }
+.quadro-frio { color: var(--perda); }
+.numeros-quadro { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 960px) { .numeros-quadro { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .numeros-quadro { grid-template-columns: minmax(0, 1fr); } }
+.quadro-resumo { background: var(--espera-suave); border-left: 3px solid var(--espera); padding: var(--e2) var(--e3);
+  font-size: 13px; color: var(--texto-forte); }
+.quadro-resumo ul { margin: var(--e1) 0 0; padding-left: var(--e5); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

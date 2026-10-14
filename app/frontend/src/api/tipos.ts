@@ -2537,3 +2537,55 @@ export interface SituacaoDosLeadsDoMeta {
   ligada: boolean;
   ultima: ResultadoDaBuscaDeLeads | null;
 }
+
+/** Propostas em aberto · visão gerencial (14/10/2026), para a war room. */
+export interface PropostaAberta {
+  id: number;
+  grupo: string;
+  nome: string;
+  servico: string | null;
+  etapa: string;
+  temperatura: string | null;
+  captador: string | null;
+  anual: string;
+  mensalizado: string;
+  recorrente: boolean;
+  em_on_hold_desde: string | null;
+  on_hold_pela_originacao: boolean;
+  dias_em_on_hold: number | null;
+}
+
+export interface LinhaDoQuadroDePropostas {
+  etapa: string;
+  quantas: number;
+  anual: string;
+  mensalizado: string;
+  recorrente: string;
+  pontual: string;
+  quente: string;
+  morno: string;
+  frio: string;
+  sem_classificacao: string;
+}
+
+export interface ConversaoDoQuadro {
+  rotulo: string;
+  aceitas: number;
+  decididas: number;
+  percentual: string | null;
+}
+
+export interface QuadroDePropostas {
+  hoje: string;
+  linhas: LinhaDoQuadroDePropostas[];
+  total: LinhaDoQuadroDePropostas;
+  conversao_do_ano: ConversaoDoQuadro;
+  conversao_12_meses: ConversaoDoQuadro;
+  enviadas_no_mes: number;
+  enviadas_no_mes_em_aberto: string;
+  mes_das_enviadas: string;
+  on_hold_antigas: number;
+  on_hold_antigas_mensalizado: string;
+  resumo: string[];
+  propostas: PropostaAberta[];
+}

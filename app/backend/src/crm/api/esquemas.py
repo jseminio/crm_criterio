@@ -550,6 +550,8 @@ class ContratoResumo(Base):
     saida_em: date | None = None
     """Saída efetiva anunciada (10/10/2026): com o contrato Ativo, ele está em aviso de saída até esta data."""
     parcelas_no_ano: int = 13
+    recorrente: bool | None = None
+    """Recorrente ou não (13/10/2026). Vazio só em contrato antigo sem serviço nem preço."""
     empresa_nome: str | None = None
     """Razão social e nome fantasia do CNPJ do contrato, para a pesquisa da Gestão de contratos (13/10/2026)."""
     empresa_cnpj: str | None = None
@@ -677,6 +679,8 @@ class ConversaoEmContrato(BaseModel):
     preco_anual: Decimal | None = None
     data_inicio: date | None = None
     signatario: str | None = Field(default=None, max_length=200)
+    recorrente: bool | None = None
+    """Recorrente ou não (13/10/2026). Vazio = o tipo do serviço; serviço sem tipo exige a resposta."""
 
 
 class Fusao(BaseModel):

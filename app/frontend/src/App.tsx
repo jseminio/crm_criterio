@@ -70,7 +70,7 @@ export default function App() {
   const visiveis = TELAS.filter((t) =>
     t.chave === "configuracoes"
       ? pode("configuracoes.propostas", "configuracoes.backup", "configuracoes.perfis", "configuracoes.historico", "configuracoes.metas",
-          "grupos.ver", "conferencia.ver")
+          "configuracoes.servicos", "grupos.ver", "conferencia.ver")
       : t.chave === "abordagens"
         ? pode("abordagens.ver", "sdr.ver")
         : t.chave === "funil"

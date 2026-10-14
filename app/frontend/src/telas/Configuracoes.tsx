@@ -9,6 +9,7 @@
  * CRM — o servidor recusa pedidos que chegam por túnel.
  */
 
+import { ServicosEContratos } from "../componentes/ServicosEContratos";
 import { HistoricoDeAlteracoes } from "../componentes/HistoricoDeAlteracoes";
 import { IntegracoesDoSistema } from "../componentes/IntegracoesDoSistema";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
@@ -112,7 +113,7 @@ function Tabelas({ resumo }: { resumo: ResumoDeBackup }) {
   );
 }
 
-type Aba = "perfis" | "metas" | "propostas" | "integracoes" | "grupos" | "conferencia" | "historico" | "backup" | "servicos";
+type Aba = "perfis" | "metas" | "propostas" | "servicos_e_contratos" | "integracoes" | "grupos" | "conferencia" | "historico" | "backup" | "servicos";
 
 /** As abas, na ordem aprovada por Eduardo em 02/10/2026, com a funcionalidade que libera cada uma.
  * "Serviços pedidos" é só leitura e aparece para quem vê Configurações. */
@@ -120,6 +121,8 @@ const ABAS: { chave: Aba; rotulo: string; permissao: string | null }[] = [
   { chave: "perfis", rotulo: "Perfis e acesso", permissao: "configuracoes.perfis" },
   { chave: "metas", rotulo: "Metas", permissao: "configuracoes.metas" },
   { chave: "propostas", rotulo: "Propostas", permissao: "configuracoes.propostas" },
+  // Modelo de contrato e reajuste por serviço (aprovado por Eduardo em 13/10/2026).
+  { chave: "servicos_e_contratos", rotulo: "Serviços e contratos", permissao: "configuracoes.servicos" },
   // Chaves e integrações pela tela, sem nada no painel do servidor (aprovado por Eduardo em 07/10/2026).
   { chave: "integracoes", rotulo: "Integrações", permissao: "configuracoes.integracoes" },
   // Grupos e Conferência saíram do menu e viraram abas (aprovado por Eduardo em 02/10/2026).
@@ -195,7 +198,7 @@ export function Configuracoes({ listas = null }: { listas?: Listas | null }) {
 
   return (
     // As abas usam a largura toda; os formulários ficam estreitos e as tabelas de Grupos e Conferência, largas.
-    <div className={`configuracoes${aba === "grupos" || aba === "conferencia" ? "" : " configuracoes-estreita"}`} style={{ display: "grid", gap: "var(--e4)" }}>
+    <div className={`configuracoes${aba === "grupos" || aba === "conferencia" || aba === "servicos_e_contratos" ? "" : " configuracoes-estreita"}`} style={{ display: "grid", gap: "var(--e4)" }}>
       <div className="abas" role="tablist" aria-label="Seções de Configurações">
         {visiveis.map((a) => (
           <button key={a.chave} type="button" role="tab" className="aba" aria-selected={aba === a.chave} onClick={() => escolherAba(a.chave)}>
@@ -211,6 +214,7 @@ export function Configuracoes({ listas = null }: { listas?: Listas | null }) {
         </>
       )}
       {aba === "historico" && <HistoricoDeAlteracoes />}
+      {aba === "servicos_e_contratos" && <ServicosEContratos />}
       {aba === "backup" && (
       <>
       {eu.administrador && <MigrarDoCrmLocal />}

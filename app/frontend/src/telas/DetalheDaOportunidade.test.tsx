@@ -18,7 +18,12 @@ import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
   return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(), pendencias: vi.fn(), ficha: vi.fn(),
-    exclusaoDaOportunidade: vi.fn(), excluirOportunidade: vi.fn(),
+    exclusaoDaOportunidade: vi.fn(), excluirOportunidade: vi.fn(), converterEmContrato: vi.fn(),
+    servicosEContratos: vi.fn().mockResolvedValue([
+      { servico: "BPO Financeiro", linha: "C1", tipo: "Recorrente", parcelas: 13, temas: 0, modelo: "Recorrente padrão",
+        situacao_do_modelo: "aguardando arquivo", reajuste: "IPCA em julho", modelos_possiveis: ["Recorrente padrão"],
+        reajustes_possiveis: ["IPCA em julho", "Caso a caso", "Sem reajuste"], padrao: true },
+    ]),
     historico: vi.fn().mockResolvedValue([]),
     buscarEmpresas: vi.fn().mockResolvedValue([
       { id: 9, razao_social: "Beta Serviços Ltda", nome_fantasia: null, cnpj: "11444777000161",
@@ -532,5 +537,38 @@ describe("Histórico de preço e origem da volumetria (E4, 25/09/2026)", () => {
       await screen.findByLabelText("Situação");
       expect(screen.queryByRole("button", { name: "Excluir oportunidade…" })).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("Converter em contrato pergunta o tipo (13/10/2026)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("sugere pelo serviço, mostra o modelo e converte com o tipo confirmado", async () => {
+    vi.mocked(api.converterEmContrato).mockResolvedValue({} as never);
+    await abrir(oportunidade({ situacao: "Aceita", data_aceite: "2026-10-01", servico: "BPO Financeiro", linha_servico: "C1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Converter em contrato" }));
+    expect(screen.getByText(/sugerido pelo serviço/i)).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /^✓ Recorrente$/ })).toHaveAttribute("aria-checked", "true");
+    expect(await screen.findByText(/Modelo: Recorrente padrão · 13 parcelas · reajuste ipca em julho/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar conversão" }));
+    expect(api.converterEmContrato).toHaveBeenCalledWith(1, { recorrente: true });
+  });
+
+  it("aceita a troca para não recorrente", async () => {
+    vi.mocked(api.converterEmContrato).mockResolvedValue({} as never);
+    await abrir(oportunidade({ situacao: "Aceita", data_aceite: "2026-10-01", servico: "BPO Financeiro", linha_servico: "C1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Converter em contrato" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Não recorrente" }));
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar conversão" }));
+    expect(api.converterEmContrato).toHaveBeenCalledWith(1, { recorrente: false });
+  });
+
+  it("serviço sem tipo não converte sem a escolha", async () => {
+    await abrir(oportunidade({ situacao: "Aceita", data_aceite: "2026-10-01", servico: "Outro", linha_servico: null }));
+    await userEvent.click(screen.getByRole("button", { name: "Converter em contrato" }));
+    expect(screen.getByText(/o serviço não define o tipo/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar conversão" }));
+    expect(api.converterEmContrato).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/escolha se o contrato é recorrente/i);
   });
 });

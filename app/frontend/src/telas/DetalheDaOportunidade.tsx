@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type {
   EmpresaEncontrada, ExclusaoDaOportunidade, Listas, MudancaDePreco, OportunidadeDetalhe, PendenciasDaProposta,
-  ServicoDoCatalogo,
+  ServicoDoCatalogo, ServicoNoContrato,
 } from "../api/tipos";
 import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { DIRECIONADORES_DE_PORTE } from "../componentes/direcionadoresDePorte";
@@ -294,6 +294,10 @@ export function DetalheDaOportunidade({
   const [rascunho, definirRascunho] = useState<Record<string, string>>({});
   const [convertendoEmContrato, definirConvertendoEmContrato] = useState(false);
   const [avisoDeContrato, definirAvisoDeContrato] = useState<string | null>(null);
+  // Recorrente ou não (13/10/2026): perguntado antes de converter, com o tipo do serviço como sugestão.
+  const [escolhendoTipo, definirEscolhendoTipo] = useState(false);
+  const [recorrente, definirRecorrente] = useState<boolean | null>(null);
+  const [contratoDoServico, definirContratoDoServico] = useState<ServicoNoContrato | null>(null);
   // Excluir (04/10/2026): ao clicar, a API diz o que sai junto, ou por que não pode sair.
   const [exclusao, definirExclusao] = useState<ExclusaoDaOportunidade | null>(null);
   const [abrindoExclusao, definirAbrindoExclusao] = useState(false);
@@ -440,12 +444,31 @@ export function DetalheDaOportunidade({
   const exigeDataDeEnvio =
     detalhe?.situacao === "Enviar proposta" && rascunho.situacao === "Em avaliação pela empresa" && !rascunho.data_envio_proposta;
 
+  const sugestaoDoTipo: boolean | null =
+    detalhe?.linha_servico === "C1" ? true : detalhe?.linha_servico === "C2" ? false : null;
+
+  const abrirEscolhaDoTipo = () => {
+    definirRecorrente(sugestaoDoTipo);
+    definirEscolhendoTipo(true);
+    definirErro(null);
+    definirAvisoDeContrato(null);
+    definirContratoDoServico(null);
+    api.servicosEContratos()
+      .then((lista) => definirContratoDoServico(lista.find((s) => s.servico === detalhe?.servico) ?? null))
+      .catch(() => definirContratoDoServico(null));
+  };
+
   const converterEmContrato = async () => {
+    if (recorrente === null) {
+      definirErro("Escolha se o contrato é recorrente ou não recorrente.");
+      return;
+    }
     definirConvertendoEmContrato(true);
     definirErro(null);
     definirAvisoDeContrato(null);
     try {
-      await api.converterEmContrato(id);
+      await api.converterEmContrato(id, { recorrente });
+      definirEscolhendoTipo(false);
       definirAvisoDeContrato("Contrato criado — confira na tela Contratos.");
       aoSalvar();
     } catch (falha) {
@@ -484,10 +507,10 @@ export function DetalheDaOportunidade({
         <button
           type="button"
           className="botao botao-secundario"
-          onClick={converterEmContrato}
-          disabled={convertendoEmContrato}
+          onClick={abrirEscolhaDoTipo}
+          disabled={convertendoEmContrato || escolhendoTipo}
         >
-          {convertendoEmContrato ? "Convertendo…" : "Converter em contrato"}
+          Converter em contrato
         </button>
       )}
       {detalhe.situacao === "Aceita" && !pode("funil.converter") && (
@@ -558,6 +581,37 @@ export function DetalheDaOportunidade({
             <div className="recado" role="status">
               {avisoDeContrato}
             </div>
+          )}
+          {escolhendoTipo && (
+            <section className="recado tipo-de-contrato" aria-labelledby="tipo-de-contrato-titulo">
+              <strong id="tipo-de-contrato-titulo">Tipo de contrato</strong>
+              <span className="campo-ajuda" style={{ margin: 0 }}>
+                {sugestaoDoTipo === null
+                  ? "O serviço não define o tipo: escolha."
+                  : <>Sugerido pelo serviço <strong>{detalhe.servico}</strong>: {sugestaoDoTipo ? "recorrente" : "não recorrente"}. Confirme ou troque.</>}
+              </span>
+              <div className="tipo-de-contrato-opcoes" role="radiogroup" aria-label="Tipo de contrato">
+                {[true, false].map((valor) => (
+                  <button key={String(valor)} type="button" role="radio" aria-checked={recorrente === valor}
+                    className={`botao ${recorrente === valor ? "botao-escolhido" : "botao-secundario"}`}
+                    onClick={() => definirRecorrente(valor)}>
+                    {recorrente === valor && "✓ "}{valor ? "Recorrente" : "Não recorrente"}
+                  </button>
+                ))}
+              </div>
+              {contratoDoServico && recorrente === (contratoDoServico.linha === "C1") && (
+                <span className="campo-ajuda" style={{ margin: 0 }}>
+                  Modelo: {contratoDoServico.modelo}
+                  {contratoDoServico.parcelas ? ` · ${contratoDoServico.parcelas} parcelas` : ""} · reajuste {contratoDoServico.reajuste.toLowerCase()}
+                </span>
+              )}
+              <div className="tipo-de-contrato-opcoes">
+                <button type="button" className="botao botao-secundario" disabled={convertendoEmContrato} onClick={() => void converterEmContrato()}>
+                  {convertendoEmContrato ? "Convertendo…" : "Confirmar conversão"}
+                </button>
+                <button type="button" className="botao botao-secundario" onClick={() => definirEscolhendoTipo(false)}>Voltar</button>
+              </div>
+            </section>
           )}
 
           <div className="abas" role="tablist" aria-label="Seções da oportunidade">

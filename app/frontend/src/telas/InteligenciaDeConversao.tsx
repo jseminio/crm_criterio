@@ -14,6 +14,7 @@ import type {
   SituacaoDoPlano,
 } from "../api/tipos";
 import { CampoDeValor } from "../componentes/CampoDeValor";
+import { PropostasEmAberto } from "../componentes/PropostasEmAberto";
 import { KpisDaLideranca } from "../componentes/KpisDaLideranca";
 import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
 import { ComposicaoDoFunil } from "../componentes/ComposicaoDoFunil";
@@ -683,6 +684,8 @@ export function InteligenciaDeConversao() {
     <div className="plano">
       {/* KPIs da liderança (09/10/2026): só o Administrador. */}
       {eu.administrador && <KpisDaLideranca />}
+      {/* Propostas em aberto · visão gerencial (14/10/2026), para a war room. */}
+      <PropostasEmAberto />
       <div className="plano-cabecalho">
         <div>
           <h2 className="plano-titulo">Plano de MRR</h2>

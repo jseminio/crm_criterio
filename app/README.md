@@ -16,6 +16,22 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Propostas em aberto · visão gerencial (14/10/2026)
+
+Amostra aprovada por Eduardo em 14/10/2026, para a war room com o Bruno. Em Funil comercial › Inteligência de
+Conversão, para quem vê o Funil (`GET /api/inteligencia/propostas-em-aberto`; Excel em `.../planilha`).
+
+- **Quadro por etapa** (Em avaliação pela empresa, On hold, Enviar proposta, total): quantidade, valor anual,
+  **mensalizado com a 13ª** (recorrente pela parcela × 13 ÷ 12; consultoria e legalização pelo valor único ÷ 12) e o
+  mensalizado aberto por temperatura (quente, morno, frio, sem classificação: somam a linha). Cada linha tem a lista.
+- **Conversão** do ano e dos últimos 12 meses: aceitas ÷ decididas, pela data de originação (a regra do Funil).
+- **Enviadas no mês** (data de envio no mês corrente) e quanto delas segue em aberto (valor anual).
+- **On hold há mais de 60 dias** (no lugar da antiga linha "sem data de colocação"): a entrada em On hold é a
+  última mudança de situação para On hold no histórico de alterações; sem registro, vale a originação.
+- **O que o quadro mostra:** frases montadas com os números do quadro, sem interpretação.
+- **Copiar para enviar** (texto para e-mail ou WhatsApp) e **Baixar planilha** (abas Quadro e Propostas).
+  `crm.api.propostas_em_aberto`; `componentes/PropostasEmAberto.tsx`.
+
 ## SDR de IA, fase 0: o CRM recebe as mensagens do WhatsApp (14/10/2026)
 
 Amostra aprovada por Eduardo em 14/10/2026. A Meta entrega cada mensagem do lead no webhook do CRM;

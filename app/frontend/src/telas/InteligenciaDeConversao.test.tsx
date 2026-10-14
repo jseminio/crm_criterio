@@ -8,7 +8,7 @@ import { InteligenciaDeConversao } from "./InteligenciaDeConversao";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { planoDeMrr: vi.fn(), mudarPlanoDeMrr: vi.fn(), cenariosPorServico: vi.fn(), fasesDoMes: vi.fn(), kpisDaLideranca: vi.fn(),
+  return { ...real, api: { planoDeMrr: vi.fn(), mudarPlanoDeMrr: vi.fn(), cenariosPorServico: vi.fn(), fasesDoMes: vi.fn(), kpisDaLideranca: vi.fn(), propostasEmAberto: vi.fn(),
     composicaoDaFase: vi.fn(), realizadoDoPlano: vi.fn() } };
 });
 
@@ -95,6 +95,7 @@ describe("Funil › Inteligência de Conversão", () => {
     vi.mocked(api.cenariosPorServico).mockResolvedValue([]);
     vi.mocked(api.fasesDoMes).mockResolvedValue(FASES);
     vi.mocked(api.kpisDaLideranca).mockResolvedValue({ mes: "2026-10", de: "2026-10-01", ate: "2026-10-09", kpis: [] });
+    vi.mocked(api.propostasEmAberto).mockRejectedValue(new Error("fora deste teste"));
   });
 
   it("quatro fases: explicação ao passar o mouse e 'ver' com a lista que compõe o número (10/10/2026)", async () => {

@@ -11,7 +11,8 @@
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { FunilDoCanal, LinhaDaCampanha, PainelDeCampanhas, PainelDoSdr, ResumoDasConversoes } from "../api/tipos";
+import type { FunilDoCanal, LinhaDaCampanha, PainelDeCampanhas, PainelDoSdr, ResumoDasConversoes,
+  SituacaoDosLeadsDoMeta } from "../api/tipos";
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
 import { dinheiro } from "../formato";
 import { mesAtual, nomeDoMes, numero, pct, tempo } from "../sdrFormato";
@@ -59,6 +60,7 @@ export function Campanhas() {
           explicacao="O painel acompanha os leads de tráfego pago que chegaram no mês, do formulário ao contrato. Cadastre o lead com o tipo de canal Tráfego pago, o canal (Meta Ads, Google Ads) e a campanha, e lance o investimento do mês em SDR da IA › Custos e mídia."
         />
       )}
+      {!erro && dados && <LeadsDoMetaBarra aoBuscar={recarregar} />}
       {!erro && dados && <LeituraDosAnunciosBarra mes={mes} p={dados} aoLer={recarregar} />}
       {!erro && dados?.total && <Conteudo p={dados} sdr={sdr.dados} />}
       {!erro && dados && <ConversoesDevolvidas mes={mes} />}
@@ -361,5 +363,45 @@ function ConversoesDevolvidas({ mes }: { mes: string }) {
         contatado nunca é enviado.
       </p>
     </section>
+  );
+}
+
+/** Leads do formulário do Meta (amostra aprovada em 14/10/2026): entram sozinhos a cada 10 minutos; "Buscar leads
+ * agora" roda uma vez já e recarrega o painel. */
+function LeadsDoMetaBarra({ aoBuscar }: { aoBuscar: () => void }) {
+  const { dados, recarregar } = usarDados<SituacaoDosLeadsDoMeta>(() => api.leadsDoMeta(), []);
+  const [buscando, definirBuscando] = useState(false);
+  const [aviso, definirAviso] = useState<{ ok: boolean; texto: string } | null>(null);
+  if (!dados) return null;
+  const buscar = async () => {
+    definirBuscando(true);
+    definirAviso(null);
+    try {
+      const r = await api.buscarLeadsDoMeta();
+      definirAviso(r.erro ? { ok: false, texto: r.erro }
+        : { ok: true, texto: `${numero(r.novos)} lead${r.novos === 1 ? "" : "s"} novo${r.novos === 1 ? "" : "s"} do Meta.` });
+      recarregar();
+      aoBuscar();
+    } catch (falha) {
+      definirAviso({ ok: false, texto: falha instanceof ErroDaApi ? falha.message : "Não consegui buscar os leads do Meta." });
+    } finally {
+      definirBuscando(false);
+    }
+  };
+  const u = dados.ultima;
+  const texto = !dados.ligada
+    ? "Leads do Meta: entrada desligada em Configurações › Integrações"
+    : `Leads do Meta: busca automática a cada 10 minutos${u ? ` · última em ${HORA(u.em)}, ${numero(u.novos)} novo${u.novos === 1 ? "" : "s"}` : ""}`;
+  return (
+    <div className="camp-leitura">
+      <span>{texto}</span>
+      {dados.ligada && (
+        <button type="button" className="botao botao-secundario" onClick={buscar} disabled={buscando}>
+          {buscando ? "Buscando…" : "Buscar leads agora"}
+        </button>
+      )}
+      {u?.erro && !aviso && <p role="alert" className="camp-aviso camp-aviso-falha">{u.erro}</p>}
+      {aviso && <p role={aviso.ok ? "status" : "alert"} className={aviso.ok ? "camp-aviso" : "camp-aviso camp-aviso-falha"}>{aviso.texto}</p>}
+    </div>
   );
 }

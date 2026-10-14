@@ -160,6 +160,8 @@ def evento_da_api(envio) -> dict:
         usuario["em"] = [envio.hash_email]
     if envio.hash_telefone_meta:
         usuario["ph"] = [envio.hash_telefone_meta]
+    if getattr(envio, "meta_lead_id", None) and envio.meta_lead_id.isdigit():
+        usuario["lead_id"] = int(envio.meta_lead_id)
     if envio.fbclid:
         usuario["fbc"] = f"fb.1.{int(envio.momento.timestamp() * 1000)}.{envio.fbclid}"
     evento = {

@@ -2517,3 +2517,17 @@ export interface ResumoDasConversoes {
   recusas: { lead: string; evento: string; plataforma: string; motivo: string; em: string }[];
   ultima_rodada: RodadaDeConversoes | null;
 }
+
+/** Leads do formulário do Meta entrando sozinhos (14/10/2026): `GET /api/sdr/leads-do-meta`. */
+export interface ResultadoDaBuscaDeLeads {
+  em: string;
+  ligada: boolean;
+  lidos: number;
+  novos: number;
+  erro: string | null;
+}
+
+export interface SituacaoDosLeadsDoMeta {
+  ligada: boolean;
+  ultima: ResultadoDaBuscaDeLeads | null;
+}

@@ -1541,6 +1541,14 @@ td > .celula-fonte { display: block; }
 .integralidade-trilho { height: 6px; background: var(--surface-sunken); border-radius: 3px; overflow: hidden; }
 .integralidade-barra { display: block; height: 100%; background: var(--perda); }
 
+/* Reajuste anual de julho (13/10/2026) */
+.reajuste-cabecalho { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: var(--e2); margin-bottom: var(--e3); }
+.reajuste-titulo { margin: 0; font-family: var(--fonte-titulo); font-size: 18px; font-weight: 600; color: var(--texto-forte); }
+.reajuste-acoes { display: flex; align-items: center; gap: var(--e2); flex-wrap: wrap; }
+.entrada-do-reajuste { width: 130px; text-align: right; font-variant-numeric: tabular-nums; }
+.historico-do-ipca { margin-top: var(--e4); }
+.historico-do-ipca summary { cursor: pointer; font-size: 13px; color: var(--texto-medio); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -1884,3 +1884,20 @@ class Recebimento(Base):
     valor: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
     data_do_recebimento: Mapped[date | None] = mapped_column(sa.Date)
     ativo: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=True, server_default=sa.true())
+
+
+class IpcaDoMes(Base):
+    """A variação do IPCA (IBGE) de um mês, como o Banco Central publica: série 433 do SGS (13/10/2026).
+
+    Guardada no CRM para o reajuste anual de julho não depender do site do Banco Central no dia, e para o
+    histórico ficar aqui dentro (pedido de Eduardo). Quem preenche é `crm.indices.ipca.atualizar`; ninguém
+    digita. Um mês só tem uma linha: se o Banco Central revisar o número, a linha é atualizada.
+    """
+
+    __tablename__ = "ipca_do_mes"
+
+    mes: Mapped[date] = mapped_column(sa.Date, primary_key=True)
+    """Sempre o dia 1 do mês."""
+    variacao: Mapped[Decimal] = mapped_column(sa.Numeric(7, 4), nullable=False)
+    """Em % no mês, como a série publica (0,42 = 0,42%)."""
+    buscado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)

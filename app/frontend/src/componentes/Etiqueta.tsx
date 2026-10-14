@@ -45,6 +45,13 @@ const TOM_POR_SITUACAO: Record<string, string> = {
   "Em revisão": "espera",
   Arquivada: "neutra",
   Vencida: "perda",
+  // Reajuste anual de julho (13/10/2026)
+  Reajustar: "ganho",
+  "Você decide": "espera",
+  Adiado: "neutra",
+  Reajustado: "andamento",
+  "Sem reajuste": "neutra",
+  "Sem preço": "perda",
 };
 
 const TOM_POR_TEMPERATURA: Record<string, string> = {

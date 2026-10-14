@@ -186,7 +186,7 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     # devolução das conversões ao Meta e ao Google (14/10/2026); o GET está na linha "/api/sdr/.+"
     ("POST", r"/api/sdr/conversoes/enviar", ("sdr.parametros",)),
     # leads do formulário do Meta (14/10/2026): buscar agora cria leads, como o cadastro
-    ("POST", r"/api/sdr/leads-do-meta/buscar", ("funil.editar",)),
+    ("POST", r"/api/sdr/leads-do-(meta|google)/buscar", ("funil.editar",)),
     ("PUT", r"/api/sdr/midia/campanha", ("sdr.parametros",)),
     ("DELETE", r"/api/sdr/midia/campanha/\d+", ("sdr.parametros",)),
     # base de conhecimento do SDR de IA (03/10/2026); o GET está na linha "/api/sdr/.+"

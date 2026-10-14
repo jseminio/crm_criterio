@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from zoneinfo import ZoneInfo
@@ -270,3 +270,62 @@ def enviar_conversao(config: EnvioDoGoogle, envio, *, http: httpx.Client | None 
     if falha_parcial:
         raise Recusado(f"O Google Ads recusou a conversão: {str(falha_parcial.get('message') or '')[:300]}")
     return "O Google Ads recebeu a conversão."
+
+
+# ------------------------------------------------- leads do formulário do Google (14/10/2026)
+@dataclass(frozen=True)
+class LeadDoGoogle:
+    id: str
+    criado_em: datetime
+    gclid: str | None
+    respostas: dict[str, str]
+    """Tipo do campo padrão (FULL_NAME, EMAIL…) ou o texto da pergunta personalizada → resposta."""
+    campanha: str | None
+
+
+def ler_leads() -> ConfiguracaoDoGoogleAds | None:
+    """Com a busca dos leads ligada e as credenciais completas; `None` desligada ou faltando credencial."""
+    if configuracao.valor("google_ads.leads") != "true":
+        return None
+    return _credenciais()
+
+
+def _quando(texto: str) -> datetime:
+    """"2026-10-14 09:32:05-03:00" → datetime em UTC."""
+    return datetime.fromisoformat(texto.replace(" ", "T", 1)).astimezone(timezone.utc)
+
+
+def buscar_leads(config: ConfiguracaoDoGoogleAds, desde: datetime, *, http: httpx.Client | None = None,
+                 limite: int = 1000) -> list[LeadDoGoogle]:
+    """Os envios do formulário de lead depois de `desde`, os mais novos primeiro. O filtro por data é feito aqui:
+    a documentação não garante que `submission_date_time` aceite WHERE (hipótese de 14/10/2026)."""
+    _validar(config)
+    consulta = ("SELECT lead_form_submission_data.id, lead_form_submission_data.gclid, "
+                "lead_form_submission_data.submission_date_time, lead_form_submission_data.lead_form_submission_fields, "
+                "lead_form_submission_data.custom_lead_form_submission_fields, campaign.name "
+                "FROM lead_form_submission_data ORDER BY lead_form_submission_data.submission_date_time DESC "
+                f"LIMIT {int(limite)}")
+    cliente = http or httpx.Client(timeout=60.0)
+    try:
+        linhas = _buscar(cliente, config, _acesso(cliente, config), consulta)
+    finally:
+        if http is None:
+            cliente.close()
+    leads = []
+    for linha in linhas:
+        dados = linha.get("leadFormSubmissionData") or {}
+        if not dados.get("id") or not dados.get("submissionDateTime"):
+            continue
+        quando = _quando(dados["submissionDateTime"])
+        if quando <= desde:
+            continue
+        respostas: dict[str, str] = {}
+        for campo in dados.get("leadFormSubmissionFields") or []:
+            if campo.get("fieldType") and str(campo.get("fieldValue") or "").strip():
+                respostas[str(campo["fieldType"])] = str(campo["fieldValue"]).strip()
+        for campo in dados.get("customLeadFormSubmissionFields") or []:
+            if campo.get("questionText") and str(campo.get("fieldValue") or "").strip():
+                respostas[str(campo["questionText"])] = str(campo["fieldValue"]).strip()
+        leads.append(LeadDoGoogle(str(dados["id"]), quando, dados.get("gclid") or None, respostas,
+                                  (linha.get("campaign") or {}).get("name")))
+    return leads

@@ -11,8 +11,8 @@
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { FunilDoCanal, LinhaDaCampanha, PainelDeCampanhas, PainelDoSdr, ResumoDasConversoes,
-  SituacaoDosLeadsDoMeta } from "../api/tipos";
+import type { FunilDoCanal, LinhaDaCampanha, PainelDeCampanhas, PainelDoSdr, ResultadoDaBuscaDeLeads,
+  ResumoDasConversoes, SituacaoDosLeadsDoMeta } from "../api/tipos";
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
 import { dinheiro } from "../formato";
 import { mesAtual, nomeDoMes, numero, pct, tempo } from "../sdrFormato";
@@ -60,7 +60,14 @@ export function Campanhas() {
           explicacao="O painel acompanha os leads de tráfego pago que chegaram no mês, do formulário ao contrato. Cadastre o lead com o tipo de canal Tráfego pago, o canal (Meta Ads, Google Ads) e a campanha, e lance o investimento do mês em SDR da IA › Custos e mídia."
         />
       )}
-      {!erro && dados && <LeadsDoMetaBarra aoBuscar={recarregar} />}
+      {!erro && dados && (
+        <LeadsDoFormularioBarra plataforma="Meta" situacao={api.leadsDoMeta} buscarAgora={api.buscarLeadsDoMeta}
+          aoBuscar={recarregar} />
+      )}
+      {!erro && dados && (
+        <LeadsDoFormularioBarra plataforma="Google" situacao={api.leadsDoGoogle} buscarAgora={api.buscarLeadsDoGoogle}
+          aoBuscar={recarregar} />
+      )}
       {!erro && dados && <LeituraDosAnunciosBarra mes={mes} p={dados} aoLer={recarregar} />}
       {!erro && dados?.total && <Conteudo p={dados} sdr={sdr.dados} />}
       {!erro && dados && <ConversoesDevolvidas mes={mes} />}
@@ -366,10 +373,15 @@ function ConversoesDevolvidas({ mes }: { mes: string }) {
   );
 }
 
-/** Leads do formulário do Meta (amostra aprovada em 14/10/2026): entram sozinhos a cada 10 minutos; "Buscar leads
- * agora" roda uma vez já e recarrega o painel. */
-function LeadsDoMetaBarra({ aoBuscar }: { aoBuscar: () => void }) {
-  const { dados, recarregar } = usarDados<SituacaoDosLeadsDoMeta>(() => api.leadsDoMeta(), []);
+/** Leads do formulário do Meta e do Google (amostras aprovadas em 14/10/2026): entram sozinhos a cada 10 minutos;
+ * "Buscar leads agora" roda uma vez já e recarrega o painel. */
+function LeadsDoFormularioBarra({ plataforma, situacao, buscarAgora, aoBuscar }: {
+  plataforma: "Meta" | "Google";
+  situacao: () => Promise<SituacaoDosLeadsDoMeta>;
+  buscarAgora: () => Promise<ResultadoDaBuscaDeLeads>;
+  aoBuscar: () => void;
+}) {
+  const { dados, recarregar } = usarDados<SituacaoDosLeadsDoMeta>(situacao, [situacao]);
   const [buscando, definirBuscando] = useState(false);
   const [aviso, definirAviso] = useState<{ ok: boolean; texto: string } | null>(null);
   if (!dados) return null;
@@ -377,21 +389,21 @@ function LeadsDoMetaBarra({ aoBuscar }: { aoBuscar: () => void }) {
     definirBuscando(true);
     definirAviso(null);
     try {
-      const r = await api.buscarLeadsDoMeta();
+      const r = await buscarAgora();
       definirAviso(r.erro ? { ok: false, texto: r.erro }
-        : { ok: true, texto: `${numero(r.novos)} lead${r.novos === 1 ? "" : "s"} novo${r.novos === 1 ? "" : "s"} do Meta.` });
+        : { ok: true, texto: `${numero(r.novos)} lead${r.novos === 1 ? "" : "s"} novo${r.novos === 1 ? "" : "s"} do ${plataforma}.` });
       recarregar();
       aoBuscar();
     } catch (falha) {
-      definirAviso({ ok: false, texto: falha instanceof ErroDaApi ? falha.message : "Não consegui buscar os leads do Meta." });
+      definirAviso({ ok: false, texto: falha instanceof ErroDaApi ? falha.message : `Não consegui buscar os leads do ${plataforma}.` });
     } finally {
       definirBuscando(false);
     }
   };
   const u = dados.ultima;
   const texto = !dados.ligada
-    ? "Leads do Meta: entrada desligada em Configurações › Integrações"
-    : `Leads do Meta: busca automática a cada 10 minutos${u ? ` · última em ${HORA(u.em)}, ${numero(u.novos)} novo${u.novos === 1 ? "" : "s"}` : ""}`;
+    ? `Leads do ${plataforma}: entrada desligada em Configurações › Integrações`
+    : `Leads do ${plataforma}: busca automática a cada 10 minutos${u ? ` · última em ${HORA(u.em)}, ${numero(u.novos)} novo${u.novos === 1 ? "" : "s"}` : ""}`;
   return (
     <div className="camp-leitura">
       <span>{texto}</span>

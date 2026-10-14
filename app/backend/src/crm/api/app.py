@@ -56,7 +56,9 @@ from crm.api.backup import roteador as roteador_de_backup, roteador_da_migracao
 from crm.api.classificacao import ServicosDeAnalise, parametros_vigentes, roteador as roteador_de_carteira, servicos_de_analise_reais
 from crm.api.contatos import roteador as roteador_de_contatos
 from crm.api.contatos import roteador_de_empresas
-from crm.api.leads_do_meta import buscador_real, laco_dos_leads_do_meta, roteador_de_leads_do_meta
+from crm.api.leads_do_meta import (
+    ESTADO_DO_GOOGLE, buscador_do_google, buscador_real, laco_dos_leads_do_meta, roteador_de_leads_do_meta,
+)
 from crm.api.conversoes import enviadores_reais, laco_das_conversoes, roteador_de_conversoes
 from crm.api.sdr import roteador as roteador_do_sdr
 from crm.api.ficha import pendencias_de, roteador_da_ficha
@@ -178,6 +180,7 @@ def criar_app(
     conversoes_automaticas: bool | None = None,
     busca_de_leads_do_meta: Callable[[], object] | None = None,
     leads_do_meta_automaticos: bool | None = None,
+    busca_de_leads_do_google: Callable[[], object] | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede; `tentativas`, para o
@@ -220,10 +223,14 @@ def criar_app(
         leads_do_meta = asyncio.create_task(
             laco_dos_leads_do_meta(_fabrica, busca_de_leads_do_meta or buscador_real)
         ) if com_leads_do_meta else None
+        # Leads do formulário do Google Ads (14/10/2026): o mesmo laço, com o seu estado; liga junto com o do Meta.
+        leads_do_google = asyncio.create_task(laco_dos_leads_do_meta(
+            _fabrica, busca_de_leads_do_google or buscador_do_google, estado=ESTADO_DO_GOOGLE)
+        ) if com_leads_do_meta else None
         try:
             yield
         finally:
-            for t in (tarefa, disparo, saidas, conversoes, leads_do_meta):
+            for t in (tarefa, disparo, saidas, conversoes, leads_do_meta, leads_do_google):
                 if t is not None:
                     t.cancel()
                     with contextlib.suppress(asyncio.CancelledError):
@@ -326,6 +333,9 @@ def criar_app(
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
     api.include_router(roteador_de_leads_do_meta(obter_sessao, busca_de_leads_do_meta or buscador_real))
+    api.include_router(roteador_de_leads_do_meta(
+        obter_sessao, busca_de_leads_do_google or buscador_do_google, ESTADO_DO_GOOGLE,
+        prefixo="/api/sdr/leads-do-google", plataforma="Google"))
     api.include_router(roteador_de_conversoes(obter_sessao, enviadores_de_conversoes or enviadores_reais))
     api.include_router(roteador_do_sdr(obter_sessao, canais_do_disparo or canais_reais,
                                        **({"leitores": leitores_de_anuncios} if leitores_de_anuncios else {})))

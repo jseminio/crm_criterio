@@ -107,9 +107,10 @@ def _testar_meta_ads(_: ConfiguracaoDoAgente) -> str:
 def _testar_google_ads(_: ConfiguracaoDoAgente) -> str:
     from crm.anuncios import LeituraFalhou, google
 
-    config = google.ler_configuracao()
+    config = google.ler_configuracao() or google.ler_leads()
     if config is None:
-        raise Falhou("Ligue a leitura e preencha o token de desenvolvedor, o cliente OAuth, o refresh token e a conta.")
+        raise Falhou("Ligue a leitura ou a entrada dos leads e preencha o token de desenvolvedor, o cliente OAuth, "
+                     "o refresh token e a conta.")
     try:
         return google.conferir_conta(config)
     except LeituraFalhou as falha:

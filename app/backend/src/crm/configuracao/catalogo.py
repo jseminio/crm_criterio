@@ -115,6 +115,9 @@ GRUPOS: tuple[Grupo, ...] = (
               ajuda="Só se o acesso vem por uma conta de administrador (MCC). Deixe vazio se não houver."),
         Campo("google_ads.versao", "Versão da API do Google Ads", padrao="v25", exemplo="v25",
               ajuda="A v25 é a mais nova em 14/10/2026. O Google aposenta cada versão em cerca de um ano."),
+        Campo("google_ads.leads", "Trazer leads do formulário", padrao="false", opcoes=("true", "false"),
+              ajuda="Ligada, os leads do formulário de lead do Google Ads entram sozinhos no CRM, a cada 10 minutos, "
+                    "com o gclid. Usa as mesmas credenciais da leitura."),
         Campo("google_ads.conversoes", "Devolver conversões", padrao="false", opcoes=("true", "false"),
               ajuda="Ligada, o CRM avisa ao Google, a cada 10 minutos, os eventos dos leads que têm gclid. "
                     "E-mail e telefone saem só criptografados (SHA-256)."),

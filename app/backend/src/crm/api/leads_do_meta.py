@@ -1,4 +1,5 @@
-"""Leads do formulário do Meta entrando sozinhos no CRM — amostra aprovada por Eduardo em 14/10/2026.
+"""Leads dos formulários do Meta e do Google entrando sozinhos no CRM — amostra aprovada por Eduardo em 14/10/2026;
+o Google entrou no mesmo dia, pelo formulário de lead do próprio Google Ads (decisão de Eduardo).
 
 Uma rodada (`buscar_uma_vez`) pede ao Meta os leads criados desde o último que entrou (na primeira vez, os dos
 últimos 30 dias) e cria no CRM os que ainda não existem, pelo ID do lead no Meta. Roda a cada 10 minutos
@@ -23,12 +24,15 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, sessionmaker
 
 from crm.anuncios import LeituraFalhou
+from crm.anuncios import google as google_ads
 from crm.anuncios import leads_do_meta as meta_leads
 from crm.db.base import agora
 from crm.db.modelos import Lead
+from crm.domain import leads_do_google
 from crm.domain.leads_do_meta import campos_do_lead
 
-__all__ = ["Busca", "buscador_real", "buscar_uma_vez", "laco_dos_leads_do_meta", "roteador_de_leads_do_meta"]
+__all__ = ["Busca", "buscador_do_google", "buscador_real", "buscar_uma_vez", "laco_dos_leads_do_meta",
+           "roteador_de_leads_do_meta"]
 
 _log = logging.getLogger(__name__)
 
@@ -41,9 +45,12 @@ FOLGA = timedelta(hours=1)
 
 @dataclass(frozen=True)
 class Busca:
-    """A busca de uma rodada: `None` com a entrada desligada; o teste troca por falsos."""
+    """A busca de uma rodada: `preparar` devolve `None` com a entrada desligada; o teste troca por falsos.
+    `coluna` = a coluna do lead com o ID na plataforma; `converter` = respostas → campos do lead."""
 
-    preparar: Callable[[], Callable[[datetime], list[meta_leads.LeadDoMeta]] | None]
+    preparar: Callable[[], Callable[[datetime], list] | None]
+    coluna: str = "meta_lead_id"
+    converter: Callable[[object], dict] = campos_do_lead
 
 
 def buscador_real() -> Busca:
@@ -53,6 +60,15 @@ def buscador_real() -> Busca:
             return None
         return lambda desde: meta_leads.buscar_leads(config, desde)
     return Busca(preparar)
+
+
+def buscador_do_google() -> Busca:
+    def preparar():
+        config = google_ads.ler_leads()
+        if config is None:
+            return None
+        return lambda desde: google_ads.buscar_leads(config, desde)
+    return Busca(preparar, coluna="google_lead_id", converter=leads_do_google.campos_do_lead)
 
 
 class ResultadoDaBusca(BaseModel):
@@ -70,6 +86,7 @@ class EstadoDaBusca:
 
 
 ESTADO = EstadoDaBusca()
+ESTADO_DO_GOOGLE = EstadoDaBusca()
 
 
 def _utc(m: datetime) -> datetime:
@@ -80,19 +97,20 @@ def buscar_uma_vez(sessao: Session, busca: Busca, momento: datetime) -> Resultad
     buscar = busca.preparar()
     if buscar is None:
         return ResultadoDaBusca(em=momento, ligada=False)
-    ultimo = sessao.scalar(sa.select(sa.func.max(Lead.criado_em)).where(Lead.meta_lead_id.is_not(None)))
+    coluna = getattr(Lead, busca.coluna)
+    ultimo = sessao.scalar(sa.select(sa.func.max(Lead.criado_em)).where(coluna.is_not(None)))
     desde = _utc(ultimo) - FOLGA if ultimo else momento - PRIMEIRA_VEZ
     try:
         lidos = buscar(desde)
     except LeituraFalhou as falha:
         return ResultadoDaBusca(em=momento, ligada=True, erro=str(falha))
     ids = [l.id for l in lidos]
-    existentes = set(sessao.scalars(sa.select(Lead.meta_lead_id).where(Lead.meta_lead_id.in_(ids or ["-"]))))
+    existentes = set(sessao.scalars(sa.select(coluna).where(coluna.in_(ids or ["-"]))))
     novos = 0
     for lead in sorted(lidos, key=lambda l: l.criado_em):
         if lead.id in existentes:
             continue
-        sessao.add(Lead(**campos_do_lead(lead)))
+        sessao.add(Lead(**busca.converter(lead)))
         existentes.add(lead.id)
         novos += 1
     sessao.flush()
@@ -130,8 +148,9 @@ class SituacaoDaBusca(BaseModel):
 
 def roteador_de_leads_do_meta(obter_sessao: Callable[[], Iterator[Session]],
                               busca: Callable[[], Busca] = buscador_real,
-                              estado: EstadoDaBusca = ESTADO) -> APIRouter:
-    r = APIRouter(prefix="/api/sdr/leads-do-meta", tags=["sdr"])
+                              estado: EstadoDaBusca = ESTADO, *, prefixo: str = "/api/sdr/leads-do-meta",
+                              plataforma: str = "Meta") -> APIRouter:
+    r = APIRouter(prefix=prefixo, tags=["sdr"])
 
     @r.get("", response_model=SituacaoDaBusca)
     def situacao() -> SituacaoDaBusca:
@@ -142,7 +161,7 @@ def roteador_de_leads_do_meta(obter_sessao: Callable[[], Iterator[Session]],
         """Uma busca agora, sem esperar os 10 minutos."""
         b = busca()
         if b.preparar() is None:
-            raise HTTPException(409, "a entrada dos leads do Meta está desligada: ligue em Configurações › Integrações")
+            raise HTTPException(409, f"a entrada dos leads do {plataforma} está desligada: ligue em Configurações › Integrações")
         if not estado.trava.acquire(blocking=False):
             raise HTTPException(409, "já tem uma busca em curso: tente em instantes")
         try:

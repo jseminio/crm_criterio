@@ -81,6 +81,23 @@ Decisões de Eduardo em 13/10/2026, amostra aprovada. Em **Sucesso do Cliente �
 - Rotas: `GET /api/reajustes?ano=`, `POST /api/reajustes/aprovar`, `GET /api/ipca`, `POST /api/ipca/atualizar`.
   Regras em `crm.domain.reajuste`; busca em `crm.indices`.
 
+## Leads do formulário do Google Ads entrando sozinhos no CRM (14/10/2026)
+
+Decisão de Eduardo em 14/10/2026: o lead do Google entra pelo formulário de lead do próprio Google Ads (não há
+página de captação da Critério). Mesmo molde dos leads do Meta.
+
+- Integrações › Google Ads: **Trazer leads do formulário**, com as mesmas credenciais da leitura do gasto.
+- A cada 10 minutos (e pelo **Buscar leads agora** da linha "Leads do Google" na aba Campanhas,
+  `POST /api/sdr/leads-do-google/buscar`), o CRM consulta `lead_form_submission_data` (GAQL, os 1.000 envios mais
+  recentes; o filtro por data é feito no CRM, porque a documentação não garante filtro em `submission_date_time`) e
+  cria os leads que faltam. `lead.google_lead_id` (único) impede a entrada em dobro.
+- O lead entra como Tráfego pago › Google Ads, com a campanha e o **gclid** (a devolução de conversões ao Google
+  passa a reconhecê-lo). Campos padrão (FULL_NAME, EMAIL, PHONE_NUMBER, COMPANY_NAME) vão para os campos do lead;
+  os outros e as perguntas personalizadas, para a observação, com a data.
+- A rodada é a mesma dos leads do Meta (`crm.api.leads_do_meta`, `Busca` com a coluna e a conversão de cada
+  plataforma); regra pura em `crm.domain.leads_do_google`.
+- Migração `f5c1e7a3b9d6`: coluna `google_lead_id` no lead. Só acrescenta.
+
 ## Leads do formulário do Meta entrando sozinhos no CRM (14/10/2026)
 
 Amostra aprovada por Eduardo em 14/10/2026.

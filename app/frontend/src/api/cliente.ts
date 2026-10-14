@@ -687,6 +687,10 @@ export const api = {
 
   buscarLeadsDoMeta: () => pedir<ResultadoDaBuscaDeLeads>("/api/sdr/leads-do-meta/buscar", { method: "POST" }),
 
+  leadsDoGoogle: () => pedir<SituacaoDosLeadsDoMeta>("/api/sdr/leads-do-google"),
+
+  buscarLeadsDoGoogle: () => pedir<ResultadoDaBuscaDeLeads>("/api/sdr/leads-do-google/buscar", { method: "POST" }),
+
   conversoes: (mes: string) => pedir<ResumoDasConversoes>(comParametros("/api/sdr/conversoes", { mes })),
 
   enviarConversoes: () => pedir<RodadaDeConversoes>("/api/sdr/conversoes/enviar", { method: "POST" }),

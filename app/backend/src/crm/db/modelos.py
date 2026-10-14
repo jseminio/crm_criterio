@@ -340,6 +340,8 @@ class Lead(CarimboMixin, Base):
     """Identificador do clique no Google Ads: é o que permite devolver a conversão ao Google."""
     fbclid: Mapped[str | None] = mapped_column(sa.String(255))
     """Identificador do clique no Meta: é o que permite devolver a conversão ao Meta."""
+    google_lead_id: Mapped[str | None] = mapped_column(sa.String(40), unique=True, index=True)
+    """O ID do envio no formulário de lead do Google Ads (14/10/2026): o mesmo lead nunca entra duas vezes."""
     meta_lead_id: Mapped[str | None] = mapped_column(sa.String(40), unique=True, index=True)
     """O ID do lead no formulário de anúncio do Meta (14/10/2026): o mesmo lead nunca entra duas vezes, e a
     devolução de conversões reconhece a pessoa por ele."""

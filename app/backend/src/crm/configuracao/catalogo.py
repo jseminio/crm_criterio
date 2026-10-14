@@ -92,6 +92,12 @@ GRUPOS: tuple[Grupo, ...] = (
                     "E-mail e telefone saem só criptografados (SHA-256)."),
         Campo("meta_ads.conjunto", "ID do conjunto de dados (pixel)", exemplo="123456789012345",
               ajuda="Gerenciador de Eventos › Conjuntos de dados. O token precisa de acesso a ele."),
+        Campo("meta_ads.leads", "Trazer leads do formulário", padrao="false", opcoes=("true", "false"),
+              ajuda="Ligada, os leads dos formulários de anúncio da página entram sozinhos no CRM, a cada 10 minutos."),
+        Campo("meta_ads.pagina", "ID da página do Facebook", exemplo="102938475610293",
+              ajuda="Configurações da página › Transparência da página, ou o Business Manager › Páginas."),
+        Campo("meta_ads.token_pagina", "Token da página", segredo=True,
+              ajuda="Usuário do sistema no Business Manager com a página atribuída e a permissão leads_retrieval."),
     )),
     Grupo("google_ads", "Google Ads (investimento por campanha)", (
         Campo("google_ads.ligado", "Leitura ligada", padrao="false", opcoes=("true", "false"),

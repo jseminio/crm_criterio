@@ -8,7 +8,8 @@ import { Campanhas } from "./Campanhas";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { campanhas: vi.fn(), painelDoSdr: vi.fn(), atualizarDosAnuncios: vi.fn(), conversoes: vi.fn(), enviarConversoes: vi.fn() } };
+  return { ...real, api: { campanhas: vi.fn(), painelDoSdr: vi.fn(), atualizarDosAnuncios: vi.fn(), conversoes: vi.fn(), enviarConversoes: vi.fn(),
+    leadsDoMeta: vi.fn(), buscarLeadsDoMeta: vi.fn() } };
 });
 
 const taxa = (numerador: number, denominador: number) => ({
@@ -82,6 +83,8 @@ describe("Campanhas", () => {
     vi.mocked(api.painelDoSdr).mockReset().mockResolvedValue(sdr);
     vi.mocked(api.conversoes).mockReset().mockResolvedValue(resumo());
     vi.mocked(api.enviarConversoes).mockReset();
+    vi.mocked(api.leadsDoMeta).mockReset().mockResolvedValue({ ligada: false, ultima: null });
+    vi.mocked(api.buscarLeadsDoMeta).mockReset();
   });
 
   it("mostra um funil por canal, com o total, a passagem e o custo de cada etapa", async () => {
@@ -209,5 +212,28 @@ describe("Campanhas", () => {
     render(<Campanhas />);
     expect(await screen.findByText("Devolução desligada em Configurações › Integrações")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Enviar agora" })).not.toBeInTheDocument();
+  });
+
+  it("leads do Meta: mostra a última busca e busca agora", async () => {
+    vi.mocked(api.campanhas).mockResolvedValue(painel());
+    vi.mocked(api.leadsDoMeta).mockResolvedValue({ ligada: true, ultima: { em: "2026-10-14T12:40:00Z", ligada: true, lidos: 3, novos: 3, erro: null } });
+    vi.mocked(api.buscarLeadsDoMeta).mockResolvedValue({ em: "2026-10-14T12:50:00Z", ligada: true, lidos: 4, novos: 1, erro: null });
+    render(<Campanhas />);
+    expect(await screen.findByText(/Leads do Meta: busca automática a cada 10 minutos · última em .*, 3 novos/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Buscar leads agora" }));
+    expect(await screen.findByText("1 lead novo do Meta.")).toBeInTheDocument();
+    expect(api.campanhas).toHaveBeenCalledTimes(2);
+  });
+
+  it("leads do Meta: desligada sem botão, e erro da Meta em frase", async () => {
+    vi.mocked(api.campanhas).mockResolvedValue(painel());
+    const { unmount } = render(<Campanhas />);
+    expect(await screen.findByText("Leads do Meta: entrada desligada em Configurações › Integrações")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Buscar leads agora" })).not.toBeInTheDocument();
+    unmount();
+    vi.mocked(api.leadsDoMeta).mockResolvedValue({ ligada: true, ultima: { em: "2026-10-14T12:40:00Z", ligada: true, lidos: 0, novos: 0,
+      erro: "A Meta recusou o token da página (HTTP 400): Invalid token" } });
+    render(<Campanhas />);
+    expect(await screen.findByText(/recusou o token da página/)).toBeInTheDocument();
   });
 });

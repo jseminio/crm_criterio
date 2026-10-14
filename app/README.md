@@ -81,6 +81,22 @@ Decisões de Eduardo em 13/10/2026, amostra aprovada. Em **Sucesso do Cliente �
 - Rotas: `GET /api/reajustes?ano=`, `POST /api/reajustes/aprovar`, `GET /api/ipca`, `POST /api/ipca/atualizar`.
   Regras em `crm.domain.reajuste`; busca em `crm.indices`.
 
+## Leads do formulário do Meta entrando sozinhos no CRM (14/10/2026)
+
+Amostra aprovada por Eduardo em 14/10/2026.
+
+- Integrações › Meta Ads: **Trazer leads do formulário**, o **ID da página** e o **token da página** (usuário do
+  sistema com a página atribuída e `leads_retrieval`). O Testar confere a página e conta os formulários.
+- A cada 10 minutos (e pelo **Buscar leads agora** da aba Campanhas, `POST /api/sdr/leads-do-meta/buscar`), o CRM
+  pede ao Meta os leads de todos os formulários da página criados desde o último que entrou (na primeira vez, 30
+  dias) e cria os que faltam. O ID do lead no Meta (`lead.meta_lead_id`, único) impede a entrada em dobro.
+- O lead entra como Tráfego pago › Meta Ads, com a campanha e o anúncio; lead orgânico entra com a campanha
+  "Orgânico (formulário)". Nome, e-mail, telefone e empresa vão para os campos; as outras respostas, para a
+  observação, com o formulário e a data. Lead com e-mail que já existe entra assim mesmo (decisão de 14/10/2026).
+- A devolução de conversões ao Meta passa a mandar o ID do lead (`user_data.lead_id`), que reconhece a pessoa com
+  certeza.
+- Migração `e3b9d5f1a7c4`: coluna `meta_lead_id` no lead. Só acrescenta.
+
 ## Conversões devolvidas ao Meta Ads e ao Google Ads (14/10/2026)
 
 Amostra aprovada por Eduardo em 14/10/2026, com o envio de e-mail e telefone **só criptografados** (SHA-256).

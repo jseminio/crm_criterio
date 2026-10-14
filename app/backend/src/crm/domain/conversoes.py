@@ -86,6 +86,8 @@ class Envio:
     """SHA-256 do E.164, com o + (o formato do Google)."""
     gclid: str | None
     fbclid: str | None
+    meta_lead_id: str | None = None
+    """O ID do lead no formulário do Meta (14/10/2026): o Meta reconhece a pessoa com certeza por ele."""
     tentativas: int = 0
     """Quantas vezes já falhou por rede: o envio de agora é a tentativa seguinte."""
     recusa_previa: str | None = None
@@ -161,7 +163,7 @@ def pendentes(leads: Iterable[LeadLido], ja: Iterable[JaEnviada], plataformas: I
                 antes = feitos.get((lead.id, evento, plataforma))
                 if antes is not None and (antes.situacao != "falhou" or antes.tentativas >= TENTATIVAS):
                     continue
-                reconhece = bool(lead.gclid) if plataforma == GOOGLE else bool(email or tel_meta or lead.fbclid)
+                reconhece = bool(lead.gclid) if plataforma == GOOGLE else bool(email or tel_meta or lead.fbclid or getattr(lead, "meta_lead_id", None))
                 if not reconhece:
                     sem_identificador[(evento, plataforma)] = sem_identificador.get((evento, plataforma), 0) + 1
                     continue
@@ -170,5 +172,6 @@ def pendentes(leads: Iterable[LeadLido], ja: Iterable[JaEnviada], plataformas: I
                 if plataforma == META and agora - quando > MAX_IDADE_NO_META:
                     recusa = "O evento tem mais de 7 dias: o Meta não aceita."
                 envios.append(Envio(lead.id, evento, plataforma, quando, valor, email, tel_meta, tel_google,
-                                    lead.gclid, lead.fbclid, antes.tentativas if antes else 0, recusa))
+                                    lead.gclid, lead.fbclid, getattr(lead, "meta_lead_id", None),
+                                    antes.tentativas if antes else 0, recusa))
     return envios, sem_identificador

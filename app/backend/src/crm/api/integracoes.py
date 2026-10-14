@@ -83,15 +83,25 @@ def _testar_email(config: ConfiguracaoDoAgente) -> str:
 
 
 def _testar_meta_ads(_: ConfiguracaoDoAgente) -> str:
-    from crm.anuncios import meta
+    """Testa o que estiver ligado no grupo: a leitura do gasto (conta de anúncios) e a entrada dos leads (página)."""
+    from crm.anuncios import LeituraFalhou
+    from crm.anuncios import leads_do_meta, meta
 
-    config = meta.ler_configuracao()
-    if config is None:
-        raise Falhou("Ligue a leitura e preencha o token e o ID da conta.")
-    try:
-        return meta.conferir_conta(config)
-    except meta.LeituraFalhou as falha:
-        raise Falhou(str(falha)) from falha
+    leitura, leads = meta.ler_configuracao(), leads_do_meta.ler_configuracao()
+    if leitura is None and leads is None:
+        raise Falhou("Ligue a leitura (token e conta) ou a entrada dos leads (página e token da página).")
+    partes, falhou = [], False
+    for executar in ([lambda: meta.conferir_conta(leitura)] if leitura else []) + (
+            [lambda: leads_do_meta.conferir_pagina(leads)] if leads else []):
+        try:
+            partes.append(executar())
+        except LeituraFalhou as falha:
+            falhou = True
+            partes.append(str(falha))
+    texto = " ".join(partes)
+    if falhou:
+        raise Falhou(texto)
+    return texto
 
 
 def _testar_google_ads(_: ConfiguracaoDoAgente) -> str:
@@ -211,7 +221,7 @@ def _problema(campo: configuracao.Campo, valor: str) -> str | None:
         return "Versão da API do Google Ads: use o formato v25"
     if campo.chave in ("google_ads.conta", "google_ads.conta_admin") and not re.fullmatch(r"\d{3}-?\d{3}-?\d{4}", valor):
         return f"{campo.rotulo}: 10 dígitos, como 123-456-7890"
-    if campo.chave in ("meta_ads.conjunto", "google_ads.acao_qualificado", "google_ads.acao_reuniao",
+    if campo.chave in ("meta_ads.conjunto", "meta_ads.pagina", "google_ads.acao_qualificado", "google_ads.acao_reuniao",
                        "google_ads.acao_contrato") and not valor.isdigit():
         return f"{campo.rotulo}: só os números"
     if campo.chave == "meta_ads.conta" and not valor.removeprefix("act_").isdigit():
@@ -230,7 +240,7 @@ def _configurado(grupo: str, linhas: dict[str, configuracao.Linha]) -> bool:
 
         em_uso = {linhas["ia.principal"].valor, linhas["ia.reserva"].valor} - {NENHUMA, None}
         return all(linhas[f"{n.casefold()}.chave"].origem != "vazio" for n in em_uso)
-    opcionais = {"google_ads.conta_admin", "meta_ads.conjunto", "google_ads.acao_qualificado",
+    opcionais = {"google_ads.conta_admin", "meta_ads.conjunto", "meta_ads.pagina", "meta_ads.token_pagina", "google_ads.acao_qualificado",
                  "google_ads.acao_reuniao", "google_ads.acao_contrato"}
     return all(l.origem != "vazio" for l in linhas.values() if configuracao.CAMPOS[l.campo.chave] in
                configuracao.catalogo.grupo(grupo).campos and l.campo.chave not in opcionais)

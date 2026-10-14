@@ -81,6 +81,28 @@ Decisões de Eduardo em 13/10/2026, amostra aprovada. Em **Sucesso do Cliente �
 - Rotas: `GET /api/reajustes?ano=`, `POST /api/reajustes/aprovar`, `GET /api/ipca`, `POST /api/ipca/atualizar`.
   Regras em `crm.domain.reajuste`; busca em `crm.indices`.
 
+## Conversões devolvidas ao Meta Ads e ao Google Ads (14/10/2026)
+
+Amostra aprovada por Eduardo em 14/10/2026, com o envio de e-mail e telefone **só criptografados** (SHA-256).
+
+- O CRM avisa às plataformas quando um lead de **tráfego pago** é **qualificado**, **marca reunião** ou **fecha
+  contrato** (valor = MRR, parcela × 13 ÷ 12). Lead "não contatar" nunca sai.
+- **Meta:** Conversions API no conjunto de dados (pixel), `action_source` system_generated, eventos
+  `LeadQualificado`, `ReuniaoMarcada` e `ContratoFechado`; reconhece por e-mail, telefone ou fbclid. Evento com mais
+  de 7 dias o Meta não aceita: o CRM nem envia e registra o porquê.
+- **Google:** `uploadClickConversions` numa ação de conversão de importação por evento; só leads com gclid (com
+  e-mail e telefone em hash junto).
+- Configuração em Integrações, nos grupos Meta Ads e Google Ads: "Devolver conversões", o ID do pixel e os IDs das
+  três ações. A devolução não depende da leitura do gasto estar ligada.
+- Roda sozinha a cada 10 minutos e pelo **Enviar agora** da aba Campanhas (`POST /api/sdr/conversoes/enviar`).
+  Cada lead, evento e plataforma sai **uma vez** (`conversao_enviada`): aceito ou recusado não sai de novo; falha de
+  rede tenta até 5 vezes; credencial recusada para a plataforma na rodada sem gastar tentativa.
+- Bloco "Conversões devolvidas" na aba Campanhas (`GET /api/sdr/conversoes?mes=`): enviados, recusados com o motivo,
+  a reenviar e os que não têm como ser reconhecidos (sem gclid; sem e-mail, telefone ou fbclid).
+- Migração `d1f7b3a9c5e2`: tabela `conversao_enviada`. Só acrescenta.
+- **Antes de ligar:** a política de privacidade do site precisa prever o compartilhamento criptografado com
+  plataformas de anúncio (LGPD).
+
 ## Campanhas: leitura do Google Ads e botão único "Atualizar dos anúncios" (14/10/2026)
 
 Amostra aprovada por Eduardo em 14/10/2026.

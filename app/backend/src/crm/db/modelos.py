@@ -1345,6 +1345,34 @@ class InvestimentoPorCampanha(CarimboMixin, Base):
     )
 
 
+class ConversaoEnviada(CarimboMixin, Base):
+    """Um evento do CRM devolvido a uma plataforma de anúncio (14/10/2026).
+
+    Uma linha por lead, evento e plataforma: o que sai uma vez não sai de novo. `situacao`:
+    "enviado" (a plataforma aceitou), "recusado" (recusa definitiva, com o motivo) ou "falhou"
+    (rede ou instabilidade: tenta de novo na próxima rodada, até `TENTATIVAS` vezes).
+    """
+
+    __tablename__ = "conversao_enviada"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lead_id: Mapped[int] = mapped_column(sa.ForeignKey("lead.id", ondelete="CASCADE"), nullable=False, index=True)
+    evento: Mapped[str] = mapped_column(sa.String(30), nullable=False)
+    plataforma: Mapped[str] = mapped_column(sa.String(30), nullable=False)
+    situacao: Mapped[str] = mapped_column(sa.String(10), nullable=False)
+    momento_do_evento: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    valor: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    tentativas: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False, default=1)
+    enviado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    resposta: Mapped[str | None] = mapped_column(sa.String(500))
+    """O que a plataforma respondeu, em frase, sem segredo nem dado do lead."""
+
+    __table_args__ = (
+        sa.UniqueConstraint("lead_id", "evento", "plataforma", name="uq_conversao_lead_evento_plataforma"),
+        sa.CheckConstraint("situacao IN ('enviado', 'recusado', 'falhou')", name="situacao_da_conversao"),
+    )
+
+
 class QuestionarioRecebido(CarimboMixin, Base):
     """Um questionário para proposta enviado pelo cliente no site e trazido pelo "Buscar
     questionários" (01/10/2026). Guarda a resposta inteira, como chegou: o que o CRM fez com ela

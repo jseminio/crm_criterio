@@ -9,11 +9,21 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 
-__all__ = ["GastoDaCampanha", "LeituraFalhou", "intervalo"]
+__all__ = ["AcessoNegado", "GastoDaCampanha", "LeituraFalhou", "Recusado", "intervalo"]
 
 
 class LeituraFalhou(RuntimeError):
-    """A leitura não deu certo. A mensagem é para a pessoa ler; nunca leva token ou segredo."""
+    """A leitura ou o envio não deu certo agora (rede, instabilidade). A mensagem é para a pessoa ler;
+    nunca leva token, segredo ou dado do lead. No envio de conversão, tenta de novo na próxima rodada."""
+
+
+class AcessoNegado(LeituraFalhou):
+    """A plataforma recusou a credencial ou falta configuração (14/10/2026). O envio para na rodada e não
+    gasta tentativa: depois de corrigir em Integrações, sai normalmente."""
+
+
+class Recusado(RuntimeError):
+    """A plataforma recusou o evento de vez (dado inválido, fora do prazo): não adianta reenviar."""
 
 
 @dataclass(frozen=True)

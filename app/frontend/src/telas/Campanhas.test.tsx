@@ -3,12 +3,12 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ErroDaApi } from "../api/cliente";
-import type { EtapaDoCanal, FunilDoCanal, PainelDeCampanhas, PainelDoSdr } from "../api/tipos";
+import type { EtapaDoCanal, FunilDoCanal, PainelDeCampanhas, PainelDoSdr, ResumoDasConversoes } from "../api/tipos";
 import { Campanhas } from "./Campanhas";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { campanhas: vi.fn(), painelDoSdr: vi.fn(), atualizarDosAnuncios: vi.fn() } };
+  return { ...real, api: { campanhas: vi.fn(), painelDoSdr: vi.fn(), atualizarDosAnuncios: vi.fn(), conversoes: vi.fn(), enviarConversoes: vi.fn() } };
 });
 
 const taxa = (numerador: number, denominador: number) => ({
@@ -57,6 +57,22 @@ function painel(extra: Partial<PainelDeCampanhas> = {}): PainelDeCampanhas {
   };
 }
 
+function resumo(extra: Partial<ResumoDasConversoes> = {}): ResumoDasConversoes {
+  const linha = (evento: string, rotulo: string, plataforma: string, enviados: number, sem: number, valor: number | null = null) =>
+    ({ evento, rotulo, plataforma, enviados, recusados: 0, falhas: 0, sem_identificador: sem, valor_enviado: valor });
+  return {
+    mes: "2026-10",
+    ligadas: { "Meta Ads": true, "Google Ads": false },
+    linhas: [
+      linha("lead_qualificado", "Lead qualificado", "Meta Ads", 18, 0), linha("lead_qualificado", "Lead qualificado", "Google Ads", 0, 7),
+      linha("contrato_fechado", "Contrato fechado", "Meta Ads", 2, 0, 15166.66), linha("contrato_fechado", "Contrato fechado", "Google Ads", 0, 1),
+    ],
+    recusas: [{ lead: "Acme", evento: "Lead qualificado", plataforma: "Meta Ads", motivo: "O evento tem mais de 7 dias: o Meta não aceita.", em: "2026-10-14T12:00:00Z" }],
+    ultima_rodada: { em: "2026-10-14T12:20:00Z", plataformas: [] },
+    ...extra,
+  };
+}
+
 const sdr = { leads: 100, responderam: 61, primeira_resposta: { valor: 240 },
   qualificados_sobre_responderam: taxa(30, 61) } as unknown as PainelDoSdr;
 
@@ -64,6 +80,8 @@ describe("Campanhas", () => {
   beforeEach(() => {
     vi.mocked(api.campanhas).mockReset();
     vi.mocked(api.painelDoSdr).mockReset().mockResolvedValue(sdr);
+    vi.mocked(api.conversoes).mockReset().mockResolvedValue(resumo());
+    vi.mocked(api.enviarConversoes).mockReset();
   });
 
   it("mostra um funil por canal, com o total, a passagem e o custo de cada etapa", async () => {
@@ -159,5 +177,37 @@ describe("Campanhas", () => {
     render(<Campanhas />);
     expect(await screen.findByText(/Google Ads: leitura desligada/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Atualizar dos anúncios" })).not.toBeInTheDocument();
+  });
+
+  it("mostra as conversões devolvidas por evento e plataforma, e as recusas com o motivo", async () => {
+    vi.mocked(api.campanhas).mockResolvedValue(painel());
+    render(<Campanhas />);
+    const tabela = await screen.findByRole("table", { name: "Conversões devolvidas" });
+    expect(within(tabela).getByText("18 enviados")).toBeInTheDocument();
+    expect(within(tabela).getByText(/2 enviados · R\$\s?15\.166,66/)).toBeInTheDocument();
+    expect(within(tabela).getByText("0 enviados · 7 sem gclid")).toBeInTheDocument();
+    expect(screen.getByText(/Meta Ads: ligada · Google Ads: desligada/)).toBeInTheDocument();
+    expect(screen.getByText(/Acme · Lead qualificado · Meta Ads: O evento tem mais de 7 dias/)).toBeInTheDocument();
+    expect(screen.getByText(/só criptografados \(SHA-256\)/)).toBeInTheDocument();
+  });
+
+  it("enviar agora roda uma vez e mostra o aviso de credencial recusada", async () => {
+    vi.mocked(api.campanhas).mockResolvedValue(painel());
+    vi.mocked(api.enviarConversoes).mockResolvedValue({ em: "2026-10-14T12:30:00Z", plataformas: [] });
+    render(<Campanhas />);
+    fireEvent.click(await screen.findByRole("button", { name: "Enviar agora" }));
+    await waitFor(() => expect(api.conversoes).toHaveBeenCalledTimes(2));
+    vi.mocked(api.conversoes).mockResolvedValue(resumo({ ultima_rodada: { em: "2026-10-14T12:30:00Z", plataformas: [
+      { plataforma: "Meta Ads", ligada: true, enviados: 0, recusados: 0, falhas: 0, aviso: "A Meta recusou o token." }] } }));
+    fireEvent.click(screen.getByRole("button", { name: "Enviar agora" }));
+    expect(await screen.findByText("Meta Ads: A Meta recusou o token.")).toBeInTheDocument();
+  });
+
+  it("devolução desligada: sem botão, com o caminho para ligar", async () => {
+    vi.mocked(api.campanhas).mockResolvedValue(painel());
+    vi.mocked(api.conversoes).mockResolvedValue(resumo({ ligadas: { "Meta Ads": false, "Google Ads": false }, ultima_rodada: null }));
+    render(<Campanhas />);
+    expect(await screen.findByText("Devolução desligada em Configurações › Integrações")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Enviar agora" })).not.toBeInTheDocument();
   });
 });

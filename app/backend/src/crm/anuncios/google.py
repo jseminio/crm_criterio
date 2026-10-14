@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
+from zoneinfo import ZoneInfo
+
 import httpx2 as httpx
 
 from crm import configuracao
@@ -30,6 +32,7 @@ VERSAO_PADRAO = "v25"
 _CONTA = re.compile(r"^\d{10}$")
 _MILHAO = Decimal(1_000_000)
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
+_FUSO = ZoneInfo("America/Sao_Paulo")
 
 
 @dataclass(frozen=True)
@@ -52,16 +55,7 @@ def ler_configuracao() -> ConfiguracaoDoGoogleAds | None:
     """A configuração da tela, ou `None` com a leitura desligada ou faltando algum campo obrigatório."""
     if configuracao.valor("google_ads.ligado") != "true":
         return None
-    campos = {c: configuracao.valor(f"google_ads.{c}").strip()
-              for c in ("token_dev", "cliente_id", "cliente_segredo", "refresh_token", "conta")}
-    if not all(campos.values()):
-        return None
-    return ConfiguracaoDoGoogleAds(
-        token_de_desenvolvedor=campos["token_dev"], cliente_id=campos["cliente_id"],
-        cliente_segredo=campos["cliente_segredo"], refresh_token=campos["refresh_token"],
-        conta=so_digitos(campos["conta"]), conta_admin=so_digitos(configuracao.valor("google_ads.conta_admin")) or None,
-        versao=configuracao.valor("google_ads.versao").strip() or VERSAO_PADRAO,
-    )
+    return _credenciais()
 
 
 def _validar(config: ConfiguracaoDoGoogleAds) -> None:
@@ -172,3 +166,107 @@ def gasto_por_campanha(config: ConfiguracaoDoGoogleAds, mes: str, hoje: date, *,
         if nome:
             gastos.append(GastoDaCampanha(str(campanha.get("id") or ""), nome[:200], Decimal(str(micros)) / _MILHAO))
     return gastos
+
+
+# ------------------------------------------------- devolução de conversões (14/10/2026)
+ACOES = {
+    "lead_qualificado": "google_ads.acao_qualificado",
+    "reuniao_marcada": "google_ads.acao_reuniao",
+    "contrato_fechado": "google_ads.acao_contrato",
+}
+"""Cada evento do CRM vai para uma ação de conversão do tipo importação, criada no Google Ads."""
+
+
+@dataclass(frozen=True)
+class EnvioDoGoogle:
+    credenciais: ConfiguracaoDoGoogleAds
+    acoes: dict[str, str]
+    """Evento do CRM → ID da ação de conversão. Evento sem ação fica sem enviar."""
+
+
+def _credenciais() -> ConfiguracaoDoGoogleAds | None:
+    campos = {c: configuracao.valor(f"google_ads.{c}").strip()
+              for c in ("token_dev", "cliente_id", "cliente_segredo", "refresh_token", "conta")}
+    if not all(campos.values()):
+        return None
+    return ConfiguracaoDoGoogleAds(
+        token_de_desenvolvedor=campos["token_dev"], cliente_id=campos["cliente_id"],
+        cliente_segredo=campos["cliente_segredo"], refresh_token=campos["refresh_token"],
+        conta=so_digitos(campos["conta"]), conta_admin=so_digitos(configuracao.valor("google_ads.conta_admin")) or None,
+        versao=configuracao.valor("google_ads.versao").strip() or VERSAO_PADRAO,
+    )
+
+
+def ler_envio() -> EnvioDoGoogle | None:
+    """Com a devolução ligada e as credenciais completas; `None` desligada ou faltando credencial."""
+    if configuracao.valor("google_ads.conversoes") != "true":
+        return None
+    credenciais = _credenciais()
+    if credenciais is None:
+        return None
+    acoes = {evento: re.sub(r"\D", "", configuracao.valor(chave)) for evento, chave in ACOES.items()}
+    return EnvioDoGoogle(credenciais, {e: a for e, a in acoes.items() if a})
+
+
+def conversao_da_api(config: EnvioDoGoogle, envio) -> dict:
+    """A conversão de clique no formato do `uploadClickConversions`. E-mail e telefone vão só em SHA-256."""
+    conta = config.credenciais.conta
+    momento = envio.momento.astimezone(_FUSO)
+    conversao = {
+        "gclid": envio.gclid,
+        "conversionAction": f"customers/{conta}/conversionActions/{config.acoes[envio.evento]}",
+        "conversionDateTime": momento.strftime("%Y-%m-%d %H:%M:%S") + momento.strftime("%z")[:3] + ":"
+                              + momento.strftime("%z")[3:],
+        "orderId": f"crm-{envio.lead_id}-{envio.evento}",
+    }
+    if envio.valor is not None:
+        conversao |= {"conversionValue": float(envio.valor), "currencyCode": "BRL"}
+    identificadores = ([{"hashedEmail": envio.hash_email}] if envio.hash_email else []) + (
+        [{"hashedPhoneNumber": envio.hash_telefone_google}] if envio.hash_telefone_google else [])
+    if identificadores:
+        conversao["userIdentifiers"] = identificadores
+    return conversao
+
+
+def enviar_conversao(config: EnvioDoGoogle, envio, *, http: httpx.Client | None = None,
+                     acesso: str | None = None) -> str:
+    """Manda uma conversão de clique. Devolve a frase do aceite; levanta `Recusado`, `AcessoNegado`
+    ou `LeituraFalhou` (tenta de novo depois). `acesso` reaproveita o token da rodada."""
+    from crm.anuncios import AcessoNegado, Recusado
+
+    cred = config.credenciais
+    if envio.evento not in config.acoes:
+        raise AcessoNegado(f"Falta o ID da ação de conversão de “{envio.evento}” em Configurações › Integrações.")
+    try:
+        _validar(cred)
+    except LeituraFalhou as falha:
+        raise AcessoNegado(str(falha)) from falha
+    cliente = http or httpx.Client(timeout=30.0)
+    try:
+        try:
+            token = acesso or _acesso(cliente, cred)
+        except LeituraFalhou as falha:
+            raise AcessoNegado(str(falha)) from falha
+        cabecalho = {"Authorization": f"Bearer {token}", "developer-token": cred.token_de_desenvolvedor}
+        if cred.conta_admin:
+            cabecalho["login-customer-id"] = cred.conta_admin
+        try:
+            resposta = cliente.post(
+                f"https://googleads.googleapis.com/{cred.versao}/customers/{cred.conta}:uploadClickConversions",
+                json={"conversions": [conversao_da_api(config, envio)], "partialFailure": True}, headers=cabecalho)
+        except httpx.HTTPError as falha:
+            raise LeituraFalhou(f"Não consegui falar com o Google Ads: {type(falha).__name__}.") from falha
+    finally:
+        if http is None:
+            cliente.close()
+    if resposta.status_code in (401, 403, 404):
+        raise AcessoNegado(f"O Google Ads recusou o envio (HTTP {resposta.status_code}): "
+                           f"{_mensagem(resposta) or 'confira as credenciais e a versão'}")
+    if resposta.status_code >= 500:
+        raise LeituraFalhou(f"O Google Ads está instável (HTTP {resposta.status_code}). Tento de novo.")
+    if resposta.status_code != 200:
+        raise Recusado(f"O Google Ads recusou a conversão: {_mensagem(resposta) or f'HTTP {resposta.status_code}'}")
+    falha_parcial = (resposta.json() or {}).get("partialFailureError")
+    if falha_parcial:
+        raise Recusado(f"O Google Ads recusou a conversão: {str(falha_parcial.get('message') or '')[:300]}")
+    return "O Google Ads recebeu a conversão."

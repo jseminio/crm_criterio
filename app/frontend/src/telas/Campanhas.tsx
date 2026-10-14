@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { FunilDoCanal, LinhaDaCampanha, PainelDeCampanhas, PainelDoSdr } from "../api/tipos";
+import type { FunilDoCanal, LinhaDaCampanha, PainelDeCampanhas, PainelDoSdr, ResumoDasConversoes } from "../api/tipos";
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
 import { dinheiro } from "../formato";
 import { mesAtual, nomeDoMes, numero, pct, tempo } from "../sdrFormato";
@@ -61,6 +61,7 @@ export function Campanhas() {
       )}
       {!erro && dados && <LeituraDosAnunciosBarra mes={mes} p={dados} aoLer={recarregar} />}
       {!erro && dados?.total && <Conteudo p={dados} sdr={sdr.dados} />}
+      {!erro && dados && <ConversoesDevolvidas mes={mes} />}
       {!erro && dados && <Prontidao p={dados} />}
     </div>
   );
@@ -270,6 +271,95 @@ function Prontidao({ p }: { p: PainelDeCampanhas }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+const HORA = (iso: string) => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+
+/** Conversões devolvidas ao Meta e ao Google (amostra aprovada em 14/10/2026): o que saiu, o que foi recusado e
+ * o que não tem como ser reconhecido. O envio é automático a cada 10 minutos; "Enviar agora" roda uma vez já. */
+function ConversoesDevolvidas({ mes }: { mes: string }) {
+  const { dados, carregando, erro, recarregar } = usarDados<ResumoDasConversoes>(() => api.conversoes(mes), [mes]);
+  const [enviando, definirEnviando] = useState(false);
+  const [falha, definirFalha] = useState<string | null>(null);
+  const enviar = async () => {
+    definirEnviando(true);
+    definirFalha(null);
+    try {
+      await api.enviarConversoes();
+      recarregar();
+    } catch (e) {
+      definirFalha(e instanceof ErroDaApi ? e.message : "Não consegui enviar as conversões.");
+    } finally {
+      definirEnviando(false);
+    }
+  };
+  if (carregando && !dados) return <Carregando rotulo="Contando as conversões" />;
+  if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
+  if (!dados) return null;
+  const plataformas = Object.keys(dados.ligadas);
+  const algumaLigada = plataformas.some((p) => dados.ligadas[p]);
+  const celula = (evento: string, p: string) => {
+    const l = dados.linhas.find((x) => x.evento === evento && x.plataforma === p);
+    if (!l) return "—";
+    const partes = [`${numero(l.enviados)} enviado${l.enviados === 1 ? "" : "s"}`];
+    if (l.valor_enviado) partes[0] += ` · ${dinheiro(l.valor_enviado)}`;
+    if (l.sem_identificador) partes.push(`${numero(l.sem_identificador)} sem ${p === "Google Ads" ? "gclid" : "e-mail, telefone ou fbclid"}`);
+    if (l.recusados) partes.push(`${numero(l.recusados)} recusado${l.recusados === 1 ? "" : "s"}`);
+    if (l.falhas) partes.push(`${numero(l.falhas)} a reenviar`);
+    return partes.join(" · ");
+  };
+  const eventos = [...new Map(dados.linhas.map((l) => [l.evento, l.rotulo])).entries()];
+  const ultima = dados.ultima_rodada;
+  return (
+    <section className="sdr-secao" aria-labelledby="camp-s6">
+      <div className="sdr-secao-topo">
+        <h2 id="camp-s6">Conversões devolvidas</h2>
+        <p>{plataformas.map((p) => `${p}: ${dados.ligadas[p] ? "ligada" : "desligada"}`).join(" · ")}</p>
+      </div>
+      <div className="camp-leitura">
+        <span>
+          {algumaLigada ? "Envio automático a cada 10 minutos" : "Devolução desligada em Configurações › Integrações"}
+          {algumaLigada && ultima ? ` · última rodada em ${HORA(ultima.em)}` : ""}
+        </span>
+        {algumaLigada && (
+          <button type="button" className="botao botao-secundario" onClick={enviar} disabled={enviando}>
+            {enviando ? "Enviando…" : "Enviar agora"}
+          </button>
+        )}
+        {falha && <p role="alert" className="camp-aviso camp-aviso-falha">{falha}</p>}
+        {ultima?.plataformas.filter((p) => p.aviso).map((p) => (
+          <p key={p.plataforma} role="alert" className="camp-aviso camp-aviso-falha">{p.plataforma}: {p.aviso}</p>
+        ))}
+      </div>
+      <div className="tabela-rolagem">
+        <table className="tabela" aria-label="Conversões devolvidas">
+          <thead><tr><th>Evento do CRM</th>{plataformas.map((p) => <th key={p}>{p}</th>)}</tr></thead>
+          <tbody>
+            {eventos.map(([evento, rotulo]) => (
+              <tr key={evento}>
+                <td>{rotulo}{evento === "contrato_fechado" && <span className="sdr-fraco"> (valor = MRR)</span>}</td>
+                {plataformas.map((p) => <td key={p}>{celula(evento, p)}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {dados.recusas.length > 0 && (
+        <ul className="camp-prontidao" aria-label="Recusas">
+          {dados.recusas.map((r) => (
+            <li key={`${r.lead}-${r.evento}-${r.plataforma}`} className="camp-falta">
+              <span aria-hidden="true">!</span><span className="sr">Recusado: </span>
+              {r.lead} · {r.evento} · {r.plataforma}: {r.motivo}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="sdr-nota">
+        Cada evento sai uma vez só. E-mail e telefone saem só criptografados (SHA-256). Lead que pediu para não ser
+        contatado nunca é enviado.
+      </p>
     </section>
   );
 }

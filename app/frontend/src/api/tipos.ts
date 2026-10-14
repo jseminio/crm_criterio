@@ -2491,3 +2491,29 @@ export interface ConfiguracaoDoDocumento {
   vencimento: number;
   excedente_dp: string;
 }
+
+/** Devolução das conversões ao Meta e ao Google (14/10/2026): `GET /api/sdr/conversoes`. */
+export interface ResultadoDaRodada {
+  plataforma: string;
+  ligada: boolean;
+  enviados: number;
+  recusados: number;
+  falhas: number;
+  aviso: string | null;
+}
+
+export interface RodadaDeConversoes {
+  em: string;
+  plataformas: ResultadoDaRodada[];
+}
+
+export interface ResumoDasConversoes {
+  mes: string;
+  ligadas: Record<string, boolean>;
+  linhas: {
+    evento: string; rotulo: string; plataforma: string; enviados: number; recusados: number; falhas: number;
+    sem_identificador: number; valor_enviado: number | null;
+  }[];
+  recusas: { lead: string; evento: string; plataforma: string; motivo: string; em: string }[];
+  ultima_rodada: RodadaDeConversoes | null;
+}

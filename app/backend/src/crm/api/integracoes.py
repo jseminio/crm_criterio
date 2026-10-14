@@ -1,6 +1,6 @@
 """Configurações › Integrações (amostra aprovada por Eduardo em 07/10/2026).
 
-Chave de IA, WhatsApp, e-mail, questionário e disparo se cadastram, trocam e testam pela tela, sem
+Chave de IA, WhatsApp, e-mail, questionário, disparo e Meta Ads (13/10/2026) se cadastram, trocam e testam pela tela, sem
 nada no painel do servidor. Regras:
 
 - vale primeiro o que está na tela; sem valor na tela, a variável de ambiente antiga; depois o padrão
@@ -82,6 +82,18 @@ def _testar_email(config: ConfiguracaoDoAgente) -> str:
     return f"O Microsoft 365 aceitou as credenciais. Os e-mails saem de {config.email.remetente}."
 
 
+def _testar_meta_ads(_: ConfiguracaoDoAgente) -> str:
+    from crm.anuncios import meta
+
+    config = meta.ler_configuracao()
+    if config is None:
+        raise Falhou("Ligue a leitura e preencha o token e o ID da conta.")
+    try:
+        return meta.conferir_conta(config)
+    except meta.LeituraFalhou as falha:
+        raise Falhou(str(falha)) from falha
+
+
 def _enviar_whatsapp(config: ConfiguracaoDoAgente, para: str) -> str:
     if config.whatsapp is None:
         raise Falhou("Faltam o token e o ID do número.")
@@ -116,6 +128,7 @@ class Testadores:
     ia: Callable[[ConfiguracaoDoAgente], str] = _testar_ia
     whatsapp: Callable[[ConfiguracaoDoAgente], str] = _testar_whatsapp
     email: Callable[[ConfiguracaoDoAgente], str] = _testar_email
+    meta_ads: Callable[[ConfiguracaoDoAgente], str] = _testar_meta_ads
     enviar: dict[str, Callable[[ConfiguracaoDoAgente, str], str]] = field(
         default_factory=lambda: {"whatsapp": _enviar_whatsapp, "email": _enviar_email}
     )
@@ -179,8 +192,10 @@ _VERSAO = re.compile(r"^v\d{1,3}\.\d$")
 def _problema(campo: configuracao.Campo, valor: str) -> str | None:
     if campo.opcoes and valor not in campo.opcoes:
         return f"{campo.rotulo}: use {' ou '.join(campo.opcoes)}"
-    if campo.chave == "whatsapp.versao" and not _VERSAO.match(valor):
+    if campo.chave in ("whatsapp.versao", "meta_ads.versao") and not _VERSAO.match(valor):
         return "Versão da API da Meta: use o formato v24.0"
+    if campo.chave == "meta_ads.conta" and not valor.removeprefix("act_").isdigit():
+        return "ID da conta de anúncios: só os números, como 1708029123631617"
     if campo.chave in ("questionario.link", "questionario.url") and not valor.startswith("https://"):
         return f"{campo.rotulo}: o endereço começa com https://"
     if campo.chave == "m365.remetente" and "@" not in valor:
@@ -283,7 +298,7 @@ def roteador_de_integracoes(
         configuracao.invalidar()
         if g.chave == "questionario":
             return _cronometrar(_questionario)
-        testador = {"ia": t.ia, "whatsapp": t.whatsapp, "email": t.email}[g.chave]
+        testador = {"ia": t.ia, "whatsapp": t.whatsapp, "email": t.email, "meta_ads": t.meta_ads}[g.chave]
         return _cronometrar(lambda: testador(ler_configuracao()))
 
     @r.post("/{chave}/enviar-teste", response_model=ResultadoDoTeste)

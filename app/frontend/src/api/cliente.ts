@@ -50,6 +50,8 @@ import type {
   ColunaDoFunil,
   ConversaDoSdr,
   InvestimentoEmMidia,
+  InvestimentoPorCampanha,
+  LeituraDoMeta,
   PainelDeCampanhas,
   PainelDoSdr,
   ParametrosDoSdr,
@@ -669,6 +671,17 @@ export const api = {
     pedir<PainelDoSdr>(comParametros("/api/sdr/painel", filtros)),
 
   campanhas: (mes: string) => pedir<PainelDeCampanhas>(comParametros("/api/sdr/campanhas", { mes })),
+
+  atualizarDoMeta: (mes: string) =>
+    pedir<LeituraDoMeta>(comParametros("/api/sdr/campanhas/atualizar", { mes }), { method: "POST" }),
+
+  midiaPorCampanha: (mes: string) =>
+    pedir<InvestimentoPorCampanha[]>(comParametros("/api/sdr/midia/campanhas", { mes })),
+
+  gravarMidiaPorCampanha: (dados: { mes: string; canal: string; campanha: string; valor: string }) =>
+    pedir<InvestimentoPorCampanha>("/api/sdr/midia/campanha", { method: "PUT", body: JSON.stringify(dados) }),
+
+  apagarMidiaPorCampanha: (id: number) => pedir<void>(`/api/sdr/midia/campanha/${id}`, { method: "DELETE" }),
 
   conversasDoLead: (leadId: number) =>
     pedir<ConversaDoSdr[]>(`/api/sdr/leads/${leadId}/conversas`),

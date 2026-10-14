@@ -2381,6 +2381,11 @@ export interface LinhaDaCampanha {
   descartes: Contagem[];
   decisao: string;
   porque: string;
+  investimento: string | null;
+  /** "lido" (Meta Ads), "digitado" ou null sem investimento por campanha. */
+  fonte: "lido" | "digitado" | null;
+  custo_por_lead_icp: string | null;
+  custo_por_reuniao: string | null;
 }
 
 export interface PainelDeCampanhas {
@@ -2389,8 +2394,30 @@ export interface PainelDeCampanhas {
   total: FunilDoCanal | null;
   canais: FunilDoCanal[];
   campanhas: LinhaDaCampanha[];
-  regua: { volume_minimo: number; icp_alvo_pct: string | null; qualificados_meta_pct: number; qualificados_alerta_pct: number };
+  regua: {
+    volume_minimo: number; icp_alvo_pct: string | null; qualificados_meta_pct: number; qualificados_alerta_pct: number;
+    teto_de_custo: string;
+  };
   prontidao: { ok: boolean; texto: string }[];
+  meta_ads: { configurada: boolean; lido_em: string | null };
+}
+
+/** Investimento de uma campanha no mês (13/10/2026): lido do Meta Ads ou digitado. */
+export interface InvestimentoPorCampanha {
+  id: number;
+  mes: string;
+  canal: string;
+  campanha: string;
+  valor: string;
+  fonte: "lido" | "digitado";
+  lido_em: string | null;
+}
+
+export interface LeituraDoMeta {
+  lidas: number;
+  gravadas: number;
+  digitadas_mantidas: string[];
+  lido_em: string;
 }
 
 /** Configurações › Serviços e contratos (13/10/2026): o contrato de cada serviço do catálogo. */

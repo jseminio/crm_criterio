@@ -79,6 +79,15 @@ GRUPOS: tuple[Grupo, ...] = (
               exemplo="https://<projeto>.supabase.co/functions/v1/questionarios-crm"),
         Campo("questionario.chave", "Chave da busca", segredo=True, variavel="CRM_QUESTIONARIO_CHAVE"),
     )),
+    Grupo("meta_ads", "Meta Ads (investimento por campanha)", (
+        Campo("meta_ads.ligado", "Leitura ligada", padrao="false", opcoes=("true", "false"),
+              ajuda="Ligada, a aba Campanhas lê o gasto de cada campanha do mês no Meta Ads."),
+        Campo("meta_ads.token", "Token de acesso", segredo=True,
+              ajuda="Usuário do sistema no Business Manager, com a permissão ads_read na conta de anúncios."),
+        Campo("meta_ads.conta", "ID da conta de anúncios", exemplo="1708029123631617",
+              ajuda="Gerenciador de Anúncios › Configurações da conta. Só os números, sem act_."),
+        Campo("meta_ads.versao", "Versão da API da Meta", padrao="v24.0", exemplo="v24.0"),
+    )),
     Grupo("disparo", "Disparo do lembrete e do agradecimento", (
         Campo("disparo.ligado", "Disparo ligado", variavel="CRM_DISPARO_DO_QUESTIONARIO", padrao="false",
               opcoes=("true", "false"), ajuda="A cada 10 minutos, de segunda a sexta, das 9h às 18h."),

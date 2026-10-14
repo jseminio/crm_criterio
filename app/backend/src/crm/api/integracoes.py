@@ -211,6 +211,9 @@ def _problema(campo: configuracao.Campo, valor: str) -> str | None:
         return "Versão da API do Google Ads: use o formato v25"
     if campo.chave in ("google_ads.conta", "google_ads.conta_admin") and not re.fullmatch(r"\d{3}-?\d{3}-?\d{4}", valor):
         return f"{campo.rotulo}: 10 dígitos, como 123-456-7890"
+    if campo.chave in ("meta_ads.conjunto", "google_ads.acao_qualificado", "google_ads.acao_reuniao",
+                       "google_ads.acao_contrato") and not valor.isdigit():
+        return f"{campo.rotulo}: só os números"
     if campo.chave == "meta_ads.conta" and not valor.removeprefix("act_").isdigit():
         return "ID da conta de anúncios: só os números, como 1708029123631617"
     if campo.chave in ("questionario.link", "questionario.url") and not valor.startswith("https://"):
@@ -227,7 +230,8 @@ def _configurado(grupo: str, linhas: dict[str, configuracao.Linha]) -> bool:
 
         em_uso = {linhas["ia.principal"].valor, linhas["ia.reserva"].valor} - {NENHUMA, None}
         return all(linhas[f"{n.casefold()}.chave"].origem != "vazio" for n in em_uso)
-    opcionais = {"google_ads.conta_admin"}
+    opcionais = {"google_ads.conta_admin", "meta_ads.conjunto", "google_ads.acao_qualificado",
+                 "google_ads.acao_reuniao", "google_ads.acao_contrato"}
     return all(l.origem != "vazio" for l in linhas.values() if configuracao.CAMPOS[l.campo.chave] in
                configuracao.catalogo.grupo(grupo).campos and l.campo.chave not in opcionais)
 

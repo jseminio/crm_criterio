@@ -56,6 +56,7 @@ from crm.api.backup import roteador as roteador_de_backup, roteador_da_migracao
 from crm.api.classificacao import ServicosDeAnalise, parametros_vigentes, roteador as roteador_de_carteira, servicos_de_analise_reais
 from crm.api.contatos import roteador as roteador_de_contatos
 from crm.api.contatos import roteador_de_empresas
+from crm.api.conversoes import enviadores_reais, laco_das_conversoes, roteador_de_conversoes
 from crm.api.sdr import roteador as roteador_do_sdr
 from crm.api.ficha import pendencias_de, roteador_da_ficha
 from crm.api.propostas import roteador_de_propostas
@@ -172,6 +173,8 @@ def criar_app(
     testadores: Testadores | None = None,
     buscar_ipca: BuscarIpca | None = None,
     leitores_de_anuncios: Callable[[], list] | None = None,
+    enviadores_de_conversoes: Callable[[], list] | None = None,
+    conversoes_automaticas: bool | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede; `tentativas`, para o
@@ -202,10 +205,16 @@ def criar_app(
         # Saída efetiva de contrato em aviso (10/10/2026): passa a Encerrado no dia anunciado, sem ninguém voltar ao CRM.
         com_saidas = saidas_automaticas if saidas_automaticas is not None else fabrica is None
         saidas = asyncio.create_task(laco_das_saidas(_fabrica)) if com_saidas else None
+        # Devolução das conversões ao Meta e ao Google (14/10/2026): o laço sobe no uso real e só envia com a
+        # devolução ligada em Configurações › Integrações; no teste, só se pedir.
+        com_conversoes = conversoes_automaticas if conversoes_automaticas is not None else fabrica is None
+        conversoes = asyncio.create_task(
+            laco_das_conversoes(_fabrica, enviadores_de_conversoes or enviadores_reais)
+        ) if com_conversoes else None
         try:
             yield
         finally:
-            for t in (tarefa, disparo, saidas):
+            for t in (tarefa, disparo, saidas, conversoes):
                 if t is not None:
                     t.cancel()
                     with contextlib.suppress(asyncio.CancelledError):
@@ -307,6 +316,7 @@ def criar_app(
     api.include_router(roteador_do_documento_de_contrato(obter_sessao))
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
+    api.include_router(roteador_de_conversoes(obter_sessao, enviadores_de_conversoes or enviadores_reais))
     api.include_router(roteador_do_sdr(obter_sessao, canais_do_disparo or canais_reais,
                                        **({"leitores": leitores_de_anuncios} if leitores_de_anuncios else {})))
     api.include_router(roteador_da_base(obter_sessao))

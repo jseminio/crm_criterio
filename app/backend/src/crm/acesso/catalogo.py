@@ -183,6 +183,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("POST", r"/api/sdr/questionario/disparar", ("sdr.parametros",)),
     # custo por campanha (13/10/2026): ler o Meta Ads e lançar ou tirar o investimento de uma campanha
     ("POST", r"/api/sdr/campanhas/atualizar", ("sdr.parametros",)),
+    # devolução das conversões ao Meta e ao Google (14/10/2026); o GET está na linha "/api/sdr/.+"
+    ("POST", r"/api/sdr/conversoes/enviar", ("sdr.parametros",)),
     ("PUT", r"/api/sdr/midia/campanha", ("sdr.parametros",)),
     ("DELETE", r"/api/sdr/midia/campanha/\d+", ("sdr.parametros",)),
     # base de conhecimento do SDR de IA (03/10/2026); o GET está na linha "/api/sdr/.+"

@@ -87,6 +87,11 @@ GRUPOS: tuple[Grupo, ...] = (
         Campo("meta_ads.conta", "ID da conta de anúncios", exemplo="1708029123631617",
               ajuda="Gerenciador de Anúncios › Configurações da conta. Só os números, sem act_."),
         Campo("meta_ads.versao", "Versão da API da Meta", padrao="v24.0", exemplo="v24.0"),
+        Campo("meta_ads.conversoes", "Devolver conversões", padrao="false", opcoes=("true", "false"),
+              ajuda="Ligada, o CRM avisa ao Meta lead qualificado, reunião marcada e contrato fechado, a cada 10 minutos. "
+                    "E-mail e telefone saem só criptografados (SHA-256)."),
+        Campo("meta_ads.conjunto", "ID do conjunto de dados (pixel)", exemplo="123456789012345",
+              ajuda="Gerenciador de Eventos › Conjuntos de dados. O token precisa de acesso a ele."),
     )),
     Grupo("google_ads", "Google Ads (investimento por campanha)", (
         Campo("google_ads.ligado", "Leitura ligada", padrao="false", opcoes=("true", "false"),
@@ -104,6 +109,14 @@ GRUPOS: tuple[Grupo, ...] = (
               ajuda="Só se o acesso vem por uma conta de administrador (MCC). Deixe vazio se não houver."),
         Campo("google_ads.versao", "Versão da API do Google Ads", padrao="v25", exemplo="v25",
               ajuda="A v25 é a mais nova em 14/10/2026. O Google aposenta cada versão em cerca de um ano."),
+        Campo("google_ads.conversoes", "Devolver conversões", padrao="false", opcoes=("true", "false"),
+              ajuda="Ligada, o CRM avisa ao Google, a cada 10 minutos, os eventos dos leads que têm gclid. "
+                    "E-mail e telefone saem só criptografados (SHA-256)."),
+        Campo("google_ads.acao_qualificado", "Ação de conversão “Lead qualificado”", exemplo="123456789",
+              ajuda="Google Ads › Metas › Conversões: ação do tipo importação de cliques. O ID está no endereço da ação."),
+        Campo("google_ads.acao_reuniao", "Ação de conversão “Reunião marcada”", exemplo="123456790"),
+        Campo("google_ads.acao_contrato", "Ação de conversão “Contrato fechado”", exemplo="123456791",
+              ajuda="Recebe o valor do contrato em MRR (parcela × 13 ÷ 12)."),
     )),
     Grupo("disparo", "Disparo do lembrete e do agradecimento", (
         Campo("disparo.ligado", "Disparo ligado", variavel="CRM_DISPARO_DO_QUESTIONARIO", padrao="false",

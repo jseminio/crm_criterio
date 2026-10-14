@@ -1554,6 +1554,14 @@ td > .celula-fonte { display: block; }
 .tipo-de-contrato-opcoes { display: flex; gap: var(--e2); flex-wrap: wrap; }
 .historico-do-ipca summary { cursor: pointer; font-size: 13px; color: var(--texto-medio); }
 
+/* Receber as mensagens do WhatsApp (14/10/2026). */
+.recebimento { display: grid; gap: var(--e3); border-top: 1px solid var(--borda); padding-top: var(--e4); margin-top: var(--e1); }
+.recebimento-titulo { font-size: 14px; }
+.recebimento-linha { display: flex; gap: var(--e2); }
+.recebimento-linha .entrada { flex: 1; min-width: 0; }
+.recebimento-situacao { margin: 0; }
+.sdr-janela { margin: 0 0 var(--e2); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

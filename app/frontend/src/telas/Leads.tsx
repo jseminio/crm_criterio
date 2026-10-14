@@ -570,6 +570,28 @@ function paraCampoLocal(iso: string | null | undefined): string {
   return local.toISOString().slice(0, 16);
 }
 
+const ENTREGA: Record<string, string> = {
+  enviada: "✓ enviada", entregue: "✓✓ entregue", lida: "✓✓ lida", falhou: "⚠ não entregue",
+};
+const JANELA_MS = 24 * 60 * 60 * 1000;
+
+/** A janela de 24 h do WhatsApp (14/10/2026): dentro dela vale texto livre; fora, só modelo aprovado. */
+export function JanelaDoWhatsapp({ conversa, agora = new Date() }: { conversa: ConversaDoSdr; agora?: Date }) {
+  if (conversa.canal !== "WhatsApp" || conversa.encerrada_em || !conversa.ultima_do_lead_em) return null;
+  const ate = new Date(new Date(conversa.ultima_do_lead_em).getTime() + JANELA_MS);
+  const aberta = ate.getTime() > agora.getTime();
+  return (
+    <p className="recado sdr-janela" role="status">
+      {aberta ? (
+        <>Janela do WhatsApp <b>aberta até {dataHora(ate.toISOString())}</b> (24 h desde a última mensagem do lead).</>
+      ) : (
+        <>⚠ Janela do WhatsApp <b>fechada desde {dataHora(ate.toISOString())}</b>: para escrever ao lead, só modelo aprovado.</>
+      )}{" "}
+      Respostas automáticas: <b>desligadas</b> até a fase 1. A equipe responde pelo WhatsApp da Critério.
+    </p>
+  );
+}
+
 /** O que a IA e o lead disseram. Só leitura: quem registra é a integração do canal. */
 function ConversasComAIA({ leadId }: { leadId: number }) {
   const { dados, carregando, erro, recarregar } = usarDados<ConversaDoSdr[]>(
@@ -602,6 +624,7 @@ function ConversasComAIA({ leadId }: { leadId: number }) {
                 <span className="etiqueta etiqueta-andamento">Em andamento</span>
               )}
             </p>
+            <JanelaDoWhatsapp conversa={conversa} />
             <ol className="sdr-mensagens">
               {conversa.mensagens.map((m) => (
                 <li
@@ -611,6 +634,7 @@ function ConversasComAIA({ leadId }: { leadId: number }) {
                   <span className="sdr-mensagem-autor">
                     {m.autor} · {dataHora(m.enviada_em)}
                     {m.fallback && " · não entendeu"}
+                    {m.entrega && ` · ${ENTREGA[m.entrega] ?? m.entrega}`}
                   </span>
                   {m.texto}
                 </li>

@@ -1225,6 +1225,9 @@ class ConversaDoSdr(CarimboMixin, Base):
     destino_transbordo: Mapped[DestinoDoTransbordo | None] = mapped_column(
         coluna_lista(DestinoDoTransbordo, 60)
     )
+    ultima_do_lead_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    """Hora da última mensagem do lead (14/10/2026). Abre a janela de 24 horas em que o WhatsApp aceita
+    texto livre; fora dela, só modelo aprovado."""
     atendida_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     """Primeira mensagem da equipe depois do transbordo. Carimbada pelo servidor
     ao registrar essa mensagem — é o fim da espera do lead."""
@@ -1259,6 +1262,10 @@ class MensagemDoSdr(Base):
         sa.DateTime(timezone=True), nullable=False, default=agora
     )
     texto: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    externo_id: Mapped[str | None] = mapped_column(sa.String(128), unique=True, index=True)
+    """O ID da mensagem no WhatsApp (14/10/2026). A Meta repete entregas: com ele, cada uma grava uma vez."""
+    entrega: Mapped[str | None] = mapped_column(sa.String(20))
+    """Só nas que a Critério envia: enviada, entregue, lida ou falhou, como a Meta avisa."""
 
     # Só nas mensagens da IA.
     intencao: Mapped[str | None] = mapped_column(sa.String(120))

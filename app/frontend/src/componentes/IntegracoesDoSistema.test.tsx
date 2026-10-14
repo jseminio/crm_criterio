@@ -136,3 +136,56 @@ describe("Configurações › Integrações: chaves pela tela (07/10/2026)", () 
     expect(api.salvarIntegracao).toHaveBeenCalledWith("disparo", { valores: { "disparo.ligado": "true" }, apagar: [] });
   });
 });
+
+describe("WhatsApp: receber as mensagens dos leads (14/10/2026)", () => {
+  const COM_RECEBIMENTO: Integracoes = {
+    grupos: [{
+      chave: "whatsapp", titulo: "WhatsApp (Meta)", testavel: true, envia_teste: true, configurado: true,
+      alterado_por: null, alterado_em: null, situacao: "⚠ Nenhuma mensagem recebida ainda.",
+      campos: [
+        campo("whatsapp.token", "Token permanente", { segredo: true, origem: "tela", final: "zz99" }),
+        campo("whatsapp.recebimento", "Recebimento ligado", { origem: "padrão", valor: "false", opcoes: ["true", "false"] }),
+        campo("whatsapp.token_verificacao", "Token de verificação", { segredo: true, origem: "tela", final: "7f3a" }),
+        campo("whatsapp.app_secret", "Chave secreta do aplicativo (App Secret)", { segredo: true }),
+      ],
+    }],
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(api.integracoes).mockResolvedValue(COM_RECEBIMENTO);
+    vi.mocked(api.salvarIntegracao).mockResolvedValue(COM_RECEBIMENTO);
+  });
+
+  it("mostra o endereço, a situação em texto e nunca o token salvo", async () => {
+    render(<IntegracoesDoSistema />);
+    const whatsapp = await cartao("WhatsApp (Meta)");
+    const bloco = within(whatsapp.getByRole("group", { name: "Receber as mensagens dos leads" }));
+    expect(bloco.getByLabelText("Endereço para colar na Meta (URL de retorno)"))
+      .toHaveValue(`${window.location.origin}/api/whatsapp/webhook`);
+    expect(bloco.getByText(/termina em/)).toHaveTextContent("7f3a");
+    expect(bloco.getByLabelText("Token de verificação")).toHaveValue("");
+    expect(bloco.getByRole("status")).toHaveTextContent("⚠ Nenhuma mensagem recebida ainda.");
+    expect(bloco.getByText(/ninguém responde sozinho/)).toBeInTheDocument();
+  });
+
+  it("gera o token no navegador e o manda ao salvar, junto com o liga/desliga", async () => {
+    render(<IntegracoesDoSistema />);
+    const whatsapp = await cartao("WhatsApp (Meta)");
+    await userEvent.click(whatsapp.getByRole("button", { name: "Gerar" }));
+    const gerado = (whatsapp.getByLabelText("Token de verificação") as HTMLInputElement).value;
+    expect(gerado).toMatch(/^crm-[0-9a-f]{32}$/);
+    await userEvent.click(whatsapp.getByRole("checkbox"));
+    await userEvent.type(whatsapp.getByLabelText("Chave secreta do aplicativo (App Secret)"), "segredo-do-app");
+    await userEvent.click(whatsapp.getByRole("button", { name: "Salvar" }));
+    expect(api.salvarIntegracao).toHaveBeenCalledWith("whatsapp", {
+      valores: { "whatsapp.recebimento": "true", "whatsapp.token_verificacao": gerado, "whatsapp.app_secret": "segredo-do-app" },
+      apagar: [],
+    });
+  });
+
+  it("cada token gerado é diferente", async () => {
+    const { gerarToken } = await import("./IntegracoesDoSistema");
+    expect(gerarToken()).not.toBe(gerarToken());
+  });
+});

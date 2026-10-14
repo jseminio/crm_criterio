@@ -1105,6 +1105,8 @@ class MensagemResposta(Base):
     fallback: bool = False
     termo_nao_reconhecido: str | None = None
     tom: Tom | None = None
+    entrega: str | None = None
+    """Enviada, entregue, lida ou falhou, nas mensagens da Critério pelo WhatsApp (14/10/2026)."""
 
 
 class ConversaResposta(Base):
@@ -1118,6 +1120,8 @@ class ConversaResposta(Base):
     destino_transbordo: DestinoDoTransbordo | None = None
     atendida_em: datetime | None = None
     nota: int | None = None
+    ultima_do_lead_em: datetime | None = None
+    """Abre a janela de 24 horas do WhatsApp (14/10/2026)."""
     mensagens: list[MensagemResposta] = []
 
 

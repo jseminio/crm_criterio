@@ -1164,6 +1164,8 @@ export interface MensagemDoSdr {
   fallback: boolean;
   termo_nao_reconhecido: string | null;
   tom: string | null;
+  /** Enviada, entregue, lida ou falhou: as da Critério pelo WhatsApp (14/10/2026). */
+  entrega?: string | null;
 }
 
 export interface ConversaDoSdr {
@@ -1177,6 +1179,8 @@ export interface ConversaDoSdr {
   destino_transbordo: string | null;
   atendida_em: string | null;
   nota: number | null;
+  /** A última mensagem do lead: abre a janela de 24 h do WhatsApp (14/10/2026). */
+  ultima_do_lead_em?: string | null;
   mensagens: MensagemDoSdr[];
 }
 
@@ -2175,6 +2179,8 @@ export interface GrupoDeIntegracao {
   testavel: boolean;
   envia_teste: boolean;
   configurado: boolean;
+  /** Uma frase sobre o funcionamento, quando há (o recebimento do WhatsApp, 14/10/2026). */
+  situacao?: string | null;
   campos: CampoDeIntegracao[];
   alterado_por: string | null;
   alterado_em: string | null;

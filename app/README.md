@@ -49,8 +49,9 @@ especialista humano são a fase 1, sem mudar as regras de `sdr-ia-limites-de-atu
     Eduardo); "quero sair do Simples" não marca;
   - foto, áudio, documento: só o tipo ("[áudio]", "[foto] legenda"), sem baixar o arquivo;
   - a situação de entrega (enviada, entregue, lida, falhou) atualiza a mensagem da Critério com o
-    mesmo ID, sem voltar atrás. Os modelos do disparo do questionário ainda não entram na conversa,
-    então a situação aparece nas mensagens que passarem pela conversa (fase 1).
+    mesmo ID, sem voltar atrás. O lembrete e o agradecimento do questionário pelo WhatsApp passam a
+    guardar o ID que a Meta devolve no envio (`crm.db.questionario_do_lead.marcar`), então a entrega
+    aparece neles desde já; as respostas da fase 1 seguem o mesmo caminho.
 - **Na tela do lead:** a conversa mostra a janela de 24 horas do WhatsApp (aberta até quando, ou
   fechada: só modelo aprovado) e a entrega das mensagens da Critério.
 - Migração `a8d2c6e4f0b1`, só aditiva: `mensagem_do_sdr.externo_id` e `.entrega`,

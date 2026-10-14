@@ -107,10 +107,14 @@ def marcar(
     texto: str,
     mensagem: questionario.MensagemDoQuestionario,
     momento: datetime,
+    externo_id: str | None = None,
 ) -> MensagemDoSdr:
-    """Registra o lembrete ou o agradecimento já enviado e carimba o lead: não sai de novo."""
+    """Registra o lembrete ou o agradecimento já enviado e carimba o lead: não sai de novo.
+    `externo_id` é o ID que a Meta devolveu no envio pelo WhatsApp (14/10/2026): com ele, o recebimento
+    atualiza a situação de entrega (entregue, lida)."""
     registro = MensagemDoSdr(
-        conversa_id=conversa.id, autor=AutorDaMensagem.IA, enviada_em=momento, texto=texto
+        conversa_id=conversa.id, autor=AutorDaMensagem.IA, enviada_em=momento, texto=texto,
+        externo_id=(externo_id or None) and externo_id[:128], entrega="enviada" if externo_id else None,
     )
     sessao.add(registro)
     if mensagem is questionario.MensagemDoQuestionario.LEMBRETE:

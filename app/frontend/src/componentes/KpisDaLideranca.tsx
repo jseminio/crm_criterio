@@ -6,6 +6,7 @@ import { useState } from "react";
 import { api } from "../api/cliente";
 import type { ItemDoKpi, KpiDaLideranca, KpisDaLideranca as Kpis } from "../api/tipos";
 import { Indicador, type Tom } from "./Indicador";
+import { TabelaDeComposicao } from "./TabelaDeComposicao";
 import { data, dinheiro, percentual } from "../formato";
 import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
@@ -108,18 +109,16 @@ function ComposicaoDoKpi({ k }: { k: KpiDaLideranca }) {
   const comValor = k.itens.some((i) => Number(i.valor) > 0);
   const totalDe = (itens: ItemDoKpi[]) => itens.reduce((t, i) => t + Number(i.valor), 0);
   const tabela = (itens: ItemDoKpi[], rotulo: string) => (
-    <table className="tabela" aria-label={rotulo}>
-      <thead><tr><th>Cliente</th><th>O quê</th>{comValor && <th className="tabela-numero">Valor</th>}</tr></thead>
-      <tbody>
-        {itens.map((i, n) => (
-          <tr key={n}><td>{i.grupo}</td><td>{i.detalhe}</td>{comValor && <td className="tabela-numero">{dinheiro(i.valor)}</td>}</tr>
-        ))}
-        {comValor && itens.length > 0 && itens.every((i) => i.entra) && (
-          <tr className="composicao-total"><td>Total</td><td />
-            <td className="tabela-numero">{dinheiro(totalDe(itens))}</td></tr>
-        )}
-      </tbody>
-    </table>
+    <TabelaDeComposicao rotulo={rotulo} linhas={itens} chave={(i, n) => `${i.grupo}-${n}`}
+      colunas={[
+        { titulo: "Cliente", valor: (i) => i.grupo },
+        { titulo: "O quê", valor: (i) => i.detalhe },
+        ...(comValor ? [{ titulo: "Valor", valor: (i: ItemDoKpi) => Number(i.valor), mostrar: (i: ItemDoKpi) => dinheiro(i.valor), numerico: true }] : []),
+      ]}
+      rodape={comValor && itens.length > 0 && itens.every((i) => i.entra) && (
+        <tr className="composicao-total"><td>Total</td><td />
+          <td className="tabela-numero">{dinheiro(totalDe(itens))}</td></tr>
+      )} />
   );
   const secoes = [...new Set(k.itens.map((i) => i.secao).filter((x): x is string => !!x))];
   if (secoes.length > 0) {
@@ -226,22 +225,17 @@ export function ComposicaoDaIntegralidade({ k }: { k: KpiDaLideranca }) {
         return (
           <div key={secao}>
             <h3 className="numero-rotulo">{secao} · {deste.reduce((t, i) => t + i.faltam.length, 0)} pendência(s)</h3>
-            <table className="tabela" aria-label={secao}>
-              <thead><tr><th>Registro</th><th>Falta</th></tr></thead>
-              <tbody>
-                {deste.map((i) => (
-                  <tr key={`${i.corte}-${i.grupo}`}>
-                    <td>{i.grupo}</td>
-                    <td>{i.faltam.map((f) => (
-                      <span key={f.campo} className={`integralidade-campo ${f.obrigatorio ? "integralidade-obrigatorio" : ""}`}
-                        title={f.obrigatorio ? "Obrigatório (vale 2)" : "Prioritário (vale 1)"}>
-                        {f.obrigatorio ? `! ${f.campo}` : f.campo}
-                      </span>
-                    ))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <TabelaDeComposicao rotulo={secao} linhas={deste} chave={(i) => `${i.corte}-${i.grupo}`}
+              colunas={[
+                { titulo: "Registro", valor: (i) => i.grupo },
+                { titulo: "Falta", valor: (i) => i.faltam.length,
+                  mostrar: (i) => i.faltam.map((f) => (
+                    <span key={f.campo} className={`integralidade-campo ${f.obrigatorio ? "integralidade-obrigatorio" : ""}`}
+                      title={f.obrigatorio ? "Obrigatório (vale 2)" : "Prioritário (vale 1)"}>
+                      {f.obrigatorio ? `! ${f.campo}` : f.campo}
+                    </span>
+                  )) },
+              ]} />
           </div>
         );
       })}

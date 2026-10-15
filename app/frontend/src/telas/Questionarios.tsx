@@ -11,6 +11,7 @@ import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/
 import { BotaoMesclar } from "../componentes/MesclarQuestionario";
 import { usarAcesso } from "../entrada";
 import { cnpj, data, dataHora } from "../formato";
+import { TabelaDeComposicao } from "../componentes/TabelaDeComposicao";
 import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
@@ -29,16 +30,15 @@ function QuestionariosDaConta({ filtros, entra, comDias = false }: {
   const dias = (l: LinhaDoPainel) =>
     l.proposta_enviada_em ? Math.round((new Date(`${l.proposta_enviada_em}T12:00:00`).getTime() - new Date(l.recebido_em).getTime()) / 86400000) : null;
   return (
-    <table className="tabela" aria-label="Questionários na conta">
-      <thead><tr><th>Empresa</th><th>Recebido</th><th>Situação</th>{comDias ? <th className="tabela-numero">Dias até a proposta</th> : <th>Proposta</th>}</tr></thead>
-      <tbody>
-        {itens.map((l) => (
-          <tr key={l.id}><td>{l.nome_fantasia || l.razao_social}</td><td>{data(l.recebido_em)}</td>
-            <td>{l.situacao_do_painel.replaceAll("_", " ")}{l.dias_uteis_aguardando ? ` · ${l.dias_uteis_aguardando} dias úteis` : ""}</td>
-            {comDias ? <td className="tabela-numero">{dias(l) ?? "—"}</td> : <td>{l.proposta_enviada_em ? `enviada ${data(l.proposta_enviada_em)}` : "—"}</td>}</tr>
-        ))}
-      </tbody>
-    </table>
+    <TabelaDeComposicao rotulo="Questionários na conta" linhas={itens} chave={(l) => l.id}
+      colunas={[
+        { titulo: "Empresa", valor: (l) => l.nome_fantasia || l.razao_social },
+        { titulo: "Recebido", valor: (l) => l.recebido_em, mostrar: (l) => data(l.recebido_em) },
+        { titulo: "Situação", valor: (l) => `${l.situacao_do_painel.replaceAll("_", " ")}${l.dias_uteis_aguardando ? ` · ${l.dias_uteis_aguardando} dias úteis` : ""}` },
+        comDias
+          ? { titulo: "Dias até a proposta", valor: dias, numerico: true }
+          : { titulo: "Proposta", valor: (l) => l.proposta_enviada_em, mostrar: (l) => (l.proposta_enviada_em ? `enviada ${data(l.proposta_enviada_em)}` : "—") },
+      ]} />
   );
 }
 

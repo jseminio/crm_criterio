@@ -19,6 +19,7 @@ import type {
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { dinheiro } from "../formato";
 import { mesAnterior, mesAtual, nomeDoMes, numero, pct, tempo } from "../sdrFormato";
+import { TabelaDeComposicao } from "../componentes/TabelaDeComposicao";
 import { usarDados } from "../usarDados";
 import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
 import type { ItemDoPainelDoSdr } from "../api/tipos";
@@ -38,15 +39,14 @@ function ComposicaoDoSdr({ chave, unidade }: { chave: string; unidade?: string }
   const fora = dados.filter((i) => !i.entra);
   const comValor = dados.some((i) => i.valor !== null);
   const tabela = (itens: ItemDoPainelDoSdr[], rotulo: string) => (
-    <table className="tabela" aria-label={rotulo}>
-      <thead><tr><th>Lead</th><th>Origem</th><th>O quê</th>{comValor && <th className="tabela-numero">{unidade ?? "Valor"}</th>}</tr></thead>
-      <tbody>
-        {itens.map((i, n) => (
-          <tr key={`${i.lead_id}-${n}`}><td>{i.lead}{i.contato !== i.lead ? ` · ${i.contato}` : ""}</td><td>{i.origem}</td>
-            <td>{i.categoria}</td>{comValor && <td className="tabela-numero">{i.valor === null ? "—" : numero(i.valor, 1)}</td>}</tr>
-        ))}
-      </tbody>
-    </table>
+    <TabelaDeComposicao rotulo={rotulo} linhas={itens} chave={(i, n) => `${i.lead_id}-${n}`}
+      colunas={[
+        { titulo: "Lead", valor: (i) => `${i.lead}${i.contato !== i.lead ? ` · ${i.contato}` : ""}` },
+        { titulo: "Origem", valor: (i) => i.origem },
+        { titulo: "O quê", valor: (i) => i.categoria },
+        ...(comValor ? [{ titulo: unidade ?? "Valor", valor: (i: ItemDoPainelDoSdr) => (i.valor === null ? null : Number(i.valor)),
+          mostrar: (i: ItemDoPainelDoSdr) => (i.valor === null ? "—" : numero(i.valor, 1)), numerico: true }] : []),
+      ]} />
   );
   return (
     <>

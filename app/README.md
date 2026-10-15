@@ -16,6 +16,15 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Ordenação pelo título nas composições (15/10/2026)
+
+Pedido de Eduardo, caminho A aprovado em 15/10/2026: toda tabela de "Ver composição" ordena pelo título da coluna —
+crescente ▲, decrescente ▼ e volta à ordem original —, como as grades. Uma tabela só para todas,
+`componentes/TabelaDeComposicao.tsx`: cada coluna diz o valor que compara (número para dinheiro, % e contagens; data
+ISO; texto), o vazio fica sempre por último, a linha de total fica no fim, fora da ordenação, e composição com seções
+ordena dentro de cada seção. Linha que abre os contratos embaixo (MRR da carteira) usa `linha`. Composição nova usa a
+mesma tabela e já nasce ordenável.
+
 ## Integralidade do cadastro em dois cortes: Novos e Passado (15/10/2026)
 
 Decisão de Eduardo em 15/10/2026 (troca o "só daqui para frente" de 13/10), para a equipe consertar o herdado aos

@@ -11,6 +11,7 @@ import { data, dinheiro, dinheiroCurto, percentual } from "../formato";
 import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
 import { BotaoDeComposicao, Explicavel } from "./Indicador";
+import { TabelaDeComposicao } from "./TabelaDeComposicao";
 
 /** A lista que compõe um número das fases (10/10/2026): o que entra na conta primeiro, a base à parte. */
 function ComposicaoDaFase({ mes, chave, unidade }: { mes: string; chave: string; unidade: IndicadorDaFase["unidade"] }) {
@@ -25,19 +26,18 @@ function ComposicaoDaFase({ mes, chave, unidade }: { mes: string; chave: string;
   const entram = dados.filter((l) => l.entra);
   const fora = dados.filter((l) => !l.entra);
   const tabela = (linhas: LinhaDaFase[], rotulo: string, total: boolean) => (
-    <table className="tabela" aria-label={rotulo}>
-      <thead><tr><th>Item</th><th>Detalhe</th><th>Data</th>{comValor && <th className="tabela-numero">Valor</th>}</tr></thead>
-      <tbody>
-        {linhas.map((l, i) => (
-          <tr key={i}><td>{l.titulo}</td><td>{l.detalhe ?? "—"}</td><td>{data(l.data)}</td>
-            {comValor && <td className="tabela-numero">{mostrar(l.valor)}</td>}</tr>
-        ))}
-        {total && comValor && emReais && (
-          <tr className="composicao-total"><td>Total</td><td /><td />
-            <td className="tabela-numero">{dinheiro(linhas.reduce((t, l) => t + Number(l.valor ?? 0), 0))}</td></tr>
-        )}
-      </tbody>
-    </table>
+    <TabelaDeComposicao rotulo={rotulo} linhas={linhas} chave={(l, i) => `${l.titulo}-${i}`}
+      colunas={[
+        { titulo: "Item", valor: (l) => l.titulo },
+        { titulo: "Detalhe", valor: (l) => l.detalhe },
+        { titulo: "Data", valor: (l) => l.data, mostrar: (l) => data(l.data) },
+        ...(comValor ? [{ titulo: "Valor", valor: (l: LinhaDaFase) => (l.valor === null ? null : Number(l.valor)),
+          mostrar: (l: LinhaDaFase) => mostrar(l.valor), numerico: true }] : []),
+      ]}
+      rodape={total && comValor && emReais && (
+        <tr className="composicao-total"><td>Total</td><td /><td />
+          <td className="tabela-numero">{dinheiro(linhas.reduce((t, l) => t + Number(l.valor ?? 0), 0))}</td></tr>
+      )} />
   );
   return (
     <>

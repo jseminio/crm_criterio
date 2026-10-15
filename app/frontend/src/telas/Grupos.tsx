@@ -12,6 +12,7 @@ import { Etiqueta } from "../componentes/Etiqueta";
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
+import { TabelaDeComposicao } from "../componentes/TabelaDeComposicao";
 import { usarDados } from "../usarDados";
 import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
 import { DetalheDoGrupo } from "./DetalheDoGrupo";
@@ -172,14 +173,13 @@ export function Grupos({ listas }: { listas: Listas | null }) {
             <BotaoDeComposicao rotulo="ver" composicao={{
               titulo: "Grupos com mais de uma proposta", quantos: comMaisDeUma,
               conteudo: () => (
-                <table className="tabela" aria-label="Grupos com mais de uma proposta">
-                  <thead><tr><th>Grupo</th><th className="tabela-numero">Oportunidades</th></tr></thead>
-                  <tbody>
-                    {(dados?.itens ?? []).filter((g) => g.quantas_oportunidades > 1)
-                      .sort((a, b) => b.quantas_oportunidades - a.quantas_oportunidades)
-                      .map((g) => <tr key={g.id}><td>{g.nome}</td><td className="tabela-numero">{g.quantas_oportunidades}</td></tr>)}
-                  </tbody>
-                </table>
+                <TabelaDeComposicao rotulo="Grupos com mais de uma proposta" chave={(g) => g.id}
+                  linhas={(dados?.itens ?? []).filter((g) => g.quantas_oportunidades > 1)
+                    .sort((a, b) => b.quantas_oportunidades - a.quantas_oportunidades)}
+                  colunas={[
+                    { titulo: "Grupo", valor: (g) => g.nome },
+                    { titulo: "Oportunidades", valor: (g) => g.quantas_oportunidades, numerico: true },
+                  ]} />
               ),
             }} />
           )}{" "}

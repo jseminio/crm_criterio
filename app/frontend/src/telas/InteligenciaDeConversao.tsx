@@ -19,6 +19,7 @@ import { KpisDaLideranca } from "../componentes/KpisDaLideranca";
 import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
 import { ComposicaoDoFunil } from "../componentes/ComposicaoDoFunil";
 import { Carregando, Erro } from "../componentes/estados";
+import { TabelaDeComposicao } from "../componentes/TabelaDeComposicao";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { QuatroFases } from "../componentes/QuatroFases";
 import { Recolhivel } from "../componentes/Recolhivel";
@@ -84,22 +85,19 @@ function ComposicaoDoRealizado({ linha }: { linha?: ItemDoRealizado["linha"] }) 
   const itens = (dados ?? []).filter((i) => !linha || i.linha === linha);
   if (itens.length === 0) return <p className="numero-estado">Nenhum contrato ou evento nesta conta ainda.</p>;
   const total = itens.reduce((t, i) => t + n(i.valor), 0);
+  const sinal = (v: number) => `${v < 0 ? "− " : ""}${dinheiro(Math.abs(v))}`;
   return (
-    <table className="tabela" aria-label="Composição do realizado">
-      <thead><tr><th>Data</th><th>Cliente</th><th>Contrato</th>{!linha && <th>Linha do plano</th>}<th>O quê</th><th className="tabela-numero">MRR</th></tr></thead>
-      <tbody>
-        {itens.map((i, k) => (
-          <tr key={k}>
-            <td>{data(i.data)}</td><td>{i.grupo}</td><td>{i.escopo ?? `Contrato ${i.contrato_id}`}</td>
-            {!linha && <td>{LINHA_DO_PLANO[i.linha]}</td>}
-            <td>{CATEGORIA[i.categoria] ?? i.categoria}</td>
-            <td className="tabela-numero">{n(i.valor) < 0 ? "− " : ""}{dinheiro(Math.abs(n(i.valor)))}</td>
-          </tr>
-        ))}
-        <tr className="composicao-total"><td>Total</td><td /><td />{!linha && <td />}<td />
-          <td className="tabela-numero">{total < 0 ? "− " : ""}{dinheiro(Math.abs(total))}</td></tr>
-      </tbody>
-    </table>
+    <TabelaDeComposicao rotulo="Composição do realizado" linhas={itens} chave={(i, k) => `${i.contrato_id}-${i.data}-${k}`}
+      colunas={[
+        { titulo: "Data", valor: (i) => i.data, mostrar: (i) => data(i.data) },
+        { titulo: "Cliente", valor: (i) => i.grupo },
+        { titulo: "Contrato", valor: (i) => i.escopo ?? `Contrato ${i.contrato_id}` },
+        ...(!linha ? [{ titulo: "Linha do plano", valor: (i: ItemDoRealizado) => LINHA_DO_PLANO[i.linha] }] : []),
+        { titulo: "O quê", valor: (i) => CATEGORIA[i.categoria] ?? i.categoria },
+        { titulo: "MRR", valor: (i) => n(i.valor), mostrar: (i) => sinal(n(i.valor)), numerico: true },
+      ]}
+      rodape={<tr className="composicao-total"><td>Total</td><td /><td />{!linha && <td />}<td />
+        <td className="tabela-numero">{sinal(total)}</td></tr>} />
   );
 }
 
@@ -111,19 +109,15 @@ function ComposicaoDoCenario({ plano, nome }: { plano: PlanoDeMrr; nome: NomeDoC
       <p className="composicao-linha-resumo">
         <strong>{dinheiro(c.liquido)}</strong> = partida {dinheiro(plano.premissas.ponto_de_partida)} + mês a mês abaixo
       </p>
-      <table className="tabela" aria-label={`Cenário ${NOME_DO_CENARIO[nome]} mês a mês`}>
-        <thead><tr><th>Mês</th><th className="tabela-numero">Contábil</th><th className="tabela-numero">BPO</th>
-          <th className="tabela-numero">Escada</th><th className="tabela-numero">Churn</th><th className="tabela-numero">Acumulado</th></tr></thead>
-        <tbody>
-          {c.linhas.map((l) => (
-            <tr key={l.mes}>
-              <td>{mesCurto(l.mes)}</td><td className="tabela-numero">{dinheiro(l.contabil)}</td>
-              <td className="tabela-numero">{dinheiro(l.bpo)}</td><td className="tabela-numero">{dinheiro(l.escada)}</td>
-              <td className="tabela-numero">− {dinheiro(l.churn)}</td><td className="tabela-numero">{dinheiro(l.acumulado)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <TabelaDeComposicao rotulo={`Cenário ${NOME_DO_CENARIO[nome]} mês a mês`} linhas={c.linhas} chave={(l) => l.mes}
+        colunas={[
+          { titulo: "Mês", valor: (l) => l.mes, mostrar: (l) => mesCurto(l.mes) },
+          { titulo: "Contábil", valor: (l) => n(l.contabil), mostrar: (l) => dinheiro(l.contabil), numerico: true },
+          { titulo: "BPO", valor: (l) => n(l.bpo), mostrar: (l) => dinheiro(l.bpo), numerico: true },
+          { titulo: "Escada", valor: (l) => n(l.escada), mostrar: (l) => dinheiro(l.escada), numerico: true },
+          { titulo: "Churn", valor: (l) => n(l.churn), mostrar: (l) => `− ${dinheiro(l.churn)}`, numerico: true },
+          { titulo: "Acumulado", valor: (l) => n(l.acumulado), mostrar: (l) => dinheiro(l.acumulado), numerico: true },
+        ]} />
       <p className="numero-nota">Projeção pelas premissas do plano (veja Premissas, abaixo). Não é dado realizado.</p>
     </>
   );

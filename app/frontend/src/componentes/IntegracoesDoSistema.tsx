@@ -2,9 +2,9 @@
  * e-mail, questionário e disparo se cadastram, trocam e testam aqui, sem nada no painel do servidor.
  * Vale o que está na tela; sem valor na tela, o que veio do servidor; depois o padrão. Segredo nunca
  * volta do servidor: aparecem só os 4 últimos caracteres. A IA pode ser Anthropic ou OpenAI, com a
- * outra de reserva (07/10/2026). */
+ * outra de reserva (07/10/2026). Desde 15/10/2026, uma aba por integração, com a situação ao lado do nome. */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { CampoDeIntegracao, GrupoDeIntegracao, Integracoes, ResultadoDoTeste } from "../api/tipos";
 import { dataHora } from "../formato";
@@ -30,25 +30,90 @@ const DE_ONDE: Record<string, string> = {
   vazio: "não configurado",
 };
 
+/** Nome curto da aba e a linha que explica (abas aprovadas por Eduardo em 15/10/2026); grupo novo sem nome aqui
+ * usa o título. */
+const ABA: Record<string, { rotulo: string; explicacao: string }> = {
+  ia: { rotulo: "IA", explicacao: "A chave da IA, o modelo e a IA de reserva." },
+  whatsapp: { rotulo: "WhatsApp", explicacao: "O envio pela Cloud API da Meta e o recebimento das mensagens dos leads." },
+  email: { rotulo: "E-mail", explicacao: "O envio de e-mail pelo Microsoft 365." },
+  questionario: { rotulo: "Questionário", explicacao: "O link enviado ao lead e a busca dos questionários respondidos no site." },
+  meta_ads: { rotulo: "Meta Ads", explicacao: "O gasto por campanha, os leads do formulário e a devolução das conversões." },
+  google_ads: { rotulo: "Google Ads", explicacao: "O gasto por campanha, os leads do formulário e a devolução das conversões." },
+  disparo: { rotulo: "Disparo", explicacao: "O envio automático do lembrete e do agradecimento do questionário." },
+};
+const MEMORIA = "crm.integracoes.aba";
+
+function guardada(): string | null {
+  try {
+    return localStorage.getItem(MEMORIA);
+  } catch {
+    return null;
+  }
+}
+
+/** O que falta, para o título da aba ao passar o mouse. */
+function oQueFalta(g: GrupoDeIntegracao): string {
+  if (g.configurado) return `${g.titulo}: configurado`;
+  const vazios = g.campos.filter((c) => c.origem === "vazio" || c.ilegivel).map((c) => c.rotulo);
+  return `${g.titulo}: falta configurar${vazios.length ? ` (${vazios.join(", ")})` : ""}`;
+}
+
 export function IntegracoesDoSistema() {
   const { dados, carregando, erro, recarregar } = usarDados<Integracoes>(() => api.integracoes(), []);
+  const [escolhida, definirEscolhida] = useState<string | null>(guardada);
+  const [comRascunho, definirComRascunho] = useState<Set<string>>(new Set());
   if (carregando && !dados) return <Carregando rotulo="Abrindo as integrações" />;
   if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
-  if (!dados) return null;
+  if (!dados || dados.grupos.length === 0) return null;
+  const aba = dados.grupos.find((g) => g.chave === escolhida) ?? dados.grupos[0];
+  const escolher = (chave: string) => {
+    definirEscolhida(chave);
+    try {
+      localStorage.setItem(MEMORIA, chave);
+    } catch {
+      /* sem armazenamento: vale só nesta visita */
+    }
+  };
+  const marcarRascunho = (chave: string, tem: boolean) => definirComRascunho((atual) => {
+    if (atual.has(chave) === tem) return atual;
+    const novo = new Set(atual);
+    if (tem) novo.add(chave); else novo.delete(chave);
+    return novo;
+  });
   return (
-    <div style={{ display: "grid", gap: "var(--e4)" }}>
+    <div style={{ display: "grid", gap: "var(--e3)" }}>
       <p className="campo-ajuda" style={{ margin: 0 }}>
         As chaves ficam cifradas no banco e nunca voltam para a tela: aparecem só os 4 últimos caracteres. O que
         está salvo aqui vale mais que o painel do servidor.
       </p>
+      <div className="abas" role="tablist" aria-label="Integrações">
+        {dados.grupos.map((g) => (
+          <button key={g.chave} type="button" role="tab" className="aba" aria-selected={aba.chave === g.chave}
+            title={oQueFalta(g)} onClick={() => escolher(g.chave)}>
+            {ABA[g.chave]?.rotulo ?? g.titulo}{" "}
+            <span className={g.configurado ? "aba-ok" : "aba-falta"} aria-label={g.configurado ? "configurado" : "falta configurar"}>
+              {g.configurado ? "✓" : "○"}
+            </span>
+            {comRascunho.has(g.chave) && <span className="aba-rascunho" aria-label="alterações não salvas"> •</span>}
+          </button>
+        ))}
+      </div>
+      <p className="campo-ajuda" style={{ margin: 0 }}>
+        {ABA[aba.chave]?.explicacao ?? aba.titulo} ✓ configurado · ○ desligado ou faltando dado (passe o mouse na aba).
+      </p>
+      {/* Todos ficam montados e só o da aba aparece: o que foi digitado e não salvo continua lá ao voltar. */}
       {dados.grupos.map((g) => (
-        <CartaoDeIntegracao key={g.chave} grupo={g} aoSalvar={recarregar} />
+        <div key={g.chave} role="tabpanel" hidden={g.chave !== aba.chave} aria-label={g.titulo}>
+          <CartaoDeIntegracao grupo={g} aoSalvar={recarregar} aoMudarRascunho={(tem) => marcarRascunho(g.chave, tem)} />
+        </div>
       ))}
     </div>
   );
 }
 
-function CartaoDeIntegracao({ grupo, aoSalvar }: { grupo: GrupoDeIntegracao; aoSalvar: () => void }) {
+function CartaoDeIntegracao({ grupo, aoSalvar, aoMudarRascunho }: {
+  grupo: GrupoDeIntegracao; aoSalvar: () => void; aoMudarRascunho?: (tem: boolean) => void;
+}) {
   const [rascunho, definirRascunho] = useState<Record<string, string>>({});
   const [apagar, definirApagar] = useState<string[]>([]);
   const [salvando, definirSalvando] = useState(false);
@@ -67,6 +132,7 @@ function CartaoDeIntegracao({ grupo, aoSalvar }: { grupo: GrupoDeIntegracao; aoS
     c.chave in rascunho && (c.segredo ? rascunho[c.chave].trim() !== "" : rascunho[c.chave] !== (c.valor ?? "")),
   );
   const mudou = mudados.length > 0 || apagar.length > 0;
+  useEffect(() => aoMudarRascunho?.(mudou), [mudou, aoMudarRascunho]);
 
   const salvar = async () => {
     definirSalvando(true);

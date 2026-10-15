@@ -5,14 +5,19 @@ número da liderança fica errado ou some) vale 2 pontos; **prioritário** (melh
 condicional só é devido quando se aplica (a data de envio, depois de "Enviar proposta"; o motivo, na Perdida).
 
 - **Pendente** = pontos dos campos devidos e vazios ÷ pontos de todos os campos devidos.
-- **Daqui para frente:** o número principal conta só os registros criados desde `DATA_DE_CORTE`; o legado (antes
-  dela, a Carga 2026 e a carteira anterior ao CRM) vai num número à parte.
+- **Dois cortes** (decisão de Eduardo em 15/10/2026, no lugar do "só daqui para frente" de 13/10): **Novos**, os
+  registros criados desde `DATA_DE_CORTE`, em % pendente (a disciplina da equipe); e **Passado**, o que veio antes (a
+  Carga 2026 e a carteira anterior ao CRM), em pendências que faltam e as já consertadas desde o retrato guardado na
+  publicação (`guardar_retrato`). A lista traz todos os registros com pendência, dos dois cortes, para consertar aos
+  poucos (`por_registro`, `planilha`).
 - **Quem responde:** na oportunidade, o captador; no cliente, contrato, encerramento, empresa e contato, o
   responsável de CS do grupo — ou, enquanto o grupo não é cliente, o captador da oportunidade mais recente.
 """
 
 from __future__ import annotations
 
+import io
+import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -25,7 +30,8 @@ from crm.api import sucesso
 from crm.db.modelos import Contrato, Empresa, GrupoEconomico, Oportunidade, PessoaContato, VinculoDeContato
 from crm.domain.listas import LinhaServico, Origem, Situacao, SituacaoContrato, TipoDeEventoDeContrato
 
-__all__ = ["DATA_DE_CORTE", "PESO", "CADASTROS", "Campo", "Resultado", "calcular"]
+__all__ = ["DATA_DE_CORTE", "PESO", "CADASTROS", "Campo", "Resultado", "calcular", "CHAVE_DO_RETRATO", "Retrato",
+           "ler_retrato", "guardar_retrato", "RegistroPendente", "por_registro", "planilha"]
 
 DATA_DE_CORTE = date(2026, 10, 14)
 """Primeiro dia da cobrança (a publicação): o que nasceu antes é legado (decisão de Eduardo em 13/10/2026)."""
@@ -50,6 +56,8 @@ class Campo:
     obrigatorio: bool
     preenchido: bool
     legado: bool
+    registro_id: int | None = None
+    """O id do registro no seu cadastro: junta os campos de um mesmo registro na lista de pendências."""
 
     @property
     def pontos(self) -> int:
@@ -111,9 +119,9 @@ def calcular(sessao: Session) -> Resultado:
     campos: list[Campo] = []
 
     def devido(cadastro: str, registro: str, responsavel: str | None, legado: bool,
-               itens: Iterator[tuple[str, bool, bool]]) -> None:
+               itens: Iterator[tuple[str, bool, bool]], registro_id: int | None = None) -> None:
         for campo, obrigatorio, preenchido in itens:
-            campos.append(Campo(cadastro, registro, responsavel, campo, obrigatorio, preenchido, legado))
+            campos.append(Campo(cadastro, registro, responsavel, campo, obrigatorio, preenchido, legado, registro_id))
 
     # Oportunidade: o captador responde.
     for o in oportunidades:
@@ -135,7 +143,7 @@ def calcular(sessao: Session) -> Resultado:
                 yield "Próxima ação com data", False, _tem(o.proxima_acao) and o.proxima_acao_em is not None
             yield "Porte", False, _tem(o.porte)
         legado = not _desde_o_corte(o.criado_em) or o.origem is Origem.CARGA_2026
-        devido("Oportunidade", f"{grupos[o.grupo_id].nome} · {o.servico or o.nome}", o.captador or None, legado, regras())
+        devido("Oportunidade", f"{grupos[o.grupo_id].nome} · {o.servico or o.nome}", o.captador or None, legado, regras(), o.id)
 
     # Contrato e encerramento: o responsável de CS do grupo.
     for c in contratos:
@@ -149,7 +157,7 @@ def calcular(sessao: Session) -> Resultado:
             yield "Fim da vigência", False, c.data_fim is not None
         nome = f"{grupos[c.grupo_id].nome} · {c.escopo or 'contrato'}"
         dono = dono_do_grupo(c.grupo_id)
-        devido("Contrato", nome, dono, c.anterior_ao_crm or not _desde_o_corte(c.criado_em), regras())
+        devido("Contrato", nome, dono, c.anterior_ao_crm or not _desde_o_corte(c.criado_em), regras(), c.id)
         for ev in c.eventos:
             if ev.tipo is not TipoDeEventoDeContrato.ENCERRAMENTO:
                 continue
@@ -158,7 +166,7 @@ def calcular(sessao: Session) -> Resultado:
                 yield "Motivo", True, ev.motivo_categoria is not None
                 yield "Iniciativa", True, ev.iniciativa is not None
                 yield "Descrição", False, _tem(ev.descricao)
-            devido("Encerramento", nome, dono, not _desde_o_corte(ev.registrado_em), regras_do_encerramento())
+            devido("Encerramento", nome, dono, not _desde_o_corte(ev.registrado_em), regras_do_encerramento(), ev.id)
 
     # Cliente (grupo com contrato valendo).
     for g in sorted(clientes & set(grupos)):
@@ -167,7 +175,7 @@ def calcular(sessao: Session) -> Resultado:
             yield "Responsável de CS", True, _tem(grupo.responsavel_cs)
             yield "Classificação (classe e semáforo)", True, grupo.id in classes
             yield "Porte", False, _tem(grupo.porte)
-        devido("Cliente", grupo.nome, dono_do_grupo(g), not _desde_o_corte(grupo.criado_em), regras())
+        devido("Cliente", grupo.nome, dono_do_grupo(g), not _desde_o_corte(grupo.criado_em), regras(), grupo.id)
 
     # Empresa (CNPJ).
     for e in sessao.scalars(sa.select(Empresa).order_by(Empresa.id)):
@@ -177,7 +185,7 @@ def calcular(sessao: Session) -> Resultado:
             yield "CNPJ", True, _tem(e.cnpj)
             yield "Regime tributário", False, _tem(e.regime_tributario)
             yield "Endereço (logradouro, município e CEP)", False, _tem(e.logradouro) and _tem(e.municipio) and _tem(e.cep)
-        devido("Empresa", e.razao_social, dono_do_grupo(e.grupo_id), not _desde_o_corte(e.criado_em), regras())
+        devido("Empresa", e.razao_social, dono_do_grupo(e.grupo_id), not _desde_o_corte(e.criado_em), regras(), e.id)
 
     # Contato: pelo vínculo com a empresa (o primeiro, ou o principal).
     pessoas = sessao.scalars(
@@ -196,6 +204,96 @@ def calcular(sessao: Session) -> Resultado:
             yield "Papel (decisor, influenciador…)", False, p.papel is not None
         registro = p.nome + (f" · {grupos[grupo_id].nome}" if grupo_id is not None else "")
         devido("Contato", registro, dono_do_grupo(grupo_id) if grupo_id is not None else None,
-               not _desde_o_corte(p.criado_em), regras())
+               not _desde_o_corte(p.criado_em), regras(), p.id)
 
     return Resultado(campos)
+
+
+# ------------------------------------------------------------ o Passado: retrato e lista para consertar
+CHAVE_DO_RETRATO = "integralidade.retrato_do_passado"
+"""Linha de `configuracao_do_sistema` com o retrato do Passado no dia da publicação (decisão de Eduardo em 15/10/2026):
+quantas pendências havia, para a tela mostrar quantas já foram consertadas. Não é campo da tela de Integrações."""
+
+
+@dataclass(frozen=True)
+class Retrato:
+    em: date
+    pendencias: int
+    obrigatorios: int
+
+
+def ler_retrato(sessao: Session) -> Retrato | None:
+    from crm.db.modelos import ConfiguracaoDoSistema
+
+    linha = sessao.get(ConfiguracaoDoSistema, CHAVE_DO_RETRATO)
+    if linha is None or not linha.valor:
+        return None
+    d = json.loads(linha.valor)
+    return Retrato(date.fromisoformat(d["em"]), int(d["pendencias"]), int(d["obrigatorios"]))
+
+
+def guardar_retrato(sessao: Session, hoje: date) -> Retrato | None:
+    """Guarda o retrato uma vez: se já existe, não mexe (devolve None)."""
+    from crm.db.modelos import ConfiguracaoDoSistema
+
+    if ler_retrato(sessao) is not None:
+        return None
+    faltam = [c for c in calcular(sessao).legado if not c.preenchido]
+    retrato = Retrato(hoje, len(faltam), sum(c.obrigatorio for c in faltam))
+    sessao.add(ConfiguracaoDoSistema(chave=CHAVE_DO_RETRATO, alterado_por="manutenção", valor=json.dumps(
+        {"em": hoje.isoformat(), "pendencias": retrato.pendencias, "obrigatorios": retrato.obrigatorios})))
+    sessao.flush()
+    return retrato
+
+
+@dataclass(frozen=True)
+class RegistroPendente:
+    """Um registro com o que falta nele: a linha da lista para consertar (15/10/2026)."""
+
+    corte: str
+    """"Novos" (criados desde o corte) ou "Passado"."""
+    cadastro: str
+    registro: str
+    responsavel: str | None
+    faltam: tuple[tuple[str, bool], ...]
+    """(campo, obrigatório)."""
+
+
+def por_registro(campos: list[Campo]) -> list[RegistroPendente]:
+    """Junta as pendências por registro, do responsável com mais pendências para o com menos; "Sem responsável" no fim."""
+    juntos: dict[tuple, list[Campo]] = {}
+    for c in campos:
+        if not c.preenchido:
+            juntos.setdefault((c.legado, c.cadastro, c.registro_id, c.registro, c.responsavel), []).append(c)
+    por_dono: dict[str | None, int] = {}
+    for (_, _, _, _, dono), lista in juntos.items():
+        por_dono[dono] = por_dono.get(dono, 0) + len(lista)
+    def ordem(chave):
+        legado, cadastro, _, registro, dono = chave
+        return (dono is None, -por_dono[dono], dono or "", CADASTROS.index(cadastro), registro)
+    return [RegistroPendente("Passado" if k[0] else "Novos", k[1], k[3], k[4],
+                             tuple((c.campo, c.obrigatorio) for c in sorted(juntos[k], key=lambda c: not c.obrigatorio)))
+            for k in sorted(juntos, key=ordem)]
+
+
+def planilha(registros: list[RegistroPendente]) -> bytes:
+    """Uma linha por campo em falta, para distribuir o trabalho."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Pendências"
+    ws.append(["Corte", "Responsável", "Cadastro", "Registro", "Campo em falta", "Nível"])
+    for celula in ws[1]:
+        celula.font = Font(bold=True)
+    for r in registros:
+        for campo, obrigatorio in r.faltam:
+            ws.append([r.corte, r.responsavel or "Sem responsável", r.cadastro, r.registro, campo,
+                       "Obrigatório" if obrigatorio else "Prioritário"])
+    for col, largura in zip("ABCDEF", (10, 16, 14, 60, 40, 13)):
+        ws.column_dimensions[col].width = largura
+    ws.auto_filter.ref = ws.dimensions
+    saida = io.BytesIO()
+    wb.save(saida)
+    return saida.getvalue()

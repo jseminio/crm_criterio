@@ -74,24 +74,67 @@ def test_o_legado_fica_a_parte(cadastro):
     assert integralidade.Resultado.pendente_pct(r.novos) == D("40.0")  # o legado não mexe no número principal
 
 
-def test_o_card_mostra_as_duas_visoes_e_a_composicao_por_responsavel(cadastro):
+def test_o_card_mostra_novos_em_pct_e_a_lista_por_registro(cadastro):
     with Session(cadastro) as s:
         k = {k.chave: k for k in calcular_kpis(s, "2026-10", date(2026, 10, 20)).kpis}["integralidade"]
     assert k.titulo == "Integralidade do cadastro" and k.valor == D("40.0")
     x = k.extras
-    assert (x["pontos_devidos"], x["pontos_pendentes"], x["obrigatorios_em_falta"], x["prioritarios_em_falta"]) == (40, 16, 4, 8)
-    assert x["pendente_contrato"] == D("40.0") and x["pendente_encerramento"] is None  # nenhum encerramento devido
-    secoes = [i.secao for i in k.itens]
-    assert secoes[0].startswith("KN · 7 pendência(s)") and secoes[-1].startswith("Sem responsável · 3 pendência(s)")
-    assert len(k.itens) == 12 and all(i.valor == 0 for i in k.itens)
-    assert {i.detalhe for i in k.itens if i.grupo == "Contrato · Cliente X · BPO Contábil"} == {
-        "Bruto ou líquido · Obrigatório", "Signatário · Prioritário", "Fim da vigência · Prioritário"}
+    assert (x["novos_pendencias"], x["novos_obrigatorios"], x["novos_pontos_devidos"]) == (12, 4, 40)
+    assert x["passado_pendencias"] == 0 and x["passado_retrato"] is None and x["passado_consertadas"] is None
+    assert "retrato do Passado ainda não foi guardado" in k.falta[0]
+    # Um item por registro, com tudo o que falta nele: o obrigatório primeiro e marcado com "!".
+    contrato = next(i for i in k.itens if i.grupo == "Contrato · Cliente X · BPO Contábil")
+    assert contrato.detalhe == "! Bruto ou líquido, Signatário, Fim da vigência"
+    assert (contrato.corte, contrato.cadastro, contrato.responsavel) == ("Novos", "Contrato", "KN")
+    assert [(f.campo, f.obrigatorio) for f in contrato.faltam][0] == ("Bruto ou líquido", True)
+    assert len(k.itens) == 5  # contrato, cliente, empresa, oportunidade e contato
+    assert [i.responsavel for i in k.itens][-1] == "Sem responsável"
+    assert all(i.valor == 0 for i in k.itens)
 
 
-def test_sem_registro_novo_fica_sem_dado(engine, monkeypatch):
-    monkeypatch.setattr(integralidade, "DATA_DE_CORTE", date(2999, 1, 1))
+def test_passado_com_retrato_conta_as_consertadas(engine, monkeypatch):
+    monkeypatch.setattr(integralidade, "DATA_DE_CORTE", date(2999, 1, 1))  # tudo é Passado
     with Session(engine) as s:
-        s.add(GrupoEconomico(nome="Qualquer"))
+        g = GrupoEconomico(nome="Antigo")
+        s.add(g)
+        s.flush()
+        e1, e2 = Empresa(grupo_id=g.id, razao_social="Sem CNPJ 1"), Empresa(grupo_id=g.id, razao_social="Sem CNPJ 2")
+        s.add_all([e1, e2])
+        s.commit()
+        retrato = integralidade.guardar_retrato(s, date(2026, 10, 15))
+        assert (retrato.pendencias, retrato.obrigatorios) == (6, 2)  # 2 empresas × (CNPJ, regime, endereço)
+        assert integralidade.guardar_retrato(s, date(2026, 10, 16)) is None  # uma vez só
+        e1.cnpj, e1.regime_tributario = "11222333000181", "Simples Nacional"
         s.commit()
         k = {k.chave: k for k in calcular_kpis(s, "2026-10", date(2026, 10, 20)).kpis}["integralidade"]
-    assert k.valor is None and "Nenhum registro criado desde" in k.falta[0]
+    x = k.extras
+    assert (x["passado_pendencias"], x["passado_obrigatorios"], x["passado_retrato"], x["passado_consertadas"]) == (4, 1, 6, 2)
+    assert x["passado_empresa"] == 4 and x["passado_retrato_em"] == "2026-10-15" and k.falta == []
+    assert k.valor is None  # nenhum registro Novo: sem dado
+    assert {i.corte for i in k.itens} == {"Passado"}
+
+
+def test_tarefa_do_redeploy_guarda_o_retrato_uma_vez(engine):
+    from crm.manutencao.tarefas import retrato_da_integralidade
+    with Session(engine) as s:
+        primeira = retrato_da_integralidade.executar(s)
+        segunda = retrato_da_integralidade.executar(s)
+    assert primeira.startswith("retrato do Passado em") and segunda.startswith("nada a fazer")
+
+
+def test_planilha_das_pendencias(cadastro):
+    from fastapi.testclient import TestClient
+    from io import BytesIO
+    from openpyxl import load_workbook
+    from sqlalchemy.orm import sessionmaker
+    from crm.api.app import criar_app
+
+    fabrica = sessionmaker(bind=cadastro, expire_on_commit=False, future=True)
+    with TestClient(criar_app(fabrica)) as c:
+        tudo = c.get("/api/inteligencia/integralidade/planilha")
+        passado = c.get("/api/inteligencia/integralidade/planilha", params={"corte": "Passado"})
+    assert tudo.status_code == 200 and "pendencias-de-cadastro-" in tudo.headers["content-disposition"]
+    ws = load_workbook(BytesIO(tudo.content))["Pendências"]
+    assert [c.value for c in ws[1]] == ["Corte", "Responsável", "Cadastro", "Registro", "Campo em falta", "Nível"]
+    assert ws.max_row == 13  # cabeçalho + 12 campos em falta
+    assert load_workbook(BytesIO(passado.content))["Pendências"].max_row == 1

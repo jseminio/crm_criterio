@@ -16,6 +16,20 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Integralidade do cadastro em dois cortes: Novos e Passado (15/10/2026)
+
+Decisão de Eduardo em 15/10/2026 (troca o "só daqui para frente" de 13/10), para a equipe consertar o herdado aos
+poucos sem desanimar:
+
+- **Novos · desde 14/10:** os registros criados desde o corte, em % pendente: a disciplina daqui para frente (meta:
+  zero obrigatório em falta).
+- **Passado · faltam:** o herdado da planilha, em pendências que faltam, com as **já consertadas** desde o retrato
+  guardado no dia da publicação (tarefa `2026_10_15_retrato_da_integralidade`, na linha
+  `integralidade.retrato_do_passado` de `configuracao_do_sistema`). As barras do card mostram o Passado por cadastro.
+- **A lista para consertar** ("Ver composição"): todos os registros com pendência, um por linha com tudo o que falta,
+  agrupados por corte e responsável; filtros por corte, cadastro, nível e responsável; "!" marca o obrigatório (além
+  da cor). **Baixar planilha** (`GET /api/inteligencia/integralidade/planilha?corte=`) leva uma linha por campo.
+
 ## Composições em modal (15/10/2026)
 
 Sugestão do Jesse, amostra aprovada por Eduardo em 15/10/2026: todo **"Ver composição"** abre num **modal

@@ -7,7 +7,7 @@ import { KpisDaLideranca, ultimosMeses } from "./KpisDaLideranca";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { kpisDaLideranca: vi.fn() } };
+  return { ...real, api: { kpisDaLideranca: vi.fn(), baixarPendenciasDeCadastro: vi.fn().mockResolvedValue(undefined) } };
 });
 
 const kpi = (chave: string, titulo: string, extra: object = {}) => ({
@@ -41,16 +41,19 @@ const KPIS: Kpis = {
       itens: [{ grupo: "SENTIRE", detalhe: "entrou em 05/2026 · anunciou em 14/08/2026 · sai em 13/10/2026", valor: "7458.33",
         entra: true, secao: "Entraram e saíram em 2026" }] }),
     kpi("cobertura", "Cobertura de relacionamento", { valor: null }),
-    kpi("integralidade", "Integralidade do cadastro", { valor: "40.0", resumo: "Registros criados desde 14/10/2026 · situação de hoje",
-      meta: "A definir",
-      extras: { pontos_devidos: 40, pontos_pendentes: 16, obrigatorios_em_falta: 4, prioritarios_em_falta: 8, legado_pct: "61.2",
-        pendente_oportunidade: "20.0", pendente_contrato: "40.0", pendente_encerramento: null, pendente_cliente: "60.0",
-        pendente_empresa: "50.0", pendente_contato: "66.7" },
+    kpi("integralidade", "Integralidade do cadastro", { valor: "40.0", resumo: "Novos: criados desde 14/10/2026 · Passado: até a véspera",
+      meta: "Novos: zero obrigatório em falta · Passado: diminuir",
+      extras: { novos_pendencias: 12, novos_obrigatorios: 4, novos_pontos_devidos: 40, passado_pendencias: 868,
+        passado_obrigatorios: 205, passado_pct: "22.0", passado_retrato: 880, passado_retrato_em: "2026-10-15",
+        passado_consertadas: 12, corte: "2026-10-14", passado_oportunidade: 303, passado_contrato: 127, passado_encerramento: 2,
+        passado_cliente: 72, passado_empresa: 150, passado_contato: 214 },
       itens: [
-        { grupo: "Contrato · Cliente X · BPO Contábil", detalhe: "Bruto ou líquido · Obrigatório", valor: "0", entra: true,
-          secao: "KN · 7 pendência(s) · 46,7% pendente" },
-        { grupo: "Contato · Fulana", detalhe: "Cargo · Prioritário", valor: "0", entra: true,
-          secao: "Sem responsável · 3 pendência(s) · 66,7% pendente" },
+        { grupo: "Contrato · Cliente X · BPO Contábil", detalhe: "! Bruto ou líquido, Signatário", valor: "0", entra: true,
+          secao: "Novos · KN", corte: "Novos", cadastro: "Contrato", responsavel: "KN",
+          faltam: [{ campo: "Bruto ou líquido", obrigatorio: true }, { campo: "Signatário", obrigatorio: false }] },
+        { grupo: "Empresa · Antiga Ltda", detalhe: "Regime tributário", valor: "0", entra: true,
+          secao: "Passado · Sem responsável", corte: "Passado", cadastro: "Empresa", responsavel: "Sem responsável",
+          faltam: [{ campo: "Regime tributário", obrigatorio: false }] },
       ] }),
   ],
 };
@@ -84,21 +87,25 @@ describe("KPIs da liderança (09/10/2026)", () => {
     expect(within(novos).getByText(/Tempo médio como cliente: 1,3 meses/)).toBeInTheDocument();
   });
 
-  it("integralidade do cadastro: pendente, obrigatórios em falta, barras por cadastro e pendências por responsável", async () => {
+  it("integralidade em dois cortes: Novos em %, Passado em faltam e consertadas, e a lista com filtros", async () => {
     render(<KpisDaLideranca />);
     const card = (await screen.findByText("Integralidade do cadastro")).closest("section")!;
-    const [pendente, obrigatorios] = Array.from(card.querySelectorAll(".ind-valores-item"));
-    expect(pendente).toHaveTextContent("Pendente40,0%16 de 40 pontos");
-    expect(obrigatorios).toHaveTextContent("Obrigatórios em falta4e 8 prioritários");
-    const barras = within(card).getByRole("list", { name: "Pendente por cadastro" });
-    expect(within(barras).getAllByRole("listitem").map((l) => l.textContent)).toEqual([
-      "Oportunidade20,0%", "Contrato40,0%", "Encerramento—", "Cliente60,0%", "Empresa (CNPJ)50,0%", "Contato66,7%"]);
-    expect(within(card).getByText(/Legado \(antes do corte\): 61,2% pendente/)).toBeInTheDocument();
+    const [novos, passado] = Array.from(card.querySelectorAll(".ind-valores-item"));
+    expect(novos).toHaveTextContent("Novos · desde 14/10/202640,0%12 pendência(s) · 4 obrigatória(s)");
+    expect(passado).toHaveTextContent("Passado · faltam868205 obrigatória(s) · já consertadas: 12");
+    const barras = within(card).getByRole("list", { name: "Passado: pendências por cadastro" });
+    expect(within(barras).getAllByRole("listitem")[0]).toHaveTextContent("Oportunidade303");
     fireEvent.click(within(card).getByRole("button", { name: /Ver composição/ }));
     const painel = await screen.findByRole("dialog", { name: "Integralidade do cadastro" });
-    expect(within(painel).getByText("KN · 7 pendência(s) · 46,7% pendente (1)")).toBeInTheDocument();
-    expect(within(painel).getByText("Bruto ou líquido · Obrigatório")).toBeInTheDocument();
-    expect(within(painel).queryByText(/R\$/)).toBeNull();  // pendência não tem valor em dinheiro
+    expect(within(painel).getByRole("status")).toHaveTextContent("2 registro(s) · 3 campo(s) em falta");
+    expect(within(painel).getByText("! Bruto ou líquido")).toHaveAttribute("title", "Obrigatório (vale 2)");
+    fireEvent.change(within(painel).getByLabelText("Corte"), { target: { value: "Passado" } });
+    expect(within(painel).getByRole("status")).toHaveTextContent("1 registro(s) · 1 campo(s) em falta");
+    fireEvent.change(within(painel).getByLabelText("Nível"), { target: { value: "obrigatorio" } });
+    expect(within(painel).getByText("Nada em falta com estes filtros.")).toBeInTheDocument();
+    vi.mocked(api.baixarPendenciasDeCadastro).mockResolvedValue(undefined);
+    fireEvent.click(within(painel).getByRole("button", { name: "Baixar planilha" }));
+    expect(api.baixarPendenciasDeCadastro).toHaveBeenCalledWith("Passado");
   });
 
   it("nenhum indicador tem número na frente do nome", async () => {

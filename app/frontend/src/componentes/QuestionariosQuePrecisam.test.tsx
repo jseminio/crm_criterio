@@ -28,9 +28,10 @@ describe("Agenda › questionários que precisam de você", () => {
     expect(await screen.findByRole("heading", { name: "! Questionários que precisam de você · 1" })).toBeInTheDocument();
     expect(screen.getByText("Smarthis")).toBeInTheDocument();
     expect(screen.queryByText("Outra")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Anexar à existente" }));
-    expect(api.resolverQuestionario).toHaveBeenCalledWith(1, "anexar");
-    expect(await screen.findByRole("status")).toHaveTextContent("anexado à oportunidade que já existia");
+    expect(screen.getByRole("button", { name: "Mesclar com existente" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova" }));
+    expect(api.resolverQuestionario).toHaveBeenCalledWith(1, "criar");
+    expect(await screen.findByRole("status")).toHaveTextContent("virou uma oportunidade nova");
   });
 
   it("sem nenhum pendente, não aparece", async () => {

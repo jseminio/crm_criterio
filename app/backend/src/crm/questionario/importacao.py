@@ -2,7 +2,9 @@
 
 - O **CNPJ** é a identidade: empresa já cadastrada leva a oportunidade para o grupo dela.
 - Grupo com oportunidade **em aberto** não ganha outra sozinho: o questionário fica "Precisa de
-  você", e a pessoa escolhe anexar à existente ou criar nova.
+  você", e a pessoa escolhe mesclar com a existente ou criar nova. Desde 15/10/2026 vale também para a
+  oportunidade aberta do **mesmo contato** (regra D), mesmo sem o CNPJ, e qualquer questionário pode ser
+  mesclado com outra oportunidade aberta depois (`crm.questionario.mescla`).
 - A oportunidade nasce em "Enviar proposta", com os nove direcionadores marcados como vindos do
   "Questionário". O **porte não é confirmado** aqui: a régua só sugere (`crm.domain.porte`).
 - Anexar só preenche o que está vazio na oportunidade existente: nada do que já foi digitado some.
@@ -144,6 +146,49 @@ def _preencher_endereco(empresa: Empresa, buscar_endereco: BuscaDeEndereco | Non
     return " Endereço preenchido pelo CNPJ (cadastro público)." if preenchidos else ""
 
 
+def _parou_pelo_contato(sessao: Session, q: QuestionarioRecebido) -> bool:
+    """Regra D (15/10/2026): antes de criar, procura oportunidade aberta do mesmo contato (e-mail ou celular de quem
+    respondeu, ou o lead convertido). Achou: não cria nada e deixa a pessoa escolher entre mesclar e criar nova."""
+    from crm.questionario.mescla import par_por_contato  # a mescla usa este módulo: importa aqui para não dar ciclo
+
+    par = par_por_contato(sessao, q)
+    if par is None:
+        return False
+    oportunidade, motivo = par
+    q.situacao, q.oportunidade_em_aberto_id = SituacaoDoQuestionario.PRECISA_DE_VOCE, oportunidade.id
+    q.o_que_fez = (f'O contato ({motivo}) já está na oportunidade aberta "{oportunidade.nome}" '
+                   f"({oportunidade.situacao.value}). Não criei nada, para não duplicar. "
+                   "Escolha: mesclar com ela ou criar nova.")
+    return True
+
+
+def _criar_cliente_novo(sessao: Session, q: QuestionarioRecebido, leitura: Leitura,
+                        buscar_endereco: BuscaDeEndereco | None) -> Oportunidade:
+    """CNPJ que o CRM não conhece: cria grupo, empresa, contato e a oportunidade."""
+    nome = q.nome_fantasia or q.razao_social
+    homonimo = sessao.scalar(sa.select(GrupoEconomico.nome).where(
+        sa.func.lower(GrupoEconomico.nome) == nome.casefold(), GrupoEconomico.fundido_em_id.is_(None),
+    ))
+    grupo = GrupoEconomico(nome=nome, situacao=SituacaoGrupo.PROSPECT, origem=Origem.QUESTIONARIO)
+    sessao.add(grupo)
+    sessao.flush()
+    empresa = Empresa(
+        grupo_id=grupo.id, razao_social=q.razao_social, nome_fantasia=q.nome_fantasia, cnpj=q.cnpj,
+        regime_tributario=leitura.regimes[0][:40] if len(leitura.regimes) == 1 else None,
+    )
+    sessao.add(empresa)
+    sessao.flush()
+    novo_contato = _contato(sessao, q, grupo, empresa)
+    oportunidade = _nova_oportunidade(sessao, q, grupo, leitura, empresa)
+    q.cliente_novo, q.grupo_id, q.oportunidade_id = True, grupo.id, oportunidade.id
+    q.o_que_fez = ('Criou grupo, empresa, ' + ("contato" if novo_contato else "vinculou o contato que já estava na base")
+                   + ' e a oportunidade em "Enviar proposta".' + _preencher_endereco(empresa, buscar_endereco))
+    if homonimo:
+        q.o_que_fez += (f' Já existe um grupo chamado "{homonimo}" sem este CNPJ: se for o mesmo cliente, '
+                        "mescle o questionário com a oportunidade dele.")
+    return oportunidade
+
+
 def importar(sessao: Session, linha: dict[str, Any], buscar_endereco: BuscaDeEndereco | None = None) -> QuestionarioRecebido:
     """Grava o questionário e faz o que dá para fazer sem perguntar. Não faz commit.
 
@@ -170,27 +215,8 @@ def importar(sessao: Session, linha: dict[str, Any], buscar_endereco: BuscaDeEnd
 
     empresa = sessao.scalar(sa.select(Empresa).where(Empresa.cnpj == cnpj))
     if empresa is None:
-        nome = q.nome_fantasia or q.razao_social
-        homonimo = sessao.scalar(sa.select(GrupoEconomico.nome).where(
-            sa.func.lower(GrupoEconomico.nome) == nome.casefold(), GrupoEconomico.fundido_em_id.is_(None),
-        ))
-        grupo = GrupoEconomico(nome=nome, situacao=SituacaoGrupo.PROSPECT, origem=Origem.QUESTIONARIO)
-        sessao.add(grupo)
-        sessao.flush()
-        empresa = Empresa(
-            grupo_id=grupo.id, razao_social=q.razao_social, nome_fantasia=q.nome_fantasia, cnpj=cnpj,
-            regime_tributario=leitura.regimes[0][:40] if len(leitura.regimes) == 1 else None,
-        )
-        sessao.add(empresa)
-        sessao.flush()
-        novo_contato = _contato(sessao, q, grupo, empresa)
-        oportunidade = _nova_oportunidade(sessao, q, grupo, leitura, empresa)
-        q.cliente_novo, q.grupo_id, q.oportunidade_id = True, grupo.id, oportunidade.id
-        q.o_que_fez = ('Criou grupo, empresa, ' + ("contato" if novo_contato else "vinculou o contato que já estava na base")
-                       + ' e a oportunidade em "Enviar proposta".' + _preencher_endereco(empresa, buscar_endereco))
-        if homonimo:
-            q.o_que_fez += (f' Já existe um grupo chamado "{homonimo}" sem este CNPJ: se for o mesmo cliente, '
-                            "use Fundir grupos.")
+        if not _parou_pelo_contato(sessao, q):
+            _criar_cliente_novo(sessao, q, leitura, buscar_endereco)
     else:
         grupo = _grupo_vivo(sessao, sessao.get(GrupoEconomico, empresa.grupo_id))
         q.grupo_id = grupo.id
@@ -202,8 +228,8 @@ def importar(sessao: Session, linha: dict[str, Any], buscar_endereco: BuscaDeEnd
         if aberta is not None:
             q.situacao, q.oportunidade_em_aberto_id = SituacaoDoQuestionario.PRECISA_DE_VOCE, aberta.id
             q.o_que_fez = (f'Já existe oportunidade em aberto para este CNPJ ("{aberta.nome}", {aberta.situacao.value}). '
-                           "Não criei outra, para não duplicar. Escolha: anexar a ela ou criar nova." + endereco)
-        else:
+                           "Não criei outra, para não duplicar. Escolha: mesclar com ela ou criar nova." + endereco)
+        elif not _parou_pelo_contato(sessao, q):
             novo_contato = _contato(sessao, q, grupo, empresa)
             oportunidade = _nova_oportunidade(sessao, q, grupo, leitura, empresa)
             q.oportunidade_id = oportunidade.id
@@ -220,45 +246,23 @@ def _exigir_pendente(q: QuestionarioRecebido) -> None:
 
 
 def anexar(sessao: Session, q: QuestionarioRecebido) -> int:
-    """Preenche na oportunidade em aberto só o que está vazio. Devolve quantos campos preencheu."""
+    """Mescla na oportunidade em aberto que o CRM achou, só preenchendo o vazio. Devolve quantos campos preencheu."""
+    from crm.questionario.mescla import mesclar  # a mescla usa este módulo: importa aqui para não dar ciclo
+
     _exigir_pendente(q)
-    oportunidade = sessao.get(Oportunidade, q.oportunidade_em_aberto_id)
-    leitura = leitura_de(q)
-    origem = dict(oportunidade.origem_da_volumetria or {})
-    preenchidos = 0
-    for campo, valor in leitura.volumetria.items():
-        if valor is not None and getattr(oportunidade, campo) is None:
-            setattr(oportunidade, campo, valor)
-            origem[campo] = OrigemDoDado.QUESTIONARIO.value
-            preenchidos += 1
-    for campo, valor in (("complexidade", leitura.nota_complexidade), ("risco_tecnico", leitura.nota_risco)):
-        if getattr(oportunidade, campo) is None:
-            setattr(oportunidade, campo, valor)
-            preenchidos += 1
-    oportunidade.origem_da_volumetria = origem  # dict novo: o JSON só grava se o objeto muda
-    tipo_canal, canal = origem_declarada(q.respostas or {})
-    if oportunidade.tipo_canal is None and tipo_canal is not None:
-        oportunidade.tipo_canal = tipo_canal
-        preenchidos += 1
-    if not oportunidade.canal and canal:
-        oportunidade.canal = canal
-        preenchidos += 1
-    empresa = sessao.scalar(sa.select(Empresa).where(Empresa.cnpj == q.cnpj))
-    if oportunidade.empresa_id is None and empresa is not None:
-        oportunidade.empresa_id = empresa.id  # só preenche o vazio
-    _contato(sessao, q, sessao.get(GrupoEconomico, q.grupo_id), empresa)
-    q.situacao, q.oportunidade_id = SituacaoDoQuestionario.IMPORTADO, oportunidade.id
-    q.o_que_fez = (f'Anexado à oportunidade "{oportunidade.nome}": preencheu {preenchidos} campo(s) vazio(s), '
-                   "sem apagar nada do que já estava lá.")
-    return preenchidos
+    return mesclar(sessao, q, sessao.get(Oportunidade, q.oportunidade_em_aberto_id))
 
 
-def criar_nova(sessao: Session, q: QuestionarioRecebido) -> Oportunidade:
+def criar_nova(sessao: Session, q: QuestionarioRecebido, buscar_endereco: BuscaDeEndereco | None = None) -> Oportunidade:
     _exigir_pendente(q)
-    grupo = sessao.get(GrupoEconomico, q.grupo_id)
     empresa = sessao.scalar(sa.select(Empresa).where(Empresa.cnpj == q.cnpj))
+    if empresa is None:  # a regra D parou antes de criar o cliente: cria agora
+        q.situacao, q.oportunidade_em_aberto_id = SituacaoDoQuestionario.IMPORTADO, None
+        return _criar_cliente_novo(sessao, q, leitura_de(q), buscar_endereco)
+    grupo = _grupo_vivo(sessao, sessao.get(GrupoEconomico, empresa.grupo_id))
     _contato(sessao, q, grupo, empresa)
     oportunidade = _nova_oportunidade(sessao, q, grupo, leitura_de(q), empresa)
-    q.situacao, q.oportunidade_id = SituacaoDoQuestionario.IMPORTADO, oportunidade.id
+    q.situacao, q.oportunidade_id, q.oportunidade_em_aberto_id = SituacaoDoQuestionario.IMPORTADO, oportunidade.id, None
+    q.grupo_id = grupo.id
     q.o_que_fez = f'Criou uma oportunidade nova no grupo "{grupo.nome}", ao lado da que já estava em aberto.'
     return oportunidade

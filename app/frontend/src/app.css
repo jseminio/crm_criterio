@@ -1576,6 +1576,18 @@ td > .celula-fonte { display: block; }
   font-size: 13px; color: var(--texto-forte); }
 .quadro-resumo ul { margin: var(--e1) 0 0; padding-left: var(--e5); }
 
+/* Mesclar o questionário com uma oportunidade aberta (15/10/2026). */
+.mescla-opcoes { display: grid; gap: var(--e2); margin-bottom: var(--e3); }
+.mescla-opcao { display: flex; gap: var(--e2); align-items: flex-start; border: 1px solid var(--borda); border-radius: var(--raio-sm);
+  padding: var(--e2) var(--e3); cursor: pointer; }
+.mescla-opcao-escolhida { border: 2px solid var(--azul-destaque); }
+.mescla-opcao .celula-fonte { display: block; }
+.mescla-preenche { color: var(--ganho); }
+.mescla-troca { display: inline-flex; gap: var(--e1); align-items: center; }
+.mescla-grupos { background: var(--surface-sunken); border-radius: var(--raio-sm); padding: var(--e2) var(--e3);
+  display: grid; gap: var(--e1); font-size: 13px; margin-top: var(--e3); }
+.mescla-grupos p { margin: 0; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -78,13 +78,14 @@ describe("Questionários do site no Funil", () => {
 
   it("o que precisa de você aparece ao abrir o Funil e é resolvido ali", async () => {
     vi.mocked(api.questionarios).mockResolvedValue([GAMA, ALFA]);
-    vi.mocked(api.resolverQuestionario).mockResolvedValue({ ...GAMA, situacao: "Importado", oportunidade_id: 7, o_que_fez: "Anexado à oportunidade." });
+    vi.mocked(api.resolverQuestionario).mockResolvedValue({ ...GAMA, situacao: "Importado", oportunidade_id: 7, o_que_fez: "Criou uma oportunidade nova." });
     render(<Tela />);
     expect(await screen.findByText("Exemplo Gama Indústria Ltda")).toBeInTheDocument();
     expect(screen.queryByText("Exemplo Alfa Comércio Ltda")).toBeNull(); // já resolvido: não polui a tela
-    await userEvent.click(screen.getByRole("button", { name: "Anexar à existente" }));
-    expect(api.resolverQuestionario).toHaveBeenCalledWith(3, "anexar");
-    expect(await screen.findByText("Anexado à oportunidade.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mesclar com existente" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova" }));
+    expect(api.resolverQuestionario).toHaveBeenCalledWith(3, "criar");
+    expect(await screen.findByText("Criou uma oportunidade nova.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Abrir oportunidade" })).toBeInTheDocument();
   });
 

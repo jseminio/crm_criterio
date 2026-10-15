@@ -2589,3 +2589,37 @@ export interface QuadroDePropostas {
   resumo: string[];
   propostas: PropostaAberta[];
 }
+
+/** Mescla do questionário com uma oportunidade aberta (15/10/2026). */
+export interface SugestaoDeMescla {
+  oportunidade_id: number;
+  nome: string;
+  grupo_nome: string | null;
+  situacao: string;
+  servico: string | null;
+  captador: string | null;
+  data_colocacao: string | null;
+  motivo: string;
+}
+
+export interface CampoDaMescla {
+  campo: string;
+  rotulo: string;
+  no_card: string | null;
+  no_questionario: string;
+  acao: "preenche" | "igual" | "diferente" | "fica";
+}
+
+export interface PreviaDaMescla {
+  oportunidade_id: number;
+  oportunidade_nome: string;
+  recusa: string | null;
+  campos: CampoDaMescla[];
+  fusao_de: string | null;
+  fusao_em: string | null;
+  cnpj_novo_no_grupo: string | null;
+  duplicada_id: number | null;
+  duplicada_nome: string | null;
+  duplicada_intocada: boolean;
+  duplicada_recusa: string | null;
+}

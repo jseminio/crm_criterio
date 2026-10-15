@@ -133,7 +133,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/questionarios/busca", ("questionarios.ver", "funil.ver")),
     ("GET", r"/api/questionarios/\d+/respostas", ("questionarios.ver", "funil.ver")),
     ("GET", r"/api/questionarios(/\d+/pdf)?", ("funil.ver", "questionarios.ver")),
-    ("POST", r"/api/questionarios/(buscar|\d+/resolver)", ("funil.questionarios",)),
+    ("POST", r"/api/questionarios/(buscar|\d+/resolver|\d+/mesclar)", ("funil.questionarios",)),
+    ("GET", r"/api/questionarios/\d+/(sugestoes|mescla)", ("funil.questionarios",)),
     # grupos
     ("GET", r"/api/grupos(/sugestoes-de-fusao|/fusoes)?", ("grupos.ver", "funil.ver")),
     ("PATCH", r"/api/grupos/\d+", ("grupos.editar",)),

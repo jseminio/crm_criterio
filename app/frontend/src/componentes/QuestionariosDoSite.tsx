@@ -10,6 +10,7 @@ import { api, ErroDaApi } from "../api/cliente";
 import type { QuestionarioResumo } from "../api/tipos";
 import { cnpj, dataHora } from "../formato";
 import { Etiqueta } from "./Etiqueta";
+import { BotaoMesclar } from "./MesclarQuestionario";
 
 const PRECISA = "Precisa de você";
 
@@ -52,6 +53,13 @@ export function usarQuestionarios(aoMudar: () => void) {
     }
   };
 
+  /** Depois da mescla (15/10/2026): a linha passa a mostrar o que o CRM fez. */
+  const recarregar = async () => {
+    const todos = await api.questionarios().catch(() => null);
+    if (todos) definirLinhas((antes) => antes.map((q) => todos.find((t) => t.id === q.id) ?? q));
+    aoMudar();
+  };
+
   const resolver = async (id: number, acao: "anexar" | "criar") => {
     definirErro(null);
     try {
@@ -63,7 +71,7 @@ export function usarQuestionarios(aoMudar: () => void) {
     }
   };
 
-  return { linhas, resumo, buscando, erro, buscar, resolver };
+  return { linhas, resumo, buscando, erro, buscar, resolver, recarregar };
 }
 
 export type EstadoDosQuestionarios = ReturnType<typeof usarQuestionarios>;
@@ -128,9 +136,7 @@ export function QuestionariosDoSite({ estado, aoAbrir }: { estado: EstadoDosQues
                   <td>
                     {q.situacao === PRECISA ? (
                       <>
-                        <button type="button" className="link-de-tabela" onClick={() => estado.resolver(q.id, "anexar")}>
-                          Anexar à existente
-                        </button>
+                        <BotaoMesclar q={q} aoMesclar={() => void estado.recarregar()} />
                         {" · "}
                         <button type="button" className="link-de-tabela" onClick={() => estado.resolver(q.id, "criar")}>
                           Criar nova

@@ -1588,6 +1588,17 @@ td > .celula-fonte { display: block; }
   display: grid; gap: var(--e1); font-size: 13px; margin-top: var(--e3); }
 .mescla-grupos p { margin: 0; }
 
+/* Modal das composições (15/10/2026): centralizado, até 960px, cabeçalho fixo e a lista rolando dentro.
+   z-index acima da cortina e do painel lateral (40/41), como o catálogo: a composição pode abrir de dentro de um painel. */
+.modal-cortina { position: fixed; inset: 0; z-index: 60; background: rgba(11,14,23,.45);
+  display: flex; align-items: center; justify-content: center; padding: var(--e6) var(--e4); }
+.modal { background: var(--surface-card); border-radius: var(--raio-lg); box-shadow: var(--sombra-painel);
+  width: min(960px, 100%); max-height: calc(100vh - 64px); display: flex; flex-direction: column; overflow: hidden; }
+@media (max-width: 720px) {
+  .modal-cortina { padding: 0; }
+  .modal { width: 100vw; height: 100dvh; max-height: none; border-radius: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

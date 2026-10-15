@@ -6,7 +6,7 @@ import { useState } from "react";
 import { api } from "../api/cliente";
 import type { ItemDoKpi, KpiDaLideranca, KpisDaLideranca as Kpis } from "../api/tipos";
 import { Indicador, type Tom } from "./Indicador";
-import { dinheiro, percentual } from "../formato";
+import { data, dinheiro, percentual } from "../formato";
 import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
 
@@ -59,26 +59,25 @@ function Detalhe({ k }: { k: KpiDaLideranca }) {
   if (k.chave === "integralidade") {
     const cadastros = [["Oportunidade", "oportunidade"], ["Contrato", "contrato"], ["Encerramento", "encerramento"],
       ["Cliente", "cliente"], ["Empresa (CNPJ)", "empresa"], ["Contato", "contato"]] as const;
+    const maior = Math.max(1, ...cadastros.map(([, c]) => Number(x[`passado_${c}`] ?? 0)));
     return (
       <div style={{ display: "grid", gap: "var(--e1)" }}>
-        <ul className="integralidade-barras" aria-label="Pendente por cadastro">
+        <ul className="integralidade-barras" aria-label="Passado: pendências por cadastro">
           {cadastros.map(([rotulo, chave]) => {
-            const v = x[`pendente_${chave}`];
-            const n = v === null || v === undefined ? null : Number(v);
+            const n = Number(x[`passado_${chave}`] ?? 0);
             return (
               <li key={chave}>
                 <span>{rotulo}</span>
                 <span className="integralidade-trilho" aria-hidden="true">
-                  <span className="integralidade-barra" style={{ width: `${n ?? 0}%` }} />
+                  <span className="integralidade-barra" style={{ width: `${(n / maior) * 100}%` }} />
                 </span>
-                <span className="tabela-numero">{n === null ? "—" : percentual(String(v))}</span>
+                <span className="tabela-numero">{n}</span>
               </li>
             );
           })}
         </ul>
-        <p className="campo-ajuda" style={{ margin: 0 }}>Obrigatório vale 2, prioritário vale 1.</p>
         <p className="campo-ajuda" style={{ margin: 0 }}>
-          Legado (antes do corte): {x.legado_pct === null || x.legado_pct === undefined ? "—" : percentual(String(x.legado_pct))} pendente
+          Barras: o que falta no Passado, por cadastro. Obrigatório vale 2, prioritário vale 1; "!" marca o obrigatório.
         </p>
       </div>
     );
@@ -164,9 +163,12 @@ function ComposicaoDoKpi({ k }: { k: KpiDaLideranca }) {
 function visoesDoChurn(k: KpiDaLideranca) {
   const x = k.extras;
   if (k.chave === "integralidade") {
+    const consertadas = x.passado_consertadas;
     return [
-      { rotulo: "Pendente", valor: valorDoKpi(k), apoio: `${texto(x.pontos_pendentes)} de ${texto(x.pontos_devidos)} pontos` },
-      { rotulo: "Obrigatórios em falta", valor: texto(x.obrigatorios_em_falta), apoio: `e ${texto(x.prioritarios_em_falta)} prioritários` },
+      { rotulo: `Novos · desde ${data(String(x.corte))}`, valor: k.valor === null ? "—" : valorDoKpi(k),
+        apoio: `${texto(x.novos_pendencias)} pendência(s) · ${texto(x.novos_obrigatorios)} obrigatória(s)` },
+      { rotulo: "Passado · faltam", valor: texto(x.passado_pendencias),
+        apoio: `${texto(x.passado_obrigatorios)} obrigatória(s) · já consertadas: ${consertadas === null || consertadas === undefined ? "—" : consertadas}` },
     ];
   }
   if (!NO_ANO.has(k.chave)) return undefined;
@@ -177,6 +179,76 @@ function visoesDoChurn(k: KpiDaLideranca) {
   ];
 }
 
+/** A lista para consertar aos poucos (15/10/2026): filtros por corte, cadastro, nível e responsável; um registro por
+ * linha com tudo o que falta nele; "!" marca o obrigatório (estado nunca só por cor). */
+export function ComposicaoDaIntegralidade({ k }: { k: KpiDaLideranca }) {
+  const [corte, definirCorte] = useState("");
+  const [cadastro, definirCadastro] = useState("");
+  const [so, definirSo] = useState(false);
+  const [dono, definirDono] = useState("");
+  const [erro, definirErro] = useState<string | null>(null);
+  const unicos = (f: (i: ItemDoKpi) => string | null | undefined) => [...new Set(k.itens.map(f).filter((v): v is string => !!v))];
+  const itens = k.itens
+    .filter((i) => !corte || i.corte === corte)
+    .filter((i) => !cadastro || i.cadastro === cadastro)
+    .filter((i) => !dono || i.responsavel === dono)
+    .map((i) => ({ ...i, faltam: (i.faltam ?? []).filter((f) => !so || f.obrigatorio) }))
+    .filter((i) => i.faltam.length > 0);
+  const campos = itens.reduce((t, i) => t + i.faltam.length, 0);
+  const secoes = [...new Set(itens.map((i) => i.secao ?? ""))];
+  const selecao = (rotulo: string, valor: string, mudar: (v: string) => void, opcoes: string[], todos: string) => (
+    <select className="selecao" aria-label={rotulo} value={valor} onChange={(e) => mudar(e.target.value)}>
+      <option value="">{todos}</option>
+      {opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+  return (
+    <>
+      <div className="integralidade-filtros">
+        {selecao("Corte", corte, definirCorte, ["Novos", "Passado"], "Novos e Passado")}
+        {selecao("Cadastro", cadastro, definirCadastro, unicos((i) => i.cadastro), "Todos os cadastros")}
+        <select className="selecao" aria-label="Nível" value={so ? "obrigatorio" : ""} onChange={(e) => definirSo(e.target.value === "obrigatorio")}>
+          <option value="">Obrigatórios e prioritários</option>
+          <option value="obrigatorio">Só obrigatórios</option>
+        </select>
+        {selecao("Responsável", dono, definirDono, unicos((i) => i.responsavel), "Todos os responsáveis")}
+        <button type="button" className="botao botao-secundario" onClick={() => {
+          definirErro(null);
+          api.baixarPendenciasDeCadastro((corte || undefined) as "Novos" | "Passado" | undefined)
+            .catch(() => definirErro("Não foi possível baixar a planilha agora."));
+        }}>Baixar planilha</button>
+      </div>
+      {erro && <p className="estado-texto estado-erro" role="alert">✗ {erro}</p>}
+      <p className="composicao-linha-resumo" role="status">{itens.length} registro(s) · {campos} campo(s) em falta</p>
+      {itens.length === 0 && <p className="numero-estado">Nada em falta com estes filtros.</p>}
+      {secoes.map((secao) => {
+        const deste = itens.filter((i) => (i.secao ?? "") === secao);
+        return (
+          <div key={secao}>
+            <h3 className="numero-rotulo">{secao} · {deste.reduce((t, i) => t + i.faltam.length, 0)} pendência(s)</h3>
+            <table className="tabela" aria-label={secao}>
+              <thead><tr><th>Registro</th><th>Falta</th></tr></thead>
+              <tbody>
+                {deste.map((i) => (
+                  <tr key={`${i.corte}-${i.grupo}`}>
+                    <td>{i.grupo}</td>
+                    <td>{i.faltam.map((f) => (
+                      <span key={f.campo} className={`integralidade-campo ${f.obrigatorio ? "integralidade-obrigatorio" : ""}`}
+                        title={f.obrigatorio ? "Obrigatório (vale 2)" : "Prioritário (vale 1)"}>
+                        {f.obrigatorio ? `! ${f.campo}` : f.campo}
+                      </span>
+                    ))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 function Cartao({ k }: { k: KpiDaLideranca }) {
   return (
     <Indicador
@@ -184,7 +256,7 @@ function Cartao({ k }: { k: KpiDaLideranca }) {
       tom={TOM[k.chave] ?? "marinho"}
       destaque={valorDoKpi(k)}
       valores={visoesDoChurn(k)}
-      pendente={k.valor === null}
+      pendente={k.valor === null && k.chave !== "integralidade"}
       apoio={<>{k.resumo}{k.meta && <><br />Meta: {k.meta}</>}</>}
       etiqueta={
         <>
@@ -194,10 +266,13 @@ function Cartao({ k }: { k: KpiDaLideranca }) {
           ))}
         </>
       }
-      composicao={k.itens.length > 0 ? {
+      composicao={k.itens.length > 0 ? (k.chave === "integralidade" ? {
+        titulo: k.titulo, subtitulo: "Todos os registros com pendência, para consertar aos poucos", quantos: k.itens.length,
+        conteudo: () => <ComposicaoDaIntegralidade k={k} />,
+      } : {
         titulo: k.titulo, subtitulo: NO_ANO.has(k.chave) ? "O que compõe o indicador no ano, até o fim do mês" : "O que compõe o indicador no mês", quantos: k.itens.length,
         conteudo: () => <ComposicaoDoKpi k={k} />,
-      } : undefined}
+      }) : undefined}
     >
       <p>{k.explicacao}</p>
       {k.meta && <p>Meta: {k.meta}</p>}

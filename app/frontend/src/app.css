@@ -1599,6 +1599,12 @@ td > .celula-fonte { display: block; }
   .modal { width: 100vw; height: 100dvh; max-height: none; border-radius: 0; }
 }
 
+/* Integralidade, a lista para consertar (15/10/2026): o campo em falta como etiqueta; o obrigatório leva "!" e cor. */
+.integralidade-filtros { display: flex; gap: var(--e2); flex-wrap: wrap; align-items: center; margin-bottom: var(--e2); }
+.integralidade-campo { display: inline-block; margin: 0 var(--e1) var(--e1) 0; padding: 1px var(--e2); border-radius: 999px;
+  font-size: 11px; background: var(--espera-suave); color: var(--espera); border: 1px solid var(--espera); }
+.integralidade-obrigatorio { background: var(--perda-suave); color: var(--perda); border-color: var(--perda); font-weight: 500; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

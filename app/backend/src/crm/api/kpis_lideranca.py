@@ -29,10 +29,11 @@ import calendar
 from collections.abc import Callable, Iterator
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import Literal
 from statistics import median
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
@@ -53,6 +54,11 @@ META_DE_UPSELL = Decimal("10")
 """% do MRR do mês anterior (decisão de Eduardo, 09/10/2026)."""
 
 
+class CampoEmFalta(BaseModel):
+    campo: str
+    obrigatorio: bool
+
+
 class Item(BaseModel):
     grupo: str
     detalhe: str
@@ -61,6 +67,11 @@ class Item(BaseModel):
     """Conta no numerador do KPI (10/10/2026). Fora: a base do churn, quem ficou sem reunião na cobertura."""
     secao: str | None = None
     """O bloco da composição em que o item aparece (13/10/2026): no churn, "saiu no ano" e "os demais da base"."""
+    corte: str | None = None
+    """Integralidade (15/10/2026): "Novos" ou "Passado"; com `cadastro`, `responsavel` e `faltam`, a tela filtra."""
+    cadastro: str | None = None
+    responsavel: str | None = None
+    faltam: list[CampoEmFalta] = []
 
 
 class Kpi(BaseModel):
@@ -426,44 +437,42 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
     )
 
     # ------------------------------------------------ integralidade do cadastro (situação de hoje)
+    # Dois cortes (decisão de Eduardo em 15/10/2026): **Novos** (criados desde o corte), a disciplina daqui para frente,
+    # em % pendente; e **Passado** (o herdado da planilha), em pendências que faltam, com as já consertadas desde o
+    # retrato guardado na publicação. A lista traz todos os registros com pendência, dos dois cortes.
     cadastro = integralidade.calcular(sessao)
-    novos_campos, pendentes = cadastro.novos, [c for c in cadastro.novos if not c.preenchido]
     corte = f"{integralidade.DATA_DE_CORTE:%d/%m/%Y}"
-    por_responsavel: dict[str, list] = {}
-    for c in novos_campos:
-        por_responsavel.setdefault(c.responsavel or "Sem responsável", []).append(c)
-    ordem = sorted(por_responsavel, key=lambda r: (r == "Sem responsável", -sum(not c.preenchido for c in por_responsavel[r]), r))
-    itens_do_cadastro = []
-    for r in ordem:
-        dele = por_responsavel[r]
-        faltam = [c for c in dele if not c.preenchido]
-        if not faltam:
-            continue
-        pct = integralidade.Resultado.pendente_pct(dele)
-        secao = f"{r} · {len(faltam)} pendência(s) · {str(pct).replace('.', ',')}% pendente"
-        itens_do_cadastro += [Item(grupo=f"{c.cadastro} · {c.registro}",
-                                   detalhe=f"{c.campo} · {'Obrigatório' if c.obrigatorio else 'Prioritário'}",
-                                   valor=ZERO, secao=secao) for c in sorted(faltam, key=lambda c: (not c.obrigatorio, c.cadastro))]
+    novos_pend = [c for c in cadastro.novos if not c.preenchido]
+    passado_pend = [c for c in cadastro.legado if not c.preenchido]
+    retrato = integralidade.ler_retrato(sessao)
+    consertadas = max(retrato.pendencias - len(passado_pend), 0) if retrato else None
     kpi_integralidade = Kpi(
         chave="integralidade", titulo="Integralidade do cadastro",
-        valor=integralidade.Resultado.pendente_pct(novos_campos), unidade="%",
-        resumo=f"Registros criados desde {corte} · situação de hoje",
-        falta=([] if novos_campos else [f"Nenhum registro criado desde {corte} ainda: o número começa com o primeiro"]),
-        meta="A definir",
-        extras={"pontos_devidos": sum(c.pontos for c in novos_campos),
-                "pontos_pendentes": sum(c.pontos for c in pendentes),
-                "obrigatorios_em_falta": sum(c.obrigatorio for c in pendentes),
-                "prioritarios_em_falta": sum(not c.obrigatorio for c in pendentes),
-                "legado_pct": integralidade.Resultado.pendente_pct(cadastro.legado),
-                **{f"pendente_{nome.lower()}": integralidade.Resultado.pendente_pct([c for c in novos_campos if c.cadastro == nome])
+        valor=integralidade.Resultado.pendente_pct(cadastro.novos), unidade="%",
+        resumo=f"Novos: criados desde {corte} · Passado: até a véspera · situação de hoje",
+        falta=([] if retrato else ["O retrato do Passado ainda não foi guardado: as consertadas aparecem depois do Redeploy"]),
+        meta="Novos: zero obrigatório em falta · Passado: diminuir",
+        extras={"novos_pendencias": len(novos_pend), "novos_obrigatorios": sum(c.obrigatorio for c in novos_pend),
+                "novos_pontos_devidos": sum(c.pontos for c in cadastro.novos),
+                "passado_pendencias": len(passado_pend), "passado_obrigatorios": sum(c.obrigatorio for c in passado_pend),
+                "passado_pct": integralidade.Resultado.pendente_pct(cadastro.legado),
+                "passado_retrato": retrato.pendencias if retrato else None,
+                "passado_retrato_em": retrato.em.isoformat() if retrato else None,
+                "passado_consertadas": consertadas, "corte": integralidade.DATA_DE_CORTE.isoformat(),
+                **{f"passado_{nome.lower()}": sum(1 for c in passado_pend if c.cadastro == nome)
                    for nome in integralidade.CADASTROS}},
-        itens=itens_do_cadastro,
+        itens=[Item(grupo=f"{r.cadastro} · {r.registro}",
+                    detalhe=", ".join(("! " if o else "") + c for c, o in r.faltam), valor=ZERO,
+                    secao=f"{r.corte} · {r.responsavel or 'Sem responsável'}", corte=r.corte, cadastro=r.cadastro,
+                    responsavel=r.responsavel or "Sem responsável",
+                    faltam=[CampoEmFalta(campo=c, obrigatorio=o) for c, o in r.faltam])
+               for r in integralidade.por_registro(cadastro.campos)],
         explicacao="Os campos que alimentam um indicador ou uma decisão, em oportunidade, contrato, encerramento, cliente, "
-                   "empresa e contato. Pendente = pontos dos campos devidos e vazios ÷ pontos de todos os devidos; "
-                   "obrigatório vale 2, prioritário vale 1. Campo condicional só conta quando se aplica (a data de "
-                   "envio depois de \"Enviar proposta\", o motivo na Perdida). Conta só o que foi criado desde "
-                   f"{corte}; o legado vem à parte. Quem responde: na oportunidade, o captador; no resto, o responsável "
-                   "de CS do grupo (ou o captador, enquanto o grupo não é cliente). Não muda com o mês escolhido.",
+                   "empresa e contato; obrigatório vale 2, prioritário vale 1, e campo condicional só conta quando se "
+                   f"aplica. Novos: registros criados desde {corte}, em % pendente (pontos vazios ÷ pontos devidos). "
+                   f"Passado: o que veio antes de {corte}, em pendências que faltam e as já consertadas desde o retrato "
+                   "da publicação. Quem responde: na oportunidade, o captador; no resto, o responsável de CS do grupo (ou "
+                   "o captador, enquanto o grupo não é cliente). Não muda com o mês escolhido.",
     )
 
     return KpisResposta(mes=mes, de=de, ate=ate,
@@ -484,5 +493,21 @@ def roteador_de_kpis(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter
         if u is not None and not u.administrador:
             raise HTTPException(403, "os KPIs da liderança são só do Administrador")
         return calcular(sessao, mes, hoje or date.today())
+
+    @r.get("/api/inteligencia/integralidade/planilha")
+    def planilha_da_integralidade(
+        corte: Literal["Novos", "Passado"] | None = None,
+        sessao: Session = Depends(obter_sessao, scope="function"),
+    ) -> Response:
+        """As pendências de cadastro em Excel, uma linha por campo (15/10/2026). Só o Administrador, como os KPIs."""
+        u = usuario_atual.get()
+        if u is not None and not u.administrador:
+            raise HTTPException(403, "os KPIs da liderança são só do Administrador")
+        registros = [r for r in integralidade.por_registro(integralidade.calcular(sessao).campos)
+                     if corte is None or r.corte == corte]
+        nome = f"pendencias-de-cadastro{'-' + corte.lower() if corte else ''}-{date.today():%Y%m%d}.xlsx"
+        return Response(integralidade.planilha(registros),
+                        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": f'attachment; filename="{nome}"'})
 
     return r

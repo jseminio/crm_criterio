@@ -16,6 +16,29 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Mesclar o questionário com uma oportunidade aberta (15/10/2026)
+
+Amostra aprovada por Eduardo em 15/10/2026. O caso clássico (a Mainô): o card nasce do lead, sem CNPJ, e o
+questionário chega depois; o CRM não reconhecia o grupo e criava grupo, empresa e oportunidade de novo.
+
+- **"Mesclar com existente"** em todo questionário (Questionários, Agenda e Funil), inclusive nos já importados, no
+  lugar do antigo "Anexar à existente". O painel traz as **sugestões do CRM** com o motivo (mesmo CNPJ, mesmo e-mail ou
+  celular do contato, lead convertido, nome parecido) e uma busca livre entre as oportunidades abertas.
+- **Prévia:** o questionário só **preenche o vazio**; onde difere, fica o do card, salvo volumetria e notas que a
+  pessoa marcar para usar o do questionário. Preço, captador, temperatura, serviço e datas nunca mudam.
+- **Grupos:** CNPJ que não existe é cadastrado no grupo do card; o grupo criado pelo próprio questionário é
+  **fundido** no do card (desfazível em Grupos › Fusões feitas); CNPJ de outro grupo que já existia é recusado
+  (funda os grupos antes).
+- **Duplicada:** a oportunidade que o questionário criou pode sair no mesmo passo, com o motivo no histórico; vem
+  marcada só quando ninguém mexeu nela. Clicar em "Mesclar" é a confirmação.
+- **Regra D, na importação:** antes de criar, o CRM procura oportunidade aberta do **mesmo contato** (e-mail ou
+  celular de quem respondeu, pessoa cadastrada ou lead convertido). Achou: não cria nada e põe em "Precisa de você".
+  Card já ligado a outro CNPJ não conta (a mesma pessoa respondendo por outra empresa). "Criar nova" cria o
+  cliente que a regra segurou.
+- **Depois (B, aprovado para quando o questionário for para o domínio da Critério):** o link leva o código do card.
+- `crm.questionario.mescla`; rotas `GET /api/questionarios/{id}/sugestoes`, `GET .../mescla?oportunidade_id=` e
+  `POST .../mesclar`; `componentes/MesclarQuestionario.tsx`.
+
 ## Propostas em aberto · visão gerencial (14/10/2026)
 
 Amostra aprovada por Eduardo em 14/10/2026, para a war room com o Bruno. Em Funil comercial › Inteligência de

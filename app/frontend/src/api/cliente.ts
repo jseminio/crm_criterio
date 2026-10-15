@@ -109,6 +109,8 @@ import type {
   Integracoes,
   KpisDaLideranca,
   QuadroDePropostas,
+  PreviaDaMescla,
+  SugestaoDeMescla,
   ResultadoDoTeste,
   EstadoDaBusca,
   FunilDoSucesso,
@@ -598,6 +600,11 @@ export const api = {
   respostasDoQuestionario: (id: number) => pedir<SecaoDeRespostas[]>(`/api/questionarios/${id}/respostas`),
   resolverQuestionario: (id: number, acao: "anexar" | "criar") =>
     pedir<QuestionarioResumo>(`/api/questionarios/${id}/resolver`, { method: "POST", body: JSON.stringify({ acao }) }),
+  sugestoesDeMescla: (id: number) => pedir<SugestaoDeMescla[]>(`/api/questionarios/${id}/sugestoes`),
+  previaDaMescla: (id: number, oportunidadeId: number) =>
+    pedir<PreviaDaMescla>(comParametros(`/api/questionarios/${id}/mescla`, { oportunidade_id: oportunidadeId })),
+  mesclarQuestionario: (id: number, corpo: { oportunidade_id: number; usar_do_questionario: string[]; excluir_duplicada: boolean }) =>
+    pedir<QuestionarioResumo>(`/api/questionarios/${id}/mesclar`, { method: "POST", body: JSON.stringify(corpo) }),
 
   ficha: (oportunidadeId: number) => pedir<Ficha>(`/api/oportunidades/${oportunidadeId}/ficha`),
   corrigirFicha: (oportunidadeId: number, chave: string, valor: string | string[] | null, por: string) =>

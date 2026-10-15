@@ -21,7 +21,7 @@ from crm.db.base import agora
 from crm.db.modelos import GrupoEconomico, Oportunidade, Proposta, QuestionarioRecebido
 from crm.domain.listas import Situacao, SituacaoDoQuestionario
 from crm.proposta import ficha as regras_da_ficha
-from crm.questionario import importacao
+from crm.questionario import importacao, mescla
 from crm.questionario.endereco import BuscaDeEndereco
 from crm.questionario.fonte import (
     BuscaFalhou, FonteDaFuncao, FonteDeQuestionarios, FonteSupabase, e_funcao, ler_configuracao,
@@ -68,6 +68,48 @@ class ResultadoDaBusca(BaseModel):
 
 class Resolucao(BaseModel):
     acao: Literal["anexar", "criar"]
+
+
+class SugestaoDeMescla(BaseModel):
+    """Uma oportunidade aberta que provavelmente é a deste questionário, com o motivo (15/10/2026)."""
+
+    oportunidade_id: int
+    nome: str
+    grupo_nome: str | None
+    situacao: str
+    servico: str | None
+    captador: str | None
+    data_colocacao: date | None
+    motivo: str
+
+
+class CampoDaMescla(BaseModel):
+    campo: str
+    rotulo: str
+    no_card: str | None
+    no_questionario: str
+    acao: Literal["preenche", "igual", "diferente", "fica"]
+
+
+class PreviaDaMescla(BaseModel):
+    oportunidade_id: int
+    oportunidade_nome: str
+    recusa: str | None
+    campos: list[CampoDaMescla]
+    fusao_de: str | None
+    """Grupo criado pelo questionário que será fundido no do card."""
+    fusao_em: str | None
+    cnpj_novo_no_grupo: str | None
+    duplicada_id: int | None
+    duplicada_nome: str | None
+    duplicada_intocada: bool
+    duplicada_recusa: str | None
+
+
+class PedidoDeMescla(BaseModel):
+    oportunidade_id: int
+    usar_do_questionario: list[str] = []
+    excluir_duplicada: bool = False
 
 
 class FatorDoQuestionario(BaseModel):
@@ -411,8 +453,56 @@ def roteador_de_questionarios(
             if corpo.acao == "anexar":
                 importacao.anexar(sessao, q)
             else:
-                importacao.criar_nova(sessao, q)
+                importacao.criar_nova(sessao, q, buscar_endereco)
         except ValueError as falha:
+            raise HTTPException(409, str(falha)) from falha
+        sessao.commit()
+        return _resumo(sessao, q)
+
+    @r.get("/api/questionarios/{questionario_id}/sugestoes", response_model=list[SugestaoDeMescla])
+    def sugestoes(questionario_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> list[SugestaoDeMescla]:
+        """As oportunidades abertas que provavelmente são a deste questionário (mesmo CNPJ, mesmo contato, lead
+        convertido, nome parecido), da mais forte para a mais fraca."""
+        q = _questionario(sessao, questionario_id)
+        nomes = dict(sessao.execute(sa.select(GrupoEconomico.id, GrupoEconomico.nome)).all())
+        return [SugestaoDeMescla(oportunidade_id=s.oportunidade.id, nome=s.oportunidade.nome,
+                                 grupo_nome=nomes.get(s.oportunidade.grupo_id), situacao=s.oportunidade.situacao.value,
+                                 servico=s.oportunidade.servico, captador=s.oportunidade.captador,
+                                 data_colocacao=s.oportunidade.data_colocacao, motivo=s.motivo)
+                for s in mescla.sugestoes(sessao, q)]
+
+    def _oportunidade(sessao: Session, oportunidade_id: int) -> Oportunidade:
+        op = sessao.get(Oportunidade, oportunidade_id)
+        if op is None:
+            raise HTTPException(404, "oportunidade não encontrada")
+        return op
+
+    @r.get("/api/questionarios/{questionario_id}/mescla", response_model=PreviaDaMescla)
+    def previa_da_mescla(questionario_id: int, oportunidade_id: int,
+                         sessao: Session = Depends(obter_sessao, scope="function")) -> PreviaDaMescla:
+        """O que a mescla vai fazer, antes de fazer: campos, fusão de grupos e a oportunidade duplicada."""
+        q, op = _questionario(sessao, questionario_id), _oportunidade(sessao, oportunidade_id)
+        p = mescla.previa(sessao, q, op)
+        return PreviaDaMescla(
+            oportunidade_id=op.id, oportunidade_nome=op.nome, recusa=p.recusa,
+            campos=[CampoDaMescla(campo=c.campo, rotulo=c.rotulo, no_card=c.no_card, no_questionario=c.no_questionario,
+                                  acao=c.acao) for c in p.campos],
+            fusao_de=p.fusao[0] if p.fusao else None, fusao_em=p.fusao[1] if p.fusao else None,
+            cnpj_novo_no_grupo=p.cnpj_novo_no_grupo,
+            duplicada_id=p.duplicada.id if p.duplicada else None, duplicada_nome=p.duplicada.nome if p.duplicada else None,
+            duplicada_intocada=p.duplicada_intocada, duplicada_recusa=p.duplicada_recusa,
+        )
+
+    @r.post("/api/questionarios/{questionario_id}/mesclar", response_model=QuestionarioResumo)
+    def mesclar(questionario_id: int, corpo: PedidoDeMescla,
+                sessao: Session = Depends(obter_sessao, scope="function")) -> QuestionarioResumo:
+        """Leva o questionário para uma oportunidade aberta (amostra aprovada por Eduardo em 15/10/2026)."""
+        q, op = _questionario(sessao, questionario_id), _oportunidade(sessao, corpo.oportunidade_id)
+        try:
+            mescla.mesclar(sessao, q, op, usar_do_questionario=set(corpo.usar_do_questionario),
+                           excluir_duplicada=corpo.excluir_duplicada, buscar_endereco=buscar_endereco)
+        except ValueError as falha:
+            sessao.rollback()
             raise HTTPException(409, str(falha)) from falha
         sessao.commit()
         return _resumo(sessao, q)

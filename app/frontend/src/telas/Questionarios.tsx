@@ -8,6 +8,7 @@ import type { LinhaDoPainel, Listas, PainelDeQuestionarios, SecaoDeRespostas, Si
 import { EstadoDaBuscaDeQuestionarios } from "../componentes/EstadoDaBuscaDeQuestionarios";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
+import { BotaoMesclar } from "../componentes/MesclarQuestionario";
 import { usarAcesso } from "../entrada";
 import { cnpj, data, dataHora } from "../formato";
 import { usarDados } from "../usarDados";
@@ -104,7 +105,7 @@ function Respostas({ id, nome }: { id: number; nome: string }) {
 function Acoes({ l, aoAbrir, aoResolver }: { l: LinhaDoPainel; aoAbrir: (id: number) => void; aoResolver: () => void }) {
   const { pode } = usarAcesso();
   const [erro, definirErro] = useState<string | null>(null);
-  const resolver = (acao: "anexar" | "criar") =>
+  const resolver = (acao: "criar") =>
     api.resolverQuestionario(l.id, acao).then(aoResolver).catch((f) => definirErro(f instanceof ErroDaApi ? f.message : "Falha ao resolver."));
   const pdf = l.tem_pdf && <LinkDeArquivo className="link-de-tabela" href={`/api/questionarios/${l.id}/pdf`} novaAba>PDF</LinkDeArquivo>;
   if (l.situacao_do_painel === "precisa_de_voce") {
@@ -112,7 +113,7 @@ function Acoes({ l, aoAbrir, aoResolver }: { l: LinhaDoPainel; aoAbrir: (id: num
       <span className="questionario-acoes">
         {pode("funil.questionarios") ? (
           <>
-            <button type="button" className="link-de-tabela" onClick={(e) => { e.stopPropagation(); void resolver("anexar"); }}>Anexar à existente</button>
+            <BotaoMesclar q={l} aoMesclar={aoResolver} />
             {" · "}
             <button type="button" className="link-de-tabela" onClick={(e) => { e.stopPropagation(); void resolver("criar"); }}>Criar nova</button>
           </>
@@ -131,7 +132,8 @@ function Acoes({ l, aoAbrir, aoResolver }: { l: LinhaDoPainel; aoAbrir: (id: num
           Abrir oportunidade
         </button>
       )}
-      {pdf && <>{l.oportunidade_id !== null && pode("funil.ver") ? " · " : ""}{pdf}</>}
+      {pode("funil.questionarios") && <>{l.oportunidade_id !== null && pode("funil.ver") ? " · " : ""}<BotaoMesclar q={l} aoMesclar={aoResolver} /></>}
+      {pdf && <> · {pdf}</>}
     </span>
   );
 }

@@ -67,7 +67,7 @@ describe("Questionários", () => {
     expect(alfa).toHaveTextContent("régua do CRM · o site dizia Médio");
     expect(within(tabela).getByText("Beta Engenharia").closest("tr")!).toHaveTextContent("↗ proposta enviada · 157.2026");
     const delta = within(tabela).getByText("Delta Serviços").closest("tr")!;
-    expect(within(delta).getByRole("button", { name: "Anexar à existente" })).toBeInTheDocument();
+    expect(within(delta).getByRole("button", { name: "Mesclar com existente" })).toBeInTheDocument();
   });
 
   it("clicar na linha abre as respostas por seção", async () => {

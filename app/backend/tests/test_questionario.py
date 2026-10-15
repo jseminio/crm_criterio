@@ -283,7 +283,7 @@ class TestBuscar:
         sessao.add(GrupoEconomico(nome="exemplo alfa", situacao=SituacaoGrupo.PROSPECT))
         sessao.commit()
         q = _buscar(cliente)["novos"][0]
-        assert q["cliente_novo"] is True and "Fundir grupos" in q["o_que_fez"]
+        assert q["cliente_novo"] is True and "mescle o questionário com a oportunidade dele" in q["o_que_fez"]
 
     def test_linha_invalida_fica_de_fora_e_nao_e_marcada(self, cliente, sessao, fonte):
         fonte.linhas = [linha("q-ruim", cnpj="123"), linha("q-2")]
@@ -333,7 +333,7 @@ class TestPrecisaDeVoce:
         assert o.documentos_fiscais_mes == 500 and o.origem_da_volumetria["documentos_fiscais_mes"] == "Entrevista"
         assert o.lancamentos_contabeis_mes == 250 and o.origem_da_volumetria["lancamentos_contabeis_mes"] == "Questionário"
         assert o.complexidade == 2
-        assert "preencheu 7 campo(s) vazio(s)" in r.json()["o_que_fez"]  # 5 volumes + complexidade + risco
+        assert 'Mesclado em "' in r.json()["o_que_fez"]
         assert cliente.post(f"/api/questionarios/{q['id']}/resolver", json={"acao": "criar"}).status_code == 409
 
     def test_criar_nova_ao_lado(self, cliente, sessao, em_aberto):

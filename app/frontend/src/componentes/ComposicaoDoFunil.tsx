@@ -6,6 +6,7 @@ import type { DimensaoDeRecorte, IndicadorDoFunil, ItemDaComposicao } from "../a
 import { data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
+import { TabelaDeComposicao, type ColunaDaComposicao } from "./TabelaDeComposicao";
 
 const DIRECIONADOR: Record<string, string> = {
   documentos_fiscais_mes: "documentos fiscais", lancamentos_contabeis_mes: "lançamentos", pagamentos_mes: "pagamentos",
@@ -14,34 +15,39 @@ const DIRECIONADOR: Record<string, string> = {
   tomadores_de_servico: "tomadores de serviço",
 };
 
-type Coluna = { titulo: string; numerica?: boolean; valor: (i: ItemDaComposicao) => string };
+type Coluna = ColunaDaComposicao<ItemDaComposicao>;
+type I = ItemDaComposicao;
 
+const num = (v: string | null) => (v === null ? null : Number(v));
 const OPORTUNIDADE: Coluna = { titulo: "Oportunidade", valor: (i) => i.nome };
 const CLIENTE: Coluna = { titulo: "Cliente", valor: (i) => i.grupo };
-const SERVICO: Coluna = { titulo: "Serviço", valor: (i) => i.servico ?? "—" };
+const SERVICO: Coluna = { titulo: "Serviço", valor: (i) => i.servico };
 const SITUACAO: Coluna = { titulo: "Situação", valor: (i) => i.situacao };
-const MENSAL: Coluna = { titulo: "Mensal", numerica: true, valor: (i) => (i.valor !== null ? dinheiro(i.valor) : "—") };
-const ANUAL: Coluna = { titulo: "Anual", numerica: true, valor: (i) => (i.anual !== null ? dinheiro(i.anual) : "—") };
+const MENSAL: Coluna = { titulo: "Mensal", numerico: true, valor: (i) => num(i.valor), mostrar: (i) => (i.valor !== null ? dinheiro(i.valor) : "—") };
+const ANUAL: Coluna = { titulo: "Anual", numerico: true, valor: (i) => num(i.anual), mostrar: (i) => (i.anual !== null ? dinheiro(i.anual) : "—") };
+const DATA = (titulo: string, f: (i: I) => string | null | undefined): Coluna => ({ titulo, valor: f, mostrar: (i) => data(f(i)) });
+const DIAS: Coluna = { titulo: "Dias", numerico: true, valor: (i) => num(i.valor), mostrar: (i) => (i.valor !== null ? String(Number(i.valor)) : "—") };
 
 const COLUNAS: Record<IndicadorDoFunil, Coluna[]> = {
   em_aberto: [OPORTUNIDADE, CLIENTE, SERVICO, SITUACAO, MENSAL, ANUAL],
-  aceitas: [OPORTUNIDADE, CLIENTE, SERVICO, { titulo: "Aceite", valor: (i) => data(i.data_aceite) }, MENSAL, ANUAL],
+  aceitas: [OPORTUNIDADE, CLIENTE, SERVICO, DATA("Aceite", (i) => i.data_aceite), MENSAL, ANUAL],
   propostas: [OPORTUNIDADE, CLIENTE, SERVICO, SITUACAO, MENSAL, ANUAL],
   taxa_de_conversao: [OPORTUNIDADE, CLIENTE, SERVICO, { titulo: "Desfecho", valor: (i) => i.parte }, MENSAL],
-  ticket_recorrente: [OPORTUNIDADE, CLIENTE, SERVICO, { titulo: "MRR (× 13 ÷ 12)", numerica: true, valor: (i) => dinheiro(i.valor) }],
-  ciclo_medio: [OPORTUNIDADE, CLIENTE, { titulo: "Originação", valor: (i) => data(i.data_colocacao) },
-    { titulo: "Envio", valor: (i) => data(i.data_envio_proposta) },
-    { titulo: "Aceite", valor: (i) => data(i.data_aceite) },
-    { titulo: "Dias", numerica: true, valor: (i) => (i.valor !== null ? String(Number(i.valor)) : i.parte) }],
-  cobertura_proxima_acao: [OPORTUNIDADE, CLIENTE, SITUACAO, { titulo: "Próxima ação", valor: (i) => i.proxima_acao || "— sem próxima ação" }],
+  ticket_recorrente: [OPORTUNIDADE, CLIENTE, SERVICO,
+    { titulo: "MRR (× 13 ÷ 12)", numerico: true, valor: (i) => num(i.valor), mostrar: (i) => dinheiro(i.valor) }],
+  ciclo_medio: [OPORTUNIDADE, CLIENTE, DATA("Originação", (i) => i.data_colocacao), DATA("Envio", (i) => i.data_envio_proposta),
+    DATA("Aceite", (i) => i.data_aceite),
+    { ...DIAS, mostrar: (i) => (i.valor !== null ? String(Number(i.valor)) : i.parte) }],
+  cobertura_proxima_acao: [OPORTUNIDADE, CLIENTE, SITUACAO,
+    { titulo: "Próxima ação", valor: (i) => i.proxima_acao || null, mostrar: (i) => i.proxima_acao || "— sem próxima ação" }],
   cobertura_volumetria: [OPORTUNIDADE, CLIENTE, SITUACAO, {
     titulo: "Volumetria", valor: (i) => (i.falta.length === 0 ? "completa" : `falta: ${i.falta.map((f) => DIRECIONADOR[f] ?? f).join(", ")}`),
   }],
-  dependencia_de_canal: [OPORTUNIDADE, CLIENTE, { titulo: "Canal", valor: (i) => i.parte }, { titulo: "Captador", valor: (i) => i.captador ?? "—" }],
+  dependencia_de_canal: [OPORTUNIDADE, CLIENTE, { titulo: "Canal", valor: (i) => i.parte }, { titulo: "Captador", valor: (i) => i.captador }],
   motivos_de_perda: [OPORTUNIDADE, CLIENTE, SERVICO, { titulo: "Motivo da perda", valor: (i) => i.parte }, MENSAL],
-  prazo_ate_o_envio: [OPORTUNIDADE, CLIENTE, { titulo: "Originação", valor: (i) => data(i.data_colocacao) },
-    { titulo: "Envio", valor: (i) => (i.data_envio_proposta ? data(i.data_envio_proposta) : i.parte) },
-    { titulo: "Dias", numerica: true, valor: (i) => (i.valor !== null ? String(Number(i.valor)) : "—") }],
+  prazo_ate_o_envio: [OPORTUNIDADE, CLIENTE, DATA("Originação", (i) => i.data_colocacao),
+    { titulo: "Envio", valor: (i) => i.data_envio_proposta ?? i.parte, mostrar: (i) => (i.data_envio_proposta ? data(i.data_envio_proposta) : i.parte) },
+    DIAS],
 };
 
 /** O que o resumo do topo diz, para conferir com o card. */
@@ -93,18 +99,8 @@ export function ComposicaoDoFunil({ indicador, filtros, recorte }: {
     <>
       <p className="composicao-linha-resumo"><strong>{resumo(indicador, itens)}</strong></p>
       <p className="numero-nota">Com os mesmos filtros da tela.</p>
-      <table className="tabela" aria-label="Composição do indicador">
-        <thead>
-          <tr>{colunas.map((c) => <th key={c.titulo} className={c.numerica ? "tabela-numero" : undefined}>{c.titulo}</th>)}</tr>
-        </thead>
-        <tbody>
-          {itens.map((i) => (
-            <tr key={i.id} className={i.entra ? undefined : "composicao-fora"}>
-              {colunas.map((c) => <td key={c.titulo} className={c.numerica ? "tabela-numero" : undefined}>{c.valor(i)}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <TabelaDeComposicao rotulo="Composição do indicador" linhas={itens} colunas={colunas} chave={(i) => i.id}
+        classeDaLinha={(i) => (i.entra ? undefined : "composicao-fora")} />
     </>
   );
 }

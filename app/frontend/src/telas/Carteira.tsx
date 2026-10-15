@@ -15,6 +15,7 @@ import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Recolhivel } from "../componentes/Recolhivel";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { cnpj, data, defasagem, dinheiro, fracaoEmPercentual } from "../formato";
+import { TabelaDeComposicao } from "../componentes/TabelaDeComposicao";
 import { usarDados } from "../usarDados";
 import { RevisaoMensal } from "./RevisaoMensal";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
@@ -29,23 +30,22 @@ function GruposDaConta({ itens, fora = [], peso = false, extra }: {
 }) {
   const total = itens.reduce((t, i) => t + Number(i.receita_mensal), 0);
   const ordenados = [...itens].sort((a, b) => Number(b.receita_mensal) - Number(a.receita_mensal));
+  const pct = (i: ItemDaCarteira) => (total ? (Number(i.receita_mensal) / total) * 100 : null);
   const tabela = (lista: ItemDaCarteira[], rotulo: string, comTotal: boolean) => (
-    <table className="tabela" aria-label={rotulo}>
-      <thead><tr><th>Grupo</th><th>Classe</th><th>Semáforo</th>{extra && <th>{extra.titulo}</th>}
-        <th className="tabela-numero">Receita mensal</th>{peso && <th className="tabela-numero">Peso</th>}</tr></thead>
-      <tbody>
-        {lista.map((i) => (
-          <tr key={i.grupo_id}><td>{i.grupo_nome}</td><td>{i.classe_efetiva}</td><td>{i.semaforo}</td>
-            {extra && <td>{extra.valor(i)}</td>}
-            <td className="tabela-numero">{dinheiro(i.receita_mensal)}</td>
-            {peso && <td className="tabela-numero">{total ? `${um1(String((Number(i.receita_mensal) / total) * 100))}%` : "—"}</td>}</tr>
-        ))}
-        {comTotal && (
-          <tr className="composicao-total"><td>Total · {lista.length} grupo{lista.length === 1 ? "" : "s"}</td><td /><td />{extra && <td />}
-            <td className="tabela-numero">{dinheiro(total)}</td>{peso && <td className="tabela-numero">100%</td>}</tr>
-        )}
-      </tbody>
-    </table>
+    <TabelaDeComposicao rotulo={rotulo} linhas={lista} chave={(i) => i.grupo_id}
+      colunas={[
+        { titulo: "Grupo", valor: (i) => i.grupo_nome },
+        { titulo: "Classe", valor: (i) => i.classe_efetiva },
+        { titulo: "Semáforo", valor: (i) => i.semaforo },
+        ...(extra ? [{ titulo: extra.titulo, valor: (i: ItemDaCarteira) => extra.valor(i) }] : []),
+        { titulo: "Receita mensal", valor: (i) => Number(i.receita_mensal), mostrar: (i) => dinheiro(i.receita_mensal), numerico: true },
+        ...(peso ? [{ titulo: "Peso", valor: pct, numerico: true,
+          mostrar: (i: ItemDaCarteira) => { const p = pct(i); return p === null ? "—" : `${um1(String(p))}%`; } }] : []),
+      ]}
+      rodape={comTotal && (
+        <tr className="composicao-total"><td>Total · {lista.length} grupo{lista.length === 1 ? "" : "s"}</td><td /><td />{extra && <td />}
+          <td className="tabela-numero">{dinheiro(total)}</td>{peso && <td className="tabela-numero">100%</td>}</tr>
+      )} />
   );
   return (
     <>

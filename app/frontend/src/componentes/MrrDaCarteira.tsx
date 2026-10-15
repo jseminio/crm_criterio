@@ -11,6 +11,7 @@ import type { GrupoDaCarteira, MrrDaCarteira as Carteira, SituacaoDoRecebido } f
 import { data, dataHora, dinheiro, dinheiroCurto } from "../formato";
 import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
+import { TabelaDeComposicao } from "./TabelaDeComposicao";
 import { Indicador } from "./Indicador";
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -151,19 +152,17 @@ export function ComposicaoDaCarteira({ inicial }: { inicial?: Carteira }) {
               ficam fora da comparação.
             </p>
           )}
-          <table className="tabela" aria-label="Composição do MRR da carteira">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th className="tabela-numero">Contratos</th>
-                <th className="tabela-numero">MRR contratado</th>
-                <th className="tabela-numero">Esperado</th>
-                <th className="tabela-numero">Recebido</th>
-                <th>Situação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dados.itens.map((g) => <LinhaDoGrupo key={g.grupo_id} g={g} aberto={abertos.has(g.grupo_id)} aoAlternar={alternar} importado={dados.mes_importado} />)}
+          <TabelaDeComposicao rotulo="Composição do MRR da carteira" linhas={dados.itens} chave={(g) => g.grupo_id}
+            colunas={[
+              { titulo: "Cliente", valor: (g) => g.grupo },
+              { titulo: "Contratos", valor: (g) => g.contratos, numerico: true },
+              { titulo: "MRR contratado", valor: (g) => Number(g.mrr), numerico: true },
+              { titulo: "Esperado", valor: (g) => Number(g.esperado) || null, numerico: true },
+              { titulo: "Recebido", valor: (g) => (dados.mes_importado || Number(g.recebido) > 0 ? Number(g.recebido) : null), numerico: true },
+              { titulo: "Situação", valor: (g) => g.situacao },
+            ]}
+            linha={(g) => <LinhaDoGrupo g={g} aberto={abertos.has(g.grupo_id)} aoAlternar={alternar} importado={dados.mes_importado} />}
+            rodape={
               <tr className="composicao-total">
                 <td>Total</td>
                 <td className="tabela-numero">{dados.contratos}</td>
@@ -172,8 +171,7 @@ export function ComposicaoDaCarteira({ inicial }: { inicial?: Carteira }) {
                 <td className="tabela-numero">{dados.mes_importado ? dinheiro(dados.recebido) : "—"}</td>
                 <td />
               </tr>
-            </tbody>
-          </table>
+            } />
         </>
       )}
     </>

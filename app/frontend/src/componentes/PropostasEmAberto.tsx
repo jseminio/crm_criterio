@@ -9,6 +9,7 @@ import { data, dinheiro, percentual } from "../formato";
 import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
 import { BotaoDeComposicao, Explicavel, Indicador } from "./Indicador";
+import { TabelaDeComposicao } from "./TabelaDeComposicao";
 
 const COLUNAS: { chave: keyof LinhaDoQuadroDePropostas; rotulo: string; classe?: string }[] = [
   { chave: "anual", rotulo: "Valor anual" },
@@ -49,31 +50,20 @@ function ListaDePropostas({ propostas, comOnHold = false }: { propostas: Propost
   if (propostas.length === 0) return <p className="numero-estado">Nenhuma proposta.</p>;
   const total = propostas.reduce((t, p) => t + Number(p.mensalizado), 0);
   return (
-    <table className="tabela" aria-label="Propostas">
-      <thead>
-        <tr>
-          <th>Grupo</th><th>Proposta</th><th>Temperatura</th>
-          {comOnHold && <th>Em On hold desde</th>}
-          <th className="tabela-numero">Mensalizado</th>
-        </tr>
-      </thead>
-      <tbody>
-        {propostas.map((p) => (
-          <tr key={p.id}>
-            <td>{p.grupo}</td>
-            <td>{p.servico ?? p.nome}{p.captador ? ` · ${p.captador}` : ""}</td>
-            <td>{p.temperatura ?? "sem class."}</td>
-            {comOnHold && (
-              <td>{data(p.em_on_hold_desde)}{p.dias_em_on_hold !== null && ` · ${p.dias_em_on_hold} dias`}
-                {p.on_hold_pela_originacao && <span className="numero-nota"> (pela originação)</span>}</td>
-            )}
-            <td className="tabela-numero">{dinheiro(p.mensalizado)}</td>
-          </tr>
-        ))}
-        <tr className="composicao-total"><td>Total</td><td /><td />{comOnHold && <td />}
-          <td className="tabela-numero">{dinheiro(total)}</td></tr>
-      </tbody>
-    </table>
+    <TabelaDeComposicao rotulo="Propostas" linhas={propostas} chave={(p) => p.id}
+      colunas={[
+        { titulo: "Grupo", valor: (p) => p.grupo },
+        { titulo: "Proposta", valor: (p) => `${p.servico ?? p.nome}${p.captador ? ` · ${p.captador}` : ""}` },
+        { titulo: "Temperatura", valor: (p) => p.temperatura, mostrar: (p) => p.temperatura ?? "sem class." },
+        ...(comOnHold ? [{
+          titulo: "Em On hold desde", valor: (p: PropostaAberta) => p.em_on_hold_desde,
+          mostrar: (p: PropostaAberta) => (<>{data(p.em_on_hold_desde)}{p.dias_em_on_hold !== null && ` · ${p.dias_em_on_hold} dias`}
+            {p.on_hold_pela_originacao && <span className="numero-nota"> (pela originação)</span>}</>),
+        }] : []),
+        { titulo: "Mensalizado", valor: (p) => Number(p.mensalizado), mostrar: (p) => dinheiro(p.mensalizado), numerico: true },
+      ]}
+      rodape={<tr className="composicao-total"><td>Total</td><td /><td />{comOnHold && <td />}
+        <td className="tabela-numero">{dinheiro(total)}</td></tr>} />
   );
 }
 

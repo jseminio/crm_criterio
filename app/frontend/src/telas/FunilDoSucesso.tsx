@@ -15,6 +15,7 @@ import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { usarAcesso } from "../entrada";
 import { data, dinheiro, dinheiroCurto } from "../formato";
+import { TabelaDeComposicao } from "../componentes/TabelaDeComposicao";
 import { usarDados } from "../usarDados";
 import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
 import { PainelDaCarteira } from "./PainelDaCarteira";
@@ -294,21 +295,19 @@ function GruposDaClasse({ grupos }: { grupos: Grupo[] }) {
   const n = numerosDe(grupos);
   const ordenados = [...grupos].sort((a, b) => Number(b.mrr_bruto) - Number(a.mrr_bruto));
   return (
-    <table className="tabela" aria-label="Grupos da classe">
-      <thead><tr><th>Cliente</th><th>Etapa</th><th>Reunião</th><th className="tabela-numero">MRR bruto</th>
-        <th className="tabela-numero">Ajustes pendentes</th><th className="tabela-numero">Vendas abertas</th></tr></thead>
-      <tbody>
-        {ordenados.map((g) => (
-          <tr key={g.grupo_id}><td>{g.nome}</td><td>{g.etapa}</td><td>{g.situacao ? SITUACAO_DA_REUNIAO[g.situacao] : "—"}</td>
-            <td className="tabela-numero">{dinheiro(g.mrr_bruto)}</td>
-            <td className="tabela-numero">{g.ajustes_pendentes}{g.ajustes_atrasados ? ` (⚠ ${g.ajustes_atrasados})` : ""}</td>
-            <td className="tabela-numero">{g.vendas_abertas}</td></tr>
-        ))}
-        <tr className="composicao-total"><td>Total · {n.clientes}</td><td /><td>{emDia(n)} em dia</td>
-          <td className="tabela-numero">{dinheiro(n.mrr)}</td><td className="tabela-numero">{n.ajustes}</td>
-          <td className="tabela-numero">{n.vendas}</td></tr>
-      </tbody>
-    </table>
+    <TabelaDeComposicao rotulo="Grupos da classe" linhas={ordenados} chave={(g) => g.grupo_id}
+      colunas={[
+        { titulo: "Cliente", valor: (g) => g.nome },
+        { titulo: "Etapa", valor: (g) => g.etapa },
+        { titulo: "Reunião", valor: (g) => (g.situacao ? SITUACAO_DA_REUNIAO[g.situacao] : null) },
+        { titulo: "MRR bruto", valor: (g) => Number(g.mrr_bruto), mostrar: (g) => dinheiro(g.mrr_bruto), numerico: true },
+        { titulo: "Ajustes pendentes", valor: (g) => g.ajustes_pendentes, numerico: true,
+          mostrar: (g) => `${g.ajustes_pendentes}${g.ajustes_atrasados ? ` (⚠ ${g.ajustes_atrasados})` : ""}` },
+        { titulo: "Vendas abertas", valor: (g) => g.vendas_abertas, numerico: true },
+      ]}
+      rodape={<tr className="composicao-total"><td>Total · {n.clientes}</td><td /><td>{emDia(n)} em dia</td>
+        <td className="tabela-numero">{dinheiro(n.mrr)}</td><td className="tabela-numero">{n.ajustes}</td>
+        <td className="tabela-numero">{n.vendas}</td></tr>} />
   );
 }
 

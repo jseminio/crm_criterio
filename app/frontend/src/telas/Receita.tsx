@@ -16,6 +16,7 @@ import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
 import { ComposicaoDaCarteira } from "../componentes/MrrDaCarteira";
 import { Carregando, Erro } from "../componentes/estados";
 import { aliquota, data, dinheiro, percentual } from "../formato";
+import { TabelaDeComposicao } from "../componentes/TabelaDeComposicao";
 import { usarDados } from "../usarDados";
 
 type Periodo = "mes" | "trimestre" | "ano";
@@ -52,20 +53,14 @@ function ItensDaLinha({ de, categoria }: { de: string; categoria: CategoriaDoMov
   if (itens.length === 0) return <p className="numero-estado">Nada nesta linha no período.</p>;
   const total = itens.reduce((t, i) => t + Number(i.valor), 0);
   return (
-    <table className="tabela" aria-label={ROTULO_DA_CATEGORIA[categoria]}>
-      <thead><tr><th>Cliente</th><th>Contrato</th><th>Data</th><th className="tabela-numero">MRR</th></tr></thead>
-      <tbody>
-        {itens.map((i, n) => (
-          <tr key={n}>
-            <td>{i.grupo}</td>
-            <td>{i.escopo ?? `Contrato ${i.contrato_id}`}</td>
-            <td>{i.data ? data(i.data) : "—"}</td>
-            <td className="tabela-numero">{dinheiro(i.valor)}</td>
-          </tr>
-        ))}
-        <tr className="composicao-total"><td>Total</td><td /><td /><td className="tabela-numero">{dinheiro(total)}</td></tr>
-      </tbody>
-    </table>
+    <TabelaDeComposicao rotulo={ROTULO_DA_CATEGORIA[categoria]} linhas={itens} chave={(i, n) => `${i.contrato_id}-${n}`}
+      colunas={[
+        { titulo: "Cliente", valor: (i) => i.grupo },
+        { titulo: "Contrato", valor: (i) => i.escopo ?? `Contrato ${i.contrato_id}` },
+        { titulo: "Data", valor: (i) => i.data, mostrar: (i) => (i.data ? data(i.data) : "—") },
+        { titulo: "MRR", valor: (i) => Number(i.valor), mostrar: (i) => dinheiro(i.valor), numerico: true },
+      ]}
+      rodape={<tr className="composicao-total"><td>Total</td><td /><td /><td className="tabela-numero">{dinheiro(total)}</td></tr>} />
   );
 }
 
@@ -93,15 +88,16 @@ function MotivosDeChurn({ de }: { de: string }) {
           <BotaoDeComposicao rotulo="ver composição" composicao={{
             titulo: "Motivos de churn", subtitulo: `Encerramentos anunciados desde ${data(de)}`, quantos: saidas.length,
             conteudo: () => (
-              <table className="tabela" aria-label="Encerramentos anunciados por motivo">
-                <thead><tr><th>Cliente</th><th>Contrato</th><th>Anunciou</th><th>Sai em</th><th>Quem decidiu</th><th>Motivo</th><th className="tabela-numero">MRR</th></tr></thead>
-                <tbody>
-                  {saidas.map((i, n) => (
-                    <tr key={n}><td>{i.grupo}</td><td>{i.escopo ?? `Contrato ${i.contrato_id}`}</td><td>{data(i.anuncio)}</td><td>{data(i.saida)}</td>
-                      <td>{i.iniciativa ?? "—"}</td><td>{i.motivo ?? "Sem motivo informado"}</td><td className="tabela-numero">{dinheiro(i.valor)}</td></tr>
-                  ))}
-                </tbody>
-              </table>
+              <TabelaDeComposicao rotulo="Encerramentos anunciados por motivo" linhas={saidas} chave={(i, n) => `${i.contrato_id}-${n}`}
+                colunas={[
+                  { titulo: "Cliente", valor: (i) => i.grupo },
+                  { titulo: "Contrato", valor: (i) => i.escopo ?? `Contrato ${i.contrato_id}` },
+                  { titulo: "Anunciou", valor: (i) => i.anuncio, mostrar: (i) => data(i.anuncio) },
+                  { titulo: "Sai em", valor: (i) => i.saida, mostrar: (i) => data(i.saida) },
+                  { titulo: "Quem decidiu", valor: (i) => i.iniciativa },
+                  { titulo: "Motivo", valor: (i) => i.motivo ?? "Sem motivo informado" },
+                  { titulo: "MRR", valor: (i) => Number(i.valor), mostrar: (i) => dinheiro(i.valor), numerico: true },
+                ]} />
             ),
           }} />
         )}

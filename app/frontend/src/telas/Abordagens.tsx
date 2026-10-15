@@ -12,6 +12,7 @@ import { Etiqueta } from "../componentes/Etiqueta";
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { data } from "../formato";
+import { TabelaDeComposicao } from "../componentes/TabelaDeComposicao";
 import { usarDados } from "../usarDados";
 import { CampoDeData } from "../componentes/CampoDeData";
 import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
@@ -26,16 +27,16 @@ function ContasDoResumo({ r, entra, comCusto = false }: {
   const itens = r.itens ?? [];
   const dentro = itens.filter(entra);
   const fora = itens.filter((i) => !entra(i));
+  type Conta = (typeof itens)[number];
   const tabela = (lista: typeof itens, rotulo: string) => (
-    <table className="tabela" aria-label={rotulo}>
-      <thead><tr><th>Conta</th><th>Situação</th><th>Diagnóstico</th>{comCusto && <th className="tabela-numero">Custo do agente</th>}</tr></thead>
-      <tbody>
-        {lista.map((i) => (
-          <tr key={i.abordagem_id}><td>{i.conta}</td><td>{i.situacao}</td><td>{i.diagnostico_agendado_em ? data(i.diagnostico_agendado_em) : "—"}</td>
-            {comCusto && <td className="tabela-numero">{i.custo_usd === null ? "sem preço" : usd(i.custo_usd)}</td>}</tr>
-        ))}
-      </tbody>
-    </table>
+    <TabelaDeComposicao rotulo={rotulo} linhas={lista} chave={(i) => i.abordagem_id}
+      colunas={[
+        { titulo: "Conta", valor: (i) => i.conta },
+        { titulo: "Situação", valor: (i) => i.situacao },
+        { titulo: "Diagnóstico", valor: (i) => i.diagnostico_agendado_em, mostrar: (i) => (i.diagnostico_agendado_em ? data(i.diagnostico_agendado_em) : "—") },
+        ...(comCusto ? [{ titulo: "Custo do agente", valor: (i: Conta) => (i.custo_usd === null ? null : Number(i.custo_usd)),
+          mostrar: (i: Conta) => (i.custo_usd === null ? "sem preço" : usd(i.custo_usd)), numerico: true }] : []),
+      ]} />
   );
   return (
     <>

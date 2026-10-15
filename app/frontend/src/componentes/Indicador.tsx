@@ -9,7 +9,7 @@
 
 import { useId, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { PainelLateral } from "./PainelLateral";
+import { Modal } from "./Modal";
 
 export type Tom = "azul" | "verde" | "ambar" | "vermelho" | "dourado" | "violeta" | "rosa" | "marinho";
 
@@ -100,12 +100,13 @@ export function BotaoDeComposicao({ composicao, rotulo = "ver" }: { composicao: 
   );
 }
 
-/** No `body`, fora do card: senão o foco dentro do painel manteria aberta a explicação do card. */
+/** No `body`, fora do card: senão o foco dentro do modal manteria aberta a explicação do card. Em modal desde
+ * 15/10/2026 (sugestão do Jesse): a composição é leitura de tabela e ganha largura. */
 function PainelDaComposicao({ composicao, aoFechar }: { composicao: Composicao; aoFechar: () => void }) {
   return createPortal(
-    <PainelLateral titulo={composicao.titulo} subtitulo={composicao.subtitulo} aoFechar={aoFechar}>
+    <Modal titulo={composicao.titulo} subtitulo={composicao.subtitulo} aoFechar={aoFechar}>
       <div className="composicao">{composicao.conteudo()}</div>
-    </PainelLateral>,
+    </Modal>,
     document.body,
   );
 }

@@ -16,6 +16,14 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Composições em modal (15/10/2026)
+
+Sugestão do Jesse, amostra aprovada por Eduardo em 15/10/2026: todo **"Ver composição"** abre num **modal
+centralizado** (até 960px, cabeçalho fixo, a lista rola dentro; tela inteira no celular), no lugar do painel lateral.
+A composição é leitura de tabela e ganha largura. **Edição continua no painel lateral** (oportunidade, contrato,
+eventos, premissas, mescla do questionário), que deixa ver a tela de trás. Esc, o X ou um clique fora fecham; o foco
+entra no modal e volta para o botão ao fechar. `componentes/Modal.tsx`, usado por `Indicador` e `BotaoDeComposicao`.
+
 ## Mesclar o questionário com uma oportunidade aberta (15/10/2026)
 
 Amostra aprovada por Eduardo em 15/10/2026. O caso clássico (a Mainô): o card nasce do lead, sem CNPJ, e o

@@ -203,7 +203,7 @@ describe("Integrações em abas (15/10/2026)", () => {
     vi.mocked(api.integracoes).mockResolvedValue(INTEGRACOES as never);
     render(<IntegracoesDoSistema />);
     const abas = await screen.findAllByRole("tab");
-    expect(abas.map((a) => a.textContent)).toEqual(INTEGRACOES.grupos.map((g) => expect.stringMatching(/.+ [✓○]/)));
+    expect(abas.map((a) => a.textContent)).toEqual(INTEGRACOES.grupos.map(() => expect.stringMatching(/.+ [✓○]/)));
     const whatsapp = abas.find((a) => a.textContent!.startsWith("WhatsApp"))!;
     expect(whatsapp).toHaveAttribute("title", expect.stringContaining("falta configurar"));
     await userEvent.click(whatsapp);

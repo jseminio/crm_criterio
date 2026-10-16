@@ -44,11 +44,18 @@ const INTEGRACOES: Integracoes = {
   ],
 };
 
-const cartao = async (titulo: string) => within((await screen.findByRole("heading", { name: titulo })).closest("section")!);
+/** Desde 15/10/2026 cada integração tem a sua aba: abre a aba (pelo começo do nome) e devolve o cartão. */
+const cartao = async (titulo: string) => {
+  const primeira = titulo === "Inteligência artificial" ? "IA" : titulo.split(" ")[0];
+  const aba = (await screen.findAllByRole("tab")).find((t) => (t.textContent ?? "").startsWith(primeira));
+  if (aba) await userEvent.click(aba);
+  return within((await screen.findByRole("heading", { name: titulo })).closest("section")!);
+};
 
 describe("Configurações › Integrações: chaves pela tela (07/10/2026)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    localStorage.clear();  // a aba escolhida fica guardada: cada teste começa na primeira
     vi.mocked(api.integracoes).mockResolvedValue(INTEGRACOES);
     vi.mocked(api.salvarIntegracao).mockResolvedValue(INTEGRACOES);
   });
@@ -187,5 +194,26 @@ describe("WhatsApp: receber as mensagens dos leads (14/10/2026)", () => {
   it("cada token gerado é diferente", async () => {
     const { gerarToken } = await import("./IntegracoesDoSistema");
     expect(gerarToken()).not.toBe(gerarToken());
+  });
+});
+
+describe("Integrações em abas (15/10/2026)", () => {
+  it("uma aba por integração, com a situação em sinal e texto, e o rascunho guardado ao trocar de aba", async () => {
+    localStorage.clear();
+    vi.mocked(api.integracoes).mockResolvedValue(INTEGRACOES as never);
+    render(<IntegracoesDoSistema />);
+    const abas = await screen.findAllByRole("tab");
+    expect(abas.map((a) => a.textContent)).toEqual(INTEGRACOES.grupos.map(() => expect.stringMatching(/.+ [✓○]/)));
+    const whatsapp = abas.find((a) => a.textContent!.startsWith("WhatsApp"))!;
+    expect(whatsapp).toHaveAttribute("title", expect.stringContaining("falta configurar"));
+    await userEvent.click(whatsapp);
+    expect(whatsapp).toHaveAttribute("aria-selected", "true");
+    const campo = screen.getByLabelText("ID do número de telefone");
+    await userEvent.type(campo, "123");
+    expect(whatsapp).toHaveTextContent("•");
+    await userEvent.click(abas.find((a) => a.textContent!.startsWith("Disparo"))!);
+    expect(screen.queryByRole("heading", { name: "WhatsApp (Meta)" })).toBeNull();
+    await userEvent.click(whatsapp);
+    expect(screen.getByLabelText("ID do número de telefone")).toHaveValue("5555123");
   });
 });

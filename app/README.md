@@ -16,6 +16,14 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Configurações › Integrações em abas (15/10/2026)
+
+Amostra aprovada por Eduardo em 15/10/2026: uma aba por integração (IA · WhatsApp · E-mail · Questionário · Meta Ads ·
+Google Ads · Disparo), no padrão das abas do Funil, do Sucesso do Cliente e do SDR. Ao lado do nome, a situação em
+sinal e texto (✓ configurado, ○ desligado ou faltando dado; ao passar o mouse, o que falta); "•" marca a aba com
+alteração não salva. Todos os cartões ficam montados e só o da aba aparece: o que foi digitado continua lá ao voltar.
+A tela lembra a última aba neste navegador. O conteúdo de cada cartão não mudou.
+
 ## Ordenação pelo título nas composições (15/10/2026)
 
 Pedido de Eduardo, caminho A aprovado em 15/10/2026: toda tabela de "Ver composição" ordena pelo título da coluna —

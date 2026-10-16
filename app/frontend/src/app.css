@@ -1605,6 +1605,11 @@ td > .celula-fonte { display: block; }
   font-size: 11px; background: var(--espera-suave); color: var(--espera); border: 1px solid var(--espera); }
 .integralidade-obrigatorio { background: var(--perda-suave); color: var(--perda); border-color: var(--perda); font-weight: 500; }
 
+/* Abas das integrações (15/10/2026): situação em sinal e texto ao lado do nome; "•" = alteração não salva. */
+.aba-ok { color: var(--ganho); }
+.aba-falta { color: var(--texto-fraco); }
+.aba-rascunho { color: var(--espera); font-weight: 600; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

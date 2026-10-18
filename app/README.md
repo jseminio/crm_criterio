@@ -16,6 +16,28 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Lacunas do cadastro nos cards e composições que abrem o card (18/10/2026)
+
+Pedido de Eduardo, amostra aprovada em 18/10/2026:
+
+- **Todo card mostra o que falta.** Oportunidade, contrato (com o encerramento dele), empresa e contatos, e o grupo
+  (cliente) abrem com o quadro **"O que falta no cadastro"** e marcam cada campo vazio no próprio lugar: borda
+  tracejada, ícone e texto — "!" e **Obrigatório em falta** (vermelho), "i" e **Prioritário em falta** (âmbar). Card
+  sem lacuna diz **Cadastro completo**. A regra é a da Integralidade do cadastro (13/10), inclusive os condicionais, e
+  vale para Novos e Passado. "ir ao campo" leva até o campo; o que não tem campo no card diz onde se preenche
+  (classificação e porte do cliente, na Saúde da carteira). O card do grupo junta as lacunas de todos os registros
+  dele e abre o card certo. O card da empresa ganhou o campo **Regime tributário**, que a Integralidade cobra e não
+  tinha onde ser preenchido. O quadro substitui o antigo "Falta:" do card de contatos (o filtro "só com lacunas" da
+  lista de Contatos não mudou).
+- **Toda composição abre o card do grupo.** O nome do cliente vira link em todas as composições de indicador (KPIs da
+  liderança, MRR, funil, quatro fases, propostas em aberto, realizado, Funil do Sucesso, Saúde da carteira, receita,
+  grupos e questionários); lead e abordagem ainda não têm grupo e ficam como texto. O card abre por cima da composição;
+  ✕ ou Esc fecham só o card, e a composição continua aberta no mesmo ponto.
+- **Integralidade leva à lacuna.** Na lista para consertar, cada campo em falta é um botão que abre o card do registro
+  já no campo, com o foco nele. Ao fechar o card, os KPIs recarregam: o que foi preenchido sai da lista.
+- API: `GET /api/lacunas?grupo_id=` (ou `cadastro=` e `registro_id=`) e `GET /api/grupos/{id}`; cada campo da conta
+  tem uma chave estável (`integralidade.CHAVES`), e os itens das composições trazem `grupo_id`.
+
 ## Configurações › Integrações em abas (15/10/2026)
 
 Amostra aprovada por Eduardo em 15/10/2026: uma aba por integração (IA · WhatsApp · E-mail · Questionário · Meta Ads ·

@@ -7,6 +7,7 @@ import { data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
 import { TabelaDeComposicao, type ColunaDaComposicao } from "./TabelaDeComposicao";
+import { LinkDoGrupo } from "./AberturaDeCard";
 
 const DIRECIONADOR: Record<string, string> = {
   documentos_fiscais_mes: "documentos fiscais", lancamentos_contabeis_mes: "lançamentos", pagamentos_mes: "pagamentos",
@@ -20,7 +21,7 @@ type I = ItemDaComposicao;
 
 const num = (v: string | null) => (v === null ? null : Number(v));
 const OPORTUNIDADE: Coluna = { titulo: "Oportunidade", valor: (i) => i.nome };
-const CLIENTE: Coluna = { titulo: "Cliente", valor: (i) => i.grupo };
+const CLIENTE: Coluna = { titulo: "Cliente", valor: (i) => i.grupo, mostrar: (i) => <LinkDoGrupo grupoId={i.grupo_id} nome={i.grupo} /> };
 const SERVICO: Coluna = { titulo: "Serviço", valor: (i) => i.servico };
 const SITUACAO: Coluna = { titulo: "Situação", valor: (i) => i.situacao };
 const MENSAL: Coluna = { titulo: "Mensal", numerico: true, valor: (i) => num(i.valor), mostrar: (i) => (i.valor !== null ? dinheiro(i.valor) : "—") };

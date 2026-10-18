@@ -80,6 +80,7 @@ class Entidade(Base):
     empresa_id: int | None = None
     razao_social: str | None = None
     nome_fantasia: str | None = None
+    regime_tributario: str | None = None
     cnpj: str | None = None
     endereco: Endereco = Endereco()
     mensalidade: str | None = None
@@ -142,6 +143,8 @@ class EmpresaEdicao(BaseModel):
     municipio: str | None = Field(default=None, max_length=100)
     uf: str | None = Field(default=None, max_length=2)
     cep: str | None = None
+    regime_tributario: str | None = Field(default=None, max_length=40)
+    """Entra na Integralidade do cadastro; editável no card da empresa desde 18/10/2026."""
     nome_do_grupo: str | None = Field(default=None, max_length=200)
     """Grupo (o cliente) da empresa, informado por nome: reaproveita o que existir ou nasce um
     prospect novo. Empresa com contrato não troca de grupo."""
@@ -262,7 +265,8 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
                 v = mensal.get(e.id)
                 saida.append(Entidade(
                     tipo=tipo, grupo_id=g.id, grupo_nome=g.nome, empresa_id=e.id, razao_social=e.razao_social,
-                    nome_fantasia=e.nome_fantasia, cnpj=e.cnpj, endereco=Endereco.model_validate(e),
+                    nome_fantasia=e.nome_fantasia, cnpj=e.cnpj, regime_tributario=e.regime_tributario,
+                    endereco=Endereco.model_validate(e),
                     mensalidade=str(v) if v is not None else None, recorrente=v is not None and tipo == "cliente",
                     propostas=propostas.get(g.id, 0), tem_contrato=e.id in com_contrato,
                     contatos=ps, lacunas=lacunas_de(e, ps),
@@ -274,15 +278,18 @@ def roteador(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
         tipo: Tipo,
         busca: str = "",
         so_com_lacunas: bool = False,
+        grupo_id: int | None = None,
         limite: int = Query(default=50, ge=1, le=500),
         salto: int = Query(default=0, ge=0),
         sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> dict:
-        """Empresas (cliente) ou grupos/empresas (prospect), com os contatos e as lacunas."""
+        """Empresas (cliente) ou grupos/empresas (prospect), com os contatos e as lacunas. Com `grupo_id`, só as do
+        grupo (18/10/2026): a lacuna de empresa ou contato abre o card da empresa."""
         itens = [
             e for e in _entidades(sessao, tipo)
             if casa(busca, e.razao_social, e.nome_fantasia, e.cnpj, e.grupo_nome)
             and (not so_com_lacunas or e.lacunas)
+            and (grupo_id is None or e.grupo_id == grupo_id)
         ]
         return {"total": len(itens), "itens": itens[salto:salto + limite]}
 

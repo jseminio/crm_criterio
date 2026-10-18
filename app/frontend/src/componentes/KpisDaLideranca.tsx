@@ -4,12 +4,14 @@
 
 import { useState } from "react";
 import { api } from "../api/cliente";
-import type { ItemDoKpi, KpiDaLideranca, KpisDaLideranca as Kpis } from "../api/tipos";
+import type { CadastroDaLacuna, ItemDoKpi, KpiDaLideranca, KpisDaLideranca as Kpis } from "../api/tipos";
 import { Indicador, type Tom } from "./Indicador";
 import { TabelaDeComposicao } from "./TabelaDeComposicao";
 import { data, dinheiro, percentual } from "../formato";
 import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
+import { LinkDoGrupo, usarAberturaDeCard } from "./AberturaDeCard";
+import { lacunaTemCard } from "../telas/CardDaLacuna";
 
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
   "novembro", "dezembro"];
@@ -111,7 +113,7 @@ function ComposicaoDoKpi({ k }: { k: KpiDaLideranca }) {
   const tabela = (itens: ItemDoKpi[], rotulo: string) => (
     <TabelaDeComposicao rotulo={rotulo} linhas={itens} chave={(i, n) => `${i.grupo}-${n}`}
       colunas={[
-        { titulo: "Cliente", valor: (i) => i.grupo },
+        { titulo: "Cliente", valor: (i) => i.grupo, mostrar: (i) => <LinkDoGrupo grupoId={i.grupo_id} nome={i.grupo} /> },
         { titulo: "O quê", valor: (i) => i.detalhe },
         ...(comValor ? [{ titulo: "Valor", valor: (i: ItemDoKpi) => Number(i.valor), mostrar: (i: ItemDoKpi) => dinheiro(i.valor), numerico: true }] : []),
       ]}
@@ -181,6 +183,7 @@ function visoesDoChurn(k: KpiDaLideranca) {
 /** A lista para consertar aos poucos (15/10/2026): filtros por corte, cadastro, nível e responsável; um registro por
  * linha com tudo o que falta nele; "!" marca o obrigatório (estado nunca só por cor). */
 export function ComposicaoDaIntegralidade({ k }: { k: KpiDaLideranca }) {
+  const abertura = usarAberturaDeCard();
   const [corte, definirCorte] = useState("");
   const [cadastro, definirCadastro] = useState("");
   const [so, definirSo] = useState(false);
@@ -229,12 +232,22 @@ export function ComposicaoDaIntegralidade({ k }: { k: KpiDaLideranca }) {
               colunas={[
                 { titulo: "Registro", valor: (i) => i.grupo },
                 { titulo: "Falta", valor: (i) => i.faltam.length,
-                  mostrar: (i) => i.faltam.map((f) => (
-                    <span key={f.campo} className={`integralidade-campo ${f.obrigatorio ? "integralidade-obrigatorio" : ""}`}
-                      title={f.obrigatorio ? "Obrigatório (vale 2)" : "Prioritário (vale 1)"}>
-                      {f.obrigatorio ? `! ${f.campo}` : f.campo}
-                    </span>
-                  )) },
+                  mostrar: (i) => i.faltam.map((f) => {
+                    const alvo = { cadastro: i.cadastro as CadastroDaLacuna, registro_id: i.registro_id ?? null, chave: f.chave ?? "",
+                      grupo_id: i.grupo_id ?? null, empresa_id: i.empresa_id ?? null, contrato_id: i.contrato_id ?? null };
+                    const nivel = f.obrigatorio ? "Obrigatório (vale 2)" : "Prioritário (vale 1)";
+                    const texto = f.obrigatorio ? `! ${f.campo}` : f.campo;
+                    const classe = `integralidade-campo ${f.obrigatorio ? "integralidade-obrigatorio" : ""}`;
+                    // "ir à lacuna" (18/10/2026): o clique abre o card do registro já no campo.
+                    return abertura && f.chave && lacunaTemCard(alvo) ? (
+                      <button key={f.campo} type="button" className={`${classe} integralidade-ir`}
+                        title={`${nivel}: abrir o card neste campo`} onClick={() => abertura.abrirLacuna(alvo)}>
+                        {texto} <span aria-hidden="true">›</span>
+                      </button>
+                    ) : (
+                      <span key={f.campo} className={classe} title={nivel}>{texto}</span>
+                    );
+                  }) },
               ]} />
           </div>
         );
@@ -277,7 +290,9 @@ function Cartao({ k }: { k: KpiDaLideranca }) {
 export function KpisDaLideranca() {
   const meses = ultimosMeses();
   const [mes, definirMes] = useState(meses[0].valor);
-  const { dados, carregando, erro, recarregar } = usarDados<Kpis>(() => api.kpisDaLideranca(mes), [mes]);
+  // Fechar um card aberto da composição recarrega os KPIs: o campo preenchido sai da lista da Integralidade.
+  const versaoDosCards = usarAberturaDeCard()?.versao ?? 0;
+  const { dados, carregando, erro, recarregar } = usarDados<Kpis>(() => api.kpisDaLideranca(mes), [mes, versaoDosCards]);
   return (
     <section aria-labelledby="kpis-titulo" style={{ display: "grid", gap: "var(--e3)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--e2)", flexWrap: "wrap" }}>

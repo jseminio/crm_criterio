@@ -10,6 +10,7 @@ import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
 import { BotaoDeComposicao, Explicavel, Indicador } from "./Indicador";
 import { TabelaDeComposicao } from "./TabelaDeComposicao";
+import { LinkDoGrupo } from "./AberturaDeCard";
 
 const COLUNAS: { chave: keyof LinhaDoQuadroDePropostas; rotulo: string; classe?: string }[] = [
   { chave: "anual", rotulo: "Valor anual" },
@@ -52,7 +53,7 @@ function ListaDePropostas({ propostas, comOnHold = false }: { propostas: Propost
   return (
     <TabelaDeComposicao rotulo="Propostas" linhas={propostas} chave={(p) => p.id}
       colunas={[
-        { titulo: "Grupo", valor: (p) => p.grupo },
+        { titulo: "Grupo", valor: (p) => p.grupo, mostrar: (p) => <LinkDoGrupo grupoId={p.grupo_id} nome={p.grupo} /> },
         { titulo: "Proposta", valor: (p) => `${p.servico ?? p.nome}${p.captador ? ` · ${p.captador}` : ""}` },
         { titulo: "Temperatura", valor: (p) => p.temperatura, mostrar: (p) => p.temperatura ?? "sem class." },
         ...(comOnHold ? [{

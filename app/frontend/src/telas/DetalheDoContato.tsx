@@ -9,7 +9,7 @@
  * pessoa já cadastrada pode ser vinculada pela busca — pedido de Karine em 30/09/2026.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { EntidadeDeContato, Listas, PessoaDeContato } from "../api/tipos";
 import { BuscaDeContato } from "../componentes/BuscaDeContato";
@@ -19,6 +19,11 @@ import { PainelLateral } from "../componentes/PainelLateral";
 import { dinheiro } from "../formato";
 import { SEM_PERMISSAO, usarAcesso } from "../entrada";
 import { AlteracoesDoRegistro } from "../componentes/HistoricoDeAlteracoes";
+import { AvisoDeLacuna, QuadroDeLacunas, irAoCampo, marcasDeLacuna, usarLacunas } from "../componentes/Lacunas";
+
+type Marcas = ReturnType<typeof marcasDeLacuna>;
+/** Regimes do formulário da proposta (`crm.proposta.ficha`): a mesma lista no card da empresa (18/10/2026). */
+const REGIMES = ["Simples Nacional", "Lucro Presumido", "Lucro Real", "MEI", "Outro"];
 
 const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
 
@@ -31,12 +36,15 @@ export function FormularioDePessoa({
   rotulo,
   aoSalvar,
   aoCancelar,
+  marcas,
 }: {
   inicial?: PessoaDeContato;
   papeis: string[];
   rotulo: string;
   aoSalvar: (corpo: Record<string, unknown>) => Promise<void>;
   aoCancelar?: () => void;
+  /** As lacunas deste contato no card da empresa (18/10/2026). */
+  marcas?: Marcas;
 }) {
   const [c, definirC] = useState<Campos>({
     nome: vazio(inicial?.nome), cargo: vazio(inicial?.cargo), email: vazio(inicial?.email),
@@ -73,28 +81,31 @@ export function FormularioDePessoa({
           <label className="campo-rotulo" htmlFor={`${id}-nome`}>Nome</label>
           <input id={`${id}-nome`} className="entrada" maxLength={200} value={c.nome} onChange={(e) => mudar("nome", e.target.value)} />
         </div>
-        <div className="campo-bloco">
+        <div className={`campo-bloco ${marcas?.classe("cargo") ?? ""}`} id={marcas?.id("cargo")}>
           <label className="campo-rotulo" htmlFor={`${id}-cargo`}>Cargo</label>
           <input id={`${id}-cargo`} className="entrada" maxLength={100} value={c.cargo} onChange={(e) => mudar("cargo", e.target.value)} />
+          {marcas?.aviso("cargo")}
         </div>
       </div>
       <div className="formulario-duplo">
-        <div className="campo-bloco">
+        <div className={`campo-bloco ${marcas?.classe("contato") ?? ""}`} id={marcas?.id("contato")}>
           <label className="campo-rotulo" htmlFor={`${id}-email`}>E-mail</label>
           <input id={`${id}-email`} type="email" className="entrada" maxLength={200} value={c.email} onChange={(e) => mudar("email", e.target.value)} />
+          {marcas?.tem("contato") && <AvisoDeLacuna obrigatorio texto="Obrigatório em falta: e-mail ou telefone" />}
         </div>
-        <div className="campo-bloco">
+        <div className={`campo-bloco ${marcas?.classe("contato") ?? ""}`}>
           <label className="campo-rotulo" htmlFor={`${id}-tel`}>Telefone</label>
           <input id={`${id}-tel`} className="entrada" maxLength={30} value={c.telefone} onChange={(e) => mudar("telefone", e.target.value)} />
         </div>
       </div>
       <div className="formulario-duplo">
-        <div className="campo-bloco">
+        <div className={`campo-bloco ${marcas?.classe("papel") ?? ""}`} id={marcas?.id("papel")}>
           <label className="campo-rotulo" htmlFor={`${id}-papel`}>Papel</label>
           <select id={`${id}-papel`} className="selecao" value={c.papel} onChange={(e) => mudar("papel", e.target.value)}>
             <option value="">Não informado</option>
             {papeis.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
+          {marcas?.aviso("papel")}
         </div>
         <div className="campo-bloco">
           <label className="campo-rotulo" htmlFor={`${id}-obs`}>Observação</label>
@@ -116,24 +127,34 @@ export function FormularioDePessoa({
   );
 }
 
-function Endereco({ entidade, aoMudar }: { entidade: EntidadeDeContato; aoMudar: () => void }) {
+function Endereco({ entidade, aoMudar, marcas }: { entidade: EntidadeDeContato; aoMudar: () => void; marcas: Marcas }) {
   const e = entidade.endereco;
   const [c, definirC] = useState<Campos>({
     razao_social: vazio(entidade.razao_social), cnpj: vazio(entidade.cnpj), logradouro: vazio(e.logradouro),
     numero: vazio(e.numero), complemento: vazio(e.complemento), bairro: vazio(e.bairro),
     municipio: vazio(e.municipio), uf: vazio(e.uf), cep: vazio(e.cep), nome_do_grupo: entidade.grupo_nome,
+    regime_tributario: vazio(entidade.regime_tributario),
   });
   const [erro, definirErro] = useState<string | null>(null);
   const [ok, definirOk] = useState(false);
   const [salvando, definirSalvando] = useState(false);
   const mudar = (k: string, v: string) => { definirC((a) => ({ ...a, [k]: v })); definirOk(false); };
 
-  const campo = (k: string, rotulo: string, largo = false) => (
-    <div className="campo-bloco" style={largo ? { gridColumn: "1 / -1" } : undefined}>
-      <label className="campo-rotulo" htmlFor={`end-${k}`}>{rotulo}</label>
-      <input id={`end-${k}`} className="entrada" value={c[k]} onChange={(ev) => mudar(k, ev.target.value)} />
-    </div>
-  );
+  // A lacuna do endereço (logradouro, município e CEP) marca os três campos; o "ir ao campo" para no logradouro.
+  const chaveDaLacuna = (k: string) => (k === "cnpj" ? "cnpj" : ["logradouro", "municipio", "cep"].includes(k) ? "endereco" : null);
+  const campo = (k: string, rotulo: string, largo = false) => {
+    const chave = chaveDaLacuna(k);
+    return (
+      <div className={`campo-bloco ${chave ? marcas.classe(chave) : ""}`} style={largo ? { gridColumn: "1 / -1" } : undefined}
+        id={chave && (k === "cnpj" || k === "logradouro") ? marcas.id(chave) : undefined}>
+        <label className="campo-rotulo" htmlFor={`end-${k}`}>{rotulo}</label>
+        <input id={`end-${k}`} className="entrada" value={c[k]} onChange={(ev) => mudar(k, ev.target.value)} />
+        {chave && (k === "cnpj" || k === "logradouro") && (chave === "endereco"
+          ? marcas.tem("endereco") && <AvisoDeLacuna obrigatorio={false} texto="Prioritário em falta: logradouro, município e CEP" />
+          : marcas.aviso(chave))}
+      </div>
+    );
+  };
 
   const salvar = async () => {
     definirSalvando(true);
@@ -158,6 +179,15 @@ function Endereco({ entidade, aoMudar }: { entidade: EntidadeDeContato; aoMudar:
     <div className="formulario">
       <h3 style={{ fontSize: 14 }}>Empresa e endereço</h3>
       <div className="formulario-duplo">{campo("razao_social", "Razão social")}{campo("cnpj", "CNPJ")}</div>
+      <div className={`campo-bloco ${marcas.classe("regime_tributario")}`} id={marcas.id("regime_tributario")}>
+        <label className="campo-rotulo" htmlFor="end-regime">Regime tributário</label>
+        <select id="end-regime" className="selecao" value={c.regime_tributario} onChange={(ev) => mudar("regime_tributario", ev.target.value)}>
+          <option value="">Não informado</option>
+          {[...REGIMES, ...(c.regime_tributario && !REGIMES.includes(c.regime_tributario) ? [c.regime_tributario] : [])]
+            .map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        {marcas.aviso("regime_tributario")}
+      </div>
       <CampoDeGrupo id="end-grupo" valor={c.nome_do_grupo} aoMudar={(v) => mudar("nome_do_grupo", v)}
         desabilitado={entidade.tem_contrato}
         ajuda={entidade.tem_contrato ? "Empresa com contrato não troca de grupo; use a fusão de grupos." : undefined} />
@@ -186,16 +216,35 @@ function Endereco({ entidade, aoMudar }: { entidade: EntidadeDeContato; aoMudar:
 export function DetalheDoContato({
   entidade,
   listas,
+  foco,
   aoFechar,
-  aoMudar,
+  aoMudar: aoMudarFora,
 }: {
   entidade: EntidadeDeContato;
   listas: Listas | null;
+  /** Abre já nesta lacuna, vindo da Integralidade ou do card do grupo (18/10/2026). */
+  foco?: { cadastro: "Empresa" | "Contato"; registro_id: number; chave: string };
   aoFechar: () => void;
   aoMudar: () => void;
 }) {
   const { pode } = usarAcesso();
   const [editando, definirEditando] = useState<number | null>(null);
+  // O que falta no cadastro (18/10/2026): da empresa e dos contatos dela, recarregado a cada mudança salva.
+  const [versao, definirVersao] = useState(0);
+  const aoMudar = () => { definirVersao((v) => v + 1); aoMudarFora(); };
+  const { lacunas: doGrupo } = usarLacunas({ grupo_id: entidade.grupo_id }, versao);
+  const lacunas = doGrupo && doGrupo.filter((l) => (l.cadastro === "Empresa" && l.registro_id === entidade.empresa_id)
+    || (l.cadastro === "Contato" && entidade.contatos.some((p) => p.id === l.registro_id)));
+  const marcasDaEmpresa = marcasDeLacuna(lacunas, "Empresa", entidade.empresa_id);
+  const irPara = (cadastro: string, registroId: number | null, chave: string) => {
+    if (cadastro === "Contato" && registroId !== null) definirEditando(registroId);
+    window.setTimeout(() => irAoCampo(marcasDeLacuna(lacunas, cadastro as "Contato", registroId).id(chave)), 60);
+  };
+  const prontoParaFoco = lacunas !== null;
+  useEffect(() => {
+    if (foco && prontoParaFoco) irPara(foco.cadastro, foco.registro_id, foco.chave);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [foco?.cadastro, foco?.registro_id, foco?.chave, prontoParaFoco]);
   const [erro, definirErro] = useState<string | null>(null);
   const papeis = listas?.papeis_de_contato ?? [];
   const titulo = entidade.razao_social ?? entidade.grupo_nome;
@@ -242,13 +291,8 @@ export function DetalheDoContato({
       aoFechar={aoFechar}
       rodape={<button type="button" className="botao botao-secundario" onClick={aoFechar}>Fechar</button>}
     >
-      {entidade.lacunas.length > 0 ? (
-        <div className="recado" role="note">
-          <strong>Falta:</strong> {entidade.lacunas.join(" · ")}
-        </div>
-      ) : (
-        <div className="recado" role="note">Contato e endereço completos.</div>
-      )}
+      <QuadroDeLacunas lacunas={lacunas} comRegistro={entidade.contatos.length > 0} grupoNome={entidade.grupo_nome}
+        aoIr={(l) => irPara(l.cadastro, l.registro_id, l.chave)} />
 
       <div className="formulario">
         <h3 style={{ fontSize: 14 }}>Contatos ({entidade.contatos.length})</h3>
@@ -257,7 +301,8 @@ export function DetalheDoContato({
           {entidade.contatos.map((p) =>
             editando === p.id ? (
               <li key={p.id}>
-                <FormularioDePessoa inicial={p} papeis={papeis} rotulo="Salvar contato" aoSalvar={editar(p.id)} aoCancelar={() => definirEditando(null)} />
+                <FormularioDePessoa inicial={p} papeis={papeis} rotulo="Salvar contato" aoSalvar={editar(p.id)} aoCancelar={() => definirEditando(null)}
+                  marcas={marcasDeLacuna(lacunas, "Contato", p.id)} />
               </li>
             ) : (
               <li key={p.id} className="contato-item">
@@ -269,6 +314,13 @@ export function DetalheDoContato({
                   {p.nao_contatar && <span className="etiqueta etiqueta-perda" style={{ marginLeft: 6 }}>Não contatar</span>}
                 </div>
                 <div className="numero-nota">{[p.email, p.telefone].filter(Boolean).join(" · ") || "sem e-mail nem telefone"}</div>
+                {(lacunas ?? []).some((l) => l.cadastro === "Contato" && l.registro_id === p.id) && (
+                  <div className="lacunas-do-contato">
+                    {(lacunas ?? []).filter((l) => l.cadastro === "Contato" && l.registro_id === p.id).map((l) => (
+                      <AvisoDeLacuna key={l.chave} obrigatorio={l.obrigatorio} texto={`Falta: ${l.campo}`} />
+                    ))}
+                  </div>
+                )}
                 <div className="sugestao-acoes" style={{ justifyContent: "flex-start" }}>
                   <button type="button" className="botao botao-secundario" onClick={() => definirEditando(p.id)}>Editar</button>
                   {empresaId !== null && (
@@ -306,7 +358,7 @@ export function DetalheDoContato({
 
       {entidade.empresa_id !== null ? (
         <>
-          <Endereco key={entidade.empresa_id} entidade={entidade} aoMudar={aoMudar} />
+          <Endereco key={entidade.empresa_id} entidade={entidade} aoMudar={aoMudar} marcas={marcasDaEmpresa} />
           <ExclusaoConfirmada
             rotulo="Excluir empresa"
             bloqueio={entidade.tem_contrato ? "Esta empresa tem contrato e não pode ser excluída. Encerre ou mova o contrato antes." : pode("contatos.excluir") ? null : SEM_PERMISSAO}

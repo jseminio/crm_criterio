@@ -18,6 +18,7 @@ import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
 import { DetalheDoGrupo } from "./DetalheDoGrupo";
 import { FusoesFeitas } from "./FusoesFeitas";
 import { SugestoesDeFusao } from "./SugestoesDeFusao";
+import { LinkDoGrupo } from "../componentes/AberturaDeCard";
 
 function Fusao({
   principal,
@@ -177,7 +178,7 @@ export function Grupos({ listas }: { listas: Listas | null }) {
                   linhas={(dados?.itens ?? []).filter((g) => g.quantas_oportunidades > 1)
                     .sort((a, b) => b.quantas_oportunidades - a.quantas_oportunidades)}
                   colunas={[
-                    { titulo: "Grupo", valor: (g) => g.nome },
+                    { titulo: "Grupo", valor: (g) => g.nome, mostrar: (g) => <LinkDoGrupo grupoId={g.id} nome={g.nome} /> },
                     { titulo: "Oportunidades", valor: (g) => g.quantas_oportunidades, numerico: true },
                   ]} />
               ),

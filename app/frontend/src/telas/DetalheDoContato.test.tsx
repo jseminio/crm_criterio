@@ -12,6 +12,7 @@ vi.mock("../api/cliente", async () => {
     api: {
       criarContato: vi.fn(), editarContato: vi.fn(), editarEmpresa: vi.fn(), criarEmpresaDoGrupo: vi.fn(),
       grupos: vi.fn().mockResolvedValue({ total: 1, itens: [{ id: 1, nome: "Grupo Alfa" }] }),
+      lacunas: vi.fn().mockResolvedValue([]),
     },
   };
 });
@@ -74,9 +75,9 @@ describe("DetalheDoContato", () => {
     expect(screen.getByText(/Cliente não recorrente/)).toBeInTheDocument();
   });
 
-  it("mostra os contatos e o 'não contatar'", () => {
+  it("mostra os contatos e o 'não contatar'", async () => {
     abrir(ent({ contatos: [p(), p({ id: 6, nome: "João", nao_contatar: true })], lacunas: [] }));
-    expect(screen.getByText("Contato e endereço completos.")).toBeInTheDocument();
+    expect(await screen.findByText("Cadastro completo")).toBeInTheDocument();
     expect(screen.getByText("João")).toBeInTheDocument();
     expect(screen.getByText("Não contatar")).toBeInTheDocument();
   });

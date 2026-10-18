@@ -1610,6 +1610,22 @@ td > .celula-fonte { display: block; }
 .aba-falta { color: var(--texto-fraco); }
 .aba-rascunho { color: var(--espera); font-weight: 600; }
 
+/* PDF assinado e documentos antigos (18/10/2026) */
+.documento-anexado { border: 1px solid var(--borda); border-radius: var(--raio-md); padding: var(--e3); margin-top: var(--e2); }
+.documento-linha { display: flex; align-items: center; gap: var(--e3); flex-wrap: wrap; }
+.documento-linha strong { display: block; overflow-wrap: anywhere; }
+.conferencia-do-documento { margin-top: var(--e3); }
+.area-de-envio { border: 1px dashed var(--borda-forte); border-radius: var(--raio-md); padding: var(--e4); margin: var(--e3) 0;
+  display: flex; flex-direction: column; align-items: center; gap: var(--e2); text-align: center; color: var(--texto-medio); }
+.documentos-antigos .linha-clicavel { cursor: pointer; }
+.documentos-antigos .linha-clicavel:hover { background: var(--surface-sunken); }
+.botao-link { background: none; border: 0; padding: 0; color: var(--azul-destaque); font: inherit; text-decoration: underline;
+  cursor: pointer; text-align: left; }
+.botao-link:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.dados-do-assinado { display: grid; grid-template-columns: max-content 1fr; gap: var(--e1) var(--e3); margin: var(--e3) 0 0; }
+.dados-do-assinado dt { color: var(--texto-medio); }
+.dados-do-assinado dd { margin: 0; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -1618,4 +1634,3 @@ td > .celula-fonte { display: block; }
     scroll-behavior: auto !important;
   }
 }
-

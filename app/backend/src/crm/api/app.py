@@ -51,6 +51,7 @@ from crm.api.ajustes import roteador_de_ajustes
 from crm.api.base_de_conhecimento import roteador_da_base
 from crm.api.sucesso import ServicosDaAta, roteador_do_sucesso, servicos_da_ata_reais
 from crm.domain.alcada import motivo_da_alcada
+from crm.domain.edicao_de_contrato import problema_na_edicao
 from crm.api.abordagens import Servicos, roteador_de_abordagens, servicos_reais
 from crm.api.backup import roteador as roteador_de_backup, roteador_da_migracao
 from crm.api.classificacao import ServicosDeAnalise, parametros_vigentes, roteador as roteador_de_carteira, servicos_de_analise_reais
@@ -73,6 +74,7 @@ from crm.api.kpis_lideranca import roteador_de_kpis
 from crm.api.reajustes import roteador_de_reajustes
 from crm.api.servicos_e_contratos import roteador_de_servicos_e_contratos
 from crm.api.documento_de_contrato import roteador_do_documento_de_contrato
+from crm.api.documentos import Leitor, roteador_de_documentos
 from crm.indices.ipca import BuscarIpca
 from crm.api.recebimentos import roteador_de_recebimentos
 from crm.db.saidas import efetivar_saidas, laco_das_saidas
@@ -183,6 +185,7 @@ def criar_app(
     busca_de_leads_do_meta: Callable[[], object] | None = None,
     leads_do_meta_automaticos: bool | None = None,
     busca_de_leads_do_google: Callable[[], object] | None = None,
+    leitor_de_documentos: Leitor | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede; `tentativas`, para o
@@ -332,6 +335,7 @@ def criar_app(
     api.include_router(roteador_de_reajustes(obter_sessao, buscar_ipca))
     api.include_router(roteador_de_servicos_e_contratos(obter_sessao))
     api.include_router(roteador_do_documento_de_contrato(obter_sessao))
+    api.include_router(roteador_de_documentos(obter_sessao, lambda: _fabrica, leitor_de_documentos))
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
     api.include_router(roteador_de_leads_do_meta(obter_sessao, busca_de_leads_do_meta or buscador_real))
@@ -1597,33 +1601,10 @@ def _registrar(api: FastAPI) -> None:
             raise HTTPException(404, "contrato não encontrado")
 
         mudancas = corpo.model_dump(exclude_unset=True)
-        # A tela manda o rascunho inteiro: só conta o que difere do valor atual.
-        reais = {campo: valor for campo, valor in mudancas.items() if valor != getattr(contrato, campo)}
-
-        # Encerrado não se mexe mais — nem por evento, nem por edição. Sem isto, um
-        # salvar voltava a situação para Ativo e destravava preço e data de fim.
-        # Bruto ou líquido é como o valor se lê, não uma mudança no contrato: vale até no encerrado
-        # (o churn dele também entra no MRR em bruto).
-        # Parcelas no ano (11/10/2026), como o bruto ou líquido, é como o valor se lê: vale também no encerrado.
-        if contrato.situacao is SituacaoContrato.ENCERRADO and set(reais) - {"base_do_valor", "parcelas_no_ano"}:
-            raise HTTPException(422, "contrato encerrado não se mexe mais")
-        if mudancas.get("situacao") is SituacaoContrato.ENCERRADO and contrato.situacao is not SituacaoContrato.ENCERRADO:
-            raise HTTPException(422, "para encerrar, registre um evento de Encerramento com o motivo")
-
-        # Depois de assinado, preço, fim e encerramento só mudam por evento: é o
-        # que deixa o antes e o depois registrados.
-        assinado = contrato.situacao in (SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO)
-        if assinado:
-            # Assinado não volta para antes da assinatura: "Aguardando assinatura"
-            # destravaria o preço, e a volta para Ativo o mudaria sem evento.
-            if "situacao" in reais and reais["situacao"] not in (SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO):
-                raise HTTPException(422, "contrato assinado só alterna entre Ativo e Suspenso; para encerrar, registre um Encerramento")
-            for campo, evento in (("preco_mensal", "Reajuste, Expansão ou Contração"),
-                                  ("preco_anual", "Reajuste, Expansão ou Contração")):
-                if campo in mudancas and mudancas[campo] != getattr(contrato, campo):
-                    raise HTTPException(422, f"contrato assinado: para mudar o preço, registre um evento ({evento})")
-            if "data_fim" in mudancas and contrato.data_fim is not None and mudancas["data_fim"] != contrato.data_fim:
-                raise HTTPException(422, "contrato assinado: para mudar a data de fim, registre uma Renovação")
+        # As regras por situação (encerrado, assinado) valem igual na conferência do PDF (18/10/2026).
+        problema = problema_na_edicao(contrato, mudancas)
+        if problema:
+            raise HTTPException(422, problema)
 
         for campo, valor in mudancas.items():
             setattr(contrato, campo, valor)

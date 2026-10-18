@@ -21,6 +21,7 @@ import { ImportarRecebimentos } from "../componentes/ImportarRecebimentos";
 import { usarAcesso } from "../entrada";
 import { contratoCombina, Destaque } from "./pesquisaDeContratos";
 import { GerarContrato } from "../componentes/GerarContrato";
+import { DocumentosAnexados } from "../componentes/DocumentosAnexados";
 
 const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "Encerrado"];
 
@@ -101,6 +102,26 @@ function EdicaoDeContrato({
       data_fim: atualizado.data_fim ?? "",
       situacao: atualizado.situacao,
     }));
+    aoSalvar();
+  };
+
+  // A conferência do PDF grava no contrato: o rascunho volta ao que está gravado, para "Salvar alterações" não
+  // desfazer o que acabou de entrar.
+  const aoGravarDocumento = () => {
+    api.contrato(contrato.id).then((atualizado) => {
+      definirDetalhe(atualizado);
+      definirRascunho((r) => ({
+        ...r,
+        escopo: atualizado.escopo ?? "",
+        preco_mensal: atualizado.preco_mensal ?? "",
+        preco_anual: atualizado.preco_anual ?? "",
+        data_inicio: atualizado.data_inicio ?? "",
+        data_fim: atualizado.data_fim ?? "",
+        signatario: atualizado.signatario ?? "",
+        base_do_valor: atualizado.base_do_valor ?? "",
+        parcelas_no_ano: String(atualizado.parcelas_no_ano ?? 13),
+      }));
+    }).catch(() => undefined);
     aoSalvar();
   };
 
@@ -302,6 +323,14 @@ function EdicaoDeContrato({
       </div>
 
       {contrato.recorrente !== false && contrato.situacao !== "Encerrado" && <GerarContrato contratoId={contrato.id} />}
+      {detalhe && (detalhe.multa_rescisoria || detalhe.aviso_previo_dias || detalhe.renovacao) && (
+        <dl className="dados-do-assinado">
+          {detalhe.multa_rescisoria && <><dt>Multa rescisória</dt><dd>{detalhe.multa_rescisoria}</dd></>}
+          {detalhe.aviso_previo_dias != null && <><dt>Aviso prévio</dt><dd>{detalhe.aviso_previo_dias} dias</dd></>}
+          {detalhe.renovacao && <><dt>Renovação</dt><dd>{detalhe.renovacao}</dd></>}
+        </dl>
+      )}
+      <DocumentosAnexados contratoId={contrato.id} tipo="contrato" titulo="Documento assinado" aoGravar={aoGravarDocumento} />
 
       {detalhe && <EventosDeContrato contrato={detalhe} aoRegistrar={aoRegistrarEvento} motivos={motivos} iniciativas={iniciativas} />}
 

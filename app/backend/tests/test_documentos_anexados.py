@@ -253,3 +253,31 @@ def test_recusa_da_ia_vira_frase():
     cliente = NS(beta=NS(messages=NS(create=lambda **_: NS(stop_reason="refusal", content=[], usage=NS()))))
     with pytest.raises(AgenteFalhou, match="recusou"):
         regra.ler_pdf(cliente, "m", pdf=PDF, nome="a.pdf", uso=Uso(modelo="m"))
+
+
+def test_reconhece_o_numero_do_contrato_e_da_proposta_do_crm():
+    from crm.api.documentos import NUMERO_DO_CRM
+
+    contrato = NUMERO_DO_CRM.search("CONT CCE RJ1 102.2026")
+    assert contrato and contrato.groups() == ("CONT", "102", "2026")
+    proposta = NUMERO_DO_CRM.search("PROP CCE RJ 154.2026")
+    assert proposta and proposta.groups() == ("PROP", "154", "2026")
+    assert NUMERO_DO_CRM.search("CONTRATO DE PRESTAÇÃO DE SERVIÇOS") is None
+
+
+def test_lote_acha_o_contrato_pelo_numero_do_crm(engine, ids):
+    from crm.db.modelos import DocumentoDeContrato, MatrizDeContrato
+
+    with Session(engine) as s:
+        m = MatrizDeContrato(modelo="Recorrente padrão", nome_arquivo="m.docx", conteudo_base64="", enviada_por="EL",
+                             encontrados=[], faltando=[], desconhecidos=[])
+        s.add(m)
+        s.flush()
+        s.add(DocumentoDeContrato(contrato_id=ids["aguardando"], numero=102, ano=2026, matriz_id=m.id, valores={},
+                                  gerado_por="EL"))
+        s.commit()
+    outro_cnpj = {**lido(numero="CONT CCE RJ1 102.2026"), "cnpjs": ["99888777000166"]}
+    with _cliente(engine, Leitor(outro_cnpj)) as c:
+        doc = _anexar(c).json()["id"]
+        sugestao = c.get(f"/api/documentos/{doc}", headers=ADMIN).json()["sugestao"]
+    assert sugestao["motivo"] == "pelo número" and sugestao["contrato_id"] == ids["aguardando"]

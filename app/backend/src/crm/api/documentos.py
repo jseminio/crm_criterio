@@ -41,11 +41,13 @@ from crm.documento import leitura as regra
 from crm.domain.edicao_de_contrato import problema_na_edicao
 from crm.domain.listas import SituacaoContrato
 
-__all__ = ["Leitor", "leitor_real", "roteador_de_documentos", "ler_documento"]
+__all__ = ["NUMERO_DO_CRM", "Leitor", "leitor_real", "roteador_de_documentos", "ler_documento"]
 
 _log = logging.getLogger(__name__)
 
 LIMITE = 20 * 1024 * 1024
+NUMERO_DO_CRM = re.compile(r"(CONT|PROP)\D{0,12}?(?:RJ1\s*)?(\d{1,5})[.\-/](\d{4})")
+"""CONT CCE RJ1 102.2026 ou PROP CCE RJ 154.2026. O "RJ1" do contrato tem dígito: sem o grupo opcional, não casava."""
 LEITURA_PARADA = timedelta(minutes=10)
 """Lendo há mais que isto: a leitura se perdeu (o CRM reiniciou no meio) e a tela oferece ler de novo."""
 
@@ -255,7 +257,7 @@ def _situacao_da_leitura(d: DocumentoAnexado, agora_: datetime) -> str:
 def _sugerir(sessao: Session, lido: dict) -> dict:
     """Pelo número do CRM no documento (CONT CCE RJ1 102.2026, PROP CCE RJ 154.2026) e, sem ele, pelo CNPJ."""
     numero = ((lido.get("campos") or {}).get("numero") or {}).get("valor") or ""
-    achado = re.search(r"(CONT|PROP)\D{0,12}?(\d{1,5})[.\-/](\d{4})", numero.upper())
+    achado = NUMERO_DO_CRM.search(numero.upper())
     if achado:
         n, ano = int(achado.group(2)), int(achado.group(3))
         if achado.group(1) == "CONT":

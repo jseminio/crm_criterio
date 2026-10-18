@@ -13,6 +13,7 @@ vi.mock("../api/cliente", async () => {
       contratos: vi.fn(), contrato: vi.fn(), editarContrato: vi.fn(), registrarEventoDeContrato: vi.fn(),
       documentoDoContrato: vi.fn().mockReturnValue(new Promise(() => {})),
       assinaturaDoContrato: vi.fn().mockReturnValue(new Promise(() => {})),
+      documentos: vi.fn().mockReturnValue(new Promise(() => {})),
       mrr: vi.fn().mockResolvedValue(null), itensDoMovimento: vi.fn().mockResolvedValue({ de: "", ate: "", itens: [] }),
     },
   };

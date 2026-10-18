@@ -12,7 +12,7 @@ vi.mock("../api/cliente", async () => {
     ...real,
     api: {
       assinaturaDoContrato: vi.fn(), enviarParaAssinatura: vi.fn(), conferirAssinatura: vi.fn(),
-      lembrarSignatario: vi.fn(), cancelarAssinatura: vi.fn(), baixarContratoAssinado: vi.fn(),
+      lembrarSignatario: vi.fn(), cancelarAssinatura: vi.fn(),
     },
   };
 });
@@ -30,9 +30,10 @@ const ABA: AbaDaAssinatura = {
 };
 
 const envio = (o: Partial<EnvioParaAssinatura> = {}): EnvioParaAssinatura => ({
-  id: 3, situacao: "em_assinatura", situacao_texto: "Em assinatura", ambiente: "sandbox",
+  id: 3, origem: "crm", situacao: "em_assinatura", situacao_texto: "Em assinatura", ambiente: "sandbox",
   nome_arquivo: "CONT CCE RJ1 102.2026.pdf", prazo: "2026-11-17", enviado_em: "2026-10-18T17:00:00Z",
-  enviado_por: "Eduardo", concluido_em: null, motivo: null, ultimo_evento: null, ultimo_evento_em: null, tem_pdf: false,
+  enviado_por: "Eduardo", concluido_em: null, motivo: null, ultimo_evento: null, ultimo_evento_em: null,
+  documento_anexado_id: null,
   signatarios: [
     { nome: "Sócio Exemplo", email: "socio@grupocriterio.com.br", telefone: null, papel: "Contratada", assinou_em: "2026-10-18T17:02:00Z" },
     { nome: "Maria Decisora", email: "maria@clientea.com.br", telefone: null, papel: "Contratante", assinou_em: null },
@@ -85,7 +86,7 @@ describe("Assinatura eletrônica pela Clicksign (18/10/2026)", () => {
     expect(corpo.prazo).toBe("2026-11-17");
     expect(corpo.signatarios.map((s) => s.papel)).toEqual(["Contratada", "Contratante", "Testemunha"]);
     expect(await screen.findByText("⏳ Em assinatura · 1 de 2")).toBeInTheDocument();
-    expect(screen.getByText("⏳ Pendente")).toBeInTheDocument();
+    expect(screen.getByText(/⏳ Pendente/)).toBeInTheDocument();
   });
 
   it("em assinatura: reenvia o aviso só a quem falta", async () => {
@@ -99,16 +100,24 @@ describe("Assinatura eletrônica pela Clicksign (18/10/2026)", () => {
     expect(await screen.findByText("✓ Aviso reenviado para Maria Decisora.")).toBeInTheDocument();
   });
 
-  it("conferir que encontra assinado avisa o painel e oferece o PDF", async () => {
+  it("conferir que encontra assinado avisa o painel e aponta o PDF na seção Documento assinado", async () => {
     vi.mocked(api.assinaturaDoContrato).mockResolvedValue({ ...ABA, problema: "Já há um envio em assinatura.", atual: envio() });
-    const assinado = envio({ situacao: "assinado", situacao_texto: "Assinado", concluido_em: "2026-10-20T15:00:00Z", tem_pdf: true });
+    const assinado = envio({ situacao: "assinado", situacao_texto: "Assinado", concluido_em: "2026-10-20T15:00:00Z", documento_anexado_id: 9 });
     vi.mocked(api.conferirAssinatura).mockResolvedValue({ ...ABA, problema: "O contrato está Ativo.", atual: assinado });
     const aoAssinar = abrir();
     await userEvent.click(await screen.findByRole("button", { name: "Conferir na Clicksign" }));
     expect(await screen.findByText("✓ Assinado por todos em 20/10/2026")).toBeInTheDocument();
     expect(aoAssinar).toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "Baixar documento assinado" }));
-    expect(api.baixarContratoAssinado).toHaveBeenCalledWith(3);
+    expect(screen.getByText(/está na seção Documento assinado/)).toHaveTextContent(/ativou o contrato/);
+  });
+
+  it("envelope feito fora do CRM: aparece, mas não se lembra nem cancela por aqui", async () => {
+    const fora = envio({ origem: "fora", enviado_por: "direto na Clicksign", prazo: null });
+    vi.mocked(api.assinaturaDoContrato).mockResolvedValue({ ...ABA, problema: "Já há um envelope em assinatura.", atual: fora });
+    abrir();
+    expect(await screen.findByText(/feito direto na Clicksign/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reenviar aviso" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancelar envio" })).not.toBeInTheDocument();
   });
 
   it("quem só vê não envia nem cancela", async () => {

@@ -1,25 +1,31 @@
-"""Assinatura eletrônica do contrato pela Clicksign — fase 1 (amostra aprovada por Eduardo em 18/10/2026).
+"""Assinatura eletrônica pela Clicksign (amostras aprovadas por Eduardo em 18/10/2026, unificadas no mesmo dia).
+
+Pelo CRM (origem "crm"):
 
 - `GET /api/contratos/{id}/assinatura`: se dá para enviar, os signatários sugeridos (quem assina pela Critério, da
-  configuração do contrato e da tela de Integrações; o decisor do cliente, dos contatos do grupo) e os envios feitos.
+  configuração do contrato e da tela de Integrações; o decisor do cliente, dos contatos do grupo) e os envelopes.
 - `POST /api/contratos/{id}/assinatura`: sobe o PDF final, cria o envelope na Clicksign e o ativa (a Clicksign manda
-  o pedido de assinatura). Só com o contrato "Aguardando assinatura" e sem outro envio em andamento.
-- `POST …/assinatura/conferir`: pergunta à Clicksign como está o documento — o caminho de reserva se um aviso não
-  chegar — e baixa o PDF assinado se ainda faltar.
+  o pedido de assinatura). Só com o contrato "Aguardando assinatura" e sem outro envelope em assinatura.
+- `POST …/assinatura/conferir`: uma consulta à Clicksign, quando a pessoa clica. **Nunca em laço:** a Clicksign
+  proíbe polling sem autorização do suporte.
 - `POST …/assinatura/lembrete` e `POST …/assinatura/cancelar`.
-- `GET /api/assinaturas-de-contrato/{id}/pdf`: o PDF assinado.
-- `POST /api/clicksign/webhook`: o segundo endereço do CRM aberto sem login. Como no WhatsApp, a trava é a
-  assinatura: desligado responde 404; sem a chave do webhook salva, recusa tudo; com ela, exige `Content-Hmac`.
-  Aviso de documento que o CRM não enviou é aceito (200) e ignorado, para a Clicksign não repetir.
 
-**Assinado ativa o contrato sozinho**, com a data em que o envelope fechou (Brasília): a vigência começa na
-assinatura (25/09/2026). O PDF assinado vem sempre da API, nunca de um endereço que o aviso traga.
+Pelo aviso (`POST /api/clicksign/webhook`), o segundo endereço do CRM aberto sem login. Como no WhatsApp, a trava é a
+assinatura: desligado responde 404; sem a chave do webhook salva, recusa tudo; com ela, exige `Content-Hmac`.
+
+- envelope do CRM assinado por todos: **ativa o contrato sozinho**, com a data em que fechou (Brasília);
+- envelope feito direto na Clicksign: entra (origem "fora") só se o nome traz um número do CRM (CONT CCE RJ1 ou
+  PROP CCE RJ), porque o aviso é da conta inteira. Não mexe no contrato;
+- nos dois, o PDF assinado vira um documento anexado (origem "clicksign") e a IA o lê: a conferência
+  (`crm.api.documentos`) mostra o que gravar. No de fora, é ela que decide o que vai para o contrato;
+- aviso de documento que não interessa é aceito (200) e ignorado, para a Clicksign não repetir.
 """
 
 from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import json
 import logging
 import re
@@ -27,18 +33,20 @@ from collections.abc import Callable, Iterator
 from datetime import date, datetime, timedelta
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session, undefer
+from sqlalchemy.orm import Session, defer, sessionmaker
 
 import httpx2 as httpx
 
 from crm import configuracao
 from crm.api.acesso import quem_fez
+from crm.api.documentos import NUMERO_DO_CRM, Leitor, _sugerir, ler_documento, leitor_real
 from crm.contrato import clicksign as cs
 from crm.db.base import agora
 from crm.db.modelos import (
-    AssinaturaDeContrato, ConfiguracaoDeContrato, Contrato, Empresa, PessoaContato, VinculoDeContato,
+    ConfiguracaoDeContrato, Contrato, DocumentoAnexado, Empresa, EnvelopeDoClicksign, Oportunidade, PessoaContato,
+    VinculoDeContato,
 )
 from crm.domain.listas import PapelContato, SituacaoContrato
 
@@ -56,6 +64,8 @@ _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _log = logging.getLogger(__name__)
 
 FabricaDeHttp = Callable[[], httpx.Client | None]
+Agendar = Callable[[int], None]
+"""Agenda a leitura do documento anexado, fora do pedido."""
 
 
 # ── Esquemas ─────────────────────────────────────────────────────────────────────────────────────────
@@ -79,11 +89,13 @@ class SignatarioDoEnvio(BaseModel):
 
 class Envio(BaseModel):
     id: int
+    origem: str
+    """"crm" (enviado pelo CRM) ou "fora" (feito direto na Clicksign)."""
     situacao: str
     situacao_texto: str
     ambiente: str
     nome_arquivo: str
-    prazo: date
+    prazo: date | None
     enviado_em: datetime
     enviado_por: str
     concluido_em: datetime | None
@@ -91,7 +103,8 @@ class Envio(BaseModel):
     ultimo_evento: str | None
     ultimo_evento_em: datetime | None
     signatarios: list[SignatarioDoEnvio]
-    tem_pdf: bool
+    documento_anexado_id: int | None
+    """O PDF assinado, na seção Documento assinado."""
 
 
 class AbaDaAssinatura(BaseModel):
@@ -100,7 +113,7 @@ class AbaDaAssinatura(BaseModel):
     autenticacao: str
     pede_telefone: bool
     problema: str | None
-    """Por que não dá para enviar agora (desligada, contrato já assinado, envio em andamento)."""
+    """Por que não dá para enviar agora (desligada, contrato já assinado, envelope em assinatura)."""
     sugeridos: list[SignatarioSugerido]
     prazo_sugerido: date
     atual: Envio | None
@@ -133,15 +146,15 @@ def _brasilia(momento: datetime) -> date:
     return (momento if momento.tzinfo else momento.replace(tzinfo=cs.BRASILIA)).astimezone(cs.BRASILIA).date()
 
 
-def _envio(a: AssinaturaDeContrato, tem_pdf: bool) -> Envio:
+def _envio(e: EnvelopeDoClicksign) -> Envio:
     return Envio(
-        id=a.id, situacao=a.situacao, situacao_texto=SITUACOES.get(a.situacao, a.situacao), ambiente=a.ambiente,
-        nome_arquivo=a.nome_arquivo, prazo=a.prazo, enviado_em=a.enviado_em, enviado_por=a.enviado_por,
-        concluido_em=a.concluido_em, motivo=a.motivo, ultimo_evento=a.ultimo_evento,
-        ultimo_evento_em=a.ultimo_evento_em, tem_pdf=tem_pdf,
+        id=e.id, origem=e.origem, situacao=e.situacao, situacao_texto=SITUACOES.get(e.situacao, e.situacao),
+        ambiente=e.ambiente, nome_arquivo=e.nome_arquivo, prazo=e.prazo, enviado_em=e.enviado_em,
+        enviado_por=e.enviado_por, concluido_em=e.concluido_em, motivo=e.motivo, ultimo_evento=e.ultimo_evento,
+        ultimo_evento_em=e.ultimo_evento_em, documento_anexado_id=e.documento_anexado_id,
         signatarios=[SignatarioDoEnvio(nome=s.get("nome", ""), email=s.get("email", ""), telefone=s.get("telefone"),
                                        papel=s.get("papel", ""), assinou_em=s.get("assinou_em"))
-                     for s in a.signatarios],
+                     for s in e.signatarios],
     )
 
 
@@ -233,58 +246,117 @@ def _validar(corpo: PedidoDeEnvio, autenticacao: str, hoje: date) -> tuple[bytes
     return pdf, signatarios
 
 
-def _concluir_assinado(c: Contrato, a: AssinaturaDeContrato, quando: datetime, pdf: bytes | None) -> None:
-    a.situacao, a.concluido_em = "assinado", quando
-    a.signatarios = [{**s, "assinou_em": s.get("assinou_em") or quando.isoformat()} for s in a.signatarios]
-    if pdf is not None:
-        a.assinado_base64 = base64.b64encode(pdf).decode()
-    if c.situacao is SituacaoContrato.AGUARDANDO_ASSINATURA:
-        c.data_inicio = _brasilia(quando)
-        c.situacao = SituacaoContrato.ATIVO
-        clientes = [s["nome"] for s in a.signatarios if s.get("papel") == "Contratante"]
-        if not c.signatario and clientes:
-            c.signatario = ", ".join(clientes)[:200]
-        if not c.documento_assinado:
-            c.documento_assinado = f"Clicksign · envelope {a.envelope_id} (PDF na seção Assinatura eletrônica)"[:400]
+def _encerrar(e: EnvelopeDoClicksign, situacao: str, quando: datetime, motivo: str) -> None:
+    if e.situacao == "em_assinatura":
+        e.situacao, e.concluido_em, e.motivo = situacao, quando, motivo[:400]
 
 
-def _encerrar(a: AssinaturaDeContrato, situacao: str, quando: datetime, motivo: str) -> None:
-    if a.situacao == "em_assinatura":
-        a.situacao, a.concluido_em, a.motivo = situacao, quando, motivo[:400]
+def _anexar(sessao: Session, e: EnvelopeDoClicksign, pdf: bytes) -> DocumentoAnexado:
+    """O PDF assinado vira um documento anexado (origem "clicksign"), como se alguém o tivesse subido na seção
+    Documento assinado: substitui o anterior do mesmo tipo, que fica no histórico. PDF repetido não entra de novo."""
+    resumo = hashlib.sha256(pdf).hexdigest()
+    repetido = sessao.scalar(sa.select(DocumentoAnexado).options(defer(DocumentoAnexado.conteudo_base64)).where(
+        DocumentoAnexado.sha256 == resumo, DocumentoAnexado.substituido_em.is_(None)))
+    if repetido is not None:
+        return repetido
+    tipo = "proposta" if e.contrato_id is None and e.oportunidade_id is not None else "contrato"
+    grupo_id = None
+    if e.contrato_id is not None:
+        grupo_id = sessao.get(Contrato, e.contrato_id).grupo_id
+    elif e.oportunidade_id is not None:
+        grupo_id = sessao.get(Oportunidade, e.oportunidade_id).grupo_id
+    if e.contrato_id or e.oportunidade_id:
+        alvo = (DocumentoAnexado.contrato_id == e.contrato_id if tipo == "contrato"
+                else DocumentoAnexado.oportunidade_id == e.oportunidade_id)
+        for anterior in sessao.scalars(sa.select(DocumentoAnexado).options(defer(DocumentoAnexado.conteudo_base64))
+                                       .where(alvo, DocumentoAnexado.tipo == tipo, DocumentoAnexado.substituido_em.is_(None))):
+            anterior.substituido_em = agora()
+    nome = e.nome_arquivo if e.nome_arquivo.lower().endswith(".pdf") else f"{e.nome_arquivo}.pdf"
+    d = DocumentoAnexado(
+        tipo=tipo, grupo_id=grupo_id, contrato_id=e.contrato_id if tipo == "contrato" else None,
+        oportunidade_id=e.oportunidade_id if tipo == "proposta" else None, nome_arquivo=nome[:200], tamanho=len(pdf),
+        sha256=resumo, conteudo_base64=base64.b64encode(pdf).decode(), origem="clicksign", enviado_em=agora(),
+        enviado_por="Clicksign" + (" (enviado pelo CRM)" if e.origem == "crm" else " (feito fora do CRM)"),
+        leitura_situacao="pendente",
+    )
+    sessao.add(d)
+    sessao.flush()
+    return d
 
 
-def _conferir(sessao: Session, a: AssinaturaDeContrato, config: cs.ConfiguracaoDaClicksign,
-              http: httpx.Client | None) -> None:
-    """Pergunta à Clicksign e aplica: fechado vira assinado (e baixa o PDF); cancelado, cancelado."""
-    doc = cs.consultar(config, a.envelope_id, a.documento_id, http=http)
-    c = sessao.get(Contrato, a.contrato_id)
+def _pdf_assinado(e: EnvelopeDoClicksign, config: cs.ConfiguracaoDaClicksign | None, url_do_aviso: str | None,
+                  http: httpx.Client | None) -> bytes | None:
+    """O endereço do aviso, se confiável; senão, o que a API informar. Falhou, fica para a tela."""
+    url = cs.endereco_confiavel(url_do_aviso)
+    if url is None and config is not None and e.envelope_id:
+        try:
+            url = cs.consultar(config, e.envelope_id, e.documento_id, http=http).assinado_url
+        except cs.FalhaNaClicksign as falha:
+            _log.warning("Clicksign: consulta do PDF assinado falhou (%s)", falha)
+    if url is None:
+        return None
+    try:
+        return cs.baixar_assinado(url, http=http)
+    except cs.FalhaNaClicksign as falha:
+        _log.warning("Clicksign: PDF assinado não baixado (%s)", falha)
+        return None
+
+
+def _fechar(sessao: Session, e: EnvelopeDoClicksign, quando: datetime, pdf: bytes | None, agendar: Agendar) -> None:
+    """Assinado por todos. Do CRM, ativa o contrato; de fora, só leva o PDF à conferência."""
+    if e.situacao != "assinado":
+        e.situacao, e.concluido_em = "assinado", quando
+        e.signatarios = [{**s, "assinou_em": s.get("assinou_em") or quando.isoformat()} for s in e.signatarios]
+        if e.origem == "crm" and e.contrato_id is not None:
+            c = sessao.get(Contrato, e.contrato_id)
+            if c.situacao is SituacaoContrato.AGUARDANDO_ASSINATURA:
+                c.data_inicio, c.situacao = _brasilia(quando), SituacaoContrato.ATIVO
+                clientes = [s["nome"] for s in e.signatarios if s.get("papel") == "Contratante"]
+                if not c.signatario and clientes:
+                    c.signatario = ", ".join(clientes)[:200]
+                if not c.documento_assinado:
+                    c.documento_assinado = "Clicksign (PDF na seção Documento assinado)"
+    if pdf is not None and e.documento_anexado_id is None:
+        d = _anexar(sessao, e, pdf)
+        e.documento_anexado_id = d.id
+        if d.leitura_situacao == "pendente":
+            agendar(d.id)
+
+
+def _conferir(sessao: Session, e: EnvelopeDoClicksign, config: cs.ConfiguracaoDaClicksign,
+              http: httpx.Client | None, agendar: Agendar) -> None:
+    """Uma consulta, a pedido da pessoa: fechado vira assinado (e traz o PDF); cancelado, cancelado."""
+    if not e.envelope_id:
+        raise HTTPException(409, "Este envelope foi feito fora do CRM e chegou sem o identificador da API: "
+                                 "o CRM depende do aviso da Clicksign.")
+    doc = cs.consultar(config, e.envelope_id, e.documento_id, http=http)
     if doc.situacao == "closed":
         pdf = None
-        if doc.assinado_url:
+        if e.documento_anexado_id is None and doc.assinado_url:
             try:
                 pdf = cs.baixar_assinado(doc.assinado_url, http=http)
             except cs.FalhaNaClicksign as falha:
-                _log.warning("Clicksign: envelope fechado, PDF não baixado (%s)", falha)
-        if a.situacao == "assinado":
-            if pdf is not None:
-                a.assinado_base64 = base64.b64encode(pdf).decode()
-        else:
-            _concluir_assinado(c, a, a.concluido_em or doc.modificado_em or agora(), pdf)
+                _log.warning("Clicksign: PDF assinado não baixado (%s)", falha)
+        _fechar(sessao, e, e.concluido_em or doc.modificado_em or agora(), pdf, agendar)
     elif doc.situacao == "canceled":
-        _encerrar(a, "cancelado", doc.modificado_em or agora(), "cancelado na Clicksign")
-
-
-def _tem_pdf(sessao: Session, a: AssinaturaDeContrato) -> bool:
-    return bool(sessao.scalar(sa.select(AssinaturaDeContrato.assinado_base64.is_not(None))
-                              .where(AssinaturaDeContrato.id == a.id)))
+        _encerrar(e, "cancelado", doc.modificado_em or agora(), "cancelado na Clicksign")
 
 
 # ── Rotas ────────────────────────────────────────────────────────────────────────────────────────────
 
 def roteador_da_assinatura(obter_sessao: Callable[[], Iterator[Session]],
+                           fabrica: Callable[[], sessionmaker[Session]] | None = None,
+                           leitor: Leitor | None = None,
                            http_da_clicksign: FabricaDeHttp | None = None) -> APIRouter:
     r = APIRouter(tags=["contratos"])
     novo_http: FabricaDeHttp = http_da_clicksign or (lambda: None)
+    ler: Leitor = leitor or leitor_real
+
+    def _agendador(tarefas: BackgroundTasks) -> Agendar:
+        def agendar(documento_id: int) -> None:
+            if fabrica is not None:
+                tarefas.add_task(ler_documento, fabrica(), ler, documento_id)
+        return agendar
 
     def _contrato(sessao: Session, contrato_id: int) -> Contrato:
         c = sessao.get(Contrato, contrato_id)
@@ -292,9 +364,9 @@ def roteador_da_assinatura(obter_sessao: Callable[[], Iterator[Session]],
             raise HTTPException(404, "contrato não encontrado")
         return c
 
-    def _envios(sessao: Session, contrato_id: int) -> list[AssinaturaDeContrato]:
-        return list(sessao.scalars(sa.select(AssinaturaDeContrato).where(AssinaturaDeContrato.contrato_id == contrato_id)
-                                   .order_by(AssinaturaDeContrato.id.desc())))
+    def _envelopes(sessao: Session, contrato_id: int) -> list[EnvelopeDoClicksign]:
+        return list(sessao.scalars(sa.select(EnvelopeDoClicksign).where(EnvelopeDoClicksign.contrato_id == contrato_id)
+                                   .order_by(EnvelopeDoClicksign.id.desc())))
 
     def _config() -> cs.ConfiguracaoDaClicksign:
         configuracao.invalidar()
@@ -307,13 +379,13 @@ def roteador_da_assinatura(obter_sessao: Callable[[], Iterator[Session]],
         # A configuração já foi lida no começo da rota (`_config` ou `ver`): ler de novo aqui, depois de gravar,
         # abriria outra sessão no meio desta.
         config = cs.ler_configuracao()
-        envios = _envios(sessao, c.id)
-        atual = envios[0] if envios else None
+        envelopes = _envelopes(sessao, c.id)
+        atual = envelopes[0] if envelopes else None
         problema = None
         if config is None:
             problema = "Assinatura eletrônica desligada: ligue e salve o access token em Configurações › Integrações › Clicksign."
         elif atual is not None and atual.situacao == "em_assinatura":
-            problema = "Já há um envio em assinatura. Para mandar outro documento, cancele este antes."
+            problema = "Já há um envelope em assinatura. Para mandar outro documento, cancele este antes."
         elif c.situacao is not SituacaoContrato.AGUARDANDO_ASSINATURA:
             problema = f"O contrato está {c.situacao.value}: só se envia para assinatura o que aguarda assinatura."
         autenticacao = config.autenticacao if config else configuracao.valor("clicksign.autenticacao")
@@ -321,15 +393,16 @@ def roteador_da_assinatura(obter_sessao: Callable[[], Iterator[Session]],
             ligada=config is not None, ambiente=config.ambiente if config else configuracao.valor("clicksign.ambiente"),
             autenticacao=autenticacao, pede_telefone=autenticacao != "email", problema=problema,
             sugeridos=_sugeridos(sessao, c), prazo_sugerido=hoje + timedelta(days=30),
-            atual=_envio(atual, _tem_pdf(sessao, atual)) if atual else None,
-            anteriores=[_envio(a, _tem_pdf(sessao, a)) for a in envios[1:]],
+            atual=_envio(atual) if atual else None, anteriores=[_envio(e) for e in envelopes[1:]],
         )
 
-    def _em_andamento(sessao: Session, contrato_id: int) -> AssinaturaDeContrato:
-        envios = _envios(sessao, contrato_id)
-        if not envios or envios[0].situacao != "em_assinatura":
-            raise HTTPException(409, "não há envio em assinatura neste contrato")
-        return envios[0]
+    def _em_andamento(sessao: Session, contrato_id: int) -> EnvelopeDoClicksign:
+        envelopes = _envelopes(sessao, contrato_id)
+        if not envelopes or envelopes[0].situacao != "em_assinatura":
+            raise HTTPException(409, "não há envelope em assinatura neste contrato")
+        if envelopes[0].origem != "crm":
+            raise HTTPException(409, "este envelope foi feito fora do CRM: lembre ou cancele pela Clicksign")
+        return envelopes[0]
 
     @r.get("/api/contratos/{contrato_id}/assinatura", response_model=AbaDaAssinatura)
     def ver(contrato_id: int, hoje: date | None = None,
@@ -345,9 +418,9 @@ def roteador_da_assinatura(obter_sessao: Callable[[], Iterator[Session]],
         c = sessao.get(Contrato, contrato_id, with_for_update=True) or _contrato(sessao, contrato_id)
         if c.situacao is not SituacaoContrato.AGUARDANDO_ASSINATURA:
             raise HTTPException(409, f"O contrato está {c.situacao.value}: só se envia o que aguarda assinatura.")
-        envios = _envios(sessao, c.id)
-        if envios and envios[0].situacao == "em_assinatura":
-            raise HTTPException(409, "Já há um envio em assinatura. Cancele antes de mandar outro.")
+        envelopes = _envelopes(sessao, c.id)
+        if envelopes and envelopes[0].situacao == "em_assinatura":
+            raise HTTPException(409, "Já há um envelope em assinatura. Cancele antes de mandar outro.")
         pdf, signatarios = _validar(corpo, config.autenticacao, hoje)
         nome = f"{c.grupo.nome} · {corpo.nome_arquivo.rsplit('.', 1)[0]}"
         try:
@@ -360,8 +433,8 @@ def roteador_da_assinatura(obter_sessao: Callable[[], Iterator[Session]],
         for s in signatarios:
             s["clicksign_id"] = envelope.signatarios.get(s["email"])
         quem = (quem_fez((corpo.enviado_por or "").strip()) or "").strip() or "sem login"
-        sessao.add(AssinaturaDeContrato(
-            contrato_id=c.id, ambiente=config.ambiente, envelope_id=envelope.envelope_id,
+        sessao.add(EnvelopeDoClicksign(
+            origem="crm", contrato_id=c.id, ambiente=config.ambiente, envelope_id=envelope.envelope_id,
             documento_id=envelope.documento_id, nome_arquivo=corpo.nome_arquivo, situacao="em_assinatura",
             prazo=corpo.prazo, signatarios=signatarios, enviado_em=agora(), enviado_por=quem[:200],
         ))
@@ -369,15 +442,15 @@ def roteador_da_assinatura(obter_sessao: Callable[[], Iterator[Session]],
         return _aba(sessao, c, hoje)
 
     @r.post("/api/contratos/{contrato_id}/assinatura/conferir", response_model=AbaDaAssinatura)
-    def conferir(contrato_id: int, hoje: date | None = None,
+    def conferir(contrato_id: int, tarefas: BackgroundTasks, hoje: date | None = None,
                  sessao: Session = Depends(obter_sessao, scope="function")) -> AbaDaAssinatura:
         config = _config()
         c = _contrato(sessao, contrato_id)
-        envios = _envios(sessao, c.id)
-        if not envios:
+        envelopes = _envelopes(sessao, c.id)
+        if not envelopes:
             raise HTTPException(409, "este contrato ainda não foi enviado para assinatura")
         try:
-            _conferir(sessao, envios[0], config, novo_http())
+            _conferir(sessao, envelopes[0], config, novo_http(), _agendador(tarefas))
         except cs.FalhaNaClicksign as falha:
             raise HTTPException(502, str(falha)) from falha
         sessao.flush()
@@ -388,17 +461,17 @@ def roteador_da_assinatura(obter_sessao: Callable[[], Iterator[Session]],
                  sessao: Session = Depends(obter_sessao, scope="function")) -> AbaDaAssinatura:
         config = _config()
         c = _contrato(sessao, contrato_id)
-        a = _em_andamento(sessao, c.id)
-        s = next((s for s in a.signatarios if s.get("email") == corpo.email.strip().lower()), None)
+        e = _em_andamento(sessao, c.id)
+        s = next((s for s in e.signatarios if s.get("email") == corpo.email.strip().lower()), None)
         if s is None or not s.get("clicksign_id"):
-            raise HTTPException(404, "signatário não encontrado neste envio")
+            raise HTTPException(404, "signatário não encontrado neste envelope")
         if s.get("assinou_em"):
             raise HTTPException(409, "este signatário já assinou")
         try:
-            cs.lembrar(config, a.envelope_id, s["clicksign_id"], http=novo_http())
+            cs.lembrar(config, e.envelope_id, s["clicksign_id"], http=novo_http())
         except cs.FalhaNaClicksign as falha:
             raise HTTPException(502, str(falha)) from falha
-        a.ultimo_evento, a.ultimo_evento_em = f"lembrete para {s['nome']}"[:60], agora()
+        e.ultimo_evento, e.ultimo_evento_em = f"lembrete para {s['nome']}"[:60], agora()
         sessao.flush()
         return _aba(sessao, c, hoje or date.today())
 
@@ -407,29 +480,20 @@ def roteador_da_assinatura(obter_sessao: Callable[[], Iterator[Session]],
                  sessao: Session = Depends(obter_sessao, scope="function")) -> AbaDaAssinatura:
         config = _config()
         c = _contrato(sessao, contrato_id)
-        a = _em_andamento(sessao, c.id)
+        e = _em_andamento(sessao, c.id)
         try:
-            cs.cancelar(config, a.envelope_id, a.documento_id, http=novo_http())
+            cs.cancelar(config, e.envelope_id, e.documento_id, http=novo_http())
         except cs.FalhaNaClicksign as falha:
             raise HTTPException(502, str(falha)) from falha
-        _encerrar(a, "cancelado", agora(), f"cancelado no CRM por {quem_fez(None) or 'sem login'}")
+        _encerrar(e, "cancelado", agora(), f"cancelado no CRM por {quem_fez(None) or 'sem login'}")
         sessao.flush()
         return _aba(sessao, c, hoje or date.today())
-
-    @r.get("/api/assinaturas-de-contrato/{assinatura_id}/pdf")
-    def baixar(assinatura_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> Response:
-        a = sessao.scalar(sa.select(AssinaturaDeContrato).options(undefer(AssinaturaDeContrato.assinado_base64))
-                          .where(AssinaturaDeContrato.id == assinatura_id))
-        if a is None or not a.assinado_base64:
-            raise HTTPException(404, "PDF assinado não encontrado: use Conferir na Clicksign para baixá-lo")
-        nome = re.sub(r'[^\w .-]+', " ", a.nome_arquivo.rsplit(".", 1)[0]).strip()[:80] or "contrato"
-        return Response(base64.b64decode(a.assinado_base64), media_type="application/pdf", headers={
-            "Content-Disposition": f'attachment; filename="{nome} - assinado.pdf"', "Cache-Control": "no-store"})
 
     # ── Webhook ───────────────────────────────────────────────────────────────────────────────────────
 
     @r.post(CAMINHO_DO_WEBHOOK, tags=["clicksign"])
-    async def aviso(request: Request, sessao: Session = Depends(obter_sessao, scope="function")) -> Response:
+    async def aviso(request: Request, tarefas: BackgroundTasks,
+                    sessao: Session = Depends(obter_sessao, scope="function")) -> Response:
         configuracao.invalidar()
         if configuracao.valor("clicksign.ligado") != "true":
             return _recusar("assinatura desligada", 404)
@@ -453,7 +517,7 @@ def roteador_da_assinatura(obter_sessao: Callable[[], Iterator[Session]],
         if not isinstance(payload, dict):
             return _recusar("aviso fora do formato", 400)
         try:
-            _aplicar_aviso(sessao, payload, request.headers.get("event"), novo_http)
+            _aplicar_aviso(sessao, payload, request.headers.get("event"), novo_http, _agendador(tarefas))
         except Exception as falha:  # noqa: BLE001 — o erro do banco traz valores: no log, só o tipo
             sessao.rollback()
             _log.error("Clicksign: falha ao aplicar o aviso (%s); a Clicksign vai reenviar", type(falha).__name__)
@@ -474,38 +538,62 @@ def _texto(d: object, *caminho: str) -> str | None:
     return d if isinstance(d, str) and d else None
 
 
-def _aplicar_aviso(sessao: Session, payload: dict, cabecalho: str | None, novo_http: FabricaDeHttp) -> None:
+def _de_fora(sessao: Session, payload: dict, chave: str, quando: datetime) -> EnvelopeDoClicksign | None:
+    """Envelope feito direto na Clicksign: só com número do CRM no nome. Liga ao contrato ou à oportunidade pelo
+    número, como a conferência faz; sem achar, fica para alguém vincular na conferência."""
+    documento = payload.get("document") if isinstance(payload.get("document"), dict) else {}
+    nome = _texto(documento, "filename") or (_texto(documento, "path") or "").rsplit("/", 1)[-1]
+    achado = NUMERO_DO_CRM.search(nome.upper()) if nome else None
+    if achado is None:
+        return None
+    vinculo = _sugerir(sessao, {"campos": {"numero": {"valor": nome}}})
+    if vinculo.get("motivo") != "pelo número":
+        vinculo = {}
+    proposta = achado.group(1) == "PROP"  # proposta aceita fica na oportunidade, não no contrato
+    signatarios = [{"nome": _texto(s, "name") or "", "email": (_texto(s, "email") or "").lower(), "telefone": None,
+                    "papel": "", "clicksign_id": _texto(s, "key"), "assinou_em": None}
+                   for s in (documento.get("signers") or []) if isinstance(s, dict)]
+    e = EnvelopeDoClicksign(
+        origem="fora", contrato_id=None if proposta else vinculo.get("contrato_id"),
+        oportunidade_id=vinculo.get("oportunidade_id") if proposta else None,
+        ambiente=configuracao.valor("clicksign.ambiente"), envelope_id=None, documento_id=chave,
+        nome_arquivo=nome[:200], situacao="em_assinatura", signatarios=signatarios,
+        enviado_em=cs.quando(_texto(documento, "uploaded_at")) or quando, enviado_por="direto na Clicksign",
+    )
+    sessao.add(e)
+    sessao.flush()
+    return e
+
+
+def _aplicar_aviso(sessao: Session, payload: dict, cabecalho: str | None, novo_http: FabricaDeHttp,
+                   agendar: Agendar) -> None:
     evento = _texto(payload, "event", "name") or (cabecalho or "").strip()
-    chaves = {k for k in (_texto(payload, "document", "key"), _texto(payload, "document", "id"),
-                          _texto(payload, "envelope", "key"), _texto(payload, "envelope", "id")) if k}
-    if not evento or not chaves:
+    chave = _texto(payload, "document", "key") or _texto(payload, "document", "id")
+    if not evento or not chave:
         return
-    a = sessao.scalar(sa.select(AssinaturaDeContrato).where(sa.or_(
-        AssinaturaDeContrato.documento_id.in_(chaves), AssinaturaDeContrato.envelope_id.in_(chaves))))
-    if a is None:
-        _log.info("Clicksign: aviso %s de documento que o CRM não enviou; ignorado", evento)
-        return
-    quando = cs._quando(_texto(payload, "event", "occurred_at")) or agora()
-    a.ultimo_evento, a.ultimo_evento_em = evento[:60], quando
+    quando = cs.quando(_texto(payload, "event", "occurred_at")) or agora()
+    e = sessao.scalar(sa.select(EnvelopeDoClicksign).where(EnvelopeDoClicksign.documento_id == chave))
+    if e is None:
+        e = _de_fora(sessao, payload, chave, quando)
+        if e is None:
+            _log.info("Clicksign: aviso %s de documento sem número do CRM; ignorado", evento)
+            return
+    e.ultimo_evento, e.ultimo_evento_em = evento[:60], quando
     dados = (payload.get("event") or {}).get("data") if isinstance(payload.get("event"), dict) else None
     email = (_texto(dados, "signer", "email") or "").lower()
     nome = _texto(dados, "signer", "name") or _texto(dados, "user", "name") or ""
     if evento == "sign" and email:
-        a.signatarios = [{**s, "assinou_em": s.get("assinou_em") or quando.isoformat()} if s.get("email") == email else s
-                         for s in a.signatarios]
+        e.signatarios = [{**s, "assinou_em": s.get("assinou_em") or quando.isoformat()} if s.get("email") == email else s
+                         for s in e.signatarios]
     elif evento == "refusal":
-        _encerrar(a, "recusado", quando, f"recusado por {nome or email or 'um signatário'} na Clicksign")
+        _encerrar(e, "recusado", quando, f"recusado por {nome or email or 'um signatário'} na Clicksign")
     elif evento == "deadline":
-        _encerrar(a, "expirado", quando, "o prazo para assinar venceu")
+        _encerrar(e, "expirado", quando, "o prazo para assinar venceu")
     elif evento == "cancel":
-        _encerrar(a, "cancelado", quando, "cancelado na Clicksign")
-    elif evento in FECHAMENTO and a.situacao != "assinado":
+        _encerrar(e, "cancelado", quando, "cancelado na Clicksign")
+    elif evento in FECHAMENTO and (e.situacao != "assinado" or e.documento_anexado_id is None):
         config = cs.ler_configuracao()
-        if config is None:
-            return
-        try:
-            _conferir(sessao, a, config, novo_http())
-        except cs.FalhaNaClicksign as falha:
-            # O aviso fica registrado; o botão Conferir termina o trabalho.
-            _log.warning("Clicksign: envelope fechado, mas a consulta falhou (%s)", falha)
+        pdf = None if e.documento_anexado_id else _pdf_assinado(
+            e, config, _texto(payload, "document", "downloads", "signed_file_url"), novo_http())
+        _fechar(sessao, e, e.concluido_em or quando, pdf, agendar)
     sessao.flush()

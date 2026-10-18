@@ -1,8 +1,10 @@
-/** Assinatura eletrônica pela Clicksign — fase 1 (amostra aprovada por Eduardo em 18/10/2026).
+/** Assinatura eletrônica pela Clicksign (amostras aprovadas por Eduardo em 18/10/2026, unificadas no mesmo dia).
  *
  * Sobe o PDF final (o Word gerado, com os anexos ajustados), confere os signatários sugeridos e envia. Daí em diante o
  * CRM acompanha pelos avisos da Clicksign: quando todos assinam, o contrato vira Ativo sozinho, com a data da
- * assinatura. "Conferir na Clicksign" é o caminho de reserva se um aviso não chegar. Estado sempre com palavra. */
+ * assinatura, e o PDF assinado vai para a seção Documento assinado. O envelope feito direto na Clicksign (com o
+ * número do contrato no nome) aparece aqui também, mas não ativa nada: o PDF dele vai para a conferência.
+ * "Conferir na Clicksign" é uma consulta só, a pedido: a Clicksign não permite consulta em laço. */
 
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
@@ -112,9 +114,9 @@ export function AssinaturaEletronica({ contratoId, aoAssinar }: { contratoId: nu
             {aba.ligada && ` · autenticação por ${AUTENTICACAO[aba.autenticacao] ?? aba.autenticacao}`}
           </p>
         </div>
-        {atual && podeEnviar && (
+        {atual && atual.origem === "crm" && podeEnviar && (
           <div className="reajuste-acoes">
-            {(emAndamento || (atual.situacao === "assinado" && !atual.tem_pdf)) && aba.ligada && (
+            {(emAndamento || (atual.situacao === "assinado" && !atual.documento_anexado_id)) && aba.ligada && (
               <button type="button" className="botao botao-secundario" disabled={ocupado}
                 onClick={() => void agir(() => api.conferirAssinatura(contratoId), "Conferido na Clicksign.",
                   "Falha ao conferir na Clicksign.")}>
@@ -145,49 +147,49 @@ export function AssinaturaEletronica({ contratoId, aoAssinar }: { contratoId: nu
           <p style={{ margin: 0 }}>
             <Situacao envio={atual} />{" "}
             <span className="campo-ajuda">
-              {atual.nome_arquivo} · enviado por {atual.enviado_por} em {dataHora(atual.enviado_em)}
-              {emAndamento && ` · prazo ${data(atual.prazo)}`}
+              {atual.nome_arquivo} · {atual.origem === "fora" ? "feito direto na Clicksign" : `enviado por ${atual.enviado_por}`}
+              {" "}em {dataHora(atual.enviado_em)}
+              {emAndamento && atual.prazo && ` · prazo ${data(atual.prazo)}`}
             </span>
           </p>
           {atual.motivo && atual.situacao !== "assinado" && <p className="campo-ajuda">{atual.motivo}</p>}
           <div className="tabela-rolagem">
             <table className="tabela" aria-label="Signatários do envio">
               <thead>
-                <tr><th scope="col">Signatário</th><th scope="col">Papel</th><th scope="col">Situação</th>{emAndamento && podeEnviar && <th scope="col"><span className="visualmente-oculto">Ação</span></th>}</tr>
+                <tr><th scope="col">Signatário</th><th scope="col">Papel</th><th scope="col">Situação</th></tr>
               </thead>
               <tbody>
                 {atual.signatarios.map((s) => (
                   <tr key={s.email}>
                     <td>{s.nome}<span className="celula-fonte">{s.email}</span></td>
                     <td>{s.papel}</td>
-                    <td>{s.assinou_em ? `✓ Assinou em ${dataHora(s.assinou_em)}` : emAndamento ? "⏳ Pendente" : "— Não assinou"}</td>
-                    {emAndamento && podeEnviar && (
-                      <td>
-                        {!s.assinou_em && aba.ligada && (
-                          <button type="button" className="botao botao-secundario" disabled={ocupado}
+                    <td>
+                      {s.assinou_em ? `✓ Assinou em ${dataHora(s.assinou_em)}` : emAndamento ? "⏳ Pendente" : "— Não assinou"}
+                      {emAndamento && podeEnviar && atual.origem === "crm" && !s.assinou_em && aba.ligada && (
+                        <>
+                          {" · "}
+                          <button type="button" className="botao-link" disabled={ocupado}
                             onClick={() => void agir(() => api.lembrarSignatario(contratoId, s.email),
                               `Aviso reenviado para ${s.nome}.`, "Falha ao reenviar o aviso.")}>
                             Reenviar aviso
                           </button>
-                        )}
-                      </td>
-                    )}
+                        </>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           {atual.situacao === "assinado" && (
-            atual.tem_pdf ? (
-              <button type="button" className="botao botao-secundario" onClick={() => void api.baixarContratoAssinado(atual.id)}>
-                Baixar documento assinado
-              </button>
-            ) : (
-              <p className="campo-ajuda">O PDF assinado ainda não foi baixado da Clicksign: use “Conferir na Clicksign”.</p>
-            )
-          )}
-          {atual.situacao === "assinado" && (
-            <p className="campo-ajuda">A data da assinatura veio da Clicksign e ativou o contrato: a vigência começa nela.</p>
+            <p className="campo-ajuda">
+              {atual.documento_anexado_id
+                ? "O PDF assinado está na seção Documento assinado, com a leitura da IA para conferir."
+                : "O PDF assinado não veio da Clicksign: anexe-o na seção Documento assinado."}
+              {atual.origem === "crm"
+                ? " A data da assinatura veio da Clicksign e ativou o contrato: a vigência começa nela."
+                : " Feito fora do CRM: o contrato só muda pelo que for conferido."}
+            </p>
           )}
         </div>
       )}

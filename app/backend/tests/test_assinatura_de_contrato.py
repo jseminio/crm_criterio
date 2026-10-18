@@ -20,8 +20,8 @@ from crm.api.app import criar_app
 from crm.api.assinatura_de_contrato import CAMINHO_DO_WEBHOOK
 from crm.contrato import clicksign as cs
 from crm.db.modelos import (
-    AssinaturaDeContrato, ConfiguracaoDeContrato, Contrato, Empresa, GrupoEconomico, Perfil, PessoaContato, Usuario,
-    VinculoDeContato,
+    ConfiguracaoDeContrato, Contrato, DocumentoAnexado, DocumentoDeContrato, Empresa, EnvelopeDoClicksign,
+    GrupoEconomico, MatrizDeContrato, Perfil, PessoaContato, Usuario, VinculoDeContato,
 )
 from crm.domain.listas import PapelContato, SituacaoContrato
 
@@ -90,6 +90,12 @@ def falsa():
 
 
 @pytest.fixture
+def lidos():
+    """O leitor falso da IA: guarda o nome de cada PDF lido."""
+    return []
+
+
+@pytest.fixture
 def ids(engine):
     with Session(engine) as s:
         s.add(Perfil(nome="Administrador", administrador=True, permissoes=[]))
@@ -112,6 +118,12 @@ def ids(engine):
         c = Contrato(grupo_id=g.id, empresa_id=e.id, recorrente=True, preco_mensal=D("4650"),
                      situacao=SituacaoContrato.AGUARDANDO_ASSINATURA)
         s.add(c)
+        s.flush()
+        m = MatrizDeContrato(modelo="Recorrente padrão", nome_arquivo="m.docx", conteudo_base64="", enviada_por="EL",
+                             encontrados=[], faltando=[], desconhecidos=[])
+        s.add(m)
+        s.flush()
+        s.add(DocumentoDeContrato(contrato_id=c.id, numero=102, ano=2026, matriz_id=m.id, valores={}, gerado_por="EL"))
         s.commit()
         return {"contrato": c.id}
 
@@ -122,8 +134,13 @@ def fabrica(engine):
 
 
 @pytest.fixture
-def cliente(fabrica, ids, falsa):
+def cliente(fabrica, ids, falsa, lidos):
+    def ler(pdf, nome):
+        lidos.append(nome)
+        return {"tipo": "contrato", "razao_social": "", "cnpjs": [], "campos": {}}
+
     app = criar_app(fabrica, entrada=CONFIG, validar_token=validar, buscar_ipca=lambda de, ate: {},
+                    leitor_de_documentos=ler,
                     http_da_clicksign=lambda: httpx.Client(transport=httpx.MockTransport(falsa.tratar)))
     with TestClient(app) as c:
         yield c
@@ -165,12 +182,16 @@ def _aviso(cliente, payload, *, segredo=SEGREDO, assinar=True):
     return cliente.post(CAMINHO_DO_WEBHOOK, content=corpo, headers=cabecalhos)
 
 
-def _evento(nome, *, chave="doc-1", quando="2026-10-20T23:30:00-03:00", signer=None):
+def _evento(nome, *, chave="doc-1", quando="2026-10-20T23:30:00-03:00", signer=None, arquivo="contrato.pdf",
+            assinado=None):
     dados = {"account": {"key": "conta"}}
     if signer:
         dados["signer"] = signer
-    return {"event": {"name": nome, "data": dados, "occurred_at": quando},
-            "document": {"key": chave, "status": "running"}}
+    documento = {"key": chave, "filename": arquivo, "status": "closed" if assinado else "running",
+                 "signers": [{"key": "s1", "name": "Maria Decisora", "email": "maria@clientea.com.br"}]}
+    if assinado:
+        documento["downloads"] = {"signed_file_url": assinado}
+    return {"event": {"name": nome, "data": dados, "occurred_at": quando}, "document": documento}
 
 
 def _contrato(fabrica, ids) -> Contrato:
@@ -208,7 +229,7 @@ def test_envia_cria_envelope_ativa_e_registra(cliente, ids, fabrica, falsa):
     assert r.status_code == 200, r.text
     aba = r.json()
     assert aba["atual"]["situacao"] == "em_assinatura" and aba["atual"]["ambiente"] == "sandbox"
-    assert aba["problema"].startswith("Já há um envio")
+    assert aba["problema"].startswith("Já há um envelope")
     assert [s["email"] for s in aba["atual"]["signatarios"]] == ["socio@grupocriterio.com.br", "maria@clientea.com.br"]
 
     primeiro = falsa.pedidos[0]
@@ -224,7 +245,7 @@ def test_envia_cria_envelope_ativa_e_registra(cliente, ids, fabrica, falsa):
     assert falsa.corpos("/env-1")[-1]["data"]["attributes"] == {"status": "running"}
 
     with fabrica() as s:
-        a = s.query(AssinaturaDeContrato).one()
+        a = s.query(EnvelopeDoClicksign).one()
         assert (a.envelope_id, a.documento_id, a.enviado_por) == ("env-1", "doc-1", "Eduardo Luiz")
         assert [x["clicksign_id"] for x in a.signatarios] == ["sig-1", "sig-2"]
     assert _contrato(fabrica, ids).situacao is SituacaoContrato.AGUARDANDO_ASSINATURA
@@ -248,7 +269,7 @@ def test_falha_da_clicksign_volta_como_502_e_nada_fica_gravado(cliente, ids, fab
     r = _enviar(cliente, ids)
     assert r.status_code == 502 and "inválido (email)" in r.json()["detail"]
     with fabrica() as s:
-        assert s.query(AssinaturaDeContrato).count() == 0
+        assert s.query(EnvelopeDoClicksign).count() == 0
 
 
 def test_so_quem_edita_contrato_envia(cliente, ids, fabrica):
@@ -268,7 +289,13 @@ def test_aviso_sem_assinatura_ou_desligado_e_recusado(cliente, ids, fabrica):
     assert _aviso(cliente, _evento("sign", chave="de-outro-sistema")).status_code == 200  # aceito e ignorado
 
 
-def test_assinou_e_fechou_ativa_o_contrato_com_a_data_de_brasilia(cliente, ids, fabrica, falsa):
+def _documentos(fabrica):
+    with fabrica() as s:
+        return [(d.origem, d.tipo, d.contrato_id, d.oportunidade_id, d.leitura_situacao, base64.b64decode(d.conteudo_base64))
+                for d in s.query(DocumentoAnexado).order_by(DocumentoAnexado.id)]
+
+
+def test_assinou_e_fechou_ativa_o_contrato_e_leva_o_pdf_a_secao_documento_assinado(cliente, ids, fabrica, falsa, lidos):
     _configurar(fabrica)
     _enviar(cliente, ids)
     r = _aviso(cliente, _evento("sign", quando="2026-10-19T10:00:00-03:00",
@@ -277,20 +304,64 @@ def test_assinou_e_fechou_ativa_o_contrato_com_a_data_de_brasilia(cliente, ids, 
     aba = cliente.get(f"/api/contratos/{ids['contrato']}/assinatura", headers=ADMIN).json()
     assert [s["assinou_em"] is not None for s in aba["atual"]["signatarios"]] == [False, True]
 
-    falsa.situacao = "closed"
-    assert _aviso(cliente, _evento("auto_close")).status_code == 200
+    assert _aviso(cliente, _evento("auto_close", assinado=URL_ASSINADO)).status_code == 200
     c = _contrato(fabrica, ids)
     # 23h30 em Brasília do dia 20 já é dia 21 em UTC: vale o dia de Brasília.
     assert c.situacao is SituacaoContrato.ATIVO and c.data_inicio == date(2026, 10, 20)
-    assert c.signatario == "Maria Decisora" and "env-1" in c.documento_assinado
-    # O PDF veio do endereço que a API informou, não do aviso.
-    assert any(str(p.url) == URL_ASSINADO for p in falsa.pedidos)
+    assert c.signatario == "Maria Decisora" and "Documento assinado" in c.documento_assinado
+    # O PDF assinado virou documento anexado do contrato, e a IA o leu (multa, aviso prévio, renovação…).
+    assert _documentos(fabrica) == [("clicksign", "contrato", ids["contrato"], None, "lida", ASSINADO)]
+    assert lidos == ["CONT CCE RJ1 102.2026.pdf"]
     aba = cliente.get(f"/api/contratos/{ids['contrato']}/assinatura", headers=ADMIN).json()
-    assert aba["atual"]["situacao"] == "assinado" and aba["atual"]["tem_pdf"] is True
+    assert aba["atual"]["situacao"] == "assinado" and aba["atual"]["documento_anexado_id"] is not None
     assert "Ativo" in aba["problema"]
-    pdf = cliente.get(f"/api/assinaturas-de-contrato/{aba['atual']['id']}/pdf", headers=KARINE)
-    assert pdf.status_code == 200 and pdf.content == ASSINADO
-    assert pdf.headers["content-type"] == "application/pdf"
+    docs = cliente.get("/api/documentos", params={"contrato_id": ids["contrato"]}, headers=ADMIN).json()
+    assert [d["origem"] for d in docs] == ["clicksign"]
+    # Aviso repetido não anexa de novo.
+    _aviso(cliente, _evento("document_closed", assinado=URL_ASSINADO))
+    assert len(_documentos(fabrica)) == 1
+
+
+def test_endereco_de_fora_da_clicksign_nao_e_seguido(cliente, ids, fabrica, falsa):
+    _configurar(fabrica)
+    _enviar(cliente, ids)
+    _aviso(cliente, _evento("auto_close", assinado="https://outro-lugar.example.com/x.pdf"))
+    assert _contrato(fabrica, ids).situacao is SituacaoContrato.ATIVO  # assina do mesmo jeito
+    assert not any("example.com" in str(p.url) for p in falsa.pedidos)
+    assert _documentos(fabrica) == []  # o PDF fica para anexar pela tela
+
+
+def test_envelope_feito_fora_com_numero_vai_para_a_conferencia_sem_mexer_no_contrato(cliente, ids, fabrica, lidos):
+    _configurar(fabrica)
+    arquivo = "Cliente A - CONT CCE RJ1 102.2026 - BPO.pdf"
+    assert _aviso(cliente, _evento("sign", chave="fora-1", arquivo=arquivo,
+                                    signer={"email": "maria@clientea.com.br", "name": "Maria Decisora"})).status_code == 200
+    aba = cliente.get(f"/api/contratos/{ids['contrato']}/assinatura", headers=ADMIN).json()
+    assert aba["atual"]["origem"] == "fora" and aba["atual"]["enviado_por"] == "direto na Clicksign"
+    assert aba["problema"].startswith("Já há um envelope")  # não manda outro por cima
+    assert _aviso(cliente, _evento("auto_close", chave="fora-1", arquivo=arquivo, assinado=URL_ASSINADO)).status_code == 200
+    c = _contrato(fabrica, ids)
+    assert c.situacao is SituacaoContrato.AGUARDANDO_ASSINATURA and c.data_inicio is None  # quem decide é a conferência
+    assert _documentos(fabrica) == [("clicksign", "contrato", ids["contrato"], None, "lida", ASSINADO)]
+    assert lidos == [arquivo]
+    base = f"/api/contratos/{ids['contrato']}/assinatura"
+    assert cliente.post(f"{base}/cancelar", headers=ADMIN).status_code == 409
+
+
+def test_envelope_feito_fora_sem_numero_do_crm_e_ignorado(cliente, ids, fabrica):
+    _configurar(fabrica)
+    _aviso(cliente, _evento("auto_close", chave="rh-1", arquivo="Contrato de trabalho - Fulano.pdf", assinado=URL_ASSINADO))
+    with fabrica() as s:
+        assert s.query(EnvelopeDoClicksign).count() == 0
+    assert _documentos(fabrica) == []
+
+
+def test_envelope_feito_fora_sem_contrato_achado_espera_com_os_antigos(cliente, ids, fabrica):
+    _configurar(fabrica)
+    _aviso(cliente, _evento("auto_close", chave="fora-2", arquivo="CONT CCE RJ1 999.2025.pdf", assinado=URL_ASSINADO))
+    assert _documentos(fabrica)[0][:4] == ("clicksign", "contrato", None, None)
+    antigos = cliente.get("/api/documentos", params={"origem": "lote"}, headers=ADMIN).json()
+    assert [d["nome_arquivo"] for d in antigos] == ["CONT CCE RJ1 999.2025.pdf"]
 
 
 def test_recusa_deixa_o_contrato_aguardando_e_permite_reenviar(cliente, ids, fabrica):
@@ -302,7 +373,7 @@ def test_recusa_deixa_o_contrato_aguardando_e_permite_reenviar(cliente, ids, fab
     assert aba["problema"] is None
     assert _contrato(fabrica, ids).situacao is SituacaoContrato.AGUARDANDO_ASSINATURA
     with fabrica() as s:  # o segundo envio ganha outro envelope
-        s.query(AssinaturaDeContrato).update({"envelope_id": "env-antigo", "documento_id": "doc-antigo"})
+        s.query(EnvelopeDoClicksign).update({"envelope_id": "env-antigo", "documento_id": "doc-antigo"})
         s.commit()
     novo = _enviar(cliente, ids).json()
     assert novo["atual"]["situacao"] == "em_assinatura" and len(novo["anteriores"]) == 1
@@ -315,7 +386,7 @@ def test_conferir_e_o_caminho_de_reserva_sem_aviso(cliente, ids, fabrica, falsa)
     assert cliente.post(url, headers=ADMIN).json()["atual"]["situacao"] == "em_assinatura"
     falsa.situacao = "closed"
     aba = cliente.post(url, headers=ADMIN).json()
-    assert aba["atual"]["situacao"] == "assinado" and aba["atual"]["tem_pdf"] is True
+    assert aba["atual"]["situacao"] == "assinado" and aba["atual"]["documento_anexado_id"] is not None
     assert _contrato(fabrica, ids).data_inicio == date(2026, 10, 20)
 
 

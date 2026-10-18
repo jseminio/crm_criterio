@@ -5,10 +5,11 @@ import type { Listas } from "../api/tipos";
 import { MenuComAbas } from "../componentes/MenuComAbas";
 import { Carteira } from "./Carteira";
 import { Contratos } from "./Contratos";
+import { DocumentosAntigos } from "./DocumentosAntigos";
 import { FunilDoSucesso } from "./FunilDoSucesso";
 import { ReajusteAnual } from "./ReajusteAnual";
 
-export type AbaDoSucesso = "saude" | "contratos" | "reajuste" | "funil";
+export type AbaDoSucesso = "saude" | "contratos" | "documentos" | "reajuste" | "funil";
 
 export function SucessoDoCliente({ listas, abaPedida = null }: { listas: Listas | null; abaPedida?: AbaDoSucesso | null }) {
   return (
@@ -26,6 +27,11 @@ export function SucessoDoCliente({ listas, abaPedida = null }: { listas: Listas 
           chave: "contratos", rotulo: "Gestão de contratos", permissoes: ["contratos.ver"],
           explicacao: "O MRR da carteira contra a meta, os contratos e os eventos de cada um.",
           conteudo: () => <Contratos listas={listas} />,
+        },
+        {
+          chave: "documentos", rotulo: "Documentos antigos", permissoes: ["contratos.documentos"],
+          explicacao: "Contratos, propostas e aditivos feitos fora do CRM: a IA lê, você vincula e confere.",
+          conteudo: () => <DocumentosAntigos />,
         },
         {
           chave: "reajuste", rotulo: "Reajuste anual", permissoes: ["contratos.ver"],

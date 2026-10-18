@@ -9,8 +9,12 @@ Conferido na documentação oficial (developers.clicksign.com) em 18/10/2026:
 - o documento se cancela pelo `PATCH` do documento com `status: canceled`;
 - o webhook vem assinado com HMAC SHA256 do corpo bruto no cabeçalho `Content-Hmac` (`sha256=<hex>`).
 
-**O endereço do PDF assinado nunca vem do webhook:** o CRM pergunta à API (`links.files` do documento) e baixa dali.
-Assim um aviso adulterado não faz o CRM buscar arquivo em endereço de fora.
+**O PDF assinado:** a referência da API v3 só documenta o original em `links.files`; o aviso traz
+`downloads.signed_file_url`. O CRM usa o que vier, mas só de endereço HTTPS da Clicksign ou do S3 dela
+(`endereco_confiavel`). Sem ele, o contrato assina do mesmo jeito e o PDF se anexa pela tela.
+
+**Sem polling:** a Clicksign proíbe consulta em laço sem autorização do suporte. O CRM só consulta quando a pessoa
+clica em "Conferir"; o resto vem pelo aviso.
 
 Nenhum token passa por log ou mensagem de erro.
 """
@@ -31,6 +35,7 @@ from crm import configuracao
 __all__ = [
     "AUTENTICACOES", "ConfiguracaoDaClicksign", "Documento", "Envelope", "FalhaNaClicksign", "Signatario",
     "assinatura_valida", "baixar_assinado", "cancelar", "conferir_conta", "consultar", "criar_envelope",
+    "endereco_confiavel",
     "ler_configuracao", "lembrar",
 ]
 
@@ -210,7 +215,7 @@ def criar_envelope(config: ConfiguracaoDaClicksign, *, nome: str, nome_arquivo: 
     return Envelope(envelope_id, documento_id, ids)
 
 
-def _quando(texto: object) -> datetime | None:
+def quando(texto: object) -> datetime | None:
     if not isinstance(texto, str) or not texto:
         return None
     try:
@@ -229,8 +234,19 @@ def consultar(config: ConfiguracaoDaClicksign, envelope_id: str, documento_id: s
     arquivos = arquivos if isinstance(arquivos, dict) else {}
     assinado = arquivos.get("signed") or next(
         (v for k, v in arquivos.items() if "signed" in str(k) and "zip" not in str(k)), None)
-    return Documento(situacao=str(atributos.get("status") or ""), modificado_em=_quando(atributos.get("modified")),
-                     assinado_url=assinado if isinstance(assinado, str) and assinado.startswith("https://") else None)
+    return Documento(situacao=str(atributos.get("status") or ""), modificado_em=quando(atributos.get("modified")),
+                     assinado_url=endereco_confiavel(assinado))
+
+
+def endereco_confiavel(url: object) -> str | None:
+    """O endereço do PDF assinado só vale se for HTTPS na Clicksign ou no armazenamento dela (S3). O aviso chega
+    assinado (HMAC), mas mesmo assim o CRM não segue endereço de outro lugar."""
+    if not isinstance(url, str) or not url.startswith("https://"):
+        return None
+    host = url[len("https://"):].split("/", 1)[0].split("?", 1)[0].lower()
+    if host.endswith(".clicksign.com") or (host.endswith(".amazonaws.com") and "clicksign" in host):
+        return url
+    return None
 
 
 def baixar_assinado(url: str, *, http: httpx.Client | None = None) -> bytes:

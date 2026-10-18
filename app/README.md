@@ -16,6 +16,71 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Assinatura eletrônica pela Clicksign (18/10/2026)
+
+Amostras aprovadas por Eduardo em 18/10/2026 e unificadas no mesmo dia ("o envio sai pelo CRM; envelope enviado pelo
+CRM ativa o contrato sozinho; envelope feito fora do CRM vai para a conferência"). Reabre a decisão de 23/09/2026, que
+deixava a Clicksign para depois. Uma tabela (`envelope_do_clicksign`), um grupo de configuração e uma migração.
+
+- **Configurar:** Configurações › Integrações › Clicksign: ligar, ambiente (sandbox para teste, sem validade jurídica;
+  produção), access token, chave do webhook (o "HMAC SHA256 Secret" que a Clicksign gera ao cadastrar o webhook com o
+  endereço `https://crmcs.criterioconsultores.com.br/api/clicksign/webhook`), autenticação do signatário (token por
+  e-mail, WhatsApp ou SMS) e o e-mail de quem assina pela Critério (o nome vem de Serviços e contratos). "Testar" só lê.
+- **Enviar:** painel do contrato › Assinatura eletrônica. Sobe o PDF final (o Word gerado, com os anexos ajustados),
+  confere os signatários sugeridos (Critério; o contato decisor do grupo, ou o principal) e o prazo (30 dias, até 90).
+  O CRM cria o envelope na API v3, com os requisitos de cada signatário (papel `sign` e a autenticação escolhida), e o
+  ativa: a Clicksign manda o pedido. Um envelope em assinatura por contrato; recusado, vencido ou cancelado, envia-se
+  de novo. Reenviar aviso e cancelar ficam no mesmo lugar.
+- **Acompanhar:** pelo aviso da Clicksign (`POST /api/clicksign/webhook`), o segundo endereço sem login. Desligado,
+  404; sem a chave salva, recusa tudo; exige `Content-Hmac` (HMAC SHA256 do corpo bruto). "Conferir na Clicksign" faz
+  **uma** consulta, a pedido: a Clicksign proíbe consulta em laço (polling) sem autorização do suporte.
+- **Assinado (enviado pelo CRM):** o contrato vira **Ativo sozinho**, com a data em que o envelope fechou, no dia de
+  Brasília: a vigência começa na assinatura (25/09/2026). O signatário do cliente entra no contrato se estiver vazio.
+- **Feito direto na Clicksign:** o aviso é da conta inteira, então só entra o documento com número do CRM no nome
+  (CONT CCE RJ1 ou PROP CCE RJ); o resto (contrato de trabalho e outros papéis) é ignorado. Aparece no contrato achado
+  pelo número, mas **não mexe nele**: o PDF assinado vai para a conferência. Sem contrato achado, espera em Documentos
+  antigos.
+- **O PDF assinado:** nas duas origens vira documento anexado (origem "clicksign") na seção Documento assinado, e a IA o
+  lê. Vem do `downloads.signed_file_url` do aviso, aceito só de endereço HTTPS da Clicksign ou do S3 dela; sem ele, o
+  contrato assina do mesmo jeito e o PDF se anexa pela tela.
+- **A confirmar no sandbox:** que o `document.key` do aviso é o id do documento na API v3; o formato do aviso de cada
+  evento (`sign`, `refusal`, `deadline`, `cancel`, `auto_close`, `document_closed`); se a API aceita o prefixo `data:`
+  no base64 do documento; se o PDF assinado também aparece em `links.files` (a referência só documenta o original).
+- **Corrigido de passagem:** o reconhecimento do número do CRM ("CONT CCE RJ1 102.2026") não casava por causa do "1"
+  de "RJ1"; a mesma expressão (`crm.api.documentos.NUMERO_DO_CRM`) serve à conferência e ao aviso.
+
+## PDF assinado e documentos antigos no CRM, com conferência (18/10/2026)
+
+Amostra aprovada por Eduardo em 18/10/2026: o CRM guarda o PDF do contrato assinado, da proposta aceita e dos aditivos,
+inclusive os antigos, feitos fora do CRM. O arquivo fica no banco (`documento_anexado`) e entra no backup do Redeploy.
+
+- **Onde anexar:** no painel do contrato (seção Documento assinado), na aba Proposta da oportunidade aceita (Proposta
+  aceita em PDF) e em Sucesso do Cliente › **Documentos antigos**, que recebe vários PDFs de uma vez. Só PDF, até 20 MB.
+  Substituir guarda o anterior no histórico; o mesmo PDF não entra duas vezes.
+- **Leitura pela IA:** começa sozinha depois do envio, fora do pedido (a tela acompanha e pode ser fechada). Lê tipo,
+  número, CNPJ do cliente, data da assinatura ou do aceite, preço, bruto ou líquido, parcelas, escopo, fim da
+  vigência, renovação, multa rescisória, aviso prévio, signatário e plano, cada um com a página e o trecho.
+  **Só pela Anthropic** (a chave de Configurações › Integrações): o PDF é dado de cliente e não vai para um segundo
+  fornecedor, mesmo com a OpenAI como principal ou reserva. Falhou ou não leu: a pessoa digita o valor.
+- **Conferência:** por campo, o que está no CRM, o que foi lido e a situação (Igual · Diferente · Novo · Não achou ·
+  Só no documento). Só grava o que for marcado; **Diferente nunca vem marcado**. Grava pelas mesmas regras da edição
+  do contrato (`crm.domain.edicao_de_contrato`): assinado não muda preço nem fim por aqui (pede o evento), encerrado
+  não se mexe. A data da assinatura vai para o início da vigência; a da proposta, para a data de aceite da
+  oportunidade. Número e data ficam sempre no documento; o número de proposta antiga não entra na numeração do CRM.
+- **Documentos antigos:** a IA acha o cliente pelo número do CRM (CONT CCE RJ1 / PROP CCE RJ) ou pelo CNPJ e sugere o
+  contrato; a pessoa confirma o vínculo. CNPJ fora do cadastro: escolhe-se o grupo ou cria-se o contrato "anterior ao
+  CRM" (Ativo). A IA nunca cria cliente nem contrato sozinha. Aditivo não vira evento sozinho: registre-o na aba
+  Eventos, que segue a alçada.
+- **Contrato:** colunas novas `multa_rescisoria` e `aviso_previo_dias` e `renovacao` (texto, só registro: nada renova
+  sozinho por causa dela).
+- **Acesso:** permissões novas em Gestão de contratos: "anexar e conferir" (`contratos.documentos`) e "baixar PDF
+  assinado" (`contratos.baixar`). Nascem só no Administrador; ver a lista e a conferência basta `contratos.ver`.
+- **Rotas:** `POST/GET /api/documentos`, `GET/PATCH /api/documentos/{id}`, `POST /api/documentos/{id}/ler`,
+  `POST /api/documentos/{id}/conferir`, `GET /api/documentos/{id}/pdf`.
+- **Fora desta entrega:** a leitura do Clicksign (quem já assinou). A documentação oficial (conferida em 18/10/2026)
+  proíbe consultar o Clicksign em intervalos sem autorização do suporte e não mostra, na API 3.0, o PDF assinado nem
+  quem já assinou: entra depois do teste no ambiente de testes do Clicksign.
+
 ## Configurações › Integrações em abas (15/10/2026)
 
 Amostra aprovada por Eduardo em 15/10/2026: uma aba por integração (IA · WhatsApp · E-mail · Questionário · Meta Ads ·
@@ -2084,7 +2149,7 @@ ela partiu da lista de motivos de recusa e do conceito de "saída organizada" (c
 texto no banco, para mudar com um `UPDATE`. Responde *por que saiu*; *quem decidiu* é o campo `iniciativa`.
 
 **Fora, por decisão pendente:** alçadas de aditivo (presumidas no `anexo-tecnico.md`), NRR,
-Clicksign e implantação.
+Clicksign e implantação. (A Clicksign entrou em 18/10/2026: ver "Assinatura eletrônica pela Clicksign".)
 
 ## Etapa 2 — agenda de follow-up (25/09/2026)
 

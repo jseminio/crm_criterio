@@ -22,6 +22,7 @@ import { ImportarRecebimentos } from "../componentes/ImportarRecebimentos";
 import { usarAcesso } from "../entrada";
 import { contratoCombina, Destaque } from "./pesquisaDeContratos";
 import { GerarContrato } from "../componentes/GerarContrato";
+import { AssinaturaEletronica } from "../componentes/AssinaturaEletronica";
 import { DocumentosAnexados } from "../componentes/DocumentosAnexados";
 
 const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "Encerrado"];
@@ -101,6 +102,17 @@ export function EdicaoDeContrato({
 
   const mudar = (campo: string, valor: string) =>
     definirRascunho((atual) => ({ ...atual, [campo]: valor }));
+
+  // Assinado na Clicksign (18/10/2026): o contrato virou Ativo com a data da assinatura.
+  // O PDF assinado chega na seção Documento assinado: ela recarrega.
+  const [versaoDosDocumentos, definirVersaoDosDocumentos] = useState(0);
+  const aoAssinar = () => {
+    definirVersaoDosDocumentos((v) => v + 1);
+    api.contrato(contrato.id).then((atualizado) => {
+      aoRegistrarEvento(atualizado);
+      definirRascunho((r) => ({ ...r, data_inicio: atualizado.data_inicio ?? "", signatario: atualizado.signatario ?? "" }));
+    }).catch(() => undefined);
+  };
 
   const aoRegistrarEvento = (atualizado: ContratoDetalhe) => {
     definirDetalhe(atualizado);
@@ -349,13 +361,16 @@ export function EdicaoDeContrato({
           {detalhe.renovacao && <><dt>Renovação</dt><dd>{detalhe.renovacao}</dd></>}
         </dl>
       )}
-      <DocumentosAnexados contratoId={contrato.id} tipo="contrato" titulo="Documento assinado" aoGravar={aoGravarDocumento} />
+      <AssinaturaEletronica contratoId={contrato.id} aoAssinar={aoAssinar} />
+
+      <DocumentosAnexados key={versaoDosDocumentos} contratoId={contrato.id} tipo="contrato" titulo="Documento assinado"
+        aoGravar={aoGravarDocumento} />
 
       {detalhe && <EventosDeContrato contrato={detalhe} aoRegistrar={aoRegistrarEvento} motivos={motivos} iniciativas={iniciativas} />}
 
       <div className="recado">
-        Sem assinatura eletrônica ainda (Clicksign fica para depois) e sem renovação automática:
-        a vigência começa na data da assinatura que você informa aqui.
+        A vigência começa na data da assinatura: enviado pela Clicksign, ela vem sozinha; assinado fora, informe-a aqui.
+        Sem renovação automática.
       </div>
       <AlteracoesDoRegistro tabela="contrato" id={contrato.id} />
     </PainelLateral>

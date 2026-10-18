@@ -1,6 +1,6 @@
 """Configurações › Integrações (amostra aprovada por Eduardo em 07/10/2026).
 
-Chave de IA, WhatsApp, e-mail, questionário, disparo, Meta Ads (13/10/2026) e Google Ads (14/10/2026) se cadastram, trocam e testam pela tela, sem
+Chave de IA, WhatsApp, e-mail, questionário, disparo, Meta Ads (13/10/2026), Google Ads (14/10/2026) e Clicksign (18/10/2026) se cadastram, trocam e testam pela tela, sem
 nada no painel do servidor. Regras:
 
 - vale primeiro o que está na tela; sem valor na tela, a variável de ambiente antiga; depois o padrão
@@ -118,6 +118,22 @@ def _testar_google_ads(_: ConfiguracaoDoAgente) -> str:
         raise Falhou(str(falha)) from falha
 
 
+def _testar_clicksign(_: ConfiguracaoDoAgente) -> str:
+    from crm.contrato import clicksign
+
+    config = clicksign.ler_configuracao()
+    if config is None:
+        raise Falhou("Ligue a assinatura e salve o access token.")
+    try:
+        texto = clicksign.conferir_conta(config)
+    except clicksign.FalhaNaClicksign as falha:
+        raise Falhou(str(falha)) from falha
+    faltas = [n for c, n in (("clicksign.segredo_webhook", "a chave do webhook (sem ela o CRM recusa os avisos)"),
+                             ("clicksign.email_criterio", "o e-mail de quem assina pela Critério"))
+              if not configuracao.valor(c).strip()]
+    return texto + (f" Falta salvar {' e '.join(faltas)}." if faltas else "")
+
+
 def _enviar_whatsapp(config: ConfiguracaoDoAgente, para: str) -> str:
     if config.whatsapp is None:
         raise Falhou("Faltam o token e o ID do número.")
@@ -154,6 +170,7 @@ class Testadores:
     email: Callable[[ConfiguracaoDoAgente], str] = _testar_email
     meta_ads: Callable[[ConfiguracaoDoAgente], str] = _testar_meta_ads
     google_ads: Callable[[ConfiguracaoDoAgente], str] = _testar_google_ads
+    clicksign: Callable[[ConfiguracaoDoAgente], str] = _testar_clicksign
     enviar: dict[str, Callable[[ConfiguracaoDoAgente, str], str]] = field(
         default_factory=lambda: {"whatsapp": _enviar_whatsapp, "email": _enviar_email}
     )
@@ -336,7 +353,7 @@ def roteador_de_integracoes(
         if g.chave == "questionario":
             return _cronometrar(_questionario)
         testador = {"ia": t.ia, "whatsapp": t.whatsapp, "email": t.email, "meta_ads": t.meta_ads,
-                    "google_ads": t.google_ads}[g.chave]
+                    "google_ads": t.google_ads, "clicksign": t.clicksign}[g.chave]
         return _cronometrar(lambda: testador(ler_configuracao()))
 
     @r.post("/{chave}/enviar-teste", response_model=ResultadoDoTeste)

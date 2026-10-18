@@ -2643,6 +2643,61 @@ export interface PreviaDaMescla {
   duplicada_recusa: string | null;
 }
 
+/** Assinatura eletrônica pela Clicksign (18/10/2026): `GET /api/contratos/{id}/assinatura`. */
+export interface SignatarioSugerido {
+  nome: string;
+  email: string;
+  telefone: string | null;
+  papel: string;
+  origem: string;
+}
+
+export interface SignatarioDoEnvio {
+  nome: string;
+  email: string;
+  telefone: string | null;
+  papel: string;
+  assinou_em: string | null;
+}
+
+export interface EnvioParaAssinatura {
+  id: number;
+  /** "crm" (enviado pelo CRM) ou "fora" (feito direto na Clicksign, com número do CRM no nome). */
+  origem: "crm" | "fora";
+  situacao: "em_assinatura" | "assinado" | "recusado" | "expirado" | "cancelado";
+  situacao_texto: string;
+  ambiente: string;
+  nome_arquivo: string;
+  prazo: string | null;
+  enviado_em: string;
+  enviado_por: string;
+  concluido_em: string | null;
+  motivo: string | null;
+  ultimo_evento: string | null;
+  ultimo_evento_em: string | null;
+  signatarios: SignatarioDoEnvio[];
+  /** O PDF assinado, na seção Documento assinado. */
+  documento_anexado_id: number | null;
+}
+
+export interface AbaDaAssinatura {
+  ligada: boolean;
+  ambiente: string;
+  autenticacao: string;
+  pede_telefone: boolean;
+  problema: string | null;
+  sugeridos: SignatarioSugerido[];
+  prazo_sugerido: string;
+  atual: EnvioParaAssinatura | null;
+  anteriores: EnvioParaAssinatura[];
+}
+
+export interface SignatarioNovo {
+  nome: string;
+  email: string;
+  telefone: string | null;
+  papel: string;
+}
 
 /** PDF anexado ao CRM: contrato assinado, proposta aceita ou aditivo, inclusive os antigos (18/10/2026). */
 export type TipoDeDocumento = "contrato" | "proposta" | "aditivo";
@@ -2663,7 +2718,7 @@ export interface DocumentoAnexado {
   tipo: TipoDeDocumento;
   nome_arquivo: string;
   tamanho: number;
-  origem: "tela" | "lote";
+  origem: "tela" | "lote" | "clicksign";
   enviado_em: string;
   enviado_por: string;
   substituido_em: string | null;

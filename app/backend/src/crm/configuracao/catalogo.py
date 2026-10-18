@@ -135,6 +135,22 @@ GRUPOS: tuple[Grupo, ...] = (
         Campo("google_ads.acao_contrato", "Ação de conversão “Contrato fechado”", exemplo="123456791",
               ajuda="Recebe o valor do contrato em MRR (parcela × 13 ÷ 12)."),
     )),
+    # Assinatura eletrônica do contrato (amostra aprovada por Eduardo em 18/10/2026).
+    Grupo("clicksign", "Clicksign (assinatura eletrônica)", (
+        Campo("clicksign.ligado", "Assinatura ligada", padrao="false", opcoes=("true", "false"),
+              ajuda="Ligada, o contrato ganha o envio para assinatura e o CRM aceita os avisos da Clicksign."),
+        Campo("clicksign.ambiente", "Ambiente", padrao="sandbox", opcoes=("sandbox", "producao"),
+              ajuda="Sandbox é para teste e não tem validade jurídica. Troque para produção depois do ensaio."),
+        Campo("clicksign.token", "Access token", segredo=True,
+              ajuda="Clicksign › Configurações › API (o token do sandbox é outro, gerado na conta de sandbox)."),
+        Campo("clicksign.segredo_webhook", "Chave do webhook (HMAC SHA256 Secret)", segredo=True,
+              ajuda="Gerada ao cadastrar o webhook na Clicksign, com o endereço "
+                    "https://crmcs.criterioconsultores.com.br/api/clicksign/webhook. Sem ela o CRM recusa os avisos."),
+        Campo("clicksign.autenticacao", "Autenticação do signatário", padrao="email", opcoes=("email", "whatsapp", "sms"),
+              ajuda="Como a Clicksign confirma quem assina: token por e-mail, WhatsApp ou SMS (estes dois pedem o celular)."),
+        Campo("clicksign.email_criterio", "E-mail de quem assina pela Critério", exemplo="socio@grupocriterio.com.br",
+              ajuda="O nome vem de Configurações › Serviços e contratos; o e-mail, daqui."),
+    )),
     Grupo("disparo", "Disparo do lembrete e do agradecimento", (
         Campo("disparo.ligado", "Disparo ligado", variavel="CRM_DISPARO_DO_QUESTIONARIO", padrao="false",
               opcoes=("true", "false"), ajuda="A cada 10 minutos, de segunda a sexta, das 9h às 18h."),

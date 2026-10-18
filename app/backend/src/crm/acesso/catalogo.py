@@ -67,10 +67,11 @@ def permissoes_do_comercial() -> list[str]:
     )
 
 
-PUBLICAS: tuple[str, ...] = ("/api/acesso/entrada", "/api/acesso/login", "/api/whatsapp/webhook")
+PUBLICAS: tuple[str, ...] = ("/api/acesso/entrada", "/api/acesso/login", "/api/whatsapp/webhook", "/api/clicksign/webhook")
 """Sem entrada nenhuma: a tela precisa saber como entrar, e entrar, antes de ter entrado. O webhook do
 WhatsApp (14/10/2026) é chamado pela Meta, não por uma pessoa: a trava é a assinatura da entrega
-(`crm.api.whatsapp_recebido`)."""
+(`crm.api.whatsapp_recebido`). O da Clicksign (18/10/2026), o mesmo: a trava é o `Content-Hmac`
+(`crm.api.assinatura_de_contrato`)."""
 
 _TODOS = ()  # qualquer pessoa que entrou
 _CARD_DO_GRUPO = ("grupos.ver", "funil.ver", "contatos.ver", "contratos.ver", "carteira.ver", "sucesso.ver",
@@ -161,6 +162,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/contratos/\d+/documento", ("contratos.ver",)),
     ("POST", r"/api/contratos/\d+/documento", ("contratos.editar",)),
     ("GET", r"/api/documentos-de-contrato/\d+/docx", ("contratos.ver",)),
+    ("GET", r"/api/contratos/\d+/assinatura", ("contratos.ver",)),
+    ("POST", r"/api/contratos/\d+/assinatura(/conferir|/lembrete|/cancelar)?", ("contratos.editar",)),
     ("GET", r"/api/documentos-de-contrato/matriz(/\d+/docx)?", ("configuracoes.servicos", "contratos.ver")),
     ("POST", r"/api/documentos-de-contrato/matriz", ("configuracoes.servicos",)),
     ("GET", r"/api/documentos-de-contrato/configuracao", ("configuracoes.servicos", "contratos.ver")),

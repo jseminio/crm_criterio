@@ -16,6 +16,39 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Assinatura eletrônica pela Clicksign (18/10/2026)
+
+Amostras aprovadas por Eduardo em 18/10/2026 e unificadas no mesmo dia ("o envio sai pelo CRM; envelope enviado pelo
+CRM ativa o contrato sozinho; envelope feito fora do CRM vai para a conferência"). Reabre a decisão de 23/09/2026, que
+deixava a Clicksign para depois. Uma tabela (`envelope_do_clicksign`), um grupo de configuração e uma migração.
+
+- **Configurar:** Configurações › Integrações › Clicksign: ligar, ambiente (sandbox para teste, sem validade jurídica;
+  produção), access token, chave do webhook (o "HMAC SHA256 Secret" que a Clicksign gera ao cadastrar o webhook com o
+  endereço `https://crmcs.criterioconsultores.com.br/api/clicksign/webhook`), autenticação do signatário (token por
+  e-mail, WhatsApp ou SMS) e o e-mail de quem assina pela Critério (o nome vem de Serviços e contratos). "Testar" só lê.
+- **Enviar:** painel do contrato › Assinatura eletrônica. Sobe o PDF final (o Word gerado, com os anexos ajustados),
+  confere os signatários sugeridos (Critério; o contato decisor do grupo, ou o principal) e o prazo (30 dias, até 90).
+  O CRM cria o envelope na API v3, com os requisitos de cada signatário (papel `sign` e a autenticação escolhida), e o
+  ativa: a Clicksign manda o pedido. Um envelope em assinatura por contrato; recusado, vencido ou cancelado, envia-se
+  de novo. Reenviar aviso e cancelar ficam no mesmo lugar.
+- **Acompanhar:** pelo aviso da Clicksign (`POST /api/clicksign/webhook`), o segundo endereço sem login. Desligado,
+  404; sem a chave salva, recusa tudo; exige `Content-Hmac` (HMAC SHA256 do corpo bruto). "Conferir na Clicksign" faz
+  **uma** consulta, a pedido: a Clicksign proíbe consulta em laço (polling) sem autorização do suporte.
+- **Assinado (enviado pelo CRM):** o contrato vira **Ativo sozinho**, com a data em que o envelope fechou, no dia de
+  Brasília: a vigência começa na assinatura (25/09/2026). O signatário do cliente entra no contrato se estiver vazio.
+- **Feito direto na Clicksign:** o aviso é da conta inteira, então só entra o documento com número do CRM no nome
+  (CONT CCE RJ1 ou PROP CCE RJ); o resto (contrato de trabalho e outros papéis) é ignorado. Aparece no contrato achado
+  pelo número, mas **não mexe nele**: o PDF assinado vai para a conferência. Sem contrato achado, espera em Documentos
+  antigos.
+- **O PDF assinado:** nas duas origens vira documento anexado (origem "clicksign") na seção Documento assinado, e a IA o
+  lê. Vem do `downloads.signed_file_url` do aviso, aceito só de endereço HTTPS da Clicksign ou do S3 dela; sem ele, o
+  contrato assina do mesmo jeito e o PDF se anexa pela tela.
+- **A confirmar no sandbox:** que o `document.key` do aviso é o id do documento na API v3; o formato do aviso de cada
+  evento (`sign`, `refusal`, `deadline`, `cancel`, `auto_close`, `document_closed`); se a API aceita o prefixo `data:`
+  no base64 do documento; se o PDF assinado também aparece em `links.files` (a referência só documenta o original).
+- **Corrigido de passagem:** o reconhecimento do número do CRM ("CONT CCE RJ1 102.2026") não casava por causa do "1"
+  de "RJ1"; a mesma expressão (`crm.api.documentos.NUMERO_DO_CRM`) serve à conferência e ao aviso.
+
 ## PDF assinado e documentos antigos no CRM, com conferência (18/10/2026)
 
 Amostra aprovada por Eduardo em 18/10/2026: o CRM guarda o PDF do contrato assinado, da proposta aceita e dos aditivos,
@@ -2138,7 +2171,7 @@ ela partiu da lista de motivos de recusa e do conceito de "saída organizada" (c
 texto no banco, para mudar com um `UPDATE`. Responde *por que saiu*; *quem decidiu* é o campo `iniciativa`.
 
 **Fora, por decisão pendente:** alçadas de aditivo (presumidas no `anexo-tecnico.md`), NRR,
-Clicksign e implantação.
+Clicksign e implantação. (A Clicksign entrou em 18/10/2026: ver "Assinatura eletrônica pela Clicksign".)
 
 ## Etapa 2 — agenda de follow-up (25/09/2026)
 

@@ -1610,6 +1610,12 @@ td > .celula-fonte { display: block; }
 .aba-falta { color: var(--texto-fraco); }
 .aba-rascunho { color: var(--espera); font-weight: 600; }
 
+/* Assinatura eletrônica pela Clicksign (18/10/2026) */
+.assinatura-envio { display: grid; gap: var(--e2); margin-bottom: var(--e3); }
+.assinatura-envio .campo-ajuda { margin: 0; }
+.assinatura-formulario { margin-top: var(--e3); }
+.assinatura-formulario input[type="file"] { font-size: 13px; }
+
 /* PDF assinado e documentos antigos (18/10/2026) */
 .documento-anexado { border: 1px solid var(--borda); border-radius: var(--raio-md); padding: var(--e3); margin-top: var(--e2); }
 .documento-linha { display: flex; align-items: center; gap: var(--e3); flex-wrap: wrap; }

@@ -3,7 +3,8 @@
 - `POST /api/documentos?tipo=&contrato_id=|oportunidade_id=&nome_arquivo=`: o corpo é o PDF. Sem contrato nem
   oportunidade, é o lote de documentos antigos (Contratos › Incluir documentos antigos). A leitura pela IA começa logo
   depois da resposta, fora do pedido; a tela acompanha pela situação da leitura.
-- `GET /api/documentos?contrato_id=|oportunidade_id=|origem=lote`: os documentos, sem o arquivo.
+- `GET /api/documentos?contrato_id=|oportunidade_id=|origem=lote`: os documentos, sem o arquivo. `origem=lote` traz
+  também o PDF assinado na Clicksign que chegou sem contrato nem oportunidade (`crm.api.assinatura_de_contrato`).
 - `GET /api/documentos/{id}`: o documento com a conferência: por campo, o que está no CRM, o que foi lido, a página,
   o trecho, se é igual, diferente ou novo, e se pode ser gravado (pelas mesmas regras da edição do contrato).
 - `PATCH /api/documentos/{id}`: o tipo e o vínculo (grupo, contrato, oportunidade), ou criar o contrato anterior ao
@@ -321,7 +322,7 @@ def ler_documento(fabrica: sessionmaker[Session], leitor: Leitor, documento_id: 
         else:
             lido["sugestao"] = _sugerir(sessao, lido)
             d.leitura, d.leitura_situacao = lido, "lida"
-            if d.origem == "lote" and d.contrato_id is None and d.oportunidade_id is None and lido.get("tipo") in regra.TIPOS:
+            if d.origem in ("lote", "clicksign") and d.contrato_id is None and d.oportunidade_id is None and lido.get("tipo") in regra.TIPOS:
                 d.tipo = lido["tipo"]
         sessao.commit()
 
@@ -521,7 +522,7 @@ def roteador_de_documentos(
     @r.get("", response_model=list[DocumentoResumo])
     def listar(
         contrato_id: int | None = None, oportunidade_id: int | None = None, grupo_id: int | None = None,
-        origem: Literal["tela", "lote"] | None = None, historico: bool = False,
+        origem: Literal["tela", "lote", "clicksign"] | None = None, historico: bool = False,
         limite: int = Query(default=200, le=1000),
         sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> list[DocumentoResumo]:
@@ -532,7 +533,12 @@ def roteador_de_documentos(
             consulta = consulta.where(DocumentoAnexado.oportunidade_id == oportunidade_id)
         if grupo_id is not None:
             consulta = consulta.where(DocumentoAnexado.grupo_id == grupo_id)
-        if origem is not None:
+        if origem == "lote":
+            # O assinado na Clicksign que chegou sem contrato nem oportunidade espera junto com os antigos (18/10/2026).
+            consulta = consulta.where(sa.or_(DocumentoAnexado.origem == "lote", sa.and_(
+                DocumentoAnexado.origem == "clicksign", DocumentoAnexado.contrato_id.is_(None),
+                DocumentoAnexado.oportunidade_id.is_(None))))
+        elif origem is not None:
             consulta = consulta.where(DocumentoAnexado.origem == origem)
         if not historico:
             consulta = consulta.where(DocumentoAnexado.substituido_em.is_(None))

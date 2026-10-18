@@ -2022,6 +2022,49 @@ class DocumentoDeContrato(CarimboMixin, Base):
     gerado_por: Mapped[str] = mapped_column(sa.String(200), nullable=False)
 
 
+class EnvelopeDoClicksign(CarimboMixin, Base):
+    """Um documento em assinatura na Clicksign (amostras aprovadas por Eduardo em 18/10/2026, unificadas no mesmo dia).
+
+    - **origem "crm":** enviado pelo CRM (`crm.api.assinatura_de_contrato`). Assinado por todos, **ativa o contrato
+      sozinho**, com a data em que o envelope fechou: a vigência começa na assinatura (25/09/2026). Recusado, vencido
+      ou cancelado, o contrato continua "Aguardando assinatura" e pode ser enviado de novo: cada envio é uma linha.
+    - **origem "fora":** feito direto na Clicksign. Só entra se o nome traz um número do CRM (CONT CCE RJ1 ou
+      PROP CCE RJ): o aviso da Clicksign é da conta inteira e traria papéis que não são de cliente. Não mexe no
+      contrato: o PDF assinado vai para a conferência (`DocumentoAnexado`), onde uma pessoa decide.
+
+    Nas duas origens o PDF assinado vira um `DocumentoAnexado` (origem "clicksign"), lido pela IA."""
+
+    __tablename__ = "envelope_do_clicksign"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    origem: Mapped[str] = mapped_column(sa.String(10), nullable=False)
+    """"crm" ou "fora"."""
+    contrato_id: Mapped[int | None] = mapped_column(sa.ForeignKey("contrato.id"), index=True)
+    oportunidade_id: Mapped[int | None] = mapped_column(sa.ForeignKey("oportunidade.id"), index=True)
+    ambiente: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    """"sandbox" ou "producao", o da tela quando o envelope entrou no CRM."""
+    envelope_id: Mapped[str | None] = mapped_column(sa.String(64), unique=True)
+    """O envelope na API v3. O de fora pode chegar só com a chave do documento."""
+    documento_id: Mapped[str] = mapped_column(sa.String(64), nullable=False, unique=True)
+    """A chave do documento na Clicksign: é ela que vem no aviso."""
+    nome_arquivo: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    situacao: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="em_assinatura")
+    """em_assinatura · assinado · recusado · expirado · cancelado."""
+    prazo: Mapped[date | None] = mapped_column(sa.Date)
+    signatarios: Mapped[list[dict]] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False,
+                                                    default=list)
+    """[{nome, email, telefone, papel, clicksign_id, assinou_em}]. Dado pessoal: fica só no banco."""
+    enviado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+    enviado_por: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    concluido_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    """Quando fechou: assinado por todos, recusado, vencido ou cancelado."""
+    motivo: Mapped[str | None] = mapped_column(sa.String(400))
+    ultimo_evento: Mapped[str | None] = mapped_column(sa.String(60))
+    ultimo_evento_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    documento_anexado_id: Mapped[int | None] = mapped_column(sa.ForeignKey("documento_anexado.id"))
+    """O PDF assinado, quando já veio da Clicksign."""
+
+
 class DocumentoAnexado(CarimboMixin, Base):
     """Um PDF anexado ao CRM (amostra aprovada por Eduardo em 18/10/2026): o contrato assinado, a proposta aceita ou um
     aditivo, inclusive os antigos, feitos fora do CRM. O arquivo fica no banco (entra no backup do Redeploy, sem nada
@@ -2045,7 +2088,8 @@ class DocumentoAnexado(CarimboMixin, Base):
     """Impede o mesmo PDF entrar duas vezes."""
     conteudo_base64: Mapped[str] = mapped_column(sa.Text, nullable=False)
     origem: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="tela")
-    """"tela" (anexado no contrato ou na oportunidade) ou "lote" (documentos antigos)."""
+    """"tela" (anexado no contrato ou na oportunidade), "lote" (documentos antigos) ou "clicksign" (o PDF assinado que
+    a Clicksign entregou, de um envelope do CRM ou de fora: `EnvelopeDoClicksign`)."""
     enviado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
     enviado_por: Mapped[str] = mapped_column(sa.String(200), nullable=False)
     substituido_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))

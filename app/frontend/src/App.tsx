@@ -7,6 +7,7 @@ import { api } from "./api/cliente";
 import { usarAcesso } from "./entrada";
 import type { Listas } from "./api/tipos";
 import { Agenda } from "./telas/Agenda";
+import { ProvedorDeCards } from "./componentes/AberturaDeCard";
 import { Contatos } from "./telas/Contatos";
 import { Configuracoes } from "./telas/Configuracoes";
 import { SdrEAbordagens } from "./telas/SdrEAbordagens";
@@ -103,6 +104,7 @@ export default function App() {
   }, [menuAberto]);
 
   return (
+    <ProvedorDeCards listas={listas}>
     <div className="aplicacao">
       {menuAberto && <div className="cortina-do-menu" onClick={() => definirMenuAberto(false)} aria-hidden="true" />}
       <nav id="navegacao-principal" className={`lateral ${menuAberto ? "lateral-aberta" : ""}`} aria-label="Navegação principal">
@@ -199,5 +201,6 @@ export default function App() {
         </main>
       </div>
     </div>
+    </ProvedorDeCards>
   );
 }

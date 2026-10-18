@@ -1,13 +1,15 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
 import type { KpisDaLideranca as Kpis } from "../api/tipos";
 import { KpisDaLideranca, ultimosMeses } from "./KpisDaLideranca";
+import { ProvedorDeCards } from "./AberturaDeCard";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { kpisDaLideranca: vi.fn(), baixarPendenciasDeCadastro: vi.fn().mockResolvedValue(undefined) } };
+  return { ...real, api: { kpisDaLideranca: vi.fn(), baixarPendenciasDeCadastro: vi.fn().mockResolvedValue(undefined),
+    grupo: vi.fn(), oportunidades: vi.fn(), grupos: vi.fn(), lacunas: vi.fn() } };
 });
 
 const kpi = (chave: string, titulo: string, extra: object = {}) => ({
@@ -146,5 +148,42 @@ describe("KPIs da liderança (09/10/2026)", () => {
     const anterior = ultimosMeses()[1];
     await userEvent.selectOptions(screen.getByLabelText("Mês dos KPIs"), anterior.valor);
     expect(api.kpisDaLideranca).toHaveBeenLastCalledWith(anterior.valor);
+  });
+
+  it("o nome do cliente na composição abre o card; na integralidade, o campo em falta abre o card já nele (18/10/2026)", async () => {
+    const comIds: Kpis = { ...KPIS, kpis: KPIS.kpis.map((k) => (k.chave === "mrr_novo"
+      ? { ...k, itens: k.itens.map((i) => ({ ...i, grupo_id: 4 })) }
+      : k.chave === "integralidade"
+        ? { ...k, itens: [{ grupo: "Cliente · Cliente X", detalhe: "! Responsável de CS", valor: "0", entra: true, secao: "Novos · KN",
+          corte: "Novos", cadastro: "Cliente", responsavel: "KN", grupo_id: 4, registro_id: 4, empresa_id: null, contrato_id: null,
+          faltam: [{ campo: "Responsável de CS", obrigatorio: true, chave: "responsavel_cs" }] }] }
+        : k)) };
+    vi.mocked(api.kpisDaLideranca).mockResolvedValue(comIds);
+    vi.mocked(api.grupo).mockResolvedValue({ id: 4, nome: "Cliente X", situacao: "Cliente", origem: "Carga 2026",
+      responsavel_cs: null, observacao: null, data_entrada: null, fundido_em_id: null, quantas_oportunidades: 0 });
+    vi.mocked(api.oportunidades).mockResolvedValue({ total: 0, itens: [] });
+    vi.mocked(api.grupos).mockResolvedValue({ total: 0, itens: [] });
+    vi.mocked(api.lacunas).mockResolvedValue([{ cadastro: "Cliente", registro_id: 4, registro: "Cliente X",
+      campo: "Responsável de CS", chave: "responsavel_cs", obrigatorio: true, grupo_id: 4, empresa_id: null, contrato_id: null }]);
+    render(<ProvedorDeCards listas={null}><KpisDaLideranca /></ProvedorDeCards>);
+    const mrr = (await screen.findByText("MRR novo no mês")).closest("section")!;
+    fireEvent.click(within(mrr).getByRole("button", { name: "Ver composição (1)" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Mainô" }));
+    expect(await screen.findByRole("dialog", { name: "Cliente X" })).toBeInTheDocument();
+    expect(api.grupo).toHaveBeenCalledWith(4);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Cliente X" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "MRR novo no mês" })).toBeInTheDocument();  // a composição continua aberta
+    await waitFor(() => expect(api.kpisDaLideranca).toHaveBeenCalledTimes(2));  // e se atualiza
+    fireEvent.keyDown(document.body, { key: "Escape" });
+
+    const integralidade = screen.getByText("Integralidade do cadastro").closest("section")!;
+    fireEvent.click(within(integralidade).getByRole("button", { name: /Ver composição/ }));
+    const lista = await screen.findByRole("dialog", { name: "Integralidade do cadastro" });
+    fireEvent.click(within(lista).getByRole("button", { name: /! Responsável de CS/ }));
+    const card = await screen.findByRole("dialog", { name: "Cliente X" });
+    // O card do cliente abre com o formulário e o campo em falta marcado.
+    expect(await within(card).findByLabelText("Responsável CS")).toBeInTheDocument();
+    expect(within(card).getByLabelText("Responsável CS").closest(".campo-bloco")).toHaveClass("lacuna-obrigatoria");
   });
 });

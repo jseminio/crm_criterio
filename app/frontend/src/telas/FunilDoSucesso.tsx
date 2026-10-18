@@ -20,6 +20,7 @@ import { usarDados } from "../usarDados";
 import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
 import { PainelDaCarteira } from "./PainelDaCarteira";
 import { PainelDoGrupo } from "./PainelDoGrupo";
+import { LinkDoGrupo } from "../componentes/AberturaDeCard";
 
 const MEMORIA_DA_VISAO = "crm.sucesso.visao";
 const MEMORIA_DA_CLASSE = "crm.sucesso.classe";
@@ -297,7 +298,7 @@ function GruposDaClasse({ grupos }: { grupos: Grupo[] }) {
   return (
     <TabelaDeComposicao rotulo="Grupos da classe" linhas={ordenados} chave={(g) => g.grupo_id}
       colunas={[
-        { titulo: "Cliente", valor: (g) => g.nome },
+        { titulo: "Cliente", valor: (g) => g.nome, mostrar: (g) => <LinkDoGrupo grupoId={g.grupo_id} nome={g.nome} /> },
         { titulo: "Etapa", valor: (g) => g.etapa },
         { titulo: "Reunião", valor: (g) => (g.situacao ? SITUACAO_DA_REUNIAO[g.situacao] : null) },
         { titulo: "MRR bruto", valor: (g) => Number(g.mrr_bruto), mostrar: (g) => dinheiro(g.mrr_bruto), numerico: true },

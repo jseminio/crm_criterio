@@ -10,6 +10,7 @@ import type { ContratoDetalhe, ContratoResumo, Listas, Mrr, Pagina } from "../ap
 import { Etiqueta } from "../componentes/Etiqueta";
 import { ThOrdenavel, ordenar, usarOrdenacao } from "../componentes/Ordenacao";
 import { PainelLateral } from "../componentes/PainelLateral";
+import { AvisoDeLacuna, QuadroDeLacunas, irAoCampo, marcasDeLacuna, usarFocoNaLacuna, usarLacunas } from "../componentes/Lacunas";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { aliquota, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
@@ -37,16 +38,19 @@ function BaseDoValor({ base }: { base: ContratoResumo["base_do_valor"] }) {
   return <span className="celula-fonte cartao-prazo-atrasado">⚠ bruto ou líquido?</span>;
 }
 
-function EdicaoDeContrato({
+export function EdicaoDeContrato({
   contrato,
   motivos,
   iniciativas,
+  foco,
   aoFechar,
   aoSalvar,
 }: {
   contrato: ContratoResumo;
   motivos: string[];
   iniciativas: string[];
+  /** Abre já neste campo (a chave da lacuna), vindo da Integralidade ou do card do grupo (18/10/2026). */
+  foco?: string;
   aoFechar: () => void;
   aoSalvar: () => void;
 }) {
@@ -71,6 +75,12 @@ function EdicaoDeContrato({
   useEffect(() => {
     api.contrato(contrato.id).then(definirDetalhe).catch(() => definirDetalhe(null));
   }, [contrato.id]);
+
+  // O que falta no cadastro (18/10/2026): do contrato e do encerramento dele, pelo que está salvo.
+  const { lacunas: doGrupo } = usarLacunas({ grupo_id: contrato.grupo_id });
+  const lacunas = doGrupo && doGrupo.filter((l) => l.contrato_id === contrato.id);
+  const marcas = marcasDeLacuna(lacunas, "Contrato", contrato.id);
+  usarFocoNaLacuna(foco ? marcas.id(foco) : null, lacunas !== null);
 
   const situacaoAtual = detalhe?.situacao ?? contrato.situacao;
   // Depois de assinado, preço e fim só mudam por evento — o que deixa o antes e o
@@ -182,6 +192,10 @@ function EdicaoDeContrato({
         </div>
       )}
 
+      <QuadroDeLacunas lacunas={lacunas} aoIr={(l) => irAoCampo(marcas.id(l.chave))}
+        semCampo={(l) => (l.cadastro === "Encerramento" ? "Está no evento de encerramento, abaixo; não se edita por aqui."
+          : l.chave === "empresa_id" ? "O CNPJ do contrato não se edita neste card." : null)} />
+
       <div className="formulario">
         <div className="campo-bloco">
           <label className="campo-rotulo" htmlFor="c-situacao">
@@ -221,7 +235,7 @@ function EdicaoDeContrato({
         </div>
 
         <div className="formulario-duplo">
-          <div className="campo-bloco">
+          <div className={`campo-bloco ${marcas.classe("valor")}`} id={marcas.id("valor")}>
             <label className="campo-rotulo" htmlFor="c-mensal">
               Preço mensal
             </label>
@@ -234,6 +248,7 @@ function EdicaoDeContrato({
               disabled={assinado || encerrado}
               onChange={(e) => mudar("preco_mensal", e.target.value)}
             />
+            {marcas.aviso("valor")}
           </div>
           <div className="campo-bloco">
             <label className="campo-rotulo" htmlFor="c-anual">
@@ -250,7 +265,7 @@ function EdicaoDeContrato({
             />
           </div>
         </div>
-        <fieldset className="campo-bloco base-do-valor">
+        <fieldset className={`campo-bloco base-do-valor ${marcas.classe("base_do_valor")}`} id={marcas.id("base_do_valor")}>
           <legend className="campo-rotulo">O preço mensal é</legend>
           <div className="base-do-valor-opcoes">
             {(["liquido", "bruto"] as const).map((b) => (
@@ -268,6 +283,7 @@ function EdicaoDeContrato({
                 ? "Entra no MRR como está."
                 : "⚠ Não informado: o MRR soma como está. Vale também para contrato assinado ou encerrado."}
           </p>
+          {marcas.tem("base_do_valor") && <AvisoDeLacuna obrigatorio />}
         </fieldset>
         <fieldset className="campo-bloco base-do-valor">
           <legend className="campo-rotulo">Parcelas no ano</legend>
@@ -296,7 +312,7 @@ function EdicaoDeContrato({
         )}
 
         <div className="formulario-duplo">
-          <div className="campo-bloco">
+          <div className={`campo-bloco ${marcas.classe("data_inicio")}`} id={marcas.id("data_inicio")}>
             <label className="campo-rotulo" htmlFor="c-inicio">
               Data da assinatura (início da vigência)
             </label>
@@ -306,8 +322,9 @@ function EdicaoDeContrato({
               disabled={encerrado}
               aoMudar={(v) => mudar("data_inicio", v)}
             />
+            {marcas.aviso("data_inicio")}
           </div>
-          <div className="campo-bloco">
+          <div className={`campo-bloco ${marcas.classe("data_fim")}`} id={marcas.id("data_fim")}>
             <label className="campo-rotulo" htmlFor="c-fim">
               Fim da vigência
             </label>
@@ -317,10 +334,11 @@ function EdicaoDeContrato({
               disabled={(assinado && !!dataFimGravada) || encerrado}
               aoMudar={(v) => mudar("data_fim", v)}
             />
+            {marcas.aviso("data_fim")}
           </div>
         </div>
 
-        <div className="campo-bloco">
+        <div className={`campo-bloco ${marcas.classe("signatario")}`} id={marcas.id("signatario")}>
           <label className="campo-rotulo" htmlFor="c-signatario">
             Signatário
           </label>
@@ -331,6 +349,7 @@ function EdicaoDeContrato({
             disabled={encerrado}
             onChange={(e) => mudar("signatario", e.target.value)}
           />
+          {marcas.aviso("signatario")}
         </div>
       </div>
 

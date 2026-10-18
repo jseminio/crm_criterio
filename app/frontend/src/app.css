@@ -1632,6 +1632,59 @@ td > .celula-fonte { display: block; }
 .dados-do-assinado dt { color: var(--texto-medio); }
 .dados-do-assinado dd { margin: 0; }
 
+
+/* Lacunas do cadastro no card (amostra aprovada por Eduardo em 18/10/2026). Estado nunca só por cor: borda tracejada,
+   ícone ("!" obrigatório, "i" prioritário) e texto. */
+.lacunas-quadro { display: grid; gap: var(--e2); padding: var(--e3) var(--e4); margin-bottom: var(--e4);
+  border: 1px solid var(--borda); border-radius: var(--raio-md); background: var(--surface-sunken); }
+.lacunas-completo { display: flex; align-items: center; gap: var(--e2); color: var(--ganho); font-weight: 500; }
+.lacunas-titulo { margin: 0; display: flex; align-items: center; gap: var(--e2); font-weight: 600; font-size: 13px; }
+.lacunas-lista { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--e1); }
+.lacunas-lista li { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: baseline; gap: var(--e2); }
+.lacunas-registro { color: var(--texto-medio); }
+.lacunas-todas { justify-self: start; font-size: 13px; }
+@media (max-width: 560px) {
+  .lacunas-lista li { grid-template-columns: minmax(0, 1fr) auto; }
+  .lacunas-lista .lacuna-nivel { grid-column: 1 / -1; }
+  .lacunas-lista .lacunas-onde { grid-column: 1 / -1; }
+}
+.lacunas-ir { appearance: none; background: none; border: 0; padding: 0; font: inherit; color: var(--azul-destaque);
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.lacunas-onde { margin: 0; grid-column: 2 / -1; }
+.lacuna-nivel { font-size: 12px; font-weight: 600; }
+.lacuna-nivel-obrigatoria { color: var(--perda); }
+.lacuna-nivel-prioritaria { color: var(--espera); }
+.lacuna-icone { display: inline-grid; place-items: center; flex: none; width: 16px; height: 16px; border-radius: 50%;
+  font-size: 11px; font-weight: 700; line-height: 1; background: var(--perda); color: var(--branco); }
+.lacuna-icone-prioritaria, .lacuna-aviso-prioritaria .lacuna-icone { background: var(--espera); }
+.lacuna-icone-ok { background: var(--ganho); }
+.lacuna-aviso { display: inline-flex; align-items: center; gap: var(--e1); font-size: 12px; font-weight: 500; }
+.lacuna-aviso-obrigatoria { color: var(--perda); }
+.lacuna-aviso-prioritaria { color: var(--espera); }
+.lacuna-obrigatoria :is(.entrada, .selecao, .campo-data input) { border: 2px dashed var(--perda); background: var(--perda-suave); }
+.lacuna-prioritaria :is(.entrada, .selecao, .campo-data input) { border: 2px dashed var(--espera); background: var(--espera-suave); }
+.lacuna { border-radius: var(--raio-sm); transition: box-shadow .3s; }
+fieldset.lacuna-obrigatoria { border: 2px dashed var(--perda); padding: var(--e2); }
+fieldset.lacuna-prioritaria { border: 2px dashed var(--espera); padding: var(--e2); }
+.lacuna-chegou { box-shadow: 0 0 0 3px var(--surface-card), 0 0 0 6px var(--foco); }
+.lacuna-veio-de { margin: 0 0 var(--e3); padding: var(--e2) var(--e3); border-radius: var(--raio-sm); font-size: 12px;
+  background: var(--andamento-suave); color: var(--andamento); }
+@media (prefers-reduced-motion: reduce) { .lacuna { transition: none; } }
+
+/* O nome do cliente na composição abre o card do grupo (18/10/2026). */
+.link-do-grupo { appearance: none; background: none; border: 0; padding: 0; font: inherit; color: var(--azul-destaque);
+  text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--borda-forte);
+  text-underline-offset: 3px; }
+.link-do-grupo:hover { text-decoration-color: currentColor; }
+/* O card que abre da composição fica por cima do modal da composição (60) e, ao fechar, ela continua aberta. */
+.camada-do-card .cortina { z-index: 70; }
+.camada-do-card .painel { z-index: 71; }
+.camada-do-card .modal-cortina { z-index: 80; }
+.lacunas-do-contato { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e3); }
+/* "ir à lacuna" (18/10/2026): o campo em falta é um botão que abre o card já nele. */
+.integralidade-ir { appearance: none; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.integralidade-ir:hover { border-color: var(--borda-forte); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

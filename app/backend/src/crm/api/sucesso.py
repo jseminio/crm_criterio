@@ -396,8 +396,8 @@ def _ultimas(sessao: Session) -> dict[int, dict[str, date]]:
     return ultimas
 
 
-def reunioes_em_dia_por_grupo(sessao: Session, hoje: date) -> list[tuple[str, str, bool]]:
-    """(grupo, classe, em dia) de cada grupo em curso com classe, pela cadência vigente: a mesma regra do Funil do
+def reunioes_em_dia_por_grupo(sessao: Session, hoje: date) -> list[tuple[str, str, bool, int]]:
+    """(grupo, classe, em dia, id do grupo) de cada grupo em curso com classe, pela cadência vigente: a mesma regra do Funil do
     Sucesso do Cliente. É a lista que compõe `reunioes_em_dia` (10/10/2026)."""
     jornadas = {j.grupo_id: j for j in sessao.scalars(sa.select(JornadaDoCliente))}
     classes, ultimas, cadencia = _classes(sessao), _ultimas(sessao), cadencia_vigente(sessao)
@@ -410,7 +410,7 @@ def reunioes_em_dia_por_grupo(sessao: Session, hoje: date) -> list[tuple[str, st
             continue
         desde = (jornada.em_curso_desde if jornada else None) or regra.INICIO_DO_FUNIL
         atrasada = any(d.atrasada for d in regra.devidas(cadencia.get(classe, []), ultimas.get(g.id, {}), desde, hoje))
-        linhas.append((g.nome, classe, not atrasada))
+        linhas.append((g.nome, classe, not atrasada, g.id))
     return linhas
 
 
@@ -418,7 +418,7 @@ def reunioes_em_dia(sessao: Session, hoje: date) -> tuple[int, int]:
     """(em dia, total) dos grupos em curso com classe, pela cadência vigente: a mesma regra do Funil do
     Sucesso do Cliente. A Inteligência de Conversão usa no Pós-venda (03/10/2026)."""
     linhas = reunioes_em_dia_por_grupo(sessao, hoje)
-    return sum(1 for *_, ok in linhas if ok), len(linhas)
+    return sum(1 for _, _, ok, _ in linhas if ok), len(linhas)
 
 
 def roteador_do_sucesso(

@@ -25,6 +25,7 @@ vi.mock("../api/cliente", async () => {
         reajustes_possiveis: ["IPCA em julho", "Caso a caso", "Sem reajuste"], padrao: true },
     ]),
     historico: vi.fn().mockResolvedValue([]),
+    lacunas: vi.fn().mockResolvedValue([]),
     buscarEmpresas: vi.fn().mockResolvedValue([
       { id: 9, razao_social: "Beta Serviços Ltda", nome_fantasia: null, cnpj: "11444777000161",
         grupo_id: 2, grupo_nome: "Grupo Beta", tipo: "cliente" },
@@ -570,5 +571,35 @@ describe("Converter em contrato pergunta o tipo (13/10/2026)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Confirmar conversão" }));
     expect(api.converterEmContrato).not.toHaveBeenCalled();
     expect(screen.getByRole("alert")).toHaveTextContent(/escolha se o contrato é recorrente/i);
+  });
+
+  describe("lacunas do cadastro (18/10/2026)", () => {
+    const lacuna = (chave: string, campo: string, obrigatorio: boolean) => ({ cadastro: "Oportunidade" as const, registro_id: 1,
+      registro: "Grupo Alfa · BPO", campo, chave, obrigatorio, grupo_id: 1, empresa_id: null, contrato_id: null });
+
+    it("o quadro no topo conta o que falta e o campo vazio leva a marca, com ícone e texto", async () => {
+      vi.mocked(api.lacunas).mockResolvedValue([lacuna("captador", "Captador", true), lacuna("porte", "Porte", false)]);
+      await abrir(oportunidade());
+      expect(await screen.findByText("O que falta no cadastro · 1 obrigatório e 1 prioritário")).toBeInTheDocument();
+      expect(api.lacunas).toHaveBeenCalledWith({ cadastro: "Oportunidade", registro_id: 1 });
+      const captador = screen.getByLabelText("Captador").closest(".campo-bloco")!;
+      expect(captador).toHaveClass("lacuna-obrigatoria");
+      expect(captador).toHaveTextContent("Obrigatório em falta");
+      expect(screen.getByLabelText("Tipo de canal").closest(".campo-bloco")).not.toHaveClass("lacuna");
+    });
+
+    it("ir ao campo do porte troca para a aba de volumetria; o card aberto pela lacuna já chega nela", async () => {
+      vi.mocked(api.lacunas).mockResolvedValue([lacuna("porte", "Porte", false)]);
+      await abrir(oportunidade());
+      await userEvent.click(await screen.findByRole("button", { name: "ir ao campo" }));
+      expect(screen.getByRole("tab", { name: /volumetria e porte/i })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByLabelText("Porte confirmado").closest(".campo-bloco")).toHaveTextContent("Prioritário em falta");
+    });
+
+    it("sem lacuna, o card diz que o cadastro está completo", async () => {
+      vi.mocked(api.lacunas).mockResolvedValue([]);
+      await abrir(oportunidade());
+      expect(await screen.findByText("Cadastro completo")).toBeInTheDocument();
+    });
   });
 });

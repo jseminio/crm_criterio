@@ -264,6 +264,7 @@ class ItemDoRealizado(BaseModel):
     data: date | None
     valor: Decimal
     """Com sinal: perdas negativas."""
+    grupo_id: int | None = None
 
 
 def _contratos_do_plano(sessao: Session):
@@ -287,7 +288,8 @@ def composicao_do_realizado(sessao: Session, hoje: date) -> list[ItemDoRealizado
     nomes = dict(sessao.execute(sa.select(GrupoEconomico.id, GrupoEconomico.nome)
                                 .where(GrupoEconomico.id.in_({i.grupo_id for _, i in itens} or {0}))).all())
     return [
-        ItemDoRealizado(linha=linha, categoria=i.categoria, grupo=nomes.get(i.grupo_id, "?"), contrato_id=i.contrato_id,
+        ItemDoRealizado(linha=linha, categoria=i.categoria, grupo=nomes.get(i.grupo_id, "?"), grupo_id=i.grupo_id,
+                        contrato_id=i.contrato_id,
                         escopo=escopo.get(i.contrato_id), data=i.data, valor=-i.valor if linha == "perdas" else i.valor)
         for linha, i in sorted(itens, key=lambda x: (x[1].data or date.min, x[1].contrato_id))
     ]
@@ -517,6 +519,8 @@ class LinhaDaFase(BaseModel):
     valor: Decimal | None = None
     entra: bool = True
     """Conta no numerador; fora: a base de uma taxa (ex.: lead fora do ICP)."""
+    grupo_id: int | None = None
+    """O grupo do item (18/10/2026): o título abre o card dele. Lead ainda não tem grupo."""
 
 
 class FaseResposta(BaseModel):
@@ -657,12 +661,12 @@ def _montar_fases(sessao: Session, mes: date, hoje: date) -> tuple[FasesResposta
                                      data=_dia_local(l.criado_em)) for l in icp_mes]
     comp["reunioes"] = [LinhaDaFase(titulo=_lead(l), detalhe="reunião marcada", data=_dia_local(l.reuniao_marcada_para))
                         for l in reunioes_mes]
-    comp["propostas"] = [LinhaDaFase(titulo=o.nome, detalhe=o.situacao.value, data=o.data_colocacao, valor=o.preco_mensal)
+    comp["propostas"] = [LinhaDaFase(titulo=o.nome, grupo_id=o.grupo_id, detalhe=o.situacao.value, data=o.data_colocacao, valor=o.preco_mensal)
                          for o in propostas_mes]
-    comp["contratos"] = [LinhaDaFase(titulo=nome_do_grupo.get(c.grupo_id, "?"), detalhe=escopo.get(c.id), data=c.data_inicio,
+    comp["contratos"] = [LinhaDaFase(titulo=nome_do_grupo.get(c.grupo_id, "?"), grupo_id=c.grupo_id, detalhe=escopo.get(c.id), data=c.data_inicio,
                                      valor=c.preco_mensal) for c in novos_do_mes]
     comp["mrr_novo"] = [
-        LinhaDaFase(titulo=nome_do_grupo.get(i.grupo_id, "?"),
+        LinhaDaFase(titulo=nome_do_grupo.get(i.grupo_id, "?"), grupo_id=i.grupo_id,
                     detalhe=f"{escopo.get(i.contrato_id) or 'contrato'} · {'escada (upgrade de BPO)' if linha == 'escada' else 'novo'}",
                     data=i.data, valor=i.valor)
         for linha, i in (regras.itens_do_realizado(por_motor, ini, fim) if passou else []) if linha in ("bpo", "contabil", "escada")
@@ -770,7 +774,7 @@ def _montar_fases(sessao: Session, mes: date, hoje: date) -> tuple[FasesResposta
                                                         valor=D(str(round(max((t1 - t0).total_seconds() / 3600, 0), 1)))))
     comp["perdidos_expectativa"] = ([LinhaDaFase(titulo=_lead(l), detalhe="lead descartado por expectativa", data=_dia_local(l.descartado_em))
                                      for l in leads if l.motivo_descarte is MotivoDeDescarte.EXPECTATIVA and dentro(_dia_local(l.descartado_em), ini, fim)]
-                                    + [LinhaDaFase(titulo=o.nome, detalhe="proposta perdida por expectativa", data=o.data_colocacao)
+                                    + [LinhaDaFase(titulo=o.nome, grupo_id=o.grupo_id, detalhe="proposta perdida por expectativa", data=o.data_colocacao)
                                        for o in propostas_mes if o.motivo_recusa is MotivoRecusa.EXPECTATIVA]) if passou else []
     partes = []
     if k_eng.previsto is not None and aderencia is not None and aderencia < k_eng.previsto:
@@ -829,13 +833,13 @@ def _montar_fases(sessao: Session, mes: date, hoje: date) -> tuple[FasesResposta
     ciclo = D(str(round(sum((o.data_aceite - o.data_colocacao).days for o in aceitas) / len(aceitas)))) if aceitas else None
     k_conv = IndicadorDaFase(rotulo="Contratos no mês", unidade="numero", previsto=contratos_prev, realizado=cadeia_real["contratos"],
                              chave="contratos", explicacao=explicacao_da_etapa["contratos"])
-    comp["conversao"] = [LinhaDaFase(titulo=o.nome, detalhe=o.situacao.value, data=o.data_colocacao, entra=o.situacao.ganha)
+    comp["conversao"] = [LinhaDaFase(titulo=o.nome, grupo_id=o.grupo_id, detalhe=o.situacao.value, data=o.data_colocacao, entra=o.situacao.ganha)
                          for o in propostas_mes if o.situacao.decidida]
-    comp["ticket_contabil"] = [LinhaDaFase(titulo=nome_do_grupo.get(c.grupo_id, "?"), data=c.data_inicio, valor=c.preco_mensal,
+    comp["ticket_contabil"] = [LinhaDaFase(titulo=nome_do_grupo.get(c.grupo_id, "?"), grupo_id=c.grupo_id, data=c.data_inicio, valor=c.preco_mensal,
                                            entra=c.preco_mensal <= 3 * p.previsto.ticket_contabil,
                                            detalhe=None if c.preco_mensal <= 3 * p.previsto.ticket_contabil else "atípico: fora da média")
                                for c in novos(regras.MOTOR_CONTABIL) if c.preco_mensal]
-    comp["ciclo"] = [LinhaDaFase(titulo=o.nome, detalhe="dias da originação ao aceite", data=o.data_aceite,
+    comp["ciclo"] = [LinhaDaFase(titulo=o.nome, grupo_id=o.grupo_id, detalhe="dias da originação ao aceite", data=o.data_aceite,
                                  valor=D((o.data_aceite - o.data_colocacao).days)) for o in aceitas]
     if contratos_prev is None:
         aj_conv = "Sem previsto: o mês está fora da projeção do plano."
@@ -907,7 +911,7 @@ def _montar_fases(sessao: Session, mes: date, hoje: date) -> tuple[FasesResposta
                             explicacao="(MRR no início do mês + expansão + reajuste − contração − churn) ÷ MRR no início, só com "
                                        "contratos que já existiam no início do mês.")
     sinal = {"expansao": 1, "reajuste": 1, "contracao": -1, "churn_cliente": -1, "churn_criterio": -1}
-    comp["nrr"] = [LinhaDaFase(titulo=nome_do_grupo.get(i.grupo_id, "?"), detalhe=f"{escopo.get(i.contrato_id) or 'contrato'} · {i.categoria}",
+    comp["nrr"] = [LinhaDaFase(titulo=nome_do_grupo.get(i.grupo_id, "?"), grupo_id=i.grupo_id, detalhe=f"{escopo.get(i.contrato_id) or 'contrato'} · {i.categoria}",
                                data=i.data, valor=i.valor * sinal[i.categoria])
                    for i in (regras_de_mrr.itens_do_movimento(em_bruto, ini, fim, so_existentes_em=ini) if passou else [])
                    if i.categoria in sinal]
@@ -915,17 +919,17 @@ def _montar_fases(sessao: Session, mes: date, hoje: date) -> tuple[FasesResposta
     # contrato, mesmo com o MRR seguindo até a saída efetiva.
     anunciadas = regras_de_mrr.saidas_anunciadas(em_bruto, ini, fim) if passou else []
     churn_anunciado = sum((a.valor for a in anunciadas), D("0")) if passou else None
-    comp["churn"] = [LinhaDaFase(titulo=nome_do_grupo.get(a.grupo_id, "?"),
+    comp["churn"] = [LinhaDaFase(titulo=nome_do_grupo.get(a.grupo_id, "?"), grupo_id=a.grupo_id,
                                  detalhe=f"{escopo.get(a.contrato_id) or 'contrato'} · anunciou em {a.anuncio:%d/%m} · sai em {a.saida:%d/%m}",
                                  data=a.anuncio, valor=a.valor) for a in anunciadas]
-    comp["upgrades"] = [LinhaDaFase(titulo=nome_do_grupo.get(c.grupo_id, "?"), detalhe=f"{ev.tipo.value} de BPO", data=ev.data_do_evento,
+    comp["upgrades"] = [LinhaDaFase(titulo=nome_do_grupo.get(c.grupo_id, "?"), grupo_id=c.grupo_id, detalhe=f"{ev.tipo.value} de BPO", data=ev.data_do_evento,
                                     valor=ev.preco_mensal_novo - ev.preco_mensal_anterior)
                         for c in por_motor[regras.MOTOR_BPO] for ev in c.eventos
                         if passou and ev.tipo in (TipoDeEventoDeContrato.EXPANSAO, TipoDeEventoDeContrato.ADITIVO)
                         and dentro(ev.data_do_evento, ini, fim) and ev.preco_mensal_novo and ev.preco_mensal_anterior
                         and ev.preco_mensal_novo > ev.preco_mensal_anterior]
-    comp["reunioes_em_dia"] = [LinhaDaFase(titulo=n, detalhe=f"classe {cl} · {'em dia' if ok else 'reunião vencida'}", entra=ok)
-                               for n, cl, ok in (sucesso.reunioes_em_dia_por_grupo(sessao, hoje) if corrente else [])]
+    comp["reunioes_em_dia"] = [LinhaDaFase(titulo=n, grupo_id=g, detalhe=f"classe {cl} · {'em dia' if ok else 'reunião vencida'}", entra=ok)
+                               for n, cl, ok, g in (sucesso.reunioes_em_dia_por_grupo(sessao, hoje) if corrente else [])]
     partes = []
     if churn_anunciado is not None and lp is not None and churn_anunciado > lp.churn:
         partes.append(f"Churn anunciado de {_reais(churn_anunciado)} acima da premissa ({_reais(lp.churn)}): veja os encerramentos "

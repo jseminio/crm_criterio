@@ -74,6 +74,8 @@ WhatsApp (14/10/2026) é chamado pela Meta, não por uma pessoa: a trava é a as
 (`crm.api.assinatura_de_contrato`)."""
 
 _TODOS = ()  # qualquer pessoa que entrou
+_CARD_DO_GRUPO = ("grupos.ver", "funil.ver", "contatos.ver", "contratos.ver", "carteira.ver", "sucesso.ver",
+                  "configuracoes.metas")
 
 # (métodos, padrão do caminho, permissões — basta ter uma). Ordem importa: a primeira que casa vale.
 ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
@@ -141,6 +143,9 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/questionarios/\d+/(sugestoes|mescla)", ("funil.questionarios",)),
     # grupos
     ("GET", r"/api/grupos(/sugestoes-de-fusao|/fusoes)?", ("grupos.ver", "funil.ver")),
+    # o card do grupo e as lacunas do cadastro (18/10/2026): abrem de qualquer composição de indicador
+    ("GET", r"/api/grupos/\d+", _CARD_DO_GRUPO),
+    ("GET", r"/api/lacunas", _CARD_DO_GRUPO),
     ("PATCH", r"/api/grupos/\d+", ("grupos.editar",)),
     ("POST", r"/api/grupos/\d+/empresas", ("grupos.editar", "contatos.editar")),
     ("POST", r"/api/grupos/(\d+/fundir|fusoes/\d+/desfazer)", ("grupos.fundir",)),

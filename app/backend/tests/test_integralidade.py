@@ -138,3 +138,53 @@ def test_planilha_das_pendencias(cadastro):
     assert [c.value for c in ws[1]] == ["Corte", "Responsável", "Cadastro", "Registro", "Campo em falta", "Nível"]
     assert ws.max_row == 13  # cabeçalho + 12 campos em falta
     assert load_workbook(BytesIO(passado.content))["Pendências"].max_row == 1
+
+
+def test_todo_campo_tem_chave_e_o_registro_leva_o_grupo(cadastro):
+    """A tela acha o campo pela chave e abre o card pelo grupo (18/10/2026)."""
+    with Session(cadastro) as s:
+        r = integralidade.calcular(s)
+        cliente = s.query(GrupoEconomico).filter_by(nome="Cliente X").one()
+    assert {c.chave for c in r.campos} <= set(integralidade.CHAVES.values())  # nenhum campo sem chave (KeyError)
+    assert len(set(integralidade.CHAVES)) == len(integralidade.CHAVES)
+    por = {(c.cadastro, c.campo): c for c in r.campos}
+    contrato = por[("Contrato", "Bruto ou líquido")]
+    assert (contrato.chave, contrato.grupo_id, contrato.contrato_id) == ("base_do_valor", cliente.id, contrato.registro_id)
+    empresa = por[("Empresa", "Regime tributário")]
+    assert (empresa.chave, empresa.grupo_id, empresa.empresa_id) == ("regime_tributario", cliente.id, empresa.registro_id)
+    assert por[("Contato", "Cargo")].grupo_id is None  # sem vínculo: sem grupo
+
+
+def test_a_composicao_leva_a_chave_e_o_registro(cadastro):
+    with Session(cadastro) as s:
+        k = {k.chave: k for k in calcular_kpis(s, "2026-10", date(2026, 10, 20)).kpis}["integralidade"]
+    contrato = next(i for i in k.itens if i.cadastro == "Contrato")
+    assert [f.chave for f in contrato.faltam] == ["base_do_valor", "signatario", "data_fim"]
+    assert contrato.grupo_id is not None and contrato.registro_id == contrato.contrato_id
+
+
+def test_lacunas_do_grupo_e_do_registro_pela_api(cadastro):
+    from fastapi.testclient import TestClient
+    from sqlalchemy.orm import sessionmaker
+    from crm.api.app import criar_app
+
+    with Session(cadastro) as s:
+        cliente = s.query(GrupoEconomico).filter_by(nome="Cliente X").one()
+        oportunidade = s.query(Oportunidade).one()
+    fabrica = sessionmaker(bind=cadastro, expire_on_commit=False, future=True)
+    with TestClient(criar_app(fabrica)) as c:
+        do_grupo = c.get("/api/lacunas", params={"grupo_id": cliente.id}).json()
+        da_oportunidade = c.get("/api/lacunas", params={"cadastro": "Oportunidade", "registro_id": oportunidade.id}).json()
+        sem_filtro = c.get("/api/lacunas")
+        grupo = c.get(f"/api/grupos/{cliente.id}")
+        nenhum = c.get("/api/grupos/999999")
+        sugestoes = c.get("/api/grupos/sugestoes-de-fusao")
+    assert [(l["cadastro"], l["chave"]) for l in do_grupo] == [
+        ("Contrato", "base_do_valor"), ("Contrato", "signatario"), ("Contrato", "data_fim"),
+        ("Cliente", "classificacao"), ("Cliente", "porte"),
+        ("Empresa", "regime_tributario"), ("Empresa", "endereco"),
+    ]
+    assert [(l["chave"], l["obrigatorio"]) for l in da_oportunidade] == [("motivo_recusa", True), ("porte", False)]
+    assert sem_filtro.status_code == 422
+    assert grupo.status_code == 200 and grupo.json()["nome"] == "Cliente X"
+    assert nenhum.status_code == 404 and sugestoes.status_code == 200  # a rota do id não engole as outras

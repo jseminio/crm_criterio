@@ -1274,6 +1274,7 @@ class ItemDaComposicaoResposta(Base):
     """Preço mensal, MRR (ticket) ou dias (ciclo médio), conforme o indicador."""
     anual: Decimal | None = None
     falta: list[str] = []
+    grupo_id: int | None = None
 
 
 class ComposicaoDoFunilResposta(Base):

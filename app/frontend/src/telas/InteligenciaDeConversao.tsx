@@ -26,6 +26,7 @@ import { Recolhivel } from "../componentes/Recolhivel";
 import { usarAcesso } from "../entrada";
 import { data, dataHora, dinheiro, dinheiroCurto, percentual } from "../formato";
 import { usarDados } from "../usarDados";
+import { LinkDoGrupo } from "../componentes/AberturaDeCard";
 
 const NOME_DO_CENARIO: Record<NomeDoCenario, string> = { alerta: "Alerta", previsto: "Previsto", otimista: "Otimista" };
 const PAPEL_DO_CENARIO: Record<NomeDoCenario, string> = {
@@ -90,7 +91,7 @@ function ComposicaoDoRealizado({ linha }: { linha?: ItemDoRealizado["linha"] }) 
     <TabelaDeComposicao rotulo="Composição do realizado" linhas={itens} chave={(i, k) => `${i.contrato_id}-${i.data}-${k}`}
       colunas={[
         { titulo: "Data", valor: (i) => i.data, mostrar: (i) => data(i.data) },
-        { titulo: "Cliente", valor: (i) => i.grupo },
+        { titulo: "Cliente", valor: (i) => i.grupo, mostrar: (i) => <LinkDoGrupo grupoId={i.grupo_id} nome={i.grupo} /> },
         { titulo: "Contrato", valor: (i) => i.escopo ?? `Contrato ${i.contrato_id}` },
         ...(!linha ? [{ titulo: "Linha do plano", valor: (i: ItemDoRealizado) => LINHA_DO_PLANO[i.linha] }] : []),
         { titulo: "O quê", valor: (i) => CATEGORIA[i.categoria] ?? i.categoria },

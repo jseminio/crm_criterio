@@ -23,6 +23,7 @@ import { usarAcesso } from "../entrada";
 import { precoPelasParcelas } from "../parcelas";
 import { HistoricoDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 import { ConfirmacaoDeExclusao } from "../componentes/ConfirmacaoDeExclusao";
+import { AvisoDeLacuna, QuadroDeLacunas, irAoCampo, marcasDeLacuna, usarLacunas } from "../componentes/Lacunas";
 
 function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
@@ -84,12 +85,14 @@ function VolumetriaEPorte({
   mudar,
   alternar,
   listas,
+  lacunas,
 }: {
   detalhe: OportunidadeDetalhe;
   rascunho: Record<string, string>;
   mudar: (campo: string, valor: string) => void;
   alternar: (campo: string) => (evento: { target: { checked: boolean } }) => void;
   listas: Listas | null;
+  lacunas: ReturnType<typeof marcasDeLacuna>;
 }) {
   const sugestao = detalhe.sugestao_de_porte;
 
@@ -207,7 +210,7 @@ function VolumetriaEPorte({
       </div>
 
       <div className="formulario-duplo">
-        <div className="campo-bloco">
+        <div className={`campo-bloco ${lacunas.classe("porte")}`} id={lacunas.id("porte")}>
           <label className="campo-rotulo" htmlFor="d-porte">
             Porte confirmado
           </label>
@@ -234,6 +237,7 @@ function VolumetriaEPorte({
               Usar sugestão ({sugestao.porte})
             </button>
           )}
+          {lacunas.aviso("porte")}
         </div>
         <div className="campo-bloco">
           <label className="campo-rotulo" htmlFor="d-porte-por">
@@ -270,10 +274,13 @@ export function DetalheDaOportunidade({
   id,
   listas,
   situacaoInicial,
+  foco,
   aoFechar,
   aoSalvar,
 }: {
   id: number;
+  /** Abre já neste campo (a chave da lacuna): vindo da Integralidade ou do card do grupo (18/10/2026). */
+  foco?: string;
   listas: Listas | null;
   /** Pré-seleciona a situação ao abrir — usado pelo arrasto no kanban.
    *
@@ -381,6 +388,19 @@ export function DetalheDaOportunidade({
   };
 
   useEffect(carregar, [id]);
+
+  // O que falta no cadastro (18/10/2026): o quadro no topo e a marca em cada campo vazio, pelo que está salvo.
+  const { lacunas } = usarLacunas({ cadastro: "Oportunidade", registro_id: id });
+  const marcas = marcasDeLacuna(lacunas, "Oportunidade", id);
+  const irPara = (chave: string) => {
+    definirAba(chave === "porte" ? "volumetria" : "cadastro");
+    window.setTimeout(() => irAoCampo(marcas.id(chave)), 60);
+  };
+  const prontoParaFoco = !!detalhe && lacunas !== null;
+  useEffect(() => {
+    if (foco && prontoParaFoco) irPara(foco);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [foco, prontoParaFoco]);
 
   const mudar = (campo: string, valor: string) =>
     definirRascunho((atual) => ({ ...atual, [campo]: valor }));
@@ -614,6 +634,9 @@ export function DetalheDaOportunidade({
             </section>
           )}
 
+          <QuadroDeLacunas lacunas={lacunas} aoIr={(l) => irPara(l.chave)}
+            semCampo={(l) => (l.chave === "contrato" ? "Cadastre o contrato: botão Converter em contrato, no rodapé." : null)} />
+
           <div className="abas" role="tablist" aria-label="Seções da oportunidade">
             <button
               type="button"
@@ -721,6 +744,7 @@ export function DetalheDaOportunidade({
             </div>
 
             <div className="formulario-duplo">
+              <div className={marcas.classe("servico")} id={marcas.id("servico")}>
               <EscolhaDeServico
                 id="d-servico"
                 rotulo="Serviço"
@@ -733,6 +757,8 @@ export function DetalheDaOportunidade({
                   mudar("servico_tema", tema);
                 }}
               />
+              {marcas.aviso("servico")}
+              </div>
               <div className="campo-bloco">
                 <label className="campo-rotulo" htmlFor="d-tipo-servico">
                   Tipo de serviço
@@ -748,7 +774,7 @@ export function DetalheDaOportunidade({
             </div>
 
             <div className="formulario-duplo">
-              <div className="campo-bloco">
+              <div className={`campo-bloco ${marcas.classe("valor")}`} id={marcas.id("valor")}>
                 <label className="campo-rotulo" htmlFor="d-preco-mensal">
                   Preço mensal
                 </label>
@@ -761,6 +787,7 @@ export function DetalheDaOportunidade({
                   value={rascunho.preco_mensal}
                   onChange={(e) => mudar("preco_mensal", e.target.value)}
                 />
+                {marcas.aviso("valor")}
               </div>
               <div className="campo-bloco">
                 <label className="campo-rotulo" htmlFor="d-preco-anual">
@@ -804,7 +831,7 @@ export function DetalheDaOportunidade({
               </div>
             )}
 
-            <div className="campo-bloco">
+            <div className={`campo-bloco ${marcas.classe("data_colocacao")}`} id={marcas.id("data_colocacao")}>
               <label className="campo-rotulo" htmlFor="d-originacao">
                 Data de originação
               </label>
@@ -813,9 +840,10 @@ export function DetalheDaOportunidade({
                 value={rascunho.data_colocacao}
                 aoMudar={(v) => mudar("data_colocacao", v)}
               />
+              {marcas.aviso("data_colocacao")}
             </div>
 
-            <div className="campo-bloco">
+            <div className={`campo-bloco ${marcas.classe("data_envio_proposta")}`} id={marcas.id("data_envio_proposta")}>
               <label className="campo-rotulo" htmlFor="d-envio">
                 Data de envio da proposta
               </label>
@@ -832,6 +860,7 @@ export function DetalheDaOportunidade({
               ) : (
                 <span className="campo-ajuda">O follow-up da Agenda conta a partir dela. Preenchida sozinha ao marcar a proposta gerada como enviada.</span>
               )}
+              {marcas.aviso("data_envio_proposta")}
             </div>
 
             <p className="campo-ajuda" style={{ margin: 0 }}>
@@ -841,7 +870,7 @@ export function DetalheDaOportunidade({
             </p>
 
             <div className="formulario-duplo">
-              <div className="campo-bloco">
+              <div className={`campo-bloco ${marcas.classe("temperatura")}`} id={marcas.id("temperatura")}>
                 <label className="campo-rotulo" htmlFor="d-temperatura">
                   Temperatura
                 </label>
@@ -858,6 +887,7 @@ export function DetalheDaOportunidade({
                     </option>
                   ))}
                 </select>
+                {marcas.aviso("temperatura")}
               </div>
 
               <div className="campo-bloco">
@@ -879,7 +909,7 @@ export function DetalheDaOportunidade({
             </div>
 
             {rascunho.situacao === "Perdida" && (
-              <div className="campo-bloco">
+              <div className={`campo-bloco ${marcas.classe("motivo_recusa")}`} id={marcas.id("motivo_recusa")}>
                 <label className="campo-rotulo" htmlFor="d-motivo">
                   Motivo da perda
                 </label>
@@ -911,11 +941,12 @@ export function DetalheDaOportunidade({
                     Texto original da planilha: “{detalhe.motivo_recusa_original}”
                   </span>
                 )}
+                {marcas.aviso("motivo_recusa")}
               </div>
             )}
 
             <div className="formulario-duplo">
-              <div className="campo-bloco">
+              <div className={`campo-bloco ${marcas.classe("proxima_acao")}`} id={marcas.id("proxima_acao")}>
                 <label className="campo-rotulo" htmlFor="d-acao">
                   Próxima ação
                 </label>
@@ -926,6 +957,7 @@ export function DetalheDaOportunidade({
                   onChange={(e) => mudar("proxima_acao", e.target.value)}
                   placeholder="Ligar para o decisor"
                 />
+                {marcas.tem("proxima_acao") && <AvisoDeLacuna obrigatorio={false} texto="Prioritário em falta: a ação e a data" />}
               </div>
               <div className="campo-bloco">
                 <label className="campo-rotulo" htmlFor="d-acao-em">
@@ -941,7 +973,7 @@ export function DetalheDaOportunidade({
 
             {/* Captador e origem editáveis aqui desde 07/10/2026 (Karine); antes só a planilha mudava. */}
             <div className="formulario-duplo">
-              <div className="campo-bloco">
+              <div className={`campo-bloco ${marcas.classe("captador")}`} id={marcas.id("captador")}>
                 <label className="campo-rotulo" htmlFor="d-captador">
                   Captador
                 </label>
@@ -959,8 +991,9 @@ export function DetalheDaOportunidade({
                     </option>
                   ))}
                 </select>
+                {marcas.aviso("captador")}
               </div>
-              <div className="campo-bloco">
+              <div className={`campo-bloco ${marcas.classe("tipo_canal")}`} id={marcas.id("tipo_canal")}>
                 <label className="campo-rotulo" htmlFor="d-tipo-canal">
                   Tipo de canal
                 </label>
@@ -977,6 +1010,7 @@ export function DetalheDaOportunidade({
                     </option>
                   ))}
                 </select>
+                {marcas.aviso("tipo_canal")}
               </div>
             </div>
 
@@ -1030,6 +1064,7 @@ export function DetalheDaOportunidade({
               mudar={mudar}
               alternar={alternar}
               listas={listas}
+              lacunas={marcas}
             />
           )}
 

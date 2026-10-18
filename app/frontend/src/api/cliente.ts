@@ -69,6 +69,8 @@ import type {
   Execucao,
   ExecucaoDetalhe,
   GrupoResumo,
+  CadastroDaLacuna,
+  Lacuna,
   SugestaoDeFusao,
   Indicadores,
   LeadResumo,
@@ -444,6 +446,10 @@ export const api = {
       substituir ? { "X-Confirmacao": "SUBSTITUIR" } : {},
     ),
 
+  /** As empresas de um grupo, cliente ou prospect, com os contatos (18/10/2026): o card da empresa a partir da lacuna. */
+  empresasDoGrupo: (tipo: TipoDeContato, grupoId: number) =>
+    pedir<PaginaDeContatos<EntidadeDeContato>>(comParametros("/api/contatos/empresas", { tipo, grupo_id: grupoId, limite: 500 })),
+
   contatosPorEmpresa: (tipo: TipoDeContato, busca: string, soComLacunas: boolean) =>
     pedir<PaginaDeContatos<EntidadeDeContato>>(
       comParametros("/api/contatos/empresas", { tipo, busca, so_com_lacunas: soComLacunas || undefined, limite: 200 }),
@@ -723,6 +729,13 @@ export const api = {
 
   gravarMidia: (dados: { mes: string; canal: string; valor: string }) =>
     pedir<InvestimentoEmMidia>("/api/sdr/midia", { method: "PUT", body: JSON.stringify(dados) }),
+
+  /** Um grupo pelo id (18/10/2026): o nome numa composição abre o card dele. */
+  grupo: (id: number) => pedir<GrupoResumo>(`/api/grupos/${id}`),
+
+  /** O que falta no cadastro de um grupo ou de um registro (18/10/2026). */
+  lacunas: (filtro: { grupo_id?: number; cadastro?: CadastroDaLacuna; registro_id?: number }) =>
+    pedir<Lacuna[]>(comParametros("/api/lacunas", filtro)),
 
   grupos: (filtros: { busca?: string; limite?: number; incluir_fundidos?: boolean } = {}) =>
     pedir<Pagina<GrupoResumo>>(comParametros("/api/grupos", { limite: 500, ...filtros })),

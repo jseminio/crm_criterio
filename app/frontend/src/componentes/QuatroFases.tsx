@@ -12,6 +12,7 @@ import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
 import { BotaoDeComposicao, Explicavel } from "./Indicador";
 import { TabelaDeComposicao } from "./TabelaDeComposicao";
+import { LinkDoGrupo } from "./AberturaDeCard";
 
 /** A lista que compõe um número das fases (10/10/2026): o que entra na conta primeiro, a base à parte. */
 function ComposicaoDaFase({ mes, chave, unidade }: { mes: string; chave: string; unidade: IndicadorDaFase["unidade"] }) {
@@ -28,7 +29,7 @@ function ComposicaoDaFase({ mes, chave, unidade }: { mes: string; chave: string;
   const tabela = (linhas: LinhaDaFase[], rotulo: string, total: boolean) => (
     <TabelaDeComposicao rotulo={rotulo} linhas={linhas} chave={(l, i) => `${l.titulo}-${i}`}
       colunas={[
-        { titulo: "Item", valor: (l) => l.titulo },
+        { titulo: "Item", valor: (l) => l.titulo, mostrar: (l) => <LinkDoGrupo grupoId={l.grupo_id} nome={l.titulo} /> },
         { titulo: "Detalhe", valor: (l) => l.detalhe },
         { titulo: "Data", valor: (l) => l.data, mostrar: (l) => data(l.data) },
         ...(comValor ? [{ titulo: "Valor", valor: (l: LinhaDaFase) => (l.valor === null ? null : Number(l.valor)),

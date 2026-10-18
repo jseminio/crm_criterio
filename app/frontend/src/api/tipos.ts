@@ -728,6 +728,7 @@ export interface EntidadeDeContato {
   razao_social: string | null;
   nome_fantasia: string | null;
   cnpj: string | null;
+  regime_tributario?: string | null;
   endereco: EnderecoDeContato;
   /** Só cliente. */
   mensalidade: string | null;
@@ -2117,6 +2118,7 @@ export interface IndicadorDaFase {
 /** Um item que compõe um número das quatro fases (10/10/2026). */
 export interface LinhaDaFase {
   titulo: string;
+  grupo_id?: number | null;
   detalhe: string | null;
   data: string | null;
   valor: string | null;
@@ -2210,7 +2212,12 @@ export interface ItemDoKpi {
   corte?: string | null;
   cadastro?: string | null;
   responsavel?: string | null;
-  faltam?: { campo: string; obrigatorio: boolean }[];
+  faltam?: { campo: string; obrigatorio: boolean; chave?: string }[];
+  /** O grupo do item (18/10/2026): o nome abre o card. Na integralidade, o registro com a lacuna. */
+  grupo_id?: number | null;
+  registro_id?: number | null;
+  empresa_id?: number | null;
+  contrato_id?: number | null;
 }
 
 export interface KpiDaLideranca {
@@ -2246,6 +2253,7 @@ export interface ItemDaComposicao {
   id: number;
   nome: string;
   grupo: string;
+  grupo_id?: number | null;
   servico: string | null;
   situacao: string;
   captador: string | null;
@@ -2268,6 +2276,7 @@ export interface ItemDoRealizado {
   linha: "bpo" | "contabil" | "escada" | "perdas" | "outros";
   categoria: string;
   grupo: string;
+  grupo_id?: number | null;
   contrato_id: number;
   escopo: string | null;
   data: string | null;
@@ -2547,6 +2556,7 @@ export interface SituacaoDosLeadsDoMeta {
 export interface PropostaAberta {
   id: number;
   grupo: string;
+  grupo_id?: number | null;
   nome: string;
   servico: string | null;
   etapa: string;
@@ -2627,4 +2637,20 @@ export interface PreviaDaMescla {
   duplicada_nome: string | null;
   duplicada_intocada: boolean;
   duplicada_recusa: string | null;
+}
+
+/** Um campo devido e vazio (18/10/2026): a mesma regra da Integralidade do cadastro, nos dois cortes. */
+export type CadastroDaLacuna = "Oportunidade" | "Contrato" | "Encerramento" | "Cliente" | "Empresa" | "Contato";
+
+export interface Lacuna {
+  cadastro: CadastroDaLacuna;
+  registro_id: number | null;
+  registro: string;
+  campo: string;
+  /** O nome estável do campo no card: a tela destaca e leva até ele. */
+  chave: string;
+  obrigatorio: boolean;
+  grupo_id: number | null;
+  empresa_id: number | null;
+  contrato_id: number | null;
 }

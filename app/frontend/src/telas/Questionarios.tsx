@@ -15,6 +15,7 @@ import { TabelaDeComposicao } from "../componentes/TabelaDeComposicao";
 import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
+import { LinkDoGrupo } from "../componentes/AberturaDeCard";
 
 /** Os questionários do período que compõem um número do topo (10/10/2026), com os filtros de serviço e porte
  * (a situação escolhida na lista não muda os números, então aqui também não). */
@@ -32,7 +33,7 @@ function QuestionariosDaConta({ filtros, entra, comDias = false }: {
   return (
     <TabelaDeComposicao rotulo="Questionários na conta" linhas={itens} chave={(l) => l.id}
       colunas={[
-        { titulo: "Empresa", valor: (l) => l.nome_fantasia || l.razao_social },
+        { titulo: "Empresa", valor: (l) => l.nome_fantasia || l.razao_social, mostrar: (l) => <LinkDoGrupo grupoId={l.grupo_id} nome={l.nome_fantasia || l.razao_social} /> },
         { titulo: "Recebido", valor: (l) => l.recebido_em, mostrar: (l) => data(l.recebido_em) },
         { titulo: "Situação", valor: (l) => `${l.situacao_do_painel.replaceAll("_", " ")}${l.dias_uteis_aguardando ? ` · ${l.dias_uteis_aguardando} dias úteis` : ""}` },
         comDias

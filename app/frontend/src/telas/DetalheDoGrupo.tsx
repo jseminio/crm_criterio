@@ -5,7 +5,7 @@
  * só se veria de longe, na contagem da lista.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { GrupoResumo, Listas, OportunidadeResumo, Pagina } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
@@ -15,15 +15,20 @@ import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
 import { data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
+import { AvisoDeLacuna, QuadroDeLacunas, irAoCampo, marcasDeLacuna, usarLacunas } from "../componentes/Lacunas";
+import type { Lacuna } from "../api/tipos";
+import { CardDaLacuna, lacunaTemCard } from "./CardDaLacuna";
 
 function FormularioDeGrupo({
   grupo,
   aoSalvar,
   aoCancelar,
+  marcas,
 }: {
   grupo: GrupoResumo;
   aoSalvar: (corpo: Record<string, unknown>) => Promise<void>;
   aoCancelar: () => void;
+  marcas: ReturnType<typeof marcasDeLacuna>;
 }) {
   const [nome, definirNome] = useState(grupo.nome);
   const [responsavelCs, definirResponsavelCs] = useState(grupo.responsavel_cs ?? "");
@@ -54,9 +59,10 @@ function FormularioDeGrupo({
           <label className="campo-rotulo" htmlFor="grupo-nome">Nome</label>
           <input id="grupo-nome" className="entrada" maxLength={200} value={nome} onChange={(e) => definirNome(e.target.value)} />
         </div>
-        <div className="campo-bloco">
+        <div className={`campo-bloco ${marcas.classe("responsavel_cs")}`} id={marcas.id("responsavel_cs")}>
           <label className="campo-rotulo" htmlFor="grupo-responsavel">Responsável CS</label>
           <input id="grupo-responsavel" className="entrada" maxLength={10} value={responsavelCs} onChange={(e) => definirResponsavelCs(e.target.value)} />
+          {marcas.aviso("responsavel_cs")}
         </div>
       </div>
       <div className="campo-bloco">
@@ -77,11 +83,14 @@ function FormularioDeGrupo({
 export function DetalheDoGrupo({
   grupo,
   listas,
+  foco,
   aoFechar,
   aoMudar,
 }: {
   grupo: GrupoResumo;
   listas: Listas | null;
+  /** Abre já nesta lacuna do cliente (a chave), vindo da Integralidade (18/10/2026). */
+  foco?: string;
   aoFechar: () => void;
   aoMudar: () => void;
 }) {
@@ -90,10 +99,32 @@ export function DetalheDoGrupo({
   const [aberta, definirAberta] = useState<number | null>(null);
   const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
 
+  // O que falta no cadastro do grupo inteiro (18/10/2026): cliente, oportunidades, contratos, empresas e contatos.
+  // "ir ao campo" abre o card do registro já no campo; o do cliente é o formulário daqui.
+  const [versaoDasLacunas, definirVersaoDasLacunas] = useState(0);
+  const { lacunas } = usarLacunas({ grupo_id: grupo.id }, versaoDasLacunas);
+  const marcas = marcasDeLacuna(lacunas, "Cliente", grupo.id);
+  const [lacunaAberta, definirLacunaAberta] = useState<Lacuna | null>(null);
+  const irPara = (l: Pick<Lacuna, "cadastro" | "chave">) => {
+    if (l.cadastro === "Cliente") {
+      definirEditando(true);
+      window.setTimeout(() => irAoCampo(marcas.id(l.chave)), 60);
+    } else if (lacunas) {
+      const alvo = lacunas.find((x) => x.cadastro === l.cadastro && x.chave === l.chave);
+      if (alvo) definirLacunaAberta(alvo);
+    }
+  };
+  const prontoParaFoco = lacunas !== null;
+  useEffect(() => {
+    if (foco === "responsavel_cs" && prontoParaFoco) irPara({ cadastro: "Cliente", chave: foco });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [foco, prontoParaFoco]);
+
   const salvarGrupo = async (corpo: Record<string, unknown>) => {
     const atualizado = await api.editarGrupo(grupoAtual.id, corpo);
     definirGrupoAtual(atualizado);
     definirEditando(false);
+    definirVersaoDasLacunas((v) => v + 1);
     aoMudar();
   };
 
@@ -116,9 +147,14 @@ export function DetalheDoGrupo({
         subtitulo="Grupo econômico"
         aoFechar={aoFechar}
       >
+        <QuadroDeLacunas lacunas={lacunas} comRegistro grupoNome={grupoAtual.nome} aoIr={(l) => (l.cadastro === "Cliente" ? irPara(l) : definirLacunaAberta(l))}
+          semCampo={(l) => (l.cadastro === "Cliente" && l.chave === "classificacao" ? "Na Saúde da carteira: avalie o grupo."
+            : l.cadastro === "Cliente" && l.chave === "porte" ? "Na Saúde da carteira: confirme o porte do grupo."
+              : l.cadastro !== "Cliente" && !lacunaTemCard(l) ? "Sem card para abrir: a pessoa não tem empresa." : null)} />
+
         <div className="secao-do-painel">
           {editando ? (
-            <FormularioDeGrupo grupo={grupoAtual} aoSalvar={salvarGrupo} aoCancelar={() => definirEditando(false)} />
+            <FormularioDeGrupo grupo={grupoAtual} aoSalvar={salvarGrupo} aoCancelar={() => definirEditando(false)} marcas={marcas} />
           ) : (
             <>
               <div className="cartao-linha">
@@ -130,6 +166,9 @@ export function DetalheDoGrupo({
               </div>
               {grupoAtual.responsavel_cs && (
                 <p className="campo-ajuda" style={{ marginTop: "var(--e2)" }}>Responsável CS: {grupoAtual.responsavel_cs}</p>
+              )}
+              {marcas.tem("responsavel_cs") && (
+                <p style={{ margin: "var(--e2) 0 0" }}><AvisoDeLacuna obrigatorio texto="Obrigatório em falta: responsável de CS" /></p>
               )}
               {grupoAtual.observacao && <p className="campo-ajuda">{grupoAtual.observacao}</p>}
               <button type="button" className="botao botao-secundario" style={{ marginTop: "var(--e2)" }} onClick={() => definirEditando(true)}>
@@ -220,6 +259,10 @@ export function DetalheDoGrupo({
           aoFechar={() => definirAberta(null)}
           aoSalvar={propostas.recarregar}
         />
+      )}
+      {lacunaAberta && (
+        <CardDaLacuna lacuna={lacunaAberta} listas={listas}
+          aoFechar={() => { definirLacunaAberta(null); definirVersaoDasLacunas((v) => v + 1); propostas.recarregar(); }} />
       )}
     </>
   );

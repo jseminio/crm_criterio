@@ -13,6 +13,7 @@ import { usarDados } from "../usarDados";
 import { Carregando, Erro } from "./estados";
 import { TabelaDeComposicao } from "./TabelaDeComposicao";
 import { Indicador } from "./Indicador";
+import { LinkDoGrupo } from "./AberturaDeCard";
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const MESES_LONGOS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
@@ -190,9 +191,11 @@ function LinhaDoGrupo({ g, aberto, aoAlternar, importado }: {
     <>
       <tr>
         <td>
-          <button type="button" className="link-de-tabela" aria-expanded={aberto} onClick={() => aoAlternar(g.grupo_id)}>
-            {aberto ? "▾" : "▸"} {g.grupo}
-          </button>
+          <button type="button" className="link-de-tabela" aria-expanded={aberto} onClick={() => aoAlternar(g.grupo_id)}
+            aria-label={`${aberto ? "Recolher" : "Abrir"} os contratos de ${g.grupo}`}>
+            {aberto ? "▾" : "▸"}
+          </button>{" "}
+          <LinkDoGrupo grupoId={g.grupo_id} nome={g.grupo} />
         </td>
         <td className="tabela-numero">{g.contratos}</td>
         <td className="tabela-numero">{dinheiro(g.mrr)}</td>

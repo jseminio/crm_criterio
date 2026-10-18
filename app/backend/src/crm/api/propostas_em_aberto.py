@@ -54,6 +54,7 @@ class PropostaAberta(BaseModel):
     em_on_hold_desde: date | None = None
     on_hold_pela_originacao: bool = False
     dias_em_on_hold: int | None = None
+    grupo_id: int | None = None
 
 
 class LinhaDoQuadro(BaseModel):
@@ -144,7 +145,7 @@ def montar(sessao: Session, hoje: date) -> QuadroDePropostas:
     propostas = []
     for o in abertas:
         p = PropostaAberta(
-            id=o.id, grupo=nomes.get(o.grupo_id, "?"), nome=o.nome, servico=o.servico, etapa=o.situacao.value,
+            id=o.id, grupo=nomes.get(o.grupo_id, "?"), grupo_id=o.grupo_id, nome=o.nome, servico=o.servico, etapa=o.situacao.value,
             temperatura=o.temperatura.value if o.temperatura else None, captador=o.captador,
             anual=Decimal(o.preco_anual or 0).quantize(CENTAVOS), mensalizado=_mensalizado(o), recorrente=_recorrente(o),
         )

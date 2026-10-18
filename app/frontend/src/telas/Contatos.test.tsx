@@ -15,6 +15,7 @@ vi.mock("../api/cliente", async () => {
       buscarPessoas: vi.fn(), criarEmpresa: vi.fn(), vincularContato: vi.fn(), marcarPrincipal: vi.fn(),
       desvincularContato: vi.fn(), excluirPessoa: vi.fn(), excluirEmpresa: vi.fn(),
       grupos: vi.fn().mockResolvedValue({ total: 0, itens: [] }),
+      lacunas: vi.fn().mockResolvedValue([]),
     },
   };
 });
@@ -115,9 +116,14 @@ describe("Contatos — clientes e prospects separados", () => {
   });
 
   it("abrir a empresa mostra o painel com o que falta", async () => {
+    // As lacunas do cadastro (18/10/2026): a mesma regra da Integralidade, no quadro do topo e no campo.
+    vi.mocked(api.lacunas).mockResolvedValue([{ cadastro: "Empresa", registro_id: 10, registro: "Alfa Comércio Ltda",
+      campo: "Regime tributário", chave: "regime_tributario", obrigatorio: false, grupo_id: 1, empresa_id: 10, contrato_id: null }]);
     render(<Contatos listas={null} />);
     await userEvent.click(await screen.findByRole("button", { name: "Alfa Comércio Ltda" }));
-    expect(await screen.findByText(/Falta:/)).toBeInTheDocument();
+    expect(await screen.findByText(/O que falta no cadastro · 1 prioritário/)).toBeInTheDocument();
+    expect(screen.getByText("Prioritário em falta")).toBeInTheDocument();
+    expect(api.lacunas).toHaveBeenCalledWith({ grupo_id: 1 });
     expect(screen.getByText("Nenhum contato cadastrado ainda.")).toBeInTheDocument();
   });
 

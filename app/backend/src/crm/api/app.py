@@ -71,6 +71,7 @@ from crm.api.disparo_do_questionario import canais_reais, laco_do_disparo
 from crm.api.integracoes import Testadores, roteador_de_integracoes
 from crm.api.propostas_em_aberto import roteador_de_propostas_em_aberto
 from crm.api.kpis_lideranca import roteador_de_kpis
+from crm.api.integralidade import roteador_de_lacunas
 from crm.api.reajustes import roteador_de_reajustes
 from crm.api.servicos_e_contratos import roteador_de_servicos_e_contratos
 from crm.api.documento_de_contrato import roteador_do_documento_de_contrato
@@ -353,6 +354,7 @@ def criar_app(
     api.include_router(roteador_de_integracoes(obter_sessao, fonte_de_questionarios or fonte_real, testadores))
     api.include_router(roteador_do_whatsapp_recebido(obter_sessao))
     api.include_router(roteador_de_kpis(obter_sessao))
+    api.include_router(roteador_de_lacunas(obter_sessao))
     api.include_router(roteador_de_recebimentos(obter_sessao))
     api.include_router(roteador_de_propostas(obter_sessao, servicos_da_ata or servicos_da_ata_reais))
     api.include_router(roteador_da_ficha(obter_sessao))
@@ -602,6 +604,18 @@ def _registrar(api: FastAPI) -> None:
             resumo.quantas_oportunidades = quantidade or 0
             itens.append(resumo)
         return e.Pagina(total=total or 0, itens=itens)
+
+    @api.get("/api/grupos/{grupo_id:int}", response_model=e.GrupoResumo, tags=["grupos"])
+    def obter_grupo(grupo_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> e.GrupoResumo:
+        """Um grupo pelo id (18/10/2026): o nome numa composição abre o card dele."""
+        grupo = sessao.get(GrupoEconomico, grupo_id)
+        if grupo is None:
+            raise HTTPException(404, "grupo não encontrado")
+        resumo = e.GrupoResumo.model_validate(grupo)
+        resumo.quantas_oportunidades = sessao.scalar(
+            sa.select(sa.func.count(Oportunidade.id)).where(Oportunidade.grupo_id == grupo.id)
+        ) or 0
+        return resumo
 
     @api.patch("/api/grupos/{grupo_id}", response_model=e.GrupoResumo, tags=["grupos"])
     def editar_grupo(
@@ -1230,6 +1244,7 @@ def _registrar(api: FastAPI) -> None:
         return e.ComposicaoDoFunilResposta(indicador=indicador, itens=[
             e.ItemDaComposicaoResposta(
                 id=i.oportunidade.id, nome=i.oportunidade.nome, grupo=nomes[i.oportunidade.id],
+                grupo_id=i.oportunidade.grupo_id,
                 servico=i.oportunidade.servico, situacao=i.oportunidade.situacao.value,
                 captador=i.oportunidade.captador,
                 tipo_canal=i.oportunidade.tipo_canal.value if i.oportunidade.tipo_canal else None,

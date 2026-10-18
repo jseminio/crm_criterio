@@ -18,12 +18,15 @@ from __future__ import annotations
 
 import io
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 import sqlalchemy as sa
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
 from crm.api import sucesso
@@ -31,7 +34,8 @@ from crm.db.modelos import Contrato, Empresa, GrupoEconomico, Oportunidade, Pess
 from crm.domain.listas import LinhaServico, Origem, Situacao, SituacaoContrato, TipoDeEventoDeContrato
 
 __all__ = ["DATA_DE_CORTE", "PESO", "CADASTROS", "Campo", "Resultado", "calcular", "CHAVE_DO_RETRATO", "Retrato",
-           "ler_retrato", "guardar_retrato", "RegistroPendente", "por_registro", "planilha"]
+           "ler_retrato", "guardar_retrato", "RegistroPendente", "por_registro", "planilha", "CHAVES", "lacunas",
+           "Lacuna", "roteador_de_lacunas"]
 
 DATA_DE_CORTE = date(2026, 10, 14)
 """Primeiro dia da cobrança (a publicação): o que nasceu antes é legado (decisão de Eduardo em 13/10/2026)."""
@@ -58,10 +62,57 @@ class Campo:
     legado: bool
     registro_id: int | None = None
     """O id do registro no seu cadastro: junta os campos de um mesmo registro na lista de pendências."""
+    grupo_id: int | None = None
+    """O grupo do registro (18/10/2026): a composição abre o card dele e o card mostra as lacunas."""
+    empresa_id: int | None = None
+    """No contato, a empresa do vínculo (o card do contato é o da empresa); na empresa, ela mesma."""
+    contrato_id: int | None = None
+    """No contrato, ele mesmo; no encerramento, o contrato encerrado (é no card dele que a lacuna aparece)."""
 
     @property
     def pontos(self) -> int:
         return PESO[self.obrigatorio]
+
+    @property
+    def chave(self) -> str:
+        """O nome estável do campo, que a tela usa para achar e destacar o campo no card (18/10/2026)."""
+        return CHAVES[(self.cadastro, self.campo)]
+
+
+CHAVES: dict[tuple[str, str], str] = {
+    ("Oportunidade", "Serviço"): "servico",
+    ("Oportunidade", "Valor (parcela ou valor único)"): "valor",
+    ("Oportunidade", "Captador"): "captador",
+    ("Oportunidade", "Tipo de canal"): "tipo_canal",
+    ("Oportunidade", "Data de originação"): "data_colocacao",
+    ("Oportunidade", "Data de envio da proposta"): "data_envio_proposta",
+    ("Oportunidade", "Motivo de perda"): "motivo_recusa",
+    ("Oportunidade", "Contrato cadastrado"): "contrato",
+    ("Oportunidade", "Temperatura"): "temperatura",
+    ("Oportunidade", "Próxima ação com data"): "proxima_acao",
+    ("Oportunidade", "Porte"): "porte",
+    ("Contrato", "Data de assinatura"): "data_inicio",
+    ("Contrato", "Valor (parcela ou valor único)"): "valor",
+    ("Contrato", "Bruto ou líquido"): "base_do_valor",
+    ("Contrato", "CNPJ (empresa)"): "empresa_id",
+    ("Contrato", "Signatário"): "signatario",
+    ("Contrato", "Fim da vigência"): "data_fim",
+    ("Encerramento", "Data da saída"): "data_da_saida",
+    ("Encerramento", "Motivo"): "motivo_categoria",
+    ("Encerramento", "Iniciativa"): "iniciativa",
+    ("Encerramento", "Descrição"): "descricao",
+    ("Cliente", "Responsável de CS"): "responsavel_cs",
+    ("Cliente", "Classificação (classe e semáforo)"): "classificacao",
+    ("Cliente", "Porte"): "porte",
+    ("Empresa", "CNPJ"): "cnpj",
+    ("Empresa", "Regime tributário"): "regime_tributario",
+    ("Empresa", "Endereço (logradouro, município e CEP)"): "endereco",
+    ("Contato", "Telefone ou e-mail"): "contato",
+    ("Contato", "Vínculo com a empresa"): "vinculo",
+    ("Contato", "Cargo"): "cargo",
+    ("Contato", "Papel (decisor, influenciador…)"): "papel",
+}
+"""Todo campo da conta tem a sua chave: `tests/test_integralidade.py` derruba a suíte se faltar alguma."""
 
 
 @dataclass(frozen=True)
@@ -119,9 +170,11 @@ def calcular(sessao: Session) -> Resultado:
     campos: list[Campo] = []
 
     def devido(cadastro: str, registro: str, responsavel: str | None, legado: bool,
-               itens: Iterator[tuple[str, bool, bool]], registro_id: int | None = None) -> None:
+               itens: Iterator[tuple[str, bool, bool]], registro_id: int | None = None, *, grupo_id: int | None = None,
+               empresa_id: int | None = None, contrato_id: int | None = None) -> None:
         for campo, obrigatorio, preenchido in itens:
-            campos.append(Campo(cadastro, registro, responsavel, campo, obrigatorio, preenchido, legado, registro_id))
+            campos.append(Campo(cadastro, registro, responsavel, campo, obrigatorio, preenchido, legado, registro_id,
+                                grupo_id, empresa_id, contrato_id))
 
     # Oportunidade: o captador responde.
     for o in oportunidades:
@@ -143,7 +196,8 @@ def calcular(sessao: Session) -> Resultado:
                 yield "Próxima ação com data", False, _tem(o.proxima_acao) and o.proxima_acao_em is not None
             yield "Porte", False, _tem(o.porte)
         legado = not _desde_o_corte(o.criado_em) or o.origem is Origem.CARGA_2026
-        devido("Oportunidade", f"{grupos[o.grupo_id].nome} · {o.servico or o.nome}", o.captador or None, legado, regras(), o.id)
+        devido("Oportunidade", f"{grupos[o.grupo_id].nome} · {o.servico or o.nome}", o.captador or None, legado, regras(), o.id,
+               grupo_id=o.grupo_id)
 
     # Contrato e encerramento: o responsável de CS do grupo.
     for c in contratos:
@@ -157,7 +211,8 @@ def calcular(sessao: Session) -> Resultado:
             yield "Fim da vigência", False, c.data_fim is not None
         nome = f"{grupos[c.grupo_id].nome} · {c.escopo or 'contrato'}"
         dono = dono_do_grupo(c.grupo_id)
-        devido("Contrato", nome, dono, c.anterior_ao_crm or not _desde_o_corte(c.criado_em), regras(), c.id)
+        devido("Contrato", nome, dono, c.anterior_ao_crm or not _desde_o_corte(c.criado_em), regras(), c.id,
+               grupo_id=c.grupo_id, contrato_id=c.id)
         for ev in c.eventos:
             if ev.tipo is not TipoDeEventoDeContrato.ENCERRAMENTO:
                 continue
@@ -166,7 +221,8 @@ def calcular(sessao: Session) -> Resultado:
                 yield "Motivo", True, ev.motivo_categoria is not None
                 yield "Iniciativa", True, ev.iniciativa is not None
                 yield "Descrição", False, _tem(ev.descricao)
-            devido("Encerramento", nome, dono, not _desde_o_corte(ev.registrado_em), regras_do_encerramento(), ev.id)
+            devido("Encerramento", nome, dono, not _desde_o_corte(ev.registrado_em), regras_do_encerramento(), ev.id,
+                   grupo_id=c.grupo_id, contrato_id=c.id)
 
     # Cliente (grupo com contrato valendo).
     for g in sorted(clientes & set(grupos)):
@@ -175,7 +231,8 @@ def calcular(sessao: Session) -> Resultado:
             yield "Responsável de CS", True, _tem(grupo.responsavel_cs)
             yield "Classificação (classe e semáforo)", True, grupo.id in classes
             yield "Porte", False, _tem(grupo.porte)
-        devido("Cliente", grupo.nome, dono_do_grupo(g), not _desde_o_corte(grupo.criado_em), regras(), grupo.id)
+        devido("Cliente", grupo.nome, dono_do_grupo(g), not _desde_o_corte(grupo.criado_em), regras(), grupo.id,
+               grupo_id=grupo.id)
 
     # Empresa (CNPJ).
     for e in sessao.scalars(sa.select(Empresa).order_by(Empresa.id)):
@@ -185,7 +242,8 @@ def calcular(sessao: Session) -> Resultado:
             yield "CNPJ", True, _tem(e.cnpj)
             yield "Regime tributário", False, _tem(e.regime_tributario)
             yield "Endereço (logradouro, município e CEP)", False, _tem(e.logradouro) and _tem(e.municipio) and _tem(e.cep)
-        devido("Empresa", e.razao_social, dono_do_grupo(e.grupo_id), not _desde_o_corte(e.criado_em), regras(), e.id)
+        devido("Empresa", e.razao_social, dono_do_grupo(e.grupo_id), not _desde_o_corte(e.criado_em), regras(), e.id,
+               grupo_id=e.grupo_id, empresa_id=e.id)
 
     # Contato: pelo vínculo com a empresa (o primeiro, ou o principal).
     pessoas = sessao.scalars(
@@ -204,7 +262,8 @@ def calcular(sessao: Session) -> Resultado:
             yield "Papel (decisor, influenciador…)", False, p.papel is not None
         registro = p.nome + (f" · {grupos[grupo_id].nome}" if grupo_id is not None else "")
         devido("Contato", registro, dono_do_grupo(grupo_id) if grupo_id is not None else None,
-               not _desde_o_corte(p.criado_em), regras(), p.id)
+               not _desde_o_corte(p.criado_em), regras(), p.id,
+               grupo_id=grupo_id, empresa_id=vinculos[0].empresa_id if vinculos else None)
 
     return Resultado(campos)
 
@@ -257,6 +316,12 @@ class RegistroPendente:
     responsavel: str | None
     faltam: tuple[tuple[str, bool], ...]
     """(campo, obrigatório)."""
+    chaves: tuple[str, ...] = ()
+    """A chave de cada campo de `faltam`, na mesma ordem: a tela abre o card já no campo (18/10/2026)."""
+    registro_id: int | None = None
+    grupo_id: int | None = None
+    empresa_id: int | None = None
+    contrato_id: int | None = None
 
 
 def por_registro(campos: list[Campo]) -> list[RegistroPendente]:
@@ -271,9 +336,22 @@ def por_registro(campos: list[Campo]) -> list[RegistroPendente]:
     def ordem(chave):
         legado, cadastro, _, registro, dono = chave
         return (dono is None, -por_dono[dono], dono or "", CADASTROS.index(cadastro), registro)
-    return [RegistroPendente("Passado" if k[0] else "Novos", k[1], k[3], k[4],
-                             tuple((c.campo, c.obrigatorio) for c in sorted(juntos[k], key=lambda c: not c.obrigatorio)))
-            for k in sorted(juntos, key=ordem)]
+    def registro(k) -> RegistroPendente:
+        lista = sorted(juntos[k], key=lambda c: not c.obrigatorio)
+        primeiro = lista[0]
+        return RegistroPendente("Passado" if k[0] else "Novos", k[1], k[3], k[4],
+                                tuple((c.campo, c.obrigatorio) for c in lista), tuple(c.chave for c in lista),
+                                primeiro.registro_id, primeiro.grupo_id, primeiro.empresa_id, primeiro.contrato_id)
+    return [registro(k) for k in sorted(juntos, key=ordem)]
+
+
+def lacunas(campos: list[Campo], *, grupo_id: int | None = None, cadastro: str | None = None,
+            registro_id: int | None = None) -> list[Campo]:
+    """Os campos devidos e vazios de um grupo ou de um registro, dos dois cortes: o que o card destaca (18/10/2026)."""
+    return [c for c in campos if not c.preenchido
+            and (grupo_id is None or c.grupo_id == grupo_id)
+            and (cadastro is None or c.cadastro == cadastro)
+            and (registro_id is None or c.registro_id == registro_id)]
 
 
 def planilha(registros: list[RegistroPendente]) -> bytes:
@@ -297,3 +375,38 @@ def planilha(registros: list[RegistroPendente]) -> bytes:
     saida = io.BytesIO()
     wb.save(saida)
     return saida.getvalue()
+
+
+# ------------------------------------------------------------ as lacunas no card (18/10/2026)
+class Lacuna(BaseModel):
+    cadastro: str
+    registro_id: int | None
+    registro: str
+    campo: str
+    chave: str
+    obrigatorio: bool
+    grupo_id: int | None
+    empresa_id: int | None
+    contrato_id: int | None
+
+
+def roteador_de_lacunas(obter_sessao: Callable[[], Iterator[Session]]) -> APIRouter:
+    """O que falta num grupo ou num registro (amostra aprovada por Eduardo em 18/10/2026): todo card destaca os campos
+    devidos e vazios, com a mesma regra da Integralidade do cadastro, nos dois cortes."""
+    r = APIRouter(tags=["integralidade"])
+
+    @r.get("/api/lacunas", response_model=list[Lacuna])
+    def listar_lacunas(
+        grupo_id: int | None = None,
+        cadastro: Literal["Oportunidade", "Contrato", "Encerramento", "Cliente", "Empresa", "Contato"] | None = None,
+        registro_id: int | None = None,
+        sessao: Session = Depends(obter_sessao, scope="function"),
+    ) -> list[Lacuna]:
+        if grupo_id is None and registro_id is None:
+            raise HTTPException(422, "informe o grupo ou o registro")
+        faltam = lacunas(calcular(sessao).campos, grupo_id=grupo_id, cadastro=cadastro, registro_id=registro_id)
+        return [Lacuna(cadastro=c.cadastro, registro_id=c.registro_id, registro=c.registro, campo=c.campo, chave=c.chave,
+                       obrigatorio=c.obrigatorio, grupo_id=c.grupo_id, empresa_id=c.empresa_id, contrato_id=c.contrato_id)
+                for c in sorted(faltam, key=lambda c: (CADASTROS.index(c.cadastro), c.registro, not c.obrigatorio))]
+
+    return r

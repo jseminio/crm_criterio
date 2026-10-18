@@ -21,6 +21,7 @@ import { RevisaoMensal } from "./RevisaoMensal";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
 import { usarAcesso } from "../entrada";
 import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
+import { LinkDoGrupo } from "../componentes/AberturaDeCard";
 
 /** A lista de grupos que compõe um número da Saúde da carteira (10/10/2026). `peso` mostra a participação na
  * receita, que é como o ISC pondera; `fora` são os grupos que não entram na conta, à parte. */
@@ -34,7 +35,7 @@ function GruposDaConta({ itens, fora = [], peso = false, extra }: {
   const tabela = (lista: ItemDaCarteira[], rotulo: string, comTotal: boolean) => (
     <TabelaDeComposicao rotulo={rotulo} linhas={lista} chave={(i) => i.grupo_id}
       colunas={[
-        { titulo: "Grupo", valor: (i) => i.grupo_nome },
+        { titulo: "Grupo", valor: (i) => i.grupo_nome, mostrar: (i) => <LinkDoGrupo grupoId={i.grupo_id} nome={i.grupo_nome} /> },
         { titulo: "Classe", valor: (i) => i.classe_efetiva },
         { titulo: "Semáforo", valor: (i) => i.semaforo },
         ...(extra ? [{ titulo: extra.titulo, valor: (i: ItemDaCarteira) => extra.valor(i) }] : []),

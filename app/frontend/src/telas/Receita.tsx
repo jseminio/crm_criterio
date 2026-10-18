@@ -18,6 +18,7 @@ import { Carregando, Erro } from "../componentes/estados";
 import { aliquota, data, dinheiro, percentual } from "../formato";
 import { TabelaDeComposicao } from "../componentes/TabelaDeComposicao";
 import { usarDados } from "../usarDados";
+import { LinkDoGrupo } from "../componentes/AberturaDeCard";
 
 type Periodo = "mes" | "trimestre" | "ano";
 const ROTULOS: Record<Periodo, string> = { mes: "Mês atual", trimestre: "Últimos 3 meses", ano: "Ano até hoje" };
@@ -55,7 +56,7 @@ function ItensDaLinha({ de, categoria }: { de: string; categoria: CategoriaDoMov
   return (
     <TabelaDeComposicao rotulo={ROTULO_DA_CATEGORIA[categoria]} linhas={itens} chave={(i, n) => `${i.contrato_id}-${n}`}
       colunas={[
-        { titulo: "Cliente", valor: (i) => i.grupo },
+        { titulo: "Cliente", valor: (i) => i.grupo, mostrar: (i) => <LinkDoGrupo grupoId={i.grupo_id} nome={i.grupo} /> },
         { titulo: "Contrato", valor: (i) => i.escopo ?? `Contrato ${i.contrato_id}` },
         { titulo: "Data", valor: (i) => i.data, mostrar: (i) => (i.data ? data(i.data) : "—") },
         { titulo: "MRR", valor: (i) => Number(i.valor), mostrar: (i) => dinheiro(i.valor), numerico: true },
@@ -90,7 +91,7 @@ function MotivosDeChurn({ de }: { de: string }) {
             conteudo: () => (
               <TabelaDeComposicao rotulo="Encerramentos anunciados por motivo" linhas={saidas} chave={(i, n) => `${i.contrato_id}-${n}`}
                 colunas={[
-                  { titulo: "Cliente", valor: (i) => i.grupo },
+                  { titulo: "Cliente", valor: (i) => i.grupo, mostrar: (i) => <LinkDoGrupo grupoId={i.grupo_id} nome={i.grupo} /> },
                   { titulo: "Contrato", valor: (i) => i.escopo ?? `Contrato ${i.contrato_id}` },
                   { titulo: "Anunciou", valor: (i) => i.anuncio, mostrar: (i) => data(i.anuncio) },
                   { titulo: "Sai em", valor: (i) => i.saida, mostrar: (i) => data(i.saida) },

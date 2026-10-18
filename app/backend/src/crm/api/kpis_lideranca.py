@@ -57,6 +57,8 @@ META_DE_UPSELL = Decimal("10")
 class CampoEmFalta(BaseModel):
     campo: str
     obrigatorio: bool
+    chave: str = ""
+    """O campo no card: "ir à lacuna" abre o card já nele (18/10/2026)."""
 
 
 class Item(BaseModel):
@@ -72,6 +74,12 @@ class Item(BaseModel):
     cadastro: str | None = None
     responsavel: str | None = None
     faltam: list[CampoEmFalta] = []
+    grupo_id: int | None = None
+    """O grupo do item (18/10/2026): o nome na composição abre o card dele."""
+    registro_id: int | None = None
+    """Integralidade: o registro com a lacuna; com `empresa_id` e `contrato_id`, a tela abre o card certo."""
+    empresa_id: int | None = None
+    contrato_id: int | None = None
 
 
 class Kpi(BaseModel):
@@ -168,7 +176,8 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
 
     novos = novos_entre(de, ate)
     total_novo = sum((v for _, v in novos), ZERO)
-    itens_novos = [Item(grupo=nomes.get(c.grupo_id, "?"), detalhe=(c.escopo or "contrato"), valor=v) for c, v in novos]
+    itens_novos = [Item(grupo=nomes.get(c.grupo_id, "?"), grupo_id=c.grupo_id, detalhe=(c.escopo or "contrato"), valor=v)
+                   for c, v in novos]
     aceitas_sem_contrato = list(sessao.scalars(
         sa.select(Oportunidade).where(
             Oportunidade.situacao == Situacao.ACEITA, Oportunidade.data_aceite.between(de, ate),
@@ -215,7 +224,7 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         falta=falta_contrato + ([f"{sem_cnpj} contrato(s) sem CNPJ: contam como um CNPJ cada"] if sem_cnpj else []),
         meta="Crescendo sem elevar a concentração",
         extras={**{f"mes_{k}": v for k, v in do_mes.items()}, **{f"ano_{k}": v for k, v in do_ano.items()}},
-        itens=[Item(grupo=nomes.get(c.grupo_id, "?"),
+        itens=[Item(grupo=nomes.get(c.grupo_id, "?"), grupo_id=c.grupo_id,
                     detalhe=f"{c.escopo or 'contrato'} · {_cnpj_do(c)}", valor=v) for c, v in novos],
         explicacao="MRR novo do mês ÷ número de grupos (e ÷ número de CNPJs) que o geraram. Empresas do mesmo grupo "
                    "contam como um grupo; contrato sem CNPJ conta como um CNPJ. O acumulado do ano vai na linha de baixo.",
@@ -248,10 +257,10 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         extras={"recorrente": recorrente, "recorrente_pct": _pct(recorrente, mrr_anterior),
                 "nao_recorrente": nao_recorrente, "nao_recorrente_pct": _pct(nao_recorrente, mrr_anterior),
                 "expansao": expansao, "contratos_de_clientes": len(cross_rec), "pontuais": len(pontuais)},
-        itens=[Item(grupo=nomes.get(i.grupo_id, "?"), detalhe=f"expansão ou aditivo em {i.data:%d/%m}", valor=i.valor)
+        itens=[Item(grupo=nomes.get(i.grupo_id, "?"), grupo_id=i.grupo_id, detalhe=f"expansão ou aditivo em {i.data:%d/%m}", valor=i.valor)
                for i in itens_de_expansao]
-        + [Item(grupo=nomes.get(c.grupo_id, "?"), detalhe="novo contrato recorrente", valor=v) for c, v in cross_rec]
-        + [Item(grupo=nomes.get(o.grupo_id, "?"), detalhe=f"{o.servico} (pontual)", valor=o.preco_anual or o.preco_mensal or ZERO)
+        + [Item(grupo=nomes.get(c.grupo_id, "?"), grupo_id=c.grupo_id, detalhe="novo contrato recorrente", valor=v) for c, v in cross_rec]
+        + [Item(grupo=nomes.get(o.grupo_id, "?"), grupo_id=o.grupo_id, detalhe=f"{o.servico} (pontual)", valor=o.preco_anual or o.preco_mensal or ZERO)
            for o in pontuais],
         explicacao="Recorrente: expansões e aditivos do mês + contratos recorrentes novos de quem já era cliente (MRR). "
                    "Não recorrente: consultoria e legalização aceitas no mês por quem já era cliente (valor do serviço). "
@@ -331,11 +340,11 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         saidas = [g for g in linhas if linhas[g][2]]
         contracoes = [g for g in linhas if not linhas[g][2] and linhas[g][1]]
         resto = [g for g in linhas if not linhas[g][2] and not linhas[g][1]]
-        return ([Item(grupo=nome(g), detalhe=detalhe_dos_demais(g, prefixo=True) + detalhe_da_saida(g), valor=perdido(g),
+        return ([Item(grupo=nome(g), grupo_id=g, detalhe=detalhe_dos_demais(g, prefixo=True) + detalhe_da_saida(g), valor=perdido(g),
                       secao=saiu) for g in saidas]
-                + [Item(grupo=nome(g), detalhe="contração em " + ", ".join(f"{d:%d/%m/%Y}" for d, _ in linhas[g][1]),
+                + [Item(grupo=nome(g), grupo_id=g, detalhe="contração em " + ", ".join(f"{d:%d/%m/%Y}" for d, _ in linhas[g][1]),
                         valor=perdido(g), secao=contraiu) for g in contracoes]
-                + [Item(grupo=nome(g), detalhe=detalhe_dos_demais(g, prefixo=False), valor=linhas[g][0].quantize(CENTAVOS),
+                + [Item(grupo=nome(g), grupo_id=g, detalhe=detalhe_dos_demais(g, prefixo=False), valor=linhas[g][0].quantize(CENTAVOS),
                         entra=False, secao=demais) for g in resto])
 
     nome = lambda g: nomes.get(g, "?")
@@ -407,8 +416,8 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
     # ------------------------------------------------ 21: cobertura de relacionamento
     classes, ultimas, cadencia = sucesso._classes(sessao), sucesso._ultimas(sessao), sucesso.cadencia_vigente(sessao)
     em_dia = total = 0
-    sem_reuniao: list[str] = []
-    com_reuniao: list[str] = []
+    sem_reuniao: list[tuple[int, str]] = []
+    com_reuniao: list[tuple[int, str]] = []
     for g, _anterior in sucesso._grupos(sessao):
         classe = classes.get(g.id)
         tipos = [t for t in cadencia.get(classe or "", []) if regras_do_sucesso.tipo(t)]
@@ -420,9 +429,9 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         datas = [d for t, d in ultimas.get(g.id, {}).items() if t in tipos and janela < d <= ate]
         if datas:
             em_dia += 1
-            com_reuniao.append(f"{g.nome}|reunião em {max(datas):%d/%m/%Y} (classe {classe})")
+            com_reuniao.append((g.id, f"{g.nome}|reunião em {max(datas):%d/%m/%Y} (classe {classe})"))
         else:
-            sem_reuniao.append(f"{g.nome} (classe {classe})")
+            sem_reuniao.append((g.id, f"{g.nome} (classe {classe})"))
     kpi21 = Kpi(
         chave="cobertura", titulo="Cobertura de relacionamento",
         valor=_pct(Decimal(em_dia), Decimal(total)) if total else None, unidade="%",
@@ -430,8 +439,9 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
         falta=([] if em_dia else ["Nenhuma reunião de resultado registrada na janela (Sucesso do Cliente)"]),
         meta="100% dos clientes-chave com reunião no trimestre",
         extras={"em_dia": em_dia, "total": total},
-        itens=[Item(grupo=n.split("|")[0], detalhe=n.split("|")[1], valor=ZERO) for n in com_reuniao]
-        + [Item(grupo=n, detalhe="sem reunião na janela da classe", valor=ZERO, entra=False) for n in sem_reuniao],
+        itens=[Item(grupo=n.split("|")[0], grupo_id=g, detalhe=n.split("|")[1], valor=ZERO) for g, n in com_reuniao]
+        + [Item(grupo=n, grupo_id=g, detalhe="sem reunião na janela da classe", valor=ZERO, entra=False)
+           for g, n in sem_reuniao],
         explicacao="Clientes com classe que tiveram a reunião realizada dentro da janela da classe (A: 1 mês, B: 3 meses, "
                    "C: 6 meses) até o fim do mês ÷ clientes com classe. Só conta reunião registrada no Sucesso do Cliente.",
     )
@@ -465,7 +475,8 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
                     detalhe=", ".join(("! " if o else "") + c for c, o in r.faltam), valor=ZERO,
                     secao=f"{r.corte} · {r.responsavel or 'Sem responsável'}", corte=r.corte, cadastro=r.cadastro,
                     responsavel=r.responsavel or "Sem responsável",
-                    faltam=[CampoEmFalta(campo=c, obrigatorio=o) for c, o in r.faltam])
+                    faltam=[CampoEmFalta(campo=c, obrigatorio=o, chave=k) for (c, o), k in zip(r.faltam, r.chaves)],
+                    grupo_id=r.grupo_id, registro_id=r.registro_id, empresa_id=r.empresa_id, contrato_id=r.contrato_id)
                for r in integralidade.por_registro(cadastro.campos)],
         explicacao="Os campos que alimentam um indicador ou uma decisão, em oportunidade, contrato, encerramento, cliente, "
                    "empresa e contato; obrigatório vale 2, prioritário vale 1, e campo condicional só conta quando se "

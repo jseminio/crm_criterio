@@ -81,6 +81,7 @@ _CARD_DO_GRUPO = ("grupos.ver", "funil.ver", "contatos.ver", "contratos.ver", "c
 ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     # comuns a quem entrou
     ("GET", r"/api/eu", _TODOS),
+    ("GET", r"/api/versao", _TODOS),
     ("GET", r"/api/listas", _TODOS),
     ("GET", r"/api/servicos(/pedidos)?", _TODOS),
     # acesso e histórico

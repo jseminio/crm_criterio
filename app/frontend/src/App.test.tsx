@@ -6,7 +6,13 @@ import App from "./App";
 // As telas têm testes próprios; aqui só importa o esqueleto (menu e faixa do título).
 vi.mock("./api/cliente", async () => {
   const real = await vi.importActual<typeof import("./api/cliente")>("./api/cliente");
-  return { ...real, api: { listas: vi.fn().mockResolvedValue(null) } };
+  return {
+    ...real,
+    api: {
+      listas: vi.fn().mockResolvedValue(null),
+      versao: vi.fn().mockResolvedValue({ commit: "a90b952", data_do_build: "2026-10-18" }),
+    },
+  };
 });
 vi.mock("./telas/Agenda", () => ({ Agenda: () => <p>tela da agenda</p> }));
 vi.mock("./telas/Contatos", () => ({ Contatos: () => <p>tela de contatos</p> }));
@@ -56,5 +62,13 @@ describe("Menu em gaveta (celular)", () => {
     await userEvent.click(container.querySelector(".cortina-do-menu")!);
     expect(navegacao()).not.toHaveClass("lateral-aberta");
     expect(container.querySelector(".cortina-do-menu")).toBeNull();
+  });
+});
+
+describe("Versão na barra lateral", () => {
+  it("mostra o commit que a API diz estar no ar, sem número escrito à mão", async () => {
+    render(<App />);
+    const versao = await screen.findByText("dev · a90b952");
+    expect(versao).toHaveAttribute("title", "Tela: desenvolvimento · API: build de 18/10/2026 · commit a90b952");
   });
 });

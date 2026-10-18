@@ -75,6 +75,8 @@ services:
       STRICT_UPDATER: ${STRICT_UPDATER:-true}
       BACKUP_ANTES_DIAS: ${BACKUP_ANTES_DIAS:-7}
       ESPERA_BANCO_SEGUNDOS: ${ESPERA_BANCO_SEGUNDOS:-60}
+      # Versão na tela (crm/versao.py): o commit publicado, que o Coolify preenche sozinho. Nada a criar no painel.
+      SOURCE_COMMIT: ${SOURCE_COMMIT:-}
       # Fixos do container (scripts/servir_producao.py). A API só tem "expose" e não tem domínio: o
       # proxy do Coolify não a roteia para fora. Confia no X-Forwarded-For só de IP privado (o nginx da
       # tela); "*" é recusado, porque deixaria o navegador escolher o IP e anularia o bloqueio de senha

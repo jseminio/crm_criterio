@@ -16,6 +16,19 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Versão automática na barra lateral (18/10/2026)
+
+O "Versão 1.0" escrito à mão (que nunca foi incrementado) deu lugar à identidade do build:
+**`v2026.10.18 · a90b952`** — a data do build da tela e o commit publicado, o mesmo que se abre no GitHub.
+Ao passar o mouse, o detalhe: data do build da tela, data do build da API e o commit.
+
+- **Commit:** `GET /api/versao` (`crm/versao.py`, qualquer pessoa que entrou). No container, vem de
+  `SOURCE_COMMIT`, que o Coolify entrega ao container em execução (`${SOURCE_COMMIT:-}` no compose; nada a
+  criar no painel). No desenvolvimento, a API pergunta ao git. Sem nenhum dos dois, a tela mostra só a data.
+- **Data:** a da tela é gravada pelo Vite no `npm run build` (`vite.config.ts`, fuso de São Paulo); a da API, pelo
+  Dockerfile em `DATA_DO_BUILD`. No `npm run dev`, a tela mostra `dev`.
+- Ninguém precisa incrementar nada: cada Deploy muda a versão sozinho.
+
 ## Assinatura eletrônica pela Clicksign (18/10/2026)
 
 Amostras aprovadas por Eduardo em 18/10/2026 e unificadas no mesmo dia ("o envio sai pelo CRM; envelope enviado pelo

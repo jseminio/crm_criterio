@@ -610,6 +610,10 @@ class Recusa(BaseModel):
 class ContratoDetalhe(ContratoResumo):
     documento_assinado: str | None = None
     observacao: str | None = None
+    multa_rescisoria: str | None = None
+    aviso_previo_dias: int | None = None
+    renovacao: str | None = None
+    """Lidos do PDF assinado e conferidos (18/10/2026). Só registro."""
     eventos: list[EventoDeContratoResposta] = []
     """Mais recente primeiro."""
     aprovacao_pendente: AprovacaoResposta | None = None
@@ -650,6 +654,9 @@ class ContratoEdicao(BaseModel):
     documento_assinado: str | None = Field(default=None, max_length=400)
     signatario: str | None = Field(default=None, max_length=200)
     observacao: str | None = None
+    multa_rescisoria: str | None = Field(default=None, max_length=200)
+    aviso_previo_dias: int | None = Field(default=None, ge=0, le=999)
+    renovacao: str | None = Field(default=None, max_length=200)
 
 
 class ExclusaoDaOportunidade(BaseModel):

@@ -32,6 +32,8 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     ("contratos", "Gestão de contratos", (
         ("ver", "ver"), ("editar", "editar"), ("eventos", "registrar evento"),
         ("aprovar", "aprovar eventos acima da alçada"),
+        ("documentos", "anexar e conferir PDF assinado e documentos antigos"),
+        ("baixar", "baixar PDF assinado (contrato, proposta, aditivo)"),
     )),
     ("carteira", "Saúde da carteira", (
         ("ver", "ver"), ("avaliar", "avaliar e calcular"), ("parametros", "parâmetros"), ("exportar", "exportar"),
@@ -163,6 +165,11 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("POST", r"/api/documentos-de-contrato/matriz", ("configuracoes.servicos",)),
     ("GET", r"/api/documentos-de-contrato/configuracao", ("configuracoes.servicos", "contratos.ver")),
     ("PUT", r"/api/documentos-de-contrato/configuracao", ("configuracoes.servicos",)),
+    # PDF assinado e documentos antigos (18/10/2026): ver a lista e a conferência; baixar o arquivo tem permissão própria
+    ("GET", r"/api/documentos/\d+/pdf", ("contratos.baixar",)),
+    ("GET", r"/api/documentos(/\d+)?", ("contratos.ver", "funil.ver")),
+    ("POST", r"/api/documentos(/\d+/(ler|conferir))?", ("contratos.documentos",)),
+    ("PATCH", r"/api/documentos/\d+", ("contratos.documentos",)),
     ("POST", r"/api/reajustes/aprovar", ("contratos.aprovar",)),
     ("POST", r"/api/ipca/atualizar", ("contratos.ver",)),
     # carteira

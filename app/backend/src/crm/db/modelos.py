@@ -854,11 +854,18 @@ class Contrato(CarimboMixin, Base):
         default=SituacaoContrato.AGUARDANDO_ASSINATURA,
     )
     documento_assinado: Mapped[str | None] = mapped_column(sa.String(400))
-    """Link ou referência do documento — sem upload no CRM ainda. Texto
-    livre (ex.: caminho no SharePoint), não um arquivo guardado aqui."""
+    """Link ou referência do documento, em texto livre (ex.: caminho no SharePoint). Desde 18/10/2026 o PDF assinado
+    pode ser anexado no próprio CRM (`DocumentoAnexado`); este campo fica para o que mora fora."""
 
     signatario: Mapped[str | None] = mapped_column(sa.String(200))
     observacao: Mapped[str | None] = mapped_column(sa.Text)
+    multa_rescisoria: Mapped[str | None] = mapped_column(sa.String(200))
+    """Como o contrato escreve a multa ("2 parcelas", "R$ 14.000,00"), lida do PDF assinado e conferida (18/10/2026).
+    Texto, não número: os contratos antigos escrevem a multa de jeitos diferentes, e não se converte o que não se sabe."""
+    aviso_previo_dias: Mapped[int | None] = mapped_column(sa.SmallInteger)
+    renovacao: Mapped[str | None] = mapped_column(sa.String(200))
+    """O que o contrato diz da renovação ("automática por 12 meses"). Só registro: a regra de renovação segue "a
+    confirmar" no `anexo-tecnico.md`, e nada renova sozinho por causa deste campo."""
 
     grupo: Mapped[GrupoEconomico] = relationship(back_populates="contratos")
     oportunidade: Mapped["Oportunidade | None"] = relationship()
@@ -2013,3 +2020,48 @@ class DocumentoDeContrato(CarimboMixin, Base):
     matriz_id: Mapped[int] = mapped_column(sa.ForeignKey("matriz_de_contrato.id"), nullable=False)
     valores: Mapped[dict] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
     gerado_por: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+
+
+class DocumentoAnexado(CarimboMixin, Base):
+    """Um PDF anexado ao CRM (amostra aprovada por Eduardo em 18/10/2026): o contrato assinado, a proposta aceita ou um
+    aditivo, inclusive os antigos, feitos fora do CRM. O arquivo fica no banco (entra no backup do Redeploy, sem nada
+    manual no servidor). A IA lê o PDF e **sugere** os campos (`leitura`); só o que uma pessoa marca na conferência é
+    gravado no contrato ou na oportunidade.
+
+    Substituir não apaga: o anterior ganha `substituido_em` e fica no histórico."""
+
+    __tablename__ = "documento_anexado"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tipo: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    """"contrato", "proposta" ou "aditivo". Nasce do que a pessoa escolheu ou, no lote, do que a IA leu."""
+    grupo_id: Mapped[int | None] = mapped_column(sa.ForeignKey("grupo_economico.id"), index=True)
+    contrato_id: Mapped[int | None] = mapped_column(sa.ForeignKey("contrato.id"), index=True)
+    oportunidade_id: Mapped[int | None] = mapped_column(sa.ForeignKey("oportunidade.id"), index=True)
+    """Sem grupo, contrato nem oportunidade: veio no lote e ainda espera alguém dizer de quem é."""
+    nome_arquivo: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    tamanho: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False, index=True)
+    """Impede o mesmo PDF entrar duas vezes."""
+    conteudo_base64: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    origem: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="tela")
+    """"tela" (anexado no contrato ou na oportunidade) ou "lote" (documentos antigos)."""
+    enviado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+    enviado_por: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    substituido_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+    leitura_situacao: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pendente")
+    """"pendente", "lendo", "lida", "falhou" ou "conferida"."""
+    leitura_iniciada_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    leitura: Mapped[dict | None] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"))
+    """O que a IA leu: tipo, número, CNPJs e, por campo, o valor com a página e o trecho. Sugestão, nunca fato."""
+    leitura_erro: Mapped[str | None] = mapped_column(sa.String(400))
+    conferido_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    conferido_por: Mapped[str | None] = mapped_column(sa.String(200))
+    campos_gravados: Mapped[list | None] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"))
+    """Os campos que a pessoa marcou e foram gravados na conferência."""
+
+    numero_no_documento: Mapped[str | None] = mapped_column(sa.String(60))
+    """O número como está escrito no PDF (proposta antiga "041.2019"). Não entra na numeração do CRM."""
+    data_do_documento: Mapped[date | None] = mapped_column(sa.Date)
+    """Assinatura do contrato ou do aditivo, aceite da proposta: a data conferida."""

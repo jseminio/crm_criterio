@@ -130,6 +130,10 @@ import type {
   ServicoNoContrato,
   ConfiguracaoDoDocumento,
   DocumentoDoContrato,
+  DocumentoAnexado,
+  DocumentoComConferencia,
+  TipoDeDocumento,
+  VinculoDoDocumento,
   MatrizDeContratoResumo,
   MatrizDoContrato,
 } from "./tipos";
@@ -835,6 +839,21 @@ export const api = {
   configuracaoDoDocumento: () => pedir<ConfiguracaoDoDocumento>("/api/documentos-de-contrato/configuracao"),
   editarConfiguracaoDoDocumento: (c: Omit<ConfiguracaoDoDocumento, "ultimo_usado">) =>
     pedir<ConfiguracaoDoDocumento>("/api/documentos-de-contrato/configuracao", { method: "PUT", body: JSON.stringify(c) }),
+  // PDF assinado e documentos antigos (18/10/2026)
+  documentos: (filtro: { contrato_id?: number; oportunidade_id?: number; origem?: "lote"; historico?: boolean }) =>
+    pedir<DocumentoAnexado[]>(comParametros("/api/documentos", filtro)),
+  documento: (id: number) => pedir<DocumentoComConferencia>(`/api/documentos/${id}`),
+  anexarDocumento: (arquivo: File, onde: { tipo?: TipoDeDocumento; contrato_id?: number; oportunidade_id?: number }) =>
+    enviarArquivo<DocumentoComConferencia>(comParametros("/api/documentos", { nome_arquivo: arquivo.name, ...onde }), arquivo),
+  lerDocumentoDeNovo: (id: number) => pedir<DocumentoComConferencia>(`/api/documentos/${id}/ler`, { method: "POST" }),
+  vincularDocumento: (id: number, vinculo: VinculoDoDocumento) =>
+    pedir<DocumentoComConferencia>(`/api/documentos/${id}`, { method: "PATCH", body: JSON.stringify(vinculo) }),
+  conferirDocumento: (id: number, campos: string[], valores: Record<string, string>, conferidoPor?: string) =>
+    pedir<DocumentoComConferencia>(`/api/documentos/${id}/conferir`, {
+      method: "POST",
+      body: JSON.stringify({ campos, valores, conferido_por: conferidoPor || null }),
+    }),
+  baixarDocumentoAnexado: (id: number, nome: string) => baixarArquivo(`/api/documentos/${id}/pdf`, nome),
   servicosEContratos: () => pedir<ServicoNoContrato[]>("/api/servicos/contratos"),
   gravarServicosEContratos: (itens: { servico: string; modelo: ModeloDeContrato; reajuste: ReajusteDoServico }[]) =>
     pedir<ServicoNoContrato[]>("/api/servicos/contratos", { method: "PUT", body: JSON.stringify({ itens }) }),

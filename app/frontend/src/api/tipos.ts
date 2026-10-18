@@ -386,6 +386,10 @@ export interface EventoDeContrato {
 export interface ContratoDetalhe extends ContratoResumo {
   documento_assinado: string | null;
   observacao: string | null;
+  /** Lidos do PDF assinado e conferidos (18/10/2026). Só registro. */
+  multa_rescisoria?: string | null;
+  aviso_previo_dias?: number | null;
+  renovacao?: string | null;
   /** Mais recente primeiro. */
   eventos: EventoDeContrato[];
   /** Evento acima da alçada esperando quem aprova (02/10/2026): o contrato não recebe outro até a decisão. */
@@ -2637,6 +2641,77 @@ export interface PreviaDaMescla {
   duplicada_nome: string | null;
   duplicada_intocada: boolean;
   duplicada_recusa: string | null;
+}
+
+
+/** PDF anexado ao CRM: contrato assinado, proposta aceita ou aditivo, inclusive os antigos (18/10/2026). */
+export type TipoDeDocumento = "contrato" | "proposta" | "aditivo";
+export type SituacaoDaLeitura = "pendente" | "lendo" | "lida" | "falhou" | "conferida" | "parada";
+
+export interface SugestaoDoDocumento {
+  grupo_id: number | null;
+  grupo_nome: string | null;
+  empresa_id: number | null;
+  contrato_id: number | null;
+  oportunidade_id: number | null;
+  /** "pelo número", "pelo CNPJ" ou por que não achou. */
+  motivo: string | null;
+}
+
+export interface DocumentoAnexado {
+  id: number;
+  tipo: TipoDeDocumento;
+  nome_arquivo: string;
+  tamanho: number;
+  origem: "tela" | "lote";
+  enviado_em: string;
+  enviado_por: string;
+  substituido_em: string | null;
+  leitura_situacao: SituacaoDaLeitura;
+  leitura_erro: string | null;
+  tipo_lido: string | null;
+  grupo_id: number | null;
+  grupo_nome: string | null;
+  contrato_id: number | null;
+  oportunidade_id: number | null;
+  numero_no_documento: string | null;
+  data_do_documento: string | null;
+  conferido_em: string | null;
+  conferido_por: string | null;
+  sugestao: SugestaoDoDocumento | null;
+  cnpjs_lidos: string[];
+  razao_social_lida: string | null;
+  custo_usd: string | null;
+}
+
+export interface LinhaDaConferencia {
+  campo: string;
+  rotulo: string;
+  tipo_do_valor: "data" | "dinheiro" | "inteiro" | "texto";
+  no_crm: string;
+  lido: string;
+  pagina: number;
+  trecho: string;
+  situacao: "igual" | "diferente" | "novo" | "nao_achou" | "informativo";
+  destino: "contrato" | "oportunidade" | "documento" | "nenhum";
+  gravavel: boolean;
+  motivo: string | null;
+  /** Sugestão de marcação: novo e gravável. Diferente nunca vem marcado. */
+  marcar: boolean;
+}
+
+export interface DocumentoComConferencia extends DocumentoAnexado {
+  conferencia: LinhaDaConferencia[];
+  aviso: string | null;
+}
+
+export interface VinculoDoDocumento {
+  tipo?: TipoDeDocumento;
+  grupo_id?: number;
+  contrato_id?: number;
+  oportunidade_id?: number;
+  criar_contrato?: boolean;
+  desvincular?: boolean;
 }
 
 /** Um campo devido e vazio (18/10/2026): a mesma regra da Integralidade do cadastro, nos dois cortes. */

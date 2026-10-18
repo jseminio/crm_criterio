@@ -12,6 +12,7 @@ import { FichaDaOportunidade } from "../componentes/FichaDaOportunidade";
 import { ListaDoQueFalta } from "../componentes/ListaDoQueFalta";
 import { AbaGranola } from "../componentes/AbaGranola";
 import { PropostaDaOportunidade } from "../componentes/PropostaDaOportunidade";
+import { DocumentosAnexados } from "../componentes/DocumentosAnexados";
 import { QuestionarioDaOportunidade } from "../componentes/QuestionarioDaOportunidade";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { Carregando, Erro } from "../componentes/estados";
@@ -1093,6 +1094,13 @@ export function DetalheDaOportunidade({
                 aoSalvar();
               }}
             />
+          )}
+          {aba === "proposta" && detalhe.situacao === "Aceita" && (
+            <DocumentosAnexados oportunidadeId={id} tipo="proposta" titulo="Proposta aceita (PDF)"
+              aoGravar={() => {
+                carregar();
+                aoSalvar();
+              }} />
           )}
 
           {aba === "historico" && (

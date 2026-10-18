@@ -21,6 +21,7 @@ import { ImportarRecebimentos } from "../componentes/ImportarRecebimentos";
 import { usarAcesso } from "../entrada";
 import { contratoCombina, Destaque } from "./pesquisaDeContratos";
 import { GerarContrato } from "../componentes/GerarContrato";
+import { AssinaturaEletronica } from "../componentes/AssinaturaEletronica";
 
 const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "Encerrado"];
 
@@ -90,6 +91,14 @@ function EdicaoDeContrato({
 
   const mudar = (campo: string, valor: string) =>
     definirRascunho((atual) => ({ ...atual, [campo]: valor }));
+
+  // Assinado na Clicksign (18/10/2026): o contrato virou Ativo com a data da assinatura.
+  const aoAssinar = () => {
+    api.contrato(contrato.id).then((atualizado) => {
+      aoRegistrarEvento(atualizado);
+      definirRascunho((r) => ({ ...r, data_inicio: atualizado.data_inicio ?? "", signatario: atualizado.signatario ?? "" }));
+    }).catch(() => undefined);
+  };
 
   const aoRegistrarEvento = (atualizado: ContratoDetalhe) => {
     definirDetalhe(atualizado);
@@ -303,11 +312,13 @@ function EdicaoDeContrato({
 
       {contrato.recorrente !== false && contrato.situacao !== "Encerrado" && <GerarContrato contratoId={contrato.id} />}
 
+      <AssinaturaEletronica contratoId={contrato.id} aoAssinar={aoAssinar} />
+
       {detalhe && <EventosDeContrato contrato={detalhe} aoRegistrar={aoRegistrarEvento} motivos={motivos} iniciativas={iniciativas} />}
 
       <div className="recado">
-        Sem assinatura eletrônica ainda (Clicksign fica para depois) e sem renovação automática:
-        a vigência começa na data da assinatura que você informa aqui.
+        A vigência começa na data da assinatura: enviado pela Clicksign, ela vem sozinha; assinado fora, informe-a aqui.
+        Sem renovação automática.
       </div>
       <AlteracoesDoRegistro tabela="contrato" id={contrato.id} />
     </PainelLateral>

@@ -2013,3 +2013,36 @@ class DocumentoDeContrato(CarimboMixin, Base):
     matriz_id: Mapped[int] = mapped_column(sa.ForeignKey("matriz_de_contrato.id"), nullable=False)
     valores: Mapped[dict] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
     gerado_por: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+
+
+class AssinaturaDeContrato(CarimboMixin, Base):
+    """Um envio do contrato para assinatura na Clicksign (amostra aprovada por Eduardo em 18/10/2026).
+
+    Nasce `em_assinatura` quando o envelope é ativado; o aviso da Clicksign (ou o botão "Conferir") o leva a
+    `assinado`, `recusado`, `expirado` ou `cancelado`. **Assinado ativa o contrato sozinho**, com a data em que o
+    último signatário assinou: a vigência começa na assinatura (decisão de 25/09/2026). Recusado, expirado ou
+    cancelado, o contrato continua "Aguardando assinatura" e pode ser enviado de novo: cada envio é uma linha."""
+
+    __tablename__ = "assinatura_de_contrato"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contrato_id: Mapped[int] = mapped_column(sa.ForeignKey("contrato.id"), nullable=False, index=True)
+    ambiente: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    """"sandbox" ou "producao", o da tela no momento do envio."""
+    envelope_id: Mapped[str] = mapped_column(sa.String(64), nullable=False, unique=True)
+    documento_id: Mapped[str] = mapped_column(sa.String(64), nullable=False, index=True)
+    nome_arquivo: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    situacao: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="em_assinatura")
+    """em_assinatura · assinado · recusado · expirado · cancelado."""
+    prazo: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    signatarios: Mapped[list[dict]] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+    """[{nome, email, telefone, papel, clicksign_id, assinou_em}]. Dado pessoal: fica só no banco."""
+    enviado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), default=agora, nullable=False)
+    enviado_por: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    concluido_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    """Quando fechou: assinado por todos, recusado, expirado ou cancelado."""
+    motivo: Mapped[str | None] = mapped_column(sa.String(400))
+    ultimo_evento: Mapped[str | None] = mapped_column(sa.String(60))
+    ultimo_evento_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    assinado_base64: Mapped[str | None] = mapped_column(sa.Text, deferred=True)
+    """O PDF assinado, baixado da Clicksign quando o envelope fecha."""

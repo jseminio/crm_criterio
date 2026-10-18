@@ -73,6 +73,7 @@ from crm.api.kpis_lideranca import roteador_de_kpis
 from crm.api.reajustes import roteador_de_reajustes
 from crm.api.servicos_e_contratos import roteador_de_servicos_e_contratos
 from crm.api.documento_de_contrato import roteador_do_documento_de_contrato
+from crm.api.assinatura_de_contrato import roteador_da_assinatura
 from crm.indices.ipca import BuscarIpca
 from crm.api.recebimentos import roteador_de_recebimentos
 from crm.db.saidas import efetivar_saidas, laco_das_saidas
@@ -183,10 +184,12 @@ def criar_app(
     busca_de_leads_do_meta: Callable[[], object] | None = None,
     leads_do_meta_automaticos: bool | None = None,
     busca_de_leads_do_google: Callable[[], object] | None = None,
+    http_da_clicksign: Callable[[], object] | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede; `tentativas`, para o
-    teste controlar o relógio do bloqueio de login; `buscar_ipca`, para o teste não ir ao Banco Central."""
+    teste controlar o relógio do bloqueio de login; `buscar_ipca`, para o teste não ir ao Banco Central;
+    `http_da_clicksign`, para o teste falar com uma Clicksign falsa."""
 
     @asynccontextmanager
     async def ciclo_de_vida(_: FastAPI):
@@ -332,6 +335,7 @@ def criar_app(
     api.include_router(roteador_de_reajustes(obter_sessao, buscar_ipca))
     api.include_router(roteador_de_servicos_e_contratos(obter_sessao))
     api.include_router(roteador_do_documento_de_contrato(obter_sessao))
+    api.include_router(roteador_da_assinatura(obter_sessao, http_da_clicksign))
     api.include_router(roteador_de_carteira(obter_sessao, servicos_de_analise or servicos_de_analise_reais))
     api.include_router(roteador_de_empresas(obter_sessao))
     api.include_router(roteador_de_leads_do_meta(obter_sessao, busca_de_leads_do_meta or buscador_real))

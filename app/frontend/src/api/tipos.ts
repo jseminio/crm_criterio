@@ -2628,3 +2628,56 @@ export interface PreviaDaMescla {
   duplicada_intocada: boolean;
   duplicada_recusa: string | null;
 }
+
+/** Assinatura eletrônica pela Clicksign (18/10/2026): `GET /api/contratos/{id}/assinatura`. */
+export interface SignatarioSugerido {
+  nome: string;
+  email: string;
+  telefone: string | null;
+  papel: string;
+  origem: string;
+}
+
+export interface SignatarioDoEnvio {
+  nome: string;
+  email: string;
+  telefone: string | null;
+  papel: string;
+  assinou_em: string | null;
+}
+
+export interface EnvioParaAssinatura {
+  id: number;
+  situacao: "em_assinatura" | "assinado" | "recusado" | "expirado" | "cancelado";
+  situacao_texto: string;
+  ambiente: string;
+  nome_arquivo: string;
+  prazo: string;
+  enviado_em: string;
+  enviado_por: string;
+  concluido_em: string | null;
+  motivo: string | null;
+  ultimo_evento: string | null;
+  ultimo_evento_em: string | null;
+  signatarios: SignatarioDoEnvio[];
+  tem_pdf: boolean;
+}
+
+export interface AbaDaAssinatura {
+  ligada: boolean;
+  ambiente: string;
+  autenticacao: string;
+  pede_telefone: boolean;
+  problema: string | null;
+  sugeridos: SignatarioSugerido[];
+  prazo_sugerido: string;
+  atual: EnvioParaAssinatura | null;
+  anteriores: EnvioParaAssinatura[];
+}
+
+export interface SignatarioNovo {
+  nome: string;
+  email: string;
+  telefone: string | null;
+  papel: string;
+}

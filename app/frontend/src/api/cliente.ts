@@ -128,6 +128,8 @@ import type {
   ServicoNoContrato,
   ConfiguracaoDoDocumento,
   DocumentoDoContrato,
+  AbaDaAssinatura,
+  SignatarioNovo,
   MatrizDeContratoResumo,
   MatrizDoContrato,
 } from "./tipos";
@@ -809,6 +811,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ valores, gerado_por: geradoPor || null }),
     }),
+  assinaturaDoContrato: (id: number) => pedir<AbaDaAssinatura>(`/api/contratos/${id}/assinatura`),
+  enviarParaAssinatura: (id: number, envio: { nome_arquivo: string; conteudo_base64: string; prazo: string;
+    signatarios: SignatarioNovo[]; enviado_por?: string }) =>
+    pedir<AbaDaAssinatura>(`/api/contratos/${id}/assinatura`, {
+      method: "POST",
+      body: JSON.stringify({ ...envio, enviado_por: envio.enviado_por || null }),
+    }),
+  conferirAssinatura: (id: number) => pedir<AbaDaAssinatura>(`/api/contratos/${id}/assinatura/conferir`, { method: "POST" }),
+  lembrarSignatario: (id: number, email: string) =>
+    pedir<AbaDaAssinatura>(`/api/contratos/${id}/assinatura/lembrete`, { method: "POST", body: JSON.stringify({ email }) }),
+  cancelarAssinatura: (id: number) => pedir<AbaDaAssinatura>(`/api/contratos/${id}/assinatura/cancelar`, { method: "POST" }),
+  baixarContratoAssinado: (assinaturaId: number) =>
+    baixarArquivo(`/api/assinaturas-de-contrato/${assinaturaId}/pdf`, "contrato-assinado.pdf"),
   baixarDocumentoDoContrato: (documentoId: number) =>
     baixarArquivo(`/api/documentos-de-contrato/${documentoId}/docx`, "contrato.docx"),
   matrizDoContrato: () => pedir<MatrizDoContrato>("/api/documentos-de-contrato/matriz"),

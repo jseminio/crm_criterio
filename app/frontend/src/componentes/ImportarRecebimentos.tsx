@@ -93,7 +93,7 @@ function PainelDeImportacao({ aoFechar, aoImportar }: { aoFechar: () => void; ao
       <p className="campo-ajuda">
         Uma linha por recebimento. Competência no formato mês/ano (10/2026). O CNPJ precisa estar cadastrado numa empresa do
         CRM; sem CNPJ, o nome do grupo ou da empresa serve, se não houver dois parecidos. O contas a receber do Omie entra
-        como sai: vale a aba Títulos, com o mês do vencimento como competência.
+        como sai: vale a aba Títulos, com o mês da emissão (o mês do serviço) como competência.
       </p>
       {ocupado && !previa && <p className="numero-estado">Lendo a planilha…</p>}
       {erro && <div className="estado estado-erro" role="alert"><p className="estado-texto">{erro}</p></div>}

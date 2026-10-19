@@ -448,7 +448,8 @@ precisam estar na mesma versão do banco: a prévia recusa e diz por quê. Rotas
   o histórico em `GET /api/recebimentos/importacoes`). A fusão de grupos leva os recebimentos junto. O CRM
   mostra; não cobra.
   O **contas a receber do Omie** entra como sai (19/10/2026): de todas as abas, vale a que tem cabeçalho com
-  CNPJ (a aba Títulos); a competência é o mês do **vencimento** e o valor é a coluna Recebido. Título com
+  CNPJ (a aba Títulos); a competência é o mês do serviço,
+  que no Omie é o mês da **emissão** (emitido em 25/12 e vencido em 03/01 é dezembro), e o valor é a coluna Recebido. Título com
   recebido zero (em aberto ou a vencer) não entra e a prévia diz quantos foram. CPF, CNPJ sem 14 dígitos ou
   CNPJ fora do cadastro caem para o nome do cliente.
 - **Movimento do MRR** em Gestão de contratos: cada linha (novos, expansão, reajuste, contração, churn) tem "ver

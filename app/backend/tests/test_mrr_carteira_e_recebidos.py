@@ -319,14 +319,18 @@ def _omie() -> str:
     titulos.append([])
     titulos.append(["Empresa", "Cliente", "CNPJ/CPF", "Parcela", "Emissão", "Vencimento", "Mês", "Valor do Título",
                     "Recebido", "Em Aberto", "Em Atraso", "Situação", "Dias em Atraso", "Data do Recebimento"])
-    def titulo(cliente, doc, venc, valor, recebido, pago=None):
-        titulos.append(["CCE", cliente, doc, "001/013", datetime(2026, 9, 25), venc, venc.month, valor, recebido,
+    def titulo(cliente, doc, emissao, venc, valor, recebido, pago=None):
+        titulos.append(["CCE", cliente, doc, "001/013", emissao, venc, venc.month, valor, recebido,
                         valor - recebido, 0, "", None, pago])
-    titulo("ALFA COMERCIO LTDA", "11.222.333/0001-81", datetime(2026, 10, 3), 12000, 12000, datetime(2026, 10, 6))
-    titulo("Beta Serviços", "98.765.432/0001-10", datetime(2026, 10, 5), 3600, 3600, datetime(2026, 10, 5))  # CNPJ fora do cadastro
-    titulo("Beta Serviços", "123.456.789-09", datetime(2026, 9, 5), 3600, 1000, datetime(2026, 9, 9))  # CPF: vale o nome
-    titulo("Grupo Alfa", "11.222.333/0001-81", datetime(2026, 11, 3), 12000, 0)  # a vencer: não entra
-    titulo("Desconhecida SA", None, datetime(2026, 10, 3), 500, 500, datetime(2026, 10, 3))
+    # a competência é o mês da emissão: emitido em 25/10 e vencido em 03/11 é outubro
+    titulo("ALFA COMERCIO LTDA", "11.222.333/0001-81", datetime(2026, 10, 25), datetime(2026, 11, 3), 12000, 12000,
+           datetime(2026, 11, 3))
+    titulo("Beta Serviços", "98.765.432/0001-10", datetime(2026, 10, 1), datetime(2026, 10, 25), 3600, 3600,
+           datetime(2026, 10, 25))  # CNPJ fora do cadastro
+    titulo("Beta Serviços", "123.456.789-09", datetime(2026, 9, 1), datetime(2026, 9, 25), 3600, 1000,
+           datetime(2026, 9, 25))  # CPF: vale o nome
+    titulo("Grupo Alfa", "11.222.333/0001-81", datetime(2026, 11, 25), datetime(2026, 12, 3), 12000, 0)  # a vencer
+    titulo("Desconhecida SA", None, datetime(2026, 10, 1), datetime(2026, 10, 25), 500, 500, datetime(2026, 10, 25))
     saida = io.BytesIO()
     livro.save(saida)
     return base64.b64encode(saida.getvalue()).decode()

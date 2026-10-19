@@ -16,6 +16,26 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Follow-up de parceiros na Agenda (19/10/2026)
+
+Amostra aprovada por Eduardo em 19/10/2026. O parceiro ganha o **próximo follow-up** (o que fazer e quando), no mesmo
+padrão do lead:
+
+- **Painel do parceiro:** "Próximo follow-up" com o selo (atrasado, hoje, data, sem data); "Registrar follow-up" grava
+  quando foi, o resultado (pediu indicação, recebeu indicação, sem novidade, relação em risco) e o que conversaram, e já
+  marca o próximo; o histórico fica embaixo. "Relação em risco" é só sinal: não muda a etapa.
+- **Cadência sugerida por nível** (hipótese em validação): Estratégico todo mês, Estruturado a cada 3 meses, Indicador a
+  cada 6 meses. A data é sugestão; quem registra muda. Parceiro novo já nasce com o primeiro follow-up sugerido.
+- **Agenda de follow-up:** os parceiros com follow-up marcado entram na mesma fila, com a etiqueta "Parceiro", e abrem o
+  painel do parceiro. Filtro novo por tipo. Só aparece para quem vê o Funil de Parceiros.
+- **Filtros da Agenda:** busca por empresa, parceiro, oportunidade ou próxima ação (sem acento e sem caixa), responsável,
+  temperatura e tipo, com "Limpar filtros". As contagens dos baldes seguem os filtros.
+- **Funil de Parceiros:** selo "FUP" no cartão, coluna ordenável "Próximo follow-up" na Grade e no Excel, e o indicador
+  "Sem follow-up marcado" (com os atrasados na composição).
+
+Migração `9b4e2f6a1c37`: duas colunas em branco em `parceiro` e a tabela `follow_up_de_parceiro`. Não mexe em dado
+existente; aplica sozinha no Redeploy.
+
 ## Parceiros: funil da relação, indicações e finder fee (19/10/2026)
 
 Amostra aprovada por Eduardo em 19/10/2026. **Menu próprio "Parceiros"**, com permissão própria (Configurações ›

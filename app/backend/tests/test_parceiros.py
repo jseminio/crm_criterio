@@ -339,3 +339,62 @@ def test_oportunidade_escolhe_o_parceiro_na_lista_e_liga_a_indicacao(cliente, en
     assert d["parceiro_id"] is None
     assert cliente.get(f"/api/parceiros/{ficus['id']}", headers=ADMIN).json()["indicacoes"] == []
     assert cliente.patch(f"/api/oportunidades/{o['id']}", headers=ADMIN, json={"parceiro_id": 999}).status_code == 404
+
+
+# ------------------------------------------------------------------ follow-up de parceiros (19/10/2026)
+
+def test_cadencia_sugerida_por_nivel():
+    from crm.domain.listas import NivelDeParceiro as N
+    assert regras.sugerir_proximo_follow_up(N.ESTRATEGICO, date(2026, 10, 19)) == date(2026, 11, 19)
+    assert regras.sugerir_proximo_follow_up(N.ESTRUTURADO, date(2026, 11, 30)) == date(2027, 2, 28)
+    assert regras.sugerir_proximo_follow_up(N.INDICADOR, date(2026, 10, 19)) == date(2027, 4, 19)
+
+
+def test_registrar_follow_up_guarda_historico_e_marca_o_proximo(cliente):
+    p = _criar(cliente, "Ficus", nivel="Estratégico", proximo_follow_up="Fechar a lista", proximo_follow_up_em="2026-10-15")
+    assert (p["proximo_follow_up_em"], p["cadencia_meses"], p["follow_ups"]) == ("2026-10-15", 1, [])
+    d = cliente.post(f"/api/parceiros/{p['id']}/follow-ups", headers=ADMIN, json={
+        "feito_em": "2026-10-19", "resultado": "Pediu indicação", "nota": "Vai levantar dois clientes",
+        "proximo_follow_up": "Retomar os dois nomes", "proximo_follow_up_em": "2026-11-19"}).json()
+    assert (d["proximo_follow_up"], d["proximo_follow_up_em"]) == ("Retomar os dois nomes", "2026-11-19")
+    [f] = d["follow_ups"]
+    assert (f["resultado"], f["nota"], f["registrado_por"]) == ("Pediu indicação", "Vai levantar dois clientes", "Eduardo Luiz")
+    assert d["etapa"] == "Mapeado"  # "Relação em risco" ou qualquer resultado não muda a etapa sozinho
+    r = cliente.post(f"/api/parceiros/{p['id']}/follow-ups", headers=ADMIN,
+                     json={"feito_em": "2026-10-20", "resultado": "Relação em risco"}).json()
+    assert r["proximo_follow_up_em"] == "2026-11-19" and r["etapa"] == "Mapeado" and len(r["follow_ups"]) == 2
+    assert cliente.post(f"/api/parceiros/{p['id']}/follow-ups", headers=SOCIO,
+                        json={"feito_em": "2026-10-20", "resultado": "Sem novidade"}).status_code == 403
+
+
+def test_indicador_sem_follow_up_e_atrasados(cliente):
+    _criar(cliente, "Sem data")
+    _criar(cliente, "Atrasado", proximo_follow_up="Ligar", proximo_follow_up_em="2026-10-10")
+    _criar(cliente, "Em dia", proximo_follow_up="Café", proximo_follow_up_em="2026-11-10")
+    ind = cliente.get("/api/parceiros/indicadores", headers=ADMIN, params={"hoje": "2026-10-19"}).json()
+    assert (ind["sem_follow_up"], ind["follow_up_atrasado"]) == (1, 1)
+    comp = cliente.get("/api/parceiros/indicadores/composicao", headers=ADMIN,
+                       params={"indicador": "sem_follow_up", "hoje": "2026-10-19"}).json()
+    assert [(c["parceiro"], c["referencia"], c["valor"]) for c in comp] == [("Sem data", "Sem data", "1"),
+                                                                          ("Atrasado", "Atrasado", "9")]
+    [linha] = [x for x in cliente.get("/api/parceiros", headers=ADMIN).json() if x["nome"] == "Em dia"]
+    assert (linha["proximo_follow_up"], linha["proximo_follow_up_em"]) == ("Café", "2026-11-10")
+
+
+def test_parceiro_com_follow_up_entra_na_agenda_so_para_quem_ve_parceiros(cliente, engine):
+    with Session(engine) as s:
+        agenda = Perfil(nome="Só agenda", permissoes=["agenda.ver"])
+        s.add(agenda)
+        s.flush()
+        s.add(Usuario(email="ana@grupocriterio.com.br", perfil_id=agenda.id))
+        s.commit()
+    _criar(cliente, "Ficus", nivel="Estratégico", socio_responsavel="EL",
+           proximo_follow_up="Fechar a lista", proximo_follow_up_em="2026-10-15")
+    _criar(cliente, "Sem nada")
+    itens = cliente.get("/api/agenda", headers=ADMIN, params={"hoje": "2026-10-19"}).json()["itens"]
+    [p] = [i for i in itens if i["tipo"] == "parceiro"]
+    assert (p["titulo"], p["balde"], p["dias_de_atraso"], p["captador"], p["subtitulo"]) == (
+        "Ficus", "atrasada", 4, "EL", "Estratégico · Mapeado")
+    ana = {"Authorization": "Bearer ana@grupocriterio.com.br|Ana"}
+    itens = cliente.get("/api/agenda", headers=ana, params={"hoje": "2026-10-19"}).json()["itens"]
+    assert [i for i in itens if i["tipo"] == "parceiro"] == []

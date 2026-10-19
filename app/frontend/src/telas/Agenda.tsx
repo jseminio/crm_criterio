@@ -12,10 +12,11 @@ import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { Agenda as DadosDaAgenda, BaldeDaAgenda, ItemDaAgenda, Listas } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
-import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
+import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { data, dinheiroCurto } from "../formato";
 import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
+import { DetalheDoParceiro } from "./DetalheDoParceiro";
 import { CampoDeData } from "../componentes/CampoDeData";
 import { AprovacoesPendentes } from "../componentes/AprovacoesPendentes";
 import { QuestionariosQuePrecisam } from "../componentes/QuestionariosQuePrecisam";
@@ -75,14 +76,15 @@ function Linha({
         {item.subtitulo && <span className="numero-nota">{item.subtitulo}</span>}
         <span className="agenda-etiquetas">
           <Etiqueta
-            texto={item.tipo === "lead" ? "Lead" : item.tipo === "contrato" ? "Contrato" : item.tipo === "pendencia" ? "Pendência da proposta" : item.situacao}
+            texto={item.tipo === "lead" ? "Lead" : item.tipo === "contrato" ? "Contrato" : item.tipo === "pendencia" ? "Pendência da proposta"
+              : item.tipo === "parceiro" ? "Parceiro" : item.situacao}
             tipo="neutra"
           />
           <Etiqueta texto={item.temperatura} tipo="temperatura" />
           {item.captador && <Etiqueta texto={item.captador} tipo="neutra" />}
         </span>
         <span className="numero-nota">
-          {item.valor_anual ? `${dinheiroCurto(item.valor_anual)} ao ano` : "sem valor anual"}
+          {item.tipo === "parceiro" ? "follow-up com o parceiro" : item.valor_anual ? `${dinheiroCurto(item.valor_anual)} ao ano` : "sem valor anual"}
           {item.dias_desde_o_envio !== null && ` · enviada há ${item.dias_desde_o_envio} dias`}
           {item.dias_de_atraso > 0 && ` · ${item.dias_de_atraso} dia${item.dias_de_atraso === 1 ? "" : "s"} de atraso`}
         </span>
@@ -116,12 +118,26 @@ function Linha({
               : "Defina a próxima ação na tela Funil."}
             {item.tipo === "contrato" && " · abra em Contratos para renovar."}
             {item.tipo === "pendencia" && " · abra a oportunidade, aba Proposta."}
+            {item.tipo === "parceiro" && " · abra o parceiro para registrar o follow-up."}
           </span>
         </div>
       )}
     </li>
   );
 }
+
+/** Para a busca: sem acento e sem caixa, "São" acha "sao". */
+const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+type FiltroDeTipo = "todos" | "oportunidades" | "leads" | "parceiros" | "contratos";
+
+const TIPOS: Record<FiltroDeTipo, ItemDaAgenda["tipo"][]> = {
+  todos: ["oportunidade", "lead", "contrato", "pendencia", "parceiro"],
+  oportunidades: ["oportunidade"],
+  leads: ["lead"],
+  parceiros: ["parceiro"],
+  contratos: ["contrato", "pendencia"],
+};
 
 export function Agenda({
   listas,
@@ -135,21 +151,77 @@ export function Agenda({
   const { pode } = usarAcesso();
   const [balde, definirBalde] = useState<BaldeDaAgenda | null>(null);
   const [aberta, definirAberta] = useState<number | null>(null);
+  const [parceiroAberto, definirParceiroAberto] = useState<number | null>(null);
+  const [tipo, definirTipo] = useState<FiltroDeTipo>("todos");
+  const [busca, definirBusca] = useState("");
+  const [responsavel, definirResponsavel] = useState("");
+  const [temperatura, definirTemperatura] = useState("");
   const { dados, carregando, erro, recarregar } = usarDados<DadosDaAgenda>(() => api.agenda(), []);
 
   if (carregando && !dados) return <Carregando rotulo="Montando a agenda" />;
   if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
   if (!dados) return null;
 
+  // Filtros (19/10/2026): tipo, busca por empresa, parceiro ou ação, responsável e temperatura. As contagens dos baldes
+  // seguem os filtros.
+  const termo = semAcento(busca.trim());
+  const responsaveis = [...new Set(dados.itens.map((i) => i.captador).filter((c): c is string => !!c))].sort();
+  const filtrando = tipo !== "todos" || termo !== "" || responsavel !== "" || temperatura !== "";
+  const doTipo = dados.itens.filter((i) =>
+    TIPOS[tipo].includes(i.tipo)
+    && (!termo || [i.titulo, i.subtitulo, i.proxima_acao, i.captador].some((t) => t && semAcento(t).includes(termo)))
+    && (!responsavel || i.captador === responsavel)
+    && (!temperatura || i.temperatura === temperatura));
+  const limpar = () => {
+    definirTipo("todos");
+    definirBusca("");
+    definirResponsavel("");
+    definirTemperatura("");
+  };
+  const contagens = Object.fromEntries(BALDES.map((b) => [b.chave, doTipo.filter((i) => i.balde === b.chave).length]));
   // Sem escolha, abre no primeiro balde que tem gente: o que mais urge.
-  const atual = balde ?? BALDES.find((b) => dados.contagens[b.chave] > 0)?.chave ?? "sem_acao";
-  const doBalde = dados.itens.filter((i) => i.balde === atual);
+  const atual = balde ?? BALDES.find((b) => contagens[b.chave] > 0)?.chave ?? "sem_acao";
+  const doBalde = doTipo.filter((i) => i.balde === atual);
   const info = BALDES.find((b) => b.chave === atual)!;
 
   return (
     <>
       {pode("contratos.aprovar") && <AprovacoesPendentes />}
       {pode("funil.questionarios") && <QuestionariosQuePrecisam />}
+      <div className="filtros">
+        <div className="campo">
+          <label className="campo-rotulo" htmlFor="agenda-busca">Buscar</label>
+          <input id="agenda-busca" className="entrada entrada-busca" placeholder="Empresa, parceiro ou próxima ação"
+            value={busca} onChange={(e) => definirBusca(e.target.value)} />
+        </div>
+        <div className="campo">
+          <label className="campo-rotulo" htmlFor="agenda-responsavel">Responsável</label>
+          <select id="agenda-responsavel" className="selecao" value={responsavel} onChange={(e) => definirResponsavel(e.target.value)}>
+            <option value="">Todos</option>
+            {responsaveis.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div className="campo">
+          <label className="campo-rotulo" htmlFor="agenda-temperatura">Temperatura</label>
+          <select id="agenda-temperatura" className="selecao" value={temperatura} onChange={(e) => definirTemperatura(e.target.value)}>
+            <option value="">Todas</option>
+            {(listas?.temperaturas ?? ["Quente", "Morno", "Frio"]).map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="campo">
+          <label className="campo-rotulo" htmlFor="agenda-tipo">Tipo</label>
+          <select id="agenda-tipo" className="selecao" value={tipo} onChange={(e) => definirTipo(e.target.value as FiltroDeTipo)}>
+            <option value="todos">Todos</option>
+            <option value="oportunidades">Oportunidades</option>
+            <option value="leads">Leads</option>
+            {pode("parceiros.ver") && <option value="parceiros">Parceiros</option>}
+            <option value="contratos">Contratos e pendências</option>
+          </select>
+        </div>
+        {filtrando && (
+          <button type="button" className="botao botao-secundario" onClick={limpar}>Limpar filtros</button>
+        )}
+      </div>
       <div className="abas" role="tablist" aria-label="Baldes da agenda">
         {BALDES.map((b) => (
           <button
@@ -161,7 +233,7 @@ export function Agenda({
             onClick={() => definirBalde(b.chave)}
           >
             {b.rotulo}
-            <span className="aba-contagem">{dados.contagens[b.chave]}</span>
+            <span className="aba-contagem">{contagens[b.chave]}</span>
           </button>
         ))}
       </div>
@@ -169,7 +241,9 @@ export function Agenda({
       <div className="recado">{info.explicacao}</div>
 
       {doBalde.length === 0 ? (
-        <VazioSemDados titulo={`Nada em “${info.rotulo}”`} explicacao="Nada neste balde agora: oportunidade, lead, contrato ou pendência de proposta." />
+        filtrando ? (
+          <VazioPorFiltro aoLimpar={limpar} />
+        ) : <VazioSemDados titulo={`Nada em “${info.rotulo}”`} explicacao="Nada neste balde agora: oportunidade, lead, contrato, pendência de proposta ou parceiro." />
       ) : (
         <ul className="agenda">
           {doBalde.map((item) => (
@@ -181,12 +255,18 @@ export function Agenda({
                   ? aoAbrirLeads()
                   : item.tipo === "contrato"
                     ? aoAbrirContratos()
+                    : item.tipo === "parceiro"
+                    ? definirParceiroAberto(item.id)
                     : definirAberta(item.tipo === "pendencia" ? (item.oportunidade_id ?? item.id) : item.id)
               }
               aoSalvar={recarregar}
             />
           ))}
         </ul>
+      )}
+
+      {parceiroAberto !== null && (
+        <DetalheDoParceiro id={parceiroAberto} aoFechar={() => definirParceiroAberto(null)} aoSalvar={() => recarregar()} />
       )}
 
       {aberta !== null && (

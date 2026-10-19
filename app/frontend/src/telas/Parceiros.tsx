@@ -21,11 +21,12 @@ import { Recolhivel } from "../componentes/Recolhivel";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import {
   ACORDOS, ComposicaoDosParceiros, ConferenciaDosTextos, ETAPAS, ETAPAS_MANUAIS, FeesDosParceiros, NIVEIS,
+  SeloDoFollowUp,
 } from "../componentes/ParceirosApoio";
 import { DetalheDoParceiro } from "./DetalheDoParceiro";
 import { usarAcesso } from "../entrada";
 import { abrirParaImprimir, mesPadrao } from "../relatorioDoParceiro";
-import { dinheiro, dinheiroCurto, percentual } from "../formato";
+import { data, dinheiro, dinheiroCurto, hojeIso, percentual } from "../formato";
 import { PRESETS, resolverPeriodo, type Preset } from "../periodo";
 import { usarDados } from "../usarDados";
 import { usarTelaEstreita, usarToque } from "../usarTelaEstreita";
@@ -322,13 +323,14 @@ export function Parceiros() {
                 <ThOrdenavel coluna="abertas" numerico ordenacao={ordenacao} aoAlternar={alternar}>Abertas</ThOrdenavel>
                 <ThOrdenavel coluna="fechadas" numerico ordenacao={ordenacao} aoAlternar={alternar}>Fechadas</ThOrdenavel>
                 <ThOrdenavel coluna="mrr" numerico ordenacao={ordenacao} aoAlternar={alternar}>MRR originado</ThOrdenavel>
+                <ThOrdenavel coluna="follow_up" ordenacao={ordenacao} aoAlternar={alternar}>Próximo follow-up</ThOrdenavel>
               </tr>
             </thead>
             <tbody>
               {ordenar(itens, ordenacao, {
                 nome: (p) => p.nome, nivel: (p) => p.nivel, acordo: (p) => p.acordo, etapa: (p) => ETAPAS.indexOf(p.etapa),
                 socio: (p) => p.socio_responsavel, indicacoes: (p) => p.indicacoes, abertas: (p) => p.abertas,
-                fechadas: (p) => p.fechadas, mrr: (p) => Number(p.mrr),
+                fechadas: (p) => p.fechadas, mrr: (p) => Number(p.mrr), follow_up: (p) => p.proximo_follow_up_em,
               }).map((p) => (
                 <tr key={p.id} className="tabela-clicavel" tabIndex={0} onClick={() => definirAberto(p.id)}
                   onKeyDown={(e) => e.key === "Enter" && definirAberto(p.id)}>
@@ -341,6 +343,12 @@ export function Parceiros() {
                   <td className="tabela-numero">{p.abertas}</td>
                   <td className="tabela-numero">{p.fechadas}</td>
                   <td className="tabela-numero">{Number(p.mrr) ? dinheiro(p.mrr) : "—"}</td>
+                  <td>
+                    {p.proximo_follow_up && <span>{p.proximo_follow_up}<br /></span>}
+                    {p.proximo_follow_up_em && p.proximo_follow_up_em >= hojeIso()
+                      ? <span>{data(p.proximo_follow_up_em)}</span>
+                      : <SeloDoFollowUp iso={p.proximo_follow_up_em} hoje={hojeIso()} />}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -389,6 +397,7 @@ function CartaoDoParceiro({ parceiro: p, aoAbrir, arrastavel, aoComecarArrasto, 
       <span className="cartao-nome">{p.tipo_pessoa} · {p.nivel}{p.socio_responsavel ? ` · ${p.socio_responsavel}` : ""}</span>
       <span className="cartao-valor">{Number(p.mrr) ? `${dinheiroCurto(p.mrr)}/mês` : "sem MRR no período"}</span>
       <span className="cartao-linha"><Etiqueta texto={p.acordo} /></span>
+      <span className="cartao-linha"><SeloDoFollowUp iso={p.proximo_follow_up_em} hoje={hojeIso()} /></span>
       <span className="cartao-nome">
         {p.indicacoes} indicaç{p.indicacoes === 1 ? "ão" : "ões"} · {p.abertas} aberta{p.abertas === 1 ? "" : "s"}
       </span>
@@ -410,6 +419,7 @@ const TITULOS: Record<IndicadorDosParceiros, string> = {
   mrr: "MRR originado",
   sem_contrato: "Sem contrato assinado",
   fees: "Fees a aprovar",
+  sem_follow_up: "Sem follow-up marcado",
 };
 
 function NumerosDosParceiros({ estado, consulta }: {
@@ -424,18 +434,22 @@ function NumerosDosParceiros({ estado, consulta }: {
     titulo: TITULOS[indicador], subtitulo: "O que compõe o número, com os filtros da tela", quantos,
     conteudo: () => <ComposicaoDosParceiros indicador={indicador} filtros={consulta} />,
   });
-  const cards: { chave: IndicadorDosParceiros; destaque: string; tom: "azul" | "verde" | "ambar" | "marinho" | "violeta" | "rosa"; quantos?: number }[] = [
+  const cards: { chave: IndicadorDosParceiros; destaque: string; tom: "azul" | "verde" | "ambar" | "marinho" | "violeta" | "rosa";
+    quantos?: number; apoio?: string }[] = [
     { chave: "ativos", destaque: String(dados.ativos), tom: "marinho", quantos: dados.ativos },
     { chave: "indicacoes", destaque: String(dados.indicacoes), tom: "azul", quantos: dados.indicacoes },
     { chave: "conversao", destaque: dados.conversao === null ? "" : percentual(dados.conversao), tom: "verde" },
     { chave: "mrr", destaque: dinheiro(dados.mrr), tom: "violeta" },
     { chave: "sem_contrato", destaque: String(dados.sem_contrato), tom: "ambar", quantos: dados.sem_contrato },
     { chave: "fees", destaque: dinheiro(dados.fees), tom: "rosa", quantos: dados.fees_quantos },
+    { chave: "sem_follow_up", destaque: String(dados.sem_follow_up), tom: "ambar",
+      quantos: dados.sem_follow_up + dados.follow_up_atrasado,
+      apoio: dados.follow_up_atrasado ? `+ ${dados.follow_up_atrasado} atrasado${dados.follow_up_atrasado === 1 ? "" : "s"}` : undefined },
   ];
   return (
     <div className="numeros" aria-label="Números dos parceiros">
       {cards.map((c) => (
-        <Indicador key={c.chave} rotulo={TITULOS[c.chave]} destaque={c.destaque || undefined} tom={c.tom}
+        <Indicador key={c.chave} rotulo={TITULOS[c.chave]} destaque={c.destaque || undefined} tom={c.tom} apoio={c.apoio}
           composicao={composicao(c.chave, c.quantos)}>
           {dados.explicacoes[c.chave]}
         </Indicador>

@@ -803,6 +803,9 @@ export const api = {
     pedir<ParceiroDetalhe>("/api/parceiros", { method: "POST", body: JSON.stringify(dados) }),
   editarParceiro: (id: number, dados: Partial<CadastroDoParceiro>) =>
     pedir<ParceiroDetalhe>(`/api/parceiros/${id}`, { method: "PATCH", body: JSON.stringify(dados) }),
+  registrarFollowUp: (id: number, dados: { feito_em: string; resultado: string; nota?: string | null;
+    proximo_follow_up?: string | null; proximo_follow_up_em?: string | null }) =>
+    pedir<ParceiroDetalhe>(`/api/parceiros/${id}/follow-ups`, { method: "POST", body: JSON.stringify(dados) }),
   moverParceiro: (id: number, etapa: string) =>
     pedir<ParceiroDetalhe>(`/api/parceiros/${id}/etapa`, { method: "POST", body: JSON.stringify({ etapa }) }),
   buscarOportunidadesParaIndicar: (busca: string) =>

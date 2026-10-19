@@ -222,7 +222,7 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/parceiros(/indicadores(/composicao)?|/conferencia|/fees|/oportunidades|/relatorios|/\d+(/relatorio|/alertas)?)?", ("parceiros.ver",)),
     ("POST", r"/api/parceiros/fees/\d+/(aprovar|recusar|pago)", ("parceiros.aprovar_fee",)),
     ("POST", r"/api/parceiros/fees/calcular", ("parceiros.editar", "parceiros.aprovar_fee")),
-    ("POST", r"/api/parceiros(/conferencia|/\d+/(etapa|indicacoes|indicacoes/registrar)|/indicacoes/\d+/desligar)?", ("parceiros.editar",)),
+    ("POST", r"/api/parceiros(/conferencia|/\d+/(etapa|indicacoes|indicacoes/registrar|follow-ups)|/indicacoes/\d+/desligar)?", ("parceiros.editar",)),
     ("PATCH", r"/api/parceiros/(\d+|indicacoes/\d+)", ("parceiros.editar",)),
     # conferência da carga
     ("GET", r"/api/cargas(/\d+(/ocorrencias)?)?", ("conferencia.ver",)),

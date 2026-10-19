@@ -47,7 +47,7 @@ class _Aberto(Protocol):
 
 @dataclass(frozen=True)
 class ItemDaAgenda:
-    tipo: str  # "oportunidade" | "lead" | "contrato" | "pendencia"
+    tipo: str  # "oportunidade" | "lead" | "contrato" | "pendencia" | "parceiro"
     id: int
     titulo: str
     subtitulo: str | None
@@ -84,6 +84,7 @@ def montar(
     hoje: date,
     contratos: Iterable[tuple[object, str | None]] = (),
     pendencias: Iterable[tuple[int, object, object, str | None]] = (),
+    parceiros: Iterable[tuple[object, str]] = (),
 ) -> list[ItemDaAgenda]:
     """`oportunidades` é uma lista de (oportunidade em aberto, nome do grupo).
 
@@ -174,6 +175,30 @@ def montar(
                 dias_de_atraso=(hoje - p.prazo).days if balde == "atrasada" else 0,
                 dias_desde_o_envio=None,
                 oportunidade_id=o.id,
+            )
+        )
+
+    # (parceiro com follow-up marcado, etapa da relação) — 19/10/2026. Sem nada marcado, não entra: o indicador
+    # "Sem follow-up marcado" do Funil de Parceiros é quem cobra esses.
+    for p, etapa in parceiros:
+        if not ((p.proximo_follow_up or "").strip() or p.proximo_follow_up_em):
+            continue
+        balde = _balde(p.proximo_follow_up or "Follow-up com o parceiro", p.proximo_follow_up_em, hoje)
+        itens.append(
+            ItemDaAgenda(
+                tipo="parceiro",
+                id=p.id,
+                titulo=p.nome,
+                subtitulo=f"{p.nivel.value} · {etapa}",
+                situacao=etapa,
+                temperatura=None,
+                captador=p.socio_responsavel,
+                valor_anual=None,
+                proxima_acao=(p.proximo_follow_up or "").strip() or "Follow-up com o parceiro",
+                proxima_acao_em=p.proximo_follow_up_em,
+                balde=balde,
+                dias_de_atraso=(hoje - p.proximo_follow_up_em).days if balde == "atrasada" else 0,
+                dias_desde_o_envio=None,
             )
         )
 

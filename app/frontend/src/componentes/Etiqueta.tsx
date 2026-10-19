@@ -67,6 +67,11 @@ const TOM_POR_SITUACAO: Record<string, string> = {
   "Aprovado, a pagar": "andamento",
   Pago: "ganho",
   Recusado: "perda",
+  // Follow-up de parceiros (19/10/2026): o resultado do follow-up feito
+  "Pediu indicação": "andamento",
+  "Recebeu indicação": "ganho",
+  "Sem novidade": "neutra",
+  "Relação em risco": "perda",
 };
 
 const TOM_POR_TEMPERATURA: Record<string, string> = {

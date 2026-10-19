@@ -361,9 +361,12 @@ def roteador_de_recebimentos(obter_sessao: Callable[[], Iterator[Session]]) -> A
         de: date,
         ate: date | None = None,
         hoje: date | None = None,
+        so_existentes: bool = False,
         sessao: Session = Depends(obter_sessao, scope="function"),
     ) -> MovimentoResposta:
-        """Cada contrato ou evento que compõe as linhas do movimento do MRR no período (a mesma conta)."""
+        """Cada contrato ou evento que compõe as linhas do movimento do MRR no período (a mesma conta).
+
+        `so_existentes`: só os contratos que já existiam no início, a conta do NRR e do GRR (18/10/2026)."""
         fim = ate or (hoje or date.today())
         efetivar_saidas(sessao, hoje or date.today())
         if de > fim:
@@ -371,7 +374,7 @@ def roteador_de_recebimentos(obter_sessao: Callable[[], Iterator[Session]]) -> A
         registrados = _contratos(sessao)
         por_id = {c.id: c for c in registrados}
         contratos = regras.em_bruto(registrados, parametros_vigentes(sessao)[1].imposto)
-        itens = regras.itens_do_movimento(contratos, de, fim)
+        itens = regras.itens_do_movimento(contratos, de, fim, so_existentes_em=de if so_existentes else None)
         eventos = {ev.id: ev for c in registrados for ev in c.eventos}
         anunciadas = regras.saidas_anunciadas(contratos, de, fim)
         nomes_anunciados = dict(sessao.execute(sa.select(GrupoEconomico.id, GrupoEconomico.nome)

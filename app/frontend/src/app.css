@@ -433,6 +433,17 @@
 .retrato-semaforo-1.retrato-semaforo-ativo { background: #2e7d5b; } .retrato-semaforo-1.retrato-semaforo-ativo b, .retrato-semaforo-1.retrato-semaforo-ativo small { color: #fff; }
 .retrato-semaforo-2.retrato-semaforo-ativo { background: #b8860b; } .retrato-semaforo-2.retrato-semaforo-ativo b, .retrato-semaforo-2.retrato-semaforo-ativo small { color: #fff; }
 .retrato-semaforo-3.retrato-semaforo-ativo { background: #c0392b; } .retrato-semaforo-3.retrato-semaforo-ativo b, .retrato-semaforo-3.retrato-semaforo-ativo small { color: #fff; }
+/* Saúde da carteira (18/10/2026): $$$ na inadimplência, "ver" de cada número e o NRR no ano. */
+.retrato-faixa { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.retrato-celula { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.retrato-celula > .retrato-chip { flex: 1; }
+.retrato-celula > .ind-composicao { align-self: center; }
+.retrato-cifrao { display: block; font: 700 15px var(--isc-titulo); letter-spacing: 1px; color: var(--isc-crit); }
+.retrato-chip-trav { border: 1.5px solid var(--isc-crit); background: #fdf0ee; }
+.retrato-chip-trav:not(.retrato-chip-ativo):hover { background: #fce9e7; }
+.retrato-chip-trav.retrato-chip-ativo .retrato-cifrao { color: #fff; }
+.retrato-semaforo-ver { display: flex; gap: 6px; justify-content: center; }
+.retrato-nrr-mes { display: block; font-size: 10.5px; color: var(--isc-cinza); }
 @media (max-width: 720px) { .retrato-faixa { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .ia-analise { background: #efe9fa; border-radius: var(--raio-md); padding: var(--e3) var(--e4); font-size: 12.5px; line-height: 1.5; }

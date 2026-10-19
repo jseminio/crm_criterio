@@ -150,6 +150,20 @@ def test_a_lista_do_movimento_soma_cada_linha(cliente):
     assert churn[0]["grupo"] == "Gama" and churn[0]["data"] == "2026-10-15"
 
 
+
+def test_so_existentes_e_a_conta_do_nrr(cliente):
+    """O NRR no ano da Saúde da carteira (18/10/2026): a composição traz só quem já existia no início."""
+    mrr = cliente.get("/api/mrr", params={"hoje": HOJE, "de": "2026-10-01"}, headers=ADMIN).json()["movimento"]
+    itens = cliente.get("/api/mrr/movimento", params={"hoje": HOJE, "de": "2026-10-01", "so_existentes": True},
+                        headers=ADMIN).json()["itens"]
+    assert "novo" not in {i["categoria"] for i in itens}  # o BPO Financeiro do Alfa entrou em 05/10
+    soma = {c: sum((D(i["valor"]) for i in itens if i["categoria"] == c), D("0"))
+            for c in ("expansao", "reajuste", "contracao", "churn_cliente", "churn_criterio")}
+    inicio = D(mrr["mrr_inicio"])
+    nrr = ((inicio + soma["expansao"] + soma["reajuste"] - soma["contracao"] - soma["churn_cliente"] - soma["churn_criterio"])
+           / inicio * 100).quantize(D("0.1"))
+    assert nrr == D(mrr["nrr"])
+
 # ── Importação ───────────────────────────────────────────────────────────────────────────────────────
 
 PLANILHA = [

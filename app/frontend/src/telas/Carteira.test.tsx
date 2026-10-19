@@ -23,6 +23,8 @@ vi.mock("../api/cliente", async () => {
       abrirPeriodo: vi.fn(),
       calcularCarteira: vi.fn(),
       editarJanela: vi.fn(),
+      mrr: vi.fn(),
+      itensDoMovimento: vi.fn(),
     },
   };
 });
@@ -79,8 +81,76 @@ const parametros = (o: Partial<Parametros> = {}): Parametros => ({
   mix: [], custo_hora: {}, ...o,
 });
 
+const MOVIMENTO = (nrr: string | null, grr: string | null) => ({
+  de: "2026-01-01", ate: "2026-10-18", mrr_inicio: "10000.00", novo: "800.00", expansao: "300.00", reajuste: "200.00",
+  contracao: "100.00", churn_cliente: "400.00", churn_criterio: "0.00", churn: "400.00", mrr_fim: "10800.00",
+  variacao: "800.00", nrr, grr,
+});
+function mockarMrr() {
+  vi.mocked(api.mrr).mockImplementation(async (de?: string) =>
+    ({ movimento: de ? MOVIMENTO("100.0", "95.0") : MOVIMENTO("99.6", "99.6") }) as never);
+  vi.mocked(api.itensDoMovimento).mockResolvedValue({ de: "2026-01-01", ate: "2026-10-18", itens: [
+    { categoria: "expansao", grupo_id: 2, grupo: "Beta", contrato_id: 7, escopo: "Contábil", valor: "300.00", data: "2026-03-01" },
+    { categoria: "reajuste", grupo_id: 2, grupo: "Beta", contrato_id: 7, escopo: "Contábil", valor: "200.00", data: "2026-07-01" },
+    { categoria: "contracao", grupo_id: 1, grupo: "Alfa", contrato_id: 8, escopo: "DP", valor: "100.00", data: "2026-05-01" },
+    { categoria: "churn_cliente", grupo_id: 3, grupo: "Gama", contrato_id: 9, escopo: "Contábil", valor: "400.00", data: "2026-08-31" },
+  ] });
+}
+
+describe("Saúde da carteira: $$$, composições e NRR no ano (18/10/2026)", () => {
+  beforeEach(() => { vi.clearAllMocks(); mockarMrr(); });
+
+  it("a inadimplência tem o $$$ em vermelho e a composição com a nota e a % da receita", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira listas={null} />);
+    await screen.findByText(/▸ Alfa/);
+    const chip = screen.getByRole("button", { name: /grupos inadimplentes, 16,7% da receita travada/ });
+    expect(chip.querySelector(".retrato-cifrao")).toHaveTextContent("$$$");
+    await userEvent.click(screen.getByRole("button", { name: "Ver composição: $$$ Grupos inadimplentes" }));
+    const lista = within(await screen.findByRole("dialog")).getByRole("table", { name: "Grupos na conta" });
+    expect(within(lista).getByRole("columnheader", { name: /Adimplência/ })).toBeInTheDocument();
+    expect(within(lista).getByText("Alfa")).toBeInTheDocument();
+    expect(within(lista).queryByText("Beta")).toBeNull();
+    expect(within(lista).getByText("16,7%")).toBeInTheDocument(); // 1.000 de 6.000
+    expect(chip).toHaveAttribute("aria-pressed", "false"); // abrir a composição não filtra
+  });
+
+  it("cada semáforo abre os grupos do seu nível", async () => {
+    const base = resposta();
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(
+      resposta({ itens: [base.itens[0], { ...base.itens[1], semaforo: 1 }] }));
+    render(<Carteira listas={null} />);
+    await screen.findByText(/▸ Alfa/);
+    await userEvent.click(screen.getByRole("button", { name: "Ver composição: Semáforo 1 — Controlada" }));
+    const lista = within(await screen.findByRole("dialog")).getByRole("table", { name: "Grupos na conta" });
+    expect(within(lista).getByText("Beta")).toBeInTheDocument();
+    expect(within(lista).queryByText("Alfa")).toBeNull();
+  });
+
+  it("o NRR no ano usa 1º de janeiro, mostra o do mês e abre a ponte só com quem já existia", async () => {
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira listas={null} />);
+    expect(await screen.findByText("100,0%")).toBeInTheDocument();
+    expect(api.mrr).toHaveBeenCalledWith(`${new Date().getFullYear()}-01-01`);
+    expect(screen.getByText(/desde 31\/12 · no mês 99,6%/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Ver composição: NRR no ano" }));
+    const modal = within(await screen.findByRole("dialog"));
+    expect(api.itensDoMovimento).toHaveBeenCalledWith(`${new Date().getFullYear()}-01-01`, true);
+    const ponte = modal.getByRole("table", { name: "Ponte do NRR" });
+    expect(within(ponte).getByText(/GRR 95,0%/)).toBeInTheDocument();
+    expect(await modal.findByText("Gama")).toBeInTheDocument();
+  });
+
+  it("sem MRR em 31/12 o NRR diz que não é calculável, nunca 0%", async () => {
+    vi.mocked(api.mrr).mockResolvedValue({ movimento: MOVIMENTO(null, null) } as never);
+    vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
+    render(<Carteira listas={null} />);
+    expect(await screen.findByText("não calculável")).toBeInTheDocument();
+  });
+});
+
 describe("Carteira", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); mockarMrr(); });
 
   it("mostra o ISC com a zona escrita, os avisos e a distribuição", async () => {
     vi.mocked(api.classificacaoDaCarteira).mockResolvedValue(resposta());
@@ -344,7 +414,7 @@ describe("Carteira", () => {
 });
 
 describe("Carteira: período de avaliação e revisão de honorários", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); mockarMrr(); });
 
   const periodo = (o: Partial<PeriodoDeAvaliacao> = {}): PeriodoDeAvaliacao => ({
     id: 1, mes_de_referencia: "2026-10-01", aberto_em: "2026-10-01T09:00:00", aberto_por: "Eduardo Luiz",
@@ -423,7 +493,7 @@ describe("Carteira: período de avaliação e revisão de honorários", () => {
 });
 
 describe("Carteira: valor em contrato e cliente novo", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); mockarMrr(); });
 
   const periodo: PeriodoDeAvaliacao = {
     id: 1, mes_de_referencia: "2026-10-01", aberto_em: "2026-10-01T09:00:00", aberto_por: "Eduardo Luiz",

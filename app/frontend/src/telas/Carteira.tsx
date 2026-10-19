@@ -21,14 +21,23 @@ import { RevisaoMensal } from "./RevisaoMensal";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
 import { usarAcesso } from "../entrada";
 import { BotaoDeComposicao, Explicavel } from "../componentes/Indicador";
+import { NrrNoAno } from "../componentes/NrrNoAno";
 import { LinkDoGrupo } from "../componentes/AberturaDeCard";
+
+interface ColunaExtra {
+  titulo: string;
+  valor: (i: ItemDaCarteira) => string | number;
+  mostrar?: (i: ItemDaCarteira) => string;
+  numerico?: boolean;
+}
 
 /** A lista de grupos que compõe um número da Saúde da carteira (10/10/2026). `peso` mostra a participação na
  * receita, que é como o ISC pondera; `fora` são os grupos que não entram na conta, à parte. */
 function GruposDaConta({ itens, fora = [], peso = false, extra }: {
   itens: ItemDaCarteira[]; fora?: ItemDaCarteira[]; peso?: boolean;
-  extra?: { titulo: string; valor: (i: ItemDaCarteira) => string };
+  extra?: ColunaExtra | ColunaExtra[];
 }) {
+  const extras = extra === undefined ? [] : Array.isArray(extra) ? extra : [extra];
   const total = itens.reduce((t, i) => t + Number(i.receita_mensal), 0);
   const ordenados = [...itens].sort((a, b) => Number(b.receita_mensal) - Number(a.receita_mensal));
   const pct = (i: ItemDaCarteira) => (total ? (Number(i.receita_mensal) / total) * 100 : null);
@@ -38,13 +47,14 @@ function GruposDaConta({ itens, fora = [], peso = false, extra }: {
         { titulo: "Grupo", valor: (i) => i.grupo_nome, mostrar: (i) => <LinkDoGrupo grupoId={i.grupo_id} nome={i.grupo_nome} /> },
         { titulo: "Classe", valor: (i) => i.classe_efetiva },
         { titulo: "Semáforo", valor: (i) => i.semaforo },
-        ...(extra ? [{ titulo: extra.titulo, valor: (i: ItemDaCarteira) => extra.valor(i) }] : []),
+        ...extras.map((x) => ({ titulo: x.titulo, valor: (i: ItemDaCarteira) => x.valor(i), numerico: x.numerico,
+          mostrar: x.mostrar })),
         { titulo: "Receita mensal", valor: (i) => Number(i.receita_mensal), mostrar: (i) => dinheiro(i.receita_mensal), numerico: true },
         ...(peso ? [{ titulo: "Peso", valor: pct, numerico: true,
           mostrar: (i: ItemDaCarteira) => { const p = pct(i); return p === null ? "—" : `${um1(String(p))}%`; } }] : []),
       ]}
       rodape={comTotal && (
-        <tr className="composicao-total"><td>Total · {lista.length} grupo{lista.length === 1 ? "" : "s"}</td><td /><td />{extra && <td />}
+        <tr className="composicao-total"><td>Total · {lista.length} grupo{lista.length === 1 ? "" : "s"}</td><td /><td />{extras.map((x) => <td key={x.titulo} />)}
           <td className="tabela-numero">{dinheiro(total)}</td>{peso && <td className="tabela-numero">100%</td>}</tr>
       )} />
   );
@@ -345,6 +355,8 @@ export function Carteira({ listas }: { listas: Listas | null }) {
     eixo: (i) => i.eixo_de_acao,
   });
   const { isc } = dados;
+  const travados = dados.itens.filter((i) => i.em_cobranca);
+  const receitaTotal = Number(dados.retrato?.receita_total ?? 0);
   // Cliente novo não tem eixo nem semáforo ainda: aparece em "Todos" e, se couber, em "Revisão de honorários".
   const novosVisiveis = novos.filter((n) =>
     semaforoFiltro === null && (!eixo || (eixo === REVISAO_DE_HONORARIOS && !!n.rentabilidade_do_grupo?.revisao_de_honorarios)));
@@ -374,21 +386,38 @@ export function Carteira({ listas }: { listas: Listas | null }) {
               }} />
             </small>
           </div>
-          <button
-            type="button"
-            className={`retrato-chip retrato-chip-trav${somenteInadimplentes ? " retrato-chip-ativo" : ""}`}
-            onClick={filtrarInadimplentes}
-            aria-pressed={somenteInadimplentes}
-            aria-label={`${dados.retrato.grupos_travados} grupos inadimplentes, ${um1(dados.retrato.percentual_travado)}% da receita travada — clique para ver quais`}
-            title="Grupos com a nota de adimplência na trava (em cobrança); o percentual é a receita deles sobre a receita total. Clique para filtrar a lista."
-          >
-            <b>{dados.retrato.grupos_travados}</b>
-            <small>
-              grupos inadimplentes (clique para ver quais)
-              <br />
-              {um1(dados.retrato.percentual_travado)}% da receita travada
-            </small>
-          </button>
+          <div className="retrato-celula">
+            <button
+              type="button"
+              className={`retrato-chip retrato-chip-trav${somenteInadimplentes ? " retrato-chip-ativo" : ""}`}
+              onClick={filtrarInadimplentes}
+              aria-pressed={somenteInadimplentes}
+              aria-label={`${dados.retrato.grupos_travados} grupos inadimplentes, ${um1(dados.retrato.percentual_travado)}% da receita travada — clique para ver quais`}
+              title="Grupos com a nota de adimplência na trava (em cobrança); o percentual é a receita deles sobre a receita total. Clique para filtrar a lista."
+            >
+              <span className="retrato-cifrao" aria-hidden="true">$$$</span>
+              <b>{dados.retrato.grupos_travados}</b>
+              <small>
+                grupos inadimplentes (clique para ver quais)
+                <br />
+                {um1(dados.retrato.percentual_travado)}% da receita travada
+              </small>
+            </button>
+            <BotaoDeComposicao rotulo="ver" composicao={{
+              titulo: "$$$ Grupos inadimplentes",
+              subtitulo: "Nota de adimplência na trava; a % é sobre a receita mensal recorrente da carteira",
+              quantos: travados.length,
+              conteudo: () => (
+                <GruposDaConta itens={travados} extra={[
+                  { titulo: "Adimplência", valor: (i) => Number(i.notas.adimplencia), mostrar: (i) => um1(i.notas.adimplencia), numerico: true },
+                  { titulo: "% da receita", numerico: true,
+                    valor: (i) => (receitaTotal ? (Number(i.receita_mensal) / receitaTotal) * 100 : 0),
+                    mostrar: (i) => (receitaTotal ? `${um1(String((Number(i.receita_mensal) / receitaTotal) * 100))}%` : "—") },
+                ]} />
+              ),
+            }} />
+          </div>
+          <NrrNoAno />
           <div className="retrato-chip retrato-semaforo">
             <small className="retrato-semaforo-rotulo">
               <Explicavel texto="Saúde operacional de cada grupo: 1 em dia, 2 atenção, 3 crítico. Clique num número para filtrar a lista.">
@@ -408,6 +437,14 @@ export function Carteira({ listas }: { listas: Listas | null }) {
                   <b>{s}</b>
                   <small>{porSemaforo[s]}</small>
                 </button>
+              ))}
+            </div>
+            <div className="retrato-semaforo-ver">
+              {([1, 2, 3] as const).map((s) => (
+                <BotaoDeComposicao key={s} rotulo={`ver ${s}`} composicao={{
+                  titulo: `Semáforo ${s} — ${SEMAFORO_ROTULO[s]}`, subtitulo: "Os grupos deste nível, da maior receita para a menor",
+                  conteudo: () => <GruposDaConta peso itens={dados.itens.filter((i) => i.semaforo === s)} />,
+                }} />
               ))}
             </div>
           </div>

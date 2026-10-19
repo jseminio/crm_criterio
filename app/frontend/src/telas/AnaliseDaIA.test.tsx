@@ -16,6 +16,8 @@ vi.mock("../api/cliente", async () => {
       revisoesDaCarteira: vi.fn().mockResolvedValue([]),
       registrarRevisaoDaCarteira: vi.fn(),
       editarMesDaRevisao: vi.fn(),
+      mrr: vi.fn().mockResolvedValue({ movimento: { nrr: null, grr: null } }),
+      itensDoMovimento: vi.fn().mockResolvedValue({ de: "", ate: "", itens: [] }),
     },
   };
 });

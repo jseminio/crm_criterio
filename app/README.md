@@ -16,6 +16,21 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Saúde da carteira: $$$, composições e NRR no ano (18/10/2026)
+
+Amostra aprovada por Eduardo em 18/10/2026, na faixa de cima da Saúde da carteira:
+
+- **Inadimplência em destaque:** o cartão dos grupos inadimplentes traz o `$$$` em vermelho (o mesmo sinal da
+  trava de adimplência), com o texto, nunca só a cor. Clicar no número continua filtrando a lista; o **ver** abre
+  a composição: os grupos na trava, com a nota de adimplência, a receita e a % sobre a receita da carteira.
+- **Cada semáforo tem o seu ver** (1, 2 e 3), com os grupos daquele nível.
+- **NRR no ano**, cartão novo: (MRR em 31/12 + expansão + reajuste − contração − churn) ÷ MRR em 31/12, só com
+  os contratos que já existiam em 31/12, a mesma base do Churn da base e a mesma conta da aba Receita (13
+  parcelas). O NRR do mês vai junto, menor. A composição mostra a ponte, o GRR e cada contrato ou evento; ela usa
+  `GET /api/mrr/movimento?so_existentes=true`. Sem MRR em 31/12, "não calculável", nunca 0%.
+- **Dias em atraso** ficaram de fora: o CRM tem a nota de adimplência e o recebido por competência, não o
+  vencimento e o pagamento de cada parcela. Pendência para quando esse dado existir.
+
 ## Versão automática na barra lateral (18/10/2026)
 
 O "Versão 1.0" escrito à mão (que nunca foi incrementado) deu lugar à identidade do build:

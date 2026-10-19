@@ -99,12 +99,13 @@ def normalizar(texto: object) -> str:
 COLUNAS = {
     "cnpj": ("cnpj", "cnpj/cpf"),
     "grupo": ("grupo", "cliente", "grupo economico", "razao social", "nome"),
-    "competencia": ("competencia", "mes de competencia", "referencia", "vencimento", "mes"),
+    "competencia": ("competencia", "mes de competencia", "referencia", "emissao", "vencimento", "mes"),
     "valor": ("valor recebido", "recebido", "valor pago", "valor"),
     "data": ("data do recebimento", "data de recebimento", "recebido em", "data do pagamento", "data"),
 }
 """Os apelidos de cada coluna, na ordem de preferência: quando a planilha traz dois (o contas a receber do Omie
-tem Vencimento e Mês, Valor do Título e Recebido), vale o primeiro da lista."""
+tem Emissão, Vencimento e Mês, Valor do Título e Recebido), vale o primeiro da lista. A competência é o mês do
+serviço, que no Omie é o mês da **emissão** (Eduardo, 19/10/2026): emitido em 25/12 e vencido em 03/01 é dezembro."""
 
 
 @dataclass(frozen=True)

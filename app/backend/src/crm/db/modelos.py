@@ -56,6 +56,13 @@ from crm.domain.listas import (
     TipoDeEventoDeContrato,
     TipoDeOcorrencia,
     SituacaoDaAprovacao,
+    AcordoDoParceiro,
+    EtapaDoParceiro,
+    MotivoDeIndicacaoRecusada,
+    NivelDeParceiro,
+    RegraDoFee,
+    SituacaoDoFee,
+    TipoDePessoa,
 )
 
 __all__ = [
@@ -81,6 +88,8 @@ __all__ = [
     "MensagemDoSdr",
     "ParametrosDoSdr",
     "InvestimentoEmMidia",
+    "Parceiro",
+    "FeeDeParceiro",
 ]
 
 #: Dinheiro é guardado em centavos exatos.
@@ -428,6 +437,16 @@ class Oportunidade(CarimboMixin, Base):
     tipo_canal: Mapped[TipoCanal | None] = mapped_column(coluna_lista(TipoCanal))
     canal: Mapped[str | None] = mapped_column(sa.String(120))
     captador: Mapped[str | None] = mapped_column(sa.String(10), index=True)
+
+    parceiro_id: Mapped[int | None] = mapped_column(sa.ForeignKey("parceiro.id"), index=True)
+    """O parceiro que indicou (19/10/2026). Liga a oportunidade ao cadastro de Parceiros; o texto de `canal` fica como
+    estava, e a conferência da tela Parceiros liga os textos antigos ao parceiro certo."""
+    indicacao_recebida_em: Mapped[date | None] = mapped_column(sa.Date)
+    """Quando o parceiro apresentou a conta (cláusula 2.1)."""
+    indicacao_validada_em: Mapped[date | None] = mapped_column(sa.Date)
+    """Quando a Critério aceitou a indicação (cláusula 2.2, até 5 dias úteis). O vínculo de 12 meses conta daqui."""
+    indicacao_recusada: Mapped[MotivoDeIndicacaoRecusada | None] = mapped_column(coluna_lista(MotivoDeIndicacaoRecusada))
+    """Indicação não aceita: sem fee. A oportunidade continua ligada ao parceiro, para o histórico."""
 
     situacao: Mapped[Situacao] = mapped_column(coluna_lista(Situacao), nullable=False)
     temperatura: Mapped[Temperatura | None] = mapped_column(coluna_lista(Temperatura))
@@ -2109,3 +2128,73 @@ class DocumentoAnexado(CarimboMixin, Base):
     """O número como está escrito no PDF (proposta antiga "041.2019"). Não entra na numeração do CRM."""
     data_do_documento: Mapped[date | None] = mapped_column(sa.Date)
     """Assinatura do contrato ou do aditivo, aceite da proposta: a data conferida."""
+
+
+class Parceiro(CarimboMixin, Base):
+    """Quem indica clientes à Critério (19/10/2026, amostra aprovada por Eduardo). Pessoa física ou jurídica, com o
+    nível da parceria, o acordo em vigor e o sócio responsável pela relação."""
+
+    __tablename__ = "parceiro"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nome: Mapped[str] = mapped_column(sa.String(120), nullable=False, unique=True)
+    tipo_pessoa: Mapped[TipoDePessoa] = mapped_column(coluna_lista(TipoDePessoa), nullable=False, default=TipoDePessoa.PJ)
+    documento: Mapped[str | None] = mapped_column(sa.String(20))
+    """CPF ou CNPJ, só dígitos."""
+    tipo: Mapped[str | None] = mapped_column(sa.String(60))
+    """Escritório de advocacia, consultoria, contador, pessoa: texto livre."""
+    nivel: Mapped[NivelDeParceiro] = mapped_column(
+        coluna_lista(NivelDeParceiro), nullable=False, default=NivelDeParceiro.INDICADOR
+    )
+    etapa_manual: Mapped[EtapaDoParceiro] = mapped_column(
+        coluna_lista(EtapaDoParceiro), nullable=False, default=EtapaDoParceiro.MAPEADO
+    )
+    """Só Mapeado, Qualificado ou Estratégico. As outras etapas vêm dos dados."""
+    acordo: Mapped[AcordoDoParceiro] = mapped_column(
+        coluna_lista(AcordoDoParceiro), nullable=False, default=AcordoDoParceiro.SEM_ACORDO
+    )
+    contrato_assinado_em: Mapped[date | None] = mapped_column(sa.Date)
+    regra_combinada: Mapped[str | None] = mapped_column(sa.String(400))
+    """No acordo informal: o fee que foi prometido, com as palavras de quem combinou."""
+    combinado_por: Mapped[str | None] = mapped_column(sa.String(60))
+    combinado_em: Mapped[date | None] = mapped_column(sa.Date)
+    socio_responsavel: Mapped[str | None] = mapped_column(sa.String(60))
+    perfil_pedido: Mapped[str | None] = mapped_column(sa.String(400))
+    """O perfil de cliente combinado com o parceiro (porte, setor, o que fica fora)."""
+    contato: Mapped[str | None] = mapped_column(sa.String(200))
+    """E-mail ou telefone de quem fala pelo parceiro."""
+    textos_do_canal: Mapped[list[str]] = mapped_column(
+        sa.JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    """Os textos de `canal` já ligados a este parceiro pela conferência: a oportunidade nova com o mesmo texto
+    aparece como sugestão."""
+    observacao: Mapped[str | None] = mapped_column(sa.Text)
+
+
+class FeeDeParceiro(CarimboMixin, Base):
+    """O finder fee de uma indicação. O CRM calcula a partir dos recebidos do Omie; o sócio da conta confere o valor
+    líquido de impostos, aprova e marca pago (19/10/2026). Não se apaga: recusado fica com o porquê."""
+
+    __tablename__ = "fee_de_parceiro"
+    __table_args__ = (sa.UniqueConstraint("oportunidade_id", "competencia", name="uq_fee_oportunidade_competencia"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    parceiro_id: Mapped[int] = mapped_column(sa.ForeignKey("parceiro.id"), nullable=False, index=True)
+    oportunidade_id: Mapped[int] = mapped_column(sa.ForeignKey("oportunidade.id"), nullable=False, index=True)
+    regra: Mapped[RegraDoFee] = mapped_column(coluna_lista(RegraDoFee), nullable=False)
+    competencia: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    """A competência do recebimento que gerou o fee (dia 1 do mês)."""
+    base: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    """O que o cliente pagou naquela competência, como veio do Omie (bruto)."""
+    calculado: Mapped[Decimal] = mapped_column(DINHEIRO, nullable=False)
+    valor_aprovado: Mapped[Decimal | None] = mapped_column(DINHEIRO)
+    """O valor que o sócio aprovou, já líquido de impostos."""
+    situacao: Mapped[SituacaoDoFee] = mapped_column(coluna_lista(SituacaoDoFee), nullable=False, default=SituacaoDoFee.A_APROVAR)
+    decidido_por: Mapped[str | None] = mapped_column(sa.String(200))
+    decidido_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    pago_em: Mapped[date | None] = mapped_column(sa.Date)
+    motivo: Mapped[str | None] = mapped_column(sa.String(300))
+    """Por que foi recusado."""
+
+    parceiro: Mapped[Parceiro] = relationship()
+    oportunidade: Mapped[Oportunidade] = relationship()

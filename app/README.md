@@ -16,6 +16,34 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Parceiros: funil da relação, indicações e finder fee (19/10/2026)
+
+Amostra aprovada por Eduardo em 19/10/2026. **Menu próprio "Parceiros"**, com permissão própria (Configurações ›
+Perfis: ver, editar, aprovar e marcar pago o fee, exportar). Segue o padrão do Funil comercial:
+
+- **Indicadores com composição:** parceiros ativos, indicações, conversão das indicações (fechadas ÷ decididas), MRR
+  originado (parcela × 13 ÷ 12 das indicações fechadas de serviço recorrente), parceiros sem contrato assinado (a fila
+  da regularização) e fees a aprovar. Cada um explica a conta ao passar o mouse e abre a lista em "Ver composição".
+- **Filtros:** busca, nível, acordo e período, com os atalhos do funil, "Data de" (indicação ou fechamento) e o
+  intervalo personalizado.
+- **Kanban e Grade** com ordenação crescente, decrescente e de volta à original, e exportação para Excel.
+- **Etapas da relação:** Mapeado, Qualificado, Formalizado, Ativado, Produtivo, Estratégico e Dormente. Só Mapeado,
+  Qualificado e Estratégico se marcam à mão (arrasto ou "Mover"); as outras saem dos dados: contrato assinado,
+  indicação validada, proposta enviada e seis meses sem indicação.
+- **Níveis:** Indicador, Estruturado e Estratégico (decisão de Eduardo). Parceiro PF assina o mesmo contrato da PJ.
+- **Acordo:** contrato assinado, em minuta, informal com fee (com a regra prometida, quem combinou e quando) ou sem acordo.
+- **Indicação** = oportunidade do funil ligada ao parceiro, com data de indicação, validação (o vínculo de 12 meses
+  conta daqui) ou recusa (já cliente, já em negociação, já apresentada por outro, fora do perfil).
+- **Conferência das indicações antigas:** agrupa as oportunidades de canal Parceiros ou Advogados sem parceiro pelo
+  texto do canal; "Ligar" leva todas ao parceiro escolhido.
+- **Fee:** "Calcular fees pelos recebidos" cria, como "A aprovar", o fee que falta em cada indicação fechada, pelos
+  recebidos importados do Omie. Recorrente: o primeiro recebimento do grupo a partir do aceite, limitado à parcela
+  mensal. Não recorrente: 10% de cada recebimento até o valor do contrato. O recebido é bruto e por grupo: o **sócio da
+  conta** confere o valor líquido de impostos, aprova (ou recusa, com o motivo) e marca pago.
+
+Migração `7d3a9c2e5f14`: tabelas `parceiro` e `fee_de_parceiro` e quatro colunas em branco em `oportunidade`. Não mexe em
+dado existente; aplica sozinha no Redeploy.
+
 ## Saúde da carteira: $$$, composições e NRR no ano (18/10/2026)
 
 Amostra aprovada por Eduardo em 18/10/2026, na faixa de cima da Saúde da carteira:

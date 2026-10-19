@@ -1702,6 +1702,18 @@ fieldset.lacuna-prioritaria { border: 2px dashed var(--espera); padding: var(--e
 /* "ir à lacuna" (18/10/2026): o campo em falta é um botão que abre o card já nele. */
 .integralidade-ir { appearance: none; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .integralidade-ir:hover { border-color: var(--borda-forte); }
+/* Parceiros (19/10/2026): a lista de oportunidades achadas para ligar uma indicação */
+.lista-simples { list-style: none; margin: var(--e2) 0 0; padding: 0; display: grid; gap: var(--e2); }
+.lista-simples li { display: flex; align-items: center; justify-content: space-between; gap: var(--e2);
+  padding: var(--e2) var(--e3); border: 1px solid var(--borda); border-radius: var(--raio-sm); background: var(--surface-card); }
+.lista-de-indicacoes { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e2); }
+.lista-de-indicacoes li { display: grid; gap: var(--e1); padding: var(--e3); border: 1px solid var(--borda);
+  border-radius: var(--raio-sm); background: var(--surface-card); }
+.indicacao-topo { display: flex; align-items: center; justify-content: space-between; gap: var(--e2); }
+.indicacao-detalhe { font-size: 12px; color: var(--texto-medio); }
+.indicacao-acoes { display: flex; flex-wrap: wrap; gap: var(--e2); margin-top: var(--e1); }
+.indicacao-acoes .selecao { width: auto; }
+
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

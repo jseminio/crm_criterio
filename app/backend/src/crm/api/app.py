@@ -48,6 +48,7 @@ from crm.api import esquemas as e
 from crm.api.acesso import quem_fez, roteador_do_acesso
 from crm.api.inteligencia import roteador_de_inteligencia
 from crm.api.metas import metas_vigentes, roteador_de_metas
+from crm.api.parceiros import roteador_de_parceiros
 from crm.api.ajustes import roteador_de_ajustes
 from crm.api.base_de_conhecimento import roteador_da_base
 from crm.api.sucesso import ServicosDaAta, roteador_do_sucesso, servicos_da_ata_reais
@@ -343,6 +344,7 @@ def criar_app(
         roteador_de_abordagens(obter_sessao, lambda: _fabrica, servicos or servicos_reais)
     )
     api.include_router(roteador_de_contatos(obter_sessao))
+    api.include_router(roteador_de_parceiros(obter_sessao))
     api.include_router(roteador_de_reajustes(obter_sessao, buscar_ipca))
     api.include_router(roteador_de_servicos_e_contratos(obter_sessao))
     api.include_router(roteador_do_documento_de_contrato(obter_sessao))

@@ -12,6 +12,7 @@ import { Contatos } from "./telas/Contatos";
 import { Configuracoes } from "./telas/Configuracoes";
 import { SdrEAbordagens } from "./telas/SdrEAbordagens";
 import { FunilEQuestionarios } from "./telas/FunilEQuestionarios";
+import { Parceiros } from "./telas/Parceiros";
 import { SucessoDoCliente, type AbaDoSucesso } from "./telas/SucessoDoCliente";
 import { AjustesDaAreaTecnica } from "./componentes/AjustesDaAreaTecnica";
 import { TrocarSenha } from "./componentes/TrocarSenha";
@@ -22,6 +23,7 @@ type Tela =
   | "agenda"
   | "contatos"
   | "funil"
+  | "parceiros"
   | "carteira"
   | "abordagens"
   | "configuracoes";
@@ -44,6 +46,12 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
     rotulo: "Funil comercial",
     titulo: "Funil comercial",
     descricao: "Oportunidades em kanban ou grade, e os questionários que chegaram pelo site.",
+  },
+  {
+    chave: "parceiros",
+    rotulo: "Parceiros",
+    titulo: "Parceiros",
+    descricao: "Quem indica clientes à Critério: o funil da relação, as indicações, os fees e o que cada parceiro gerou.",
   },
   {
     chave: "carteira",
@@ -196,6 +204,7 @@ export default function App() {
             />}
           {visiveis.length > 0 && tela === "contatos" && <Contatos listas={listas} />}
           {visiveis.length > 0 && tela === "funil" && <FunilEQuestionarios listas={listas} />}
+          {visiveis.length > 0 && tela === "parceiros" && <Parceiros />}
           {visiveis.length > 0 && tela === "carteira" && (
             <SucessoDoCliente key={abaDoSucesso?.vez ?? 0} listas={listas} abaPedida={abaDoSucesso?.aba ?? null} />
           )}

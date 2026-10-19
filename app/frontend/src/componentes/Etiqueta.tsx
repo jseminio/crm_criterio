@@ -52,6 +52,21 @@ const TOM_POR_SITUACAO: Record<string, string> = {
   Reajustado: "andamento",
   "Sem reajuste": "neutra",
   "Sem preço": "perda",
+  // Parceiros (19/10/2026): o acordo, a etapa da relação e o fee
+  "Contrato assinado": "ganho",
+  "Contrato em minuta": "andamento",
+  "Informal, com fee": "espera",
+  "Sem acordo": "perda",
+  Mapeado: "neutra",
+  Formalizado: "andamento",
+  Ativado: "andamento",
+  Produtivo: "ganho",
+  "Estratégico": "ganho",
+  Dormente: "perda",
+  "A aprovar": "espera",
+  "Aprovado, a pagar": "andamento",
+  Pago: "ganho",
+  Recusado: "perda",
 };
 
 const TOM_POR_TEMPERATURA: Record<string, string> = {

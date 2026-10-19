@@ -1,6 +1,15 @@
 /** O acesso à API. Um lugar só, para o erro ter uma forma só. */
 
 import type {
+  CadastroDoParceiro,
+  FeeDeParceiro,
+  IndicadorDosParceiros,
+  IndicadoresDosParceiros,
+  ItemDaComposicaoDosParceiros,
+  OportunidadeParaIndicar,
+  ParceiroDetalhe,
+  ParceiroResumo,
+  TextoSemParceiro,
   BaseDeConhecimento,
   EdicaoDeFicha,
   FichaDaBase,
@@ -370,6 +379,15 @@ function comParametros(caminho: string, parametros: Record<string, unknown>) {
   }
   const texto = busca.toString();
   return texto ? `${caminho}?${texto}` : caminho;
+}
+
+export interface FiltrosDosParceiros {
+  busca?: string;
+  nivel?: string[];
+  acordo?: string[];
+  data_tipo?: "indicacao" | "fechamento";
+  data_de?: string;
+  data_ate?: string;
 }
 
 export interface FiltrosDoFunil {
@@ -770,6 +788,39 @@ export const api = {
     pedir<Pagina<ContratoResumo>>(comParametros("/api/contratos", { ...filtros, limite: 500 })),
 
   contrato: (id: number) => pedir<ContratoDetalhe>(`/api/contratos/${id}`),
+
+  parceiros: (filtros: FiltrosDosParceiros = {}) => pedir<ParceiroResumo[]>(comParametros("/api/parceiros", { ...filtros })),
+  indicadoresDosParceiros: (filtros: FiltrosDosParceiros = {}) =>
+    pedir<IndicadoresDosParceiros>(comParametros("/api/parceiros/indicadores", { ...filtros })),
+  composicaoDosParceiros: (indicador: IndicadorDosParceiros, filtros: FiltrosDosParceiros = {}) =>
+    pedir<ItemDaComposicaoDosParceiros[]>(comParametros("/api/parceiros/indicadores/composicao", { ...filtros, indicador })),
+  enderecoDaExportacaoDosParceiros: (filtros: FiltrosDosParceiros = {}) => comParametros("/api/parceiros/exportar", { ...filtros }),
+  parceiro: (id: number) => pedir<ParceiroDetalhe>(`/api/parceiros/${id}`),
+  criarParceiro: (dados: Partial<CadastroDoParceiro> & { nome: string }) =>
+    pedir<ParceiroDetalhe>("/api/parceiros", { method: "POST", body: JSON.stringify(dados) }),
+  editarParceiro: (id: number, dados: Partial<CadastroDoParceiro>) =>
+    pedir<ParceiroDetalhe>(`/api/parceiros/${id}`, { method: "PATCH", body: JSON.stringify(dados) }),
+  moverParceiro: (id: number, etapa: string) =>
+    pedir<ParceiroDetalhe>(`/api/parceiros/${id}/etapa`, { method: "POST", body: JSON.stringify({ etapa }) }),
+  buscarOportunidadesParaIndicar: (busca: string) =>
+    pedir<OportunidadeParaIndicar[]>(comParametros("/api/parceiros/oportunidades", { busca })),
+  ligarIndicacao: (id: number, dados: { oportunidade_id: number; recebida_em?: string | null; validada_em?: string | null }) =>
+    pedir<ParceiroDetalhe>(`/api/parceiros/${id}/indicacoes`, { method: "POST", body: JSON.stringify(dados) }),
+  editarIndicacao: (oportunidadeId: number, dados: { recebida_em?: string | null; validada_em?: string | null; recusada?: string | null }) =>
+    pedir<ParceiroDetalhe>(`/api/parceiros/indicacoes/${oportunidadeId}`, { method: "PATCH", body: JSON.stringify(dados) }),
+  desligarIndicacao: (oportunidadeId: number) =>
+    pedir<ParceiroDetalhe>(`/api/parceiros/indicacoes/${oportunidadeId}/desligar`, { method: "POST" }),
+  conferenciaDosParceiros: () => pedir<TextoSemParceiro[]>("/api/parceiros/conferencia"),
+  ligarTextoDoCanal: (texto: string, parceiroId: number) =>
+    pedir<ParceiroDetalhe>("/api/parceiros/conferencia", { method: "POST", body: JSON.stringify({ texto, parceiro_id: parceiroId }) }),
+  feesDosParceiros: (situacao?: string[]) => pedir<FeeDeParceiro[]>(comParametros("/api/parceiros/fees", { situacao })),
+  calcularFees: () => pedir<{ novos: number }>("/api/parceiros/fees/calcular", { method: "POST" }),
+  aprovarFee: (id: number, valor: string) =>
+    pedir<FeeDeParceiro>(`/api/parceiros/fees/${id}/aprovar`, { method: "POST", body: JSON.stringify({ valor }) }),
+  recusarFee: (id: number, motivo: string) =>
+    pedir<FeeDeParceiro>(`/api/parceiros/fees/${id}/recusar`, { method: "POST", body: JSON.stringify({ motivo }) }),
+  marcarFeePago: (id: number, pagoEm: string) =>
+    pedir<FeeDeParceiro>(`/api/parceiros/fees/${id}/pago`, { method: "POST", body: JSON.stringify({ pago_em: pagoEm }) }),
 
   metas: () => pedir<Metas>("/api/metas"),
   mudarMetas: (metas: { mrr?: { meta: string; alerta: string }; conversao?: { meta: string; alerta: string } }) =>

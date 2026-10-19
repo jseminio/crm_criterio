@@ -646,3 +646,76 @@ class TemaDaExpectativa(Enum):
     PRAZO = "Prazo"
     PERFIL = "Porte ou segmento"
     OUTRO = "Outro"
+
+
+# --- Parceiros (19/10/2026, amostra aprovada por Eduardo) --------------------------------------------
+
+
+class NivelDeParceiro(Enum):
+    """Os três níveis da parceria, aprovados por Eduardo em 19/10/2026."""
+
+    INDICADOR = "Indicador"
+    """Indica de vez em quando; recebe o finder fee do contrato padrão, sem ritual."""
+    ESTRUTURADO = "Estruturado"
+    """Fee, perfil de cliente combinado, relatório mensal e pedido de indicação a cada trimestre."""
+    ESTRATEGICO = "Estratégico"
+    """Co-entrega: divisão de escopo por escrito, cliente atendido junto, evento, indicação nos dois sentidos."""
+
+
+class EtapaDoParceiro(Enum):
+    """O funil da relação com o parceiro. Três etapas se marcam à mão (Mapeado, Qualificado, Estratégico); as
+    outras saem dos dados (`crm.domain.parceiros.etapa_do_parceiro`)."""
+
+    MAPEADO = "Mapeado"
+    QUALIFICADO = "Qualificado"
+    FORMALIZADO = "Formalizado"
+    ATIVADO = "Ativado"
+    PRODUTIVO = "Produtivo"
+    ESTRATEGICO = "Estratégico"
+    DORMENTE = "Dormente"
+
+    @property
+    def manual(self) -> bool:
+        return self in {EtapaDoParceiro.MAPEADO, EtapaDoParceiro.QUALIFICADO, EtapaDoParceiro.ESTRATEGICO}
+
+
+class AcordoDoParceiro(Enum):
+    """Em que pé está o combinado com o parceiro. "Informal, com fee" é a fila da regularização: Eduardo confirmou
+    em 19/10/2026 que já há fee prometido fora de contrato."""
+
+    CONTRATO_ASSINADO = "Contrato assinado"
+    CONTRATO_EM_MINUTA = "Contrato em minuta"
+    INFORMAL_COM_FEE = "Informal, com fee"
+    SEM_ACORDO = "Sem acordo"
+
+
+class TipoDePessoa(Enum):
+    """O parceiro pessoa física assina o mesmo contrato da PJ, só com a qualificação de PF (19/10/2026)."""
+
+    PJ = "PJ"
+    PF = "PF"
+
+
+class RegraDoFee(Enum):
+    """Como o fee se calcula (cláusula 3 do contrato padrão de finder fee)."""
+
+    PRIMEIRA_PARCELA = "Recorrente: 1ª parcela líquida"
+    DEZ_POR_CENTO = "Não recorrente: 10% do recebido"
+
+
+class SituacaoDoFee(Enum):
+    """Quem aprova e paga o fee é o sócio da conta, não o financeiro (19/10/2026)."""
+
+    A_APROVAR = "A aprovar"
+    APROVADO = "Aprovado, a pagar"
+    PAGO = "Pago"
+    RECUSADO = "Recusado"
+
+
+class MotivoDeIndicacaoRecusada(Enum):
+    """Cláusula 2.2: não há fee quando a conta já está em negociação, já é cliente ou já veio de outro."""
+
+    JA_CLIENTE = "Já é cliente"
+    EM_NEGOCIACAO = "Já estava em negociação"
+    OUTRO_PARCEIRO = "Já apresentada por outro parceiro"
+    FORA_DO_PERFIL = "Fora do perfil"

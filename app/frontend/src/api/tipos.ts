@@ -2786,3 +2786,118 @@ export interface Lacuna {
   empresa_id: number | null;
   contrato_id: number | null;
 }
+
+// --- Parceiros (19/10/2026) -------------------------------------------------------------------------
+
+export type EtapaDoParceiro = "Mapeado" | "Qualificado" | "Formalizado" | "Ativado" | "Produtivo" | "Estratégico" | "Dormente";
+
+export interface ParceiroResumo {
+  id: number;
+  nome: string;
+  tipo_pessoa: string;
+  nivel: string;
+  acordo: string;
+  etapa: EtapaDoParceiro;
+  socio_responsavel: string | null;
+  indicacoes: number;
+  abertas: number;
+  fechadas: number;
+  mrr: string;
+  pontual: string;
+}
+
+export interface IndicacaoDoParceiro {
+  oportunidade_id: number;
+  nome: string;
+  grupo: string | null;
+  grupo_id: number;
+  situacao: string;
+  recebida_em: string | null;
+  validada_em: string | null;
+  recusada: string | null;
+  vinculo_ate: string | null;
+  mensal: string | null;
+  anual: string | null;
+  mrr: string;
+}
+
+export interface FeeDeParceiro {
+  id: number;
+  parceiro_id: number;
+  parceiro: string;
+  oportunidade_id: number;
+  oportunidade: string;
+  grupo: string | null;
+  regra: string;
+  competencia: string;
+  base: string;
+  calculado: string;
+  valor_aprovado: string | null;
+  situacao: string;
+  decidido_por: string | null;
+  decidido_em: string | null;
+  pago_em: string | null;
+  motivo: string | null;
+}
+
+export interface CadastroDoParceiro {
+  nome: string;
+  tipo_pessoa: string;
+  documento: string | null;
+  tipo: string | null;
+  nivel: string;
+  etapa_manual: string;
+  acordo: string;
+  contrato_assinado_em: string | null;
+  regra_combinada: string | null;
+  combinado_por: string | null;
+  combinado_em: string | null;
+  socio_responsavel: string | null;
+  perfil_pedido: string | null;
+  contato: string | null;
+  observacao: string | null;
+}
+
+export interface ParceiroDetalhe extends CadastroDoParceiro {
+  id: number;
+  etapa: EtapaDoParceiro;
+  textos_do_canal: string[];
+  indicacoes: IndicacaoDoParceiro[];
+  fees: FeeDeParceiro[];
+}
+
+export type IndicadorDosParceiros = "ativos" | "indicacoes" | "conversao" | "mrr" | "sem_contrato" | "fees";
+
+export interface IndicadoresDosParceiros {
+  ativos: number;
+  indicacoes: number;
+  conversao: string | null;
+  mrr: string;
+  sem_contrato: number;
+  fees: string;
+  fees_quantos: number;
+  explicacoes: Record<IndicadorDosParceiros, string>;
+}
+
+export interface ItemDaComposicaoDosParceiros {
+  parceiro: string;
+  detalhe: string;
+  valor: string;
+  referencia: string | null;
+}
+
+export interface TextoSemParceiro {
+  texto: string;
+  tipo_canal: string;
+  oportunidades: number;
+  sugestao_id: number | null;
+}
+
+export interface OportunidadeParaIndicar {
+  id: number;
+  nome: string;
+  grupo: string | null;
+  situacao: string;
+  canal: string | null;
+  parceiro: string | null;
+}

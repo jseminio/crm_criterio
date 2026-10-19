@@ -45,6 +45,10 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         ("ver", "ver"), ("editar", "registrar conversas"), ("parametros", "parâmetros e custos"),
         ("base", "base de conhecimento: criar e editar fichas"), ("base_aprovar", "base de conhecimento: aprovar fichas"),
     )),
+    ("parceiros", "Parceiros", (
+        ("ver", "ver"), ("editar", "cadastrar, editar e ligar indicações"),
+        ("aprovar_fee", "aprovar e marcar pago o fee (sócio da conta)"), ("exportar", "exportar para Excel"),
+    )),
     ("conferencia", "Conferência", (("ver", "ver"),)),
     ("configuracoes", "Configurações", (
         ("propostas", "matrizes e numeração das propostas"), ("backup", "backup"),
@@ -212,6 +216,13 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     # base de conhecimento do SDR de IA (03/10/2026); o GET está na linha "/api/sdr/.+"
     ("POST", r"/api/sdr/base/fichas/\d+/aprovar", ("sdr.base_aprovar",)),
     ("POST|PATCH", r"/api/sdr/base/(carga-inicial|fichas(/\d+(/(revisao|arquivar|reabrir))?)?)", ("sdr.base",)),
+    # parceiros (19/10/2026): menu próprio; o fee é do sócio da conta
+    ("GET", r"/api/parceiros/exportar", ("parceiros.exportar",)),
+    ("GET", r"/api/parceiros(/indicadores(/composicao)?|/conferencia|/fees|/oportunidades|/\d+)?", ("parceiros.ver",)),
+    ("POST", r"/api/parceiros/fees/\d+/(aprovar|recusar|pago)", ("parceiros.aprovar_fee",)),
+    ("POST", r"/api/parceiros/fees/calcular", ("parceiros.editar", "parceiros.aprovar_fee")),
+    ("POST", r"/api/parceiros(/conferencia|/\d+/(etapa|indicacoes)|/indicacoes/\d+/desligar)?", ("parceiros.editar",)),
+    ("PATCH", r"/api/parceiros/(\d+|indicacoes/\d+)", ("parceiros.editar",)),
     # conferência da carga
     ("GET", r"/api/cargas(/\d+(/ocorrencias)?)?", ("conferencia.ver",)),
     # metas dos indicadores

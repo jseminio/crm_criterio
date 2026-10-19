@@ -588,6 +588,8 @@ Decisões de Eduardo:
   meta 10% · **churn da base no ano** e **de quem entrou no ano**, por grupos e por faturamento · **cobertura** de
   relacionamento: clientes com a reunião da classe realizada na janela (A 1 mês, B 3, C 6). Cada KPI diz
   o que falta registrar; "sem dado" nunca vira zero.
+  Os cards ficam em duas linhas no desktop (19/10/2026): quatro por linha, e o último, sozinho no fim, ocupa
+  as duas vagas que sobram; até 1100px, dois por linha; no celular, um.
 
 ## CRM no celular e no tablet (06/10/2026)
 

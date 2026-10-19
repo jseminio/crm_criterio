@@ -532,7 +532,14 @@ def roteador_de_documentos(
         if oportunidade_id is not None:
             consulta = consulta.where(DocumentoAnexado.oportunidade_id == oportunidade_id)
         if grupo_id is not None:
-            consulta = consulta.where(DocumentoAnexado.grupo_id == grupo_id)
+            # Também pelo grupo do contrato ou da oportunidade: a junção de grupos move esses, não o documento
+            # (card do grupo, 19/10/2026).
+            consulta = consulta.where(sa.or_(
+                DocumentoAnexado.grupo_id == grupo_id,
+                DocumentoAnexado.contrato_id.in_(sa.select(Contrato.id).where(Contrato.grupo_id == grupo_id)),
+                DocumentoAnexado.oportunidade_id.in_(
+                    sa.select(Oportunidade.id).where(Oportunidade.grupo_id == grupo_id)),
+            ))
         if origem == "lote":
             # O assinado na Clicksign que chegou sem contrato nem oportunidade espera junto com os antigos (18/10/2026).
             consulta = consulta.where(sa.or_(DocumentoAnexado.origem == "lote", sa.and_(

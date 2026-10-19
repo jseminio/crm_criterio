@@ -858,7 +858,7 @@ export const api = {
   editarConfiguracaoDoDocumento: (c: Omit<ConfiguracaoDoDocumento, "ultimo_usado">) =>
     pedir<ConfiguracaoDoDocumento>("/api/documentos-de-contrato/configuracao", { method: "PUT", body: JSON.stringify(c) }),
   // PDF assinado e documentos antigos (18/10/2026)
-  documentos: (filtro: { contrato_id?: number; oportunidade_id?: number; origem?: "lote"; historico?: boolean }) =>
+  documentos: (filtro: { contrato_id?: number; oportunidade_id?: number; grupo_id?: number; origem?: "lote"; historico?: boolean }) =>
     pedir<DocumentoAnexado[]>(comParametros("/api/documentos", filtro)),
   documento: (id: number) => pedir<DocumentoComConferencia>(`/api/documentos/${id}`),
   anexarDocumento: (arquivo: File, onde: { tipo?: TipoDeDocumento; contrato_id?: number; oportunidade_id?: number }) =>

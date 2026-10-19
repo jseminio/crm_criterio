@@ -39,7 +39,7 @@ export function CardDoGrupoPeloId({ grupoId, listas, foco, aoFechar }: {
   return <DetalheDoGrupo grupo={dados} listas={listas} foco={foco} aoFechar={aoFechar} aoMudar={() => undefined} />;
 }
 
-function CardDoContrato({ contratoId, listas, foco, aoFechar }: {
+export function CardDoContrato({ contratoId, listas, foco, aoFechar }: {
   contratoId: number; listas: Listas | null; foco?: string; aoFechar: () => void;
 }) {
   const { dados, erro, recarregar } = usarDados<ContratoDetalhe>(() => api.contrato(contratoId), [contratoId]);

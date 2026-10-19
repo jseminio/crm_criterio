@@ -281,3 +281,19 @@ def test_lote_acha_o_contrato_pelo_numero_do_crm(engine, ids):
         doc = _anexar(c).json()["id"]
         sugestao = c.get(f"/api/documentos/{doc}", headers=ADMIN).json()["sugestao"]
     assert sugestao["motivo"] == "pelo número" and sugestao["contrato_id"] == ids["aguardando"]
+
+
+def test_lista_do_grupo_acha_o_pdf_pelo_contrato_depois_da_juncao(engine, ids):
+    """O card do grupo mostra todos os PDFs dele (19/10/2026); a junção de grupos move o contrato, não o documento."""
+    from crm.db.grupos import fundir_grupos
+
+    with _cliente(engine, Leitor(lido())) as c:
+        doc = _anexar(c, contrato_id=ids["antigo"]).json()["id"]
+        proposta = _anexar(c, conteudo=PDF + b" proposta", oportunidade_id=ids["op"]).json()["id"]
+        assert {d["id"] for d in c.get("/api/documentos", params={"grupo_id": ids["grupo"]}, headers=ADMIN).json()} == {
+            doc, proposta}
+        with Session(engine) as s:
+            fundir_grupos(s, s.get(GrupoEconomico, ids["outro"]), s.get(GrupoEconomico, ids["grupo"]))
+            s.commit()
+        assert {d["id"] for d in c.get("/api/documentos", params={"grupo_id": ids["outro"]}, headers=ADMIN).json()} == {
+            doc, proposta}

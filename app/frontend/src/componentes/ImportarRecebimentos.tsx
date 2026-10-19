@@ -92,7 +92,8 @@ function PainelDeImportacao({ aoFechar, aoImportar }: { aoFechar: () => void; ao
       </label>
       <p className="campo-ajuda">
         Uma linha por recebimento. Competência no formato mês/ano (10/2026). O CNPJ precisa estar cadastrado numa empresa do
-        CRM; sem CNPJ, o nome do grupo ou da empresa serve, se não houver dois parecidos.
+        CRM; sem CNPJ, o nome do grupo ou da empresa serve, se não houver dois parecidos. O contas a receber do Omie entra
+        como sai: vale a aba Títulos, com o mês do vencimento como competência.
       </p>
       {ocupado && !previa && <p className="numero-estado">Lendo a planilha…</p>}
       {erro && <div className="estado estado-erro" role="alert"><p className="estado-texto">{erro}</p></div>}
@@ -104,6 +105,12 @@ function PainelDeImportacao({ aoFechar, aoImportar }: { aoFechar: () => void; ao
             <strong>{previa.reconhecidas}</strong> linha{previa.reconhecidas === 1 ? "" : "s"} reconhecida{previa.reconhecidas === 1 ? "" : "s"},{" "}
             total <strong>{dinheiro(previa.total)}</strong>.
           </p>
+          {(previa.sem_recebimento ?? 0) > 0 && (
+            <p className="campo-ajuda">
+              {previa.sem_recebimento} título{previa.sem_recebimento === 1 ? "" : "s"} sem valor recebido (em aberto ou a vencer)
+              não entra{previa.sem_recebimento === 1 ? "" : "m"}: no mês, o cliente aparece como Em aberto.
+            </p>
+          )}
           <table className="tabela" aria-label="Meses da planilha">
             <thead><tr><th>Competência</th><th className="tabela-numero">Linhas</th><th className="tabela-numero">Total</th><th>O que acontece</th></tr></thead>
             <tbody>

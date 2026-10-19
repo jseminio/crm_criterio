@@ -660,6 +660,8 @@ export interface PreviaDeRecebimentos {
   total: string;
   meses: { competencia: string; linhas: number; total: string; substitui: string | null }[];
   problemas: { linha: number; motivo: string; trecho: string }[];
+  /** Títulos com recebido zero (em aberto ou a vencer): não entram; o cliente fica Em aberto no mês. */
+  sem_recebimento?: number;
 }
 
 export interface ImportacaoDeRecebimentos {

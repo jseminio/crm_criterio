@@ -28,6 +28,8 @@ padrão do lead:
   cada 6 meses. A data é sugestão; quem registra muda. Parceiro novo já nasce com o primeiro follow-up sugerido.
 - **Agenda de follow-up:** os parceiros com follow-up marcado entram na mesma fila, com a etiqueta "Parceiro", e abrem o
   painel do parceiro. Filtro novo por tipo. Só aparece para quem vê o Funil de Parceiros.
+- **Filtros da Agenda:** busca por empresa, parceiro, oportunidade ou próxima ação (sem acento e sem caixa), responsável,
+  temperatura e tipo, com "Limpar filtros". As contagens dos baldes seguem os filtros.
 - **Funil de Parceiros:** selo "FUP" no cartão, coluna ordenável "Próximo follow-up" na Grade e no Excel, e o indicador
   "Sem follow-up marcado" (com os atrasados na composição).
 

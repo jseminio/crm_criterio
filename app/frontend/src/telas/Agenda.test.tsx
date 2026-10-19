@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
@@ -99,7 +99,7 @@ describe("Agenda", () => {
     vi.mocked(api.oportunidade).mockReturnValue(new Promise(() => {}));
     render(<Agenda listas={null} aoAbrirLeads={vi.fn()} />);
     expect(await screen.findByText("Pendência da proposta")).toBeInTheDocument();
-    expect(screen.getByText("Karine")).toBeInTheDocument();
+    expect(within(screen.getByRole("list")).getByText("Karine")).toBeInTheDocument();
     expect(screen.getByText(/Pedir o contrato atual · 23\/09\/2026 · abra a oportunidade, aba Proposta/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Salvar" })).toBeNull(); // não se edita na linha
     await userEvent.click(screen.getByRole("button", { name: "Grupo Alfa" }));
@@ -131,5 +131,26 @@ describe("Agenda", () => {
     fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "todos" } });
     fireEvent.click(screen.getByRole("button", { name: "Ficus" }));
     expect(api.parceiro).toHaveBeenCalledWith(7);
+  });
+
+  it("busca por empresa, parceiro ou ação, sem acento, e filtra por responsável (19/10/2026)", async () => {
+    vi.mocked(api.agenda).mockResolvedValue(agenda([
+      item({ id: 1, balde: "atrasada", titulo: "Hospital Evandro", captador: "EL" }),
+      item({ id: 2, balde: "atrasada", titulo: "Grupo São Bento", captador: "BO", proxima_acao: "Ligar para o CFO" }),
+      item({ tipo: "parceiro", id: 7, titulo: "Ficus", balde: "hoje", captador: "EL", proxima_acao: "Fechar a lista" }),
+    ], { atrasada: 2, hoje: 1 }));
+    render(<Agenda listas={null} aoAbrirLeads={() => {}} />);
+    await screen.findByText("Hospital Evandro");
+    fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "sao bento" } });
+    expect(screen.queryByText("Hospital Evandro")).toBeNull();
+    expect(screen.getByText("Grupo São Bento")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "cfo" } });
+    expect(screen.getByText("Grupo São Bento")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    fireEvent.change(screen.getByLabelText("Responsável"), { target: { value: "BO" } });
+    expect(screen.queryByText("Hospital Evandro")).toBeNull();
+    expect(screen.getByRole("tab", { name: /Hoje/ }).textContent).toContain("0");
+    fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "ninguém" } });
+    expect(screen.getByText("Nenhum resultado para esses filtros")).toBeTruthy();
   });
 });

@@ -12,7 +12,7 @@ import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { Agenda as DadosDaAgenda, BaldeDaAgenda, ItemDaAgenda, Listas } from "../api/tipos";
 import { Etiqueta } from "../componentes/Etiqueta";
-import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
+import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { data, dinheiroCurto } from "../formato";
 import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
@@ -126,6 +126,9 @@ function Linha({
   );
 }
 
+/** Para a busca: sem acento e sem caixa, "São" acha "sao". */
+const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 type FiltroDeTipo = "todos" | "oportunidades" | "leads" | "parceiros" | "contratos";
 
 const TIPOS: Record<FiltroDeTipo, ItemDaAgenda["tipo"][]> = {
@@ -150,14 +153,31 @@ export function Agenda({
   const [aberta, definirAberta] = useState<number | null>(null);
   const [parceiroAberto, definirParceiroAberto] = useState<number | null>(null);
   const [tipo, definirTipo] = useState<FiltroDeTipo>("todos");
+  const [busca, definirBusca] = useState("");
+  const [responsavel, definirResponsavel] = useState("");
+  const [temperatura, definirTemperatura] = useState("");
   const { dados, carregando, erro, recarregar } = usarDados<DadosDaAgenda>(() => api.agenda(), []);
 
   if (carregando && !dados) return <Carregando rotulo="Montando a agenda" />;
   if (erro) return <Erro mensagem={erro} aoTentarDeNovo={recarregar} />;
   if (!dados) return null;
 
-  // Filtro por tipo (19/10/2026): as contagens dos baldes seguem o filtro.
-  const doTipo = dados.itens.filter((i) => TIPOS[tipo].includes(i.tipo));
+  // Filtros (19/10/2026): tipo, busca por empresa, parceiro ou ação, responsável e temperatura. As contagens dos baldes
+  // seguem os filtros.
+  const termo = semAcento(busca.trim());
+  const responsaveis = [...new Set(dados.itens.map((i) => i.captador).filter((c): c is string => !!c))].sort();
+  const filtrando = tipo !== "todos" || termo !== "" || responsavel !== "" || temperatura !== "";
+  const doTipo = dados.itens.filter((i) =>
+    TIPOS[tipo].includes(i.tipo)
+    && (!termo || [i.titulo, i.subtitulo, i.proxima_acao, i.captador].some((t) => t && semAcento(t).includes(termo)))
+    && (!responsavel || i.captador === responsavel)
+    && (!temperatura || i.temperatura === temperatura));
+  const limpar = () => {
+    definirTipo("todos");
+    definirBusca("");
+    definirResponsavel("");
+    definirTemperatura("");
+  };
   const contagens = Object.fromEntries(BALDES.map((b) => [b.chave, doTipo.filter((i) => i.balde === b.chave).length]));
   // Sem escolha, abre no primeiro balde que tem gente: o que mais urge.
   const atual = balde ?? BALDES.find((b) => contagens[b.chave] > 0)?.chave ?? "sem_acao";
@@ -170,6 +190,25 @@ export function Agenda({
       {pode("funil.questionarios") && <QuestionariosQuePrecisam />}
       <div className="filtros">
         <div className="campo">
+          <label className="campo-rotulo" htmlFor="agenda-busca">Buscar</label>
+          <input id="agenda-busca" className="entrada entrada-busca" placeholder="Empresa, parceiro ou próxima ação"
+            value={busca} onChange={(e) => definirBusca(e.target.value)} />
+        </div>
+        <div className="campo">
+          <label className="campo-rotulo" htmlFor="agenda-responsavel">Responsável</label>
+          <select id="agenda-responsavel" className="selecao" value={responsavel} onChange={(e) => definirResponsavel(e.target.value)}>
+            <option value="">Todos</option>
+            {responsaveis.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div className="campo">
+          <label className="campo-rotulo" htmlFor="agenda-temperatura">Temperatura</label>
+          <select id="agenda-temperatura" className="selecao" value={temperatura} onChange={(e) => definirTemperatura(e.target.value)}>
+            <option value="">Todas</option>
+            {(listas?.temperaturas ?? ["Quente", "Morno", "Frio"]).map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="campo">
           <label className="campo-rotulo" htmlFor="agenda-tipo">Tipo</label>
           <select id="agenda-tipo" className="selecao" value={tipo} onChange={(e) => definirTipo(e.target.value as FiltroDeTipo)}>
             <option value="todos">Todos</option>
@@ -179,6 +218,9 @@ export function Agenda({
             <option value="contratos">Contratos e pendências</option>
           </select>
         </div>
+        {filtrando && (
+          <button type="button" className="botao botao-secundario" onClick={limpar}>Limpar filtros</button>
+        )}
       </div>
       <div className="abas" role="tablist" aria-label="Baldes da agenda">
         {BALDES.map((b) => (
@@ -199,7 +241,9 @@ export function Agenda({
       <div className="recado">{info.explicacao}</div>
 
       {doBalde.length === 0 ? (
-        <VazioSemDados titulo={`Nada em “${info.rotulo}”`} explicacao="Nada neste balde agora: oportunidade, lead, contrato, pendência de proposta ou parceiro." />
+        filtrando ? (
+          <VazioPorFiltro aoLimpar={limpar} />
+        ) : <VazioSemDados titulo={`Nada em “${info.rotulo}”`} explicacao="Nada neste balde agora: oportunidade, lead, contrato, pendência de proposta ou parceiro." />
       ) : (
         <ul className="agenda">
           {doBalde.map((item) => (

@@ -99,6 +99,12 @@ inclusive os antigos, feitos fora do CRM. O arquivo fica no banco (`documento_an
   contrato; a pessoa confirma o vínculo. CNPJ fora do cadastro: escolhe-se o grupo ou cria-se o contrato "anterior ao
   CRM" (Ativo). A IA nunca cria cliente nem contrato sozinha. Aditivo não vira evento sozinho: registre-o na aba
   Eventos, que segue a alçada.
+- **No card do grupo (19/10/2026, amostra aprovada por Eduardo):** a seção **Documentos** reúne todos os PDFs do
+  cliente (contratos, propostas aceitas, aditivos, inclusive os antigos), do mais recente ao sem data: tipo, nome do
+  arquivo, número e data como estão no documento, a que contrato ou oportunidade pertence, a situação da conferência e
+  Baixar (só com `contratos.baixar`). Clicar no nome abre o contrato ou a oportunidade, onde fica a conferência; o PDF
+  ainda sem vínculo aparece sem link. `GET /api/documentos?grupo_id=` também acha o PDF pelo grupo do contrato ou da
+  oportunidade, porque a junção de grupos move esses e não o documento.
 - **Contrato:** colunas novas `multa_rescisoria` e `aviso_previo_dias` e `renovacao` (texto, só registro: nada renova
   sozinho por causa dela).
 - **Acesso:** permissões novas em Gestão de contratos: "anexar e conferir" (`contratos.documentos`) e "baixar PDF

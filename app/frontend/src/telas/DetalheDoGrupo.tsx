@@ -3,6 +3,8 @@
  * Existe para o reagrupamento ser auditável. Juntar dois grupos move tudo para
  * um deles e marca o outro como fundido — sem esta tela, o resultado da junção
  * só se veria de longe, na contagem da lista.
+ *
+ * Também reúne os PDFs do cliente (seção Documentos, 19/10/2026).
  */
 
 import { useEffect, useState } from "react";
@@ -17,7 +19,8 @@ import { usarDados } from "../usarDados";
 import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 import { AvisoDeLacuna, QuadroDeLacunas, irAoCampo, marcasDeLacuna, usarLacunas } from "../componentes/Lacunas";
 import type { Lacuna } from "../api/tipos";
-import { CardDaLacuna, lacunaTemCard } from "./CardDaLacuna";
+import { CardDaLacuna, CardDoContrato, lacunaTemCard } from "./CardDaLacuna";
+import { DocumentosDoGrupo } from "./DocumentosDoGrupo";
 
 function FormularioDeGrupo({
   grupo,
@@ -97,6 +100,7 @@ export function DetalheDoGrupo({
   const [grupoAtual, definirGrupoAtual] = useState(grupo);
   const [editando, definirEditando] = useState(false);
   const [aberta, definirAberta] = useState<number | null>(null);
+  const [contratoAberto, definirContratoAberto] = useState<number | null>(null);
   const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
 
   // O que falta no cadastro do grupo inteiro (18/10/2026): cliente, oportunidades, contratos, empresas e contatos.
@@ -230,6 +234,9 @@ export function DetalheDoGrupo({
           )}
         </div>
 
+        <DocumentosDoGrupo grupoId={grupo.id} propostas={propostas.dados?.itens ?? []}
+          aoAbrirContrato={definirContratoAberto} aoAbrirOportunidade={definirAberta} />
+
         {juntados.length > 0 && (
           <div className="secao-do-painel">
             <h3>Juntados neste grupo</h3>
@@ -259,6 +266,9 @@ export function DetalheDoGrupo({
           aoFechar={() => definirAberta(null)}
           aoSalvar={propostas.recarregar}
         />
+      )}
+      {contratoAberto !== null && (
+        <CardDoContrato contratoId={contratoAberto} listas={listas} aoFechar={() => definirContratoAberto(null)} />
       )}
       {lacunaAberta && (
         <CardDaLacuna lacuna={lacunaAberta} listas={listas}

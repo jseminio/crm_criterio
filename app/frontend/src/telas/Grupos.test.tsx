@@ -17,6 +17,8 @@ vi.mock("../api/cliente", async () => {
       fusoesFeitas: vi.fn().mockResolvedValue([]),
       fundirGrupos: vi.fn(),
       desfazerFusao: vi.fn(),
+      documentos: vi.fn().mockResolvedValue([]),
+      contratos: vi.fn().mockResolvedValue({ total: 0, itens: [] }),
     },
   };
 });

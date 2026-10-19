@@ -304,3 +304,54 @@ def calcular_fees(o: Indicacao, recebimentos: list[tuple[date, Decimal]], ja_cal
 
 def fees_pendentes(fees: Iterable) -> list:
     return [f for f in fees if f.situacao is SituacaoDoFee.A_APROVAR]
+
+
+# ------------------------------------------------------------------ relatório mensal ao parceiro
+
+PRAZO_DE_VALIDACAO_EM_DIAS_UTEIS = 5
+"""Cláusula 2.2: a Critério confirma em até 5 dias úteis se aceita a indicação."""
+
+ETAPA_PARA_O_PARCEIRO: dict[Situacao, str] = {
+    Situacao.ENVIAR_PROPOSTA: "Em conversa",
+    Situacao.EM_AVALIACAO: "Proposta enviada",
+    Situacao.ON_HOLD: "Em espera",
+    Situacao.ACEITA: "Cliente",
+    Situacao.PERDIDA: "Não seguiu",
+}
+"""O que o parceiro lê, aprovado por Eduardo em 19/10/2026. A perda não leva o motivo; a recusa da indicação leva,
+porque o contrato manda avisar (cláusula 2.2)."""
+
+
+def mais_dias_uteis(dia: date, dias: int) -> date:
+    """Dias úteis de segunda a sexta. Feriado não entra: o prazo sai um pouco folgado, nunca apertado demais."""
+    while dias > 0:
+        dia += timedelta(days=1)
+        if dia.weekday() < 5:
+            dias -= 1
+    return dia
+
+
+@dataclass(frozen=True)
+class LinhaDoRelatorio:
+    empresa: str
+    indicada_em: date | None
+    etapa: str
+    proximo_passo: str | None
+    servico_contratado: str | None
+
+
+def linha_do_relatorio(o, grupo: str, fim: date, hoje: date) -> LinhaDoRelatorio:
+    """Uma indicação como o parceiro vê. O próximo passo leva só a data, nunca o texto interno da próxima ação."""
+    recebida = data_da_indicacao(o)
+    if o.indicacao_recusada is not None:
+        return LinhaDoRelatorio(grupo, recebida, f"Não aceita: {o.indicacao_recusada.value.lower()}", None, None)
+    prazo = mais_dias_uteis(recebida, PRAZO_DE_VALIDACAO_EM_DIAS_UTEIS) if recebida else None
+    if o.indicacao_validada_em is None and o.situacao is Situacao.ENVIAR_PROPOSTA and prazo is not None and prazo >= hoje:
+        # Só no prazo da cláusula 2.2. Indicação antiga, nunca validada, mostra a etapa em que a conta está.
+        return LinhaDoRelatorio(grupo, recebida, "Em validação", f"Confirmação até {prazo:%d/%m/%Y}", None)
+    etapa = ETAPA_PARA_O_PARCEIRO[o.situacao]
+    proximo = None
+    if not o.situacao.decidida and o.proxima_acao_em is not None and o.proxima_acao_em >= fim.replace(day=1):
+        proximo = f"Próximo contato em {o.proxima_acao_em:%d/%m/%Y}"
+    contratado = (o.servico or o.nome) if o.situacao.ganha else None
+    return LinhaDoRelatorio(grupo, recebida, etapa, proximo, contratado)

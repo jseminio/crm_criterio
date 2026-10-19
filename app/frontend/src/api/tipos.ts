@@ -2901,3 +2901,34 @@ export interface OportunidadeParaIndicar {
   canal: string | null;
   parceiro: string | null;
 }
+
+export interface AlertaDaIndicacao {
+  tipo: "ja_cliente" | "em_negociacao" | "outro_parceiro";
+  motivo_sugerido: string;
+  texto: string;
+}
+
+export interface IndicacaoRegistrada {
+  empresa_id?: number | null;
+  empresa_nova?: { nome: string; cnpj?: string | null } | null;
+  servico: string;
+  recebida_em?: string | null;
+  contato_nome?: string | null;
+  contato_meio?: string | null;
+  autorizado_pelo_cliente: boolean;
+}
+
+export interface RelatorioDoParceiro {
+  parceiro_id: number;
+  parceiro: string;
+  contato: string | null;
+  mes: string;
+  emitido_em: string;
+  responsavel: string | null;
+  indicacoes: number;
+  novas_no_mes: number;
+  viraram_cliente: number;
+  fee_pago_no_mes: string;
+  linhas: { empresa: string; indicada_em: string | null; etapa: string; proximo_passo: string | null; servico_contratado: string | null }[];
+  fees: { empresa: string; competencia: string; valor: string; situacao: string }[];
+}

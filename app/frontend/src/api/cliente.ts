@@ -1,6 +1,9 @@
 /** O acesso à API. Um lugar só, para o erro ter uma forma só. */
 
 import type {
+  AlertaDaIndicacao,
+  IndicacaoRegistrada,
+  RelatorioDoParceiro,
   CadastroDoParceiro,
   FeeDeParceiro,
   IndicadorDosParceiros,
@@ -810,6 +813,13 @@ export const api = {
     pedir<ParceiroDetalhe>(`/api/parceiros/indicacoes/${oportunidadeId}`, { method: "PATCH", body: JSON.stringify(dados) }),
   desligarIndicacao: (oportunidadeId: number) =>
     pedir<ParceiroDetalhe>(`/api/parceiros/indicacoes/${oportunidadeId}/desligar`, { method: "POST" }),
+  alertasDaIndicacao: (parceiroId: number, empresaId: number) =>
+    pedir<AlertaDaIndicacao[]>(comParametros(`/api/parceiros/${parceiroId}/alertas`, { empresa_id: empresaId })),
+  registrarIndicacao: (parceiroId: number, dados: IndicacaoRegistrada) =>
+    pedir<ParceiroDetalhe>(`/api/parceiros/${parceiroId}/indicacoes/registrar`, { method: "POST", body: JSON.stringify(dados) }),
+  relatorioDoParceiro: (parceiroId: number, mes: string) =>
+    pedir<RelatorioDoParceiro>(comParametros(`/api/parceiros/${parceiroId}/relatorio`, { mes })),
+  relatoriosDosParceiros: (mes: string) => pedir<RelatorioDoParceiro[]>(comParametros("/api/parceiros/relatorios", { mes })),
   conferenciaDosParceiros: () => pedir<TextoSemParceiro[]>("/api/parceiros/conferencia"),
   ligarTextoDoCanal: (texto: string, parceiroId: number) =>
     pedir<ParceiroDetalhe>("/api/parceiros/conferencia", { method: "POST", body: JSON.stringify({ texto, parceiro_id: parceiroId }) }),

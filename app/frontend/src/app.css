@@ -1713,6 +1713,10 @@ fieldset.lacuna-prioritaria { border: 2px dashed var(--espera); padding: var(--e
 .indicacao-detalhe { font-size: 12px; color: var(--texto-medio); }
 .indicacao-acoes { display: flex; flex-wrap: wrap; gap: var(--e2); margin-top: var(--e1); }
 .indicacao-acoes .selecao { width: auto; }
+.indicacao-topo h3 { margin: 0; }
+.aviso-de-alerta { background: var(--espera-suave); color: var(--espera); border: 1px solid var(--espera);
+  border-radius: var(--raio-sm); padding: var(--e2) var(--e3); font-size: 13px; }
+.aviso-de-alerta ul { margin: var(--e1) 0; padding-left: var(--e4); }
 
 
 @media (prefers-reduced-motion: reduce) {

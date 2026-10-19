@@ -24,6 +24,7 @@ import {
 } from "../componentes/ParceirosApoio";
 import { DetalheDoParceiro } from "./DetalheDoParceiro";
 import { usarAcesso } from "../entrada";
+import { abrirParaImprimir, mesPadrao } from "../relatorioDoParceiro";
 import { dinheiro, dinheiroCurto, percentual } from "../formato";
 import { PRESETS, resolverPeriodo, type Preset } from "../periodo";
 import { usarDados } from "../usarDados";
@@ -70,6 +71,7 @@ export function Parceiros() {
   const [aviso, definirAviso] = useState<string | null>(null);
   const [movendoPelaFolha, definirMovendoPelaFolha] = useState<ParceiroResumo | null>(null);
   const [etapaVisivel, definirEtapaVisivel] = useState<string>("Produtivo");
+  const [mesDoRelatorio, definirMesDoRelatorio] = useState(mesPadrao());
   const estreita = usarTelaEstreita();
   const toque = usarToque();
   const semArrasto = estreita || toque;
@@ -101,6 +103,16 @@ export function Parceiros() {
       definirAviso(falha instanceof ErroDaApi ? falha.message : "Não consegui mover o parceiro.");
     }
     recarregar();
+  }
+
+  async function relatoriosDoMes() {
+    try {
+      const relatorios = await api.relatoriosDosParceiros(mesDoRelatorio);
+      if (relatorios.length === 0) definirAviso("Nenhum parceiro tem indicação até o fim desse mês.");
+      else if (!abrirParaImprimir(relatorios)) definirAviso("Não consegui preparar a impressão do relatório.");
+    } catch (falha) {
+      definirAviso(falha instanceof ErroDaApi ? falha.message : "Não consegui montar os relatórios.");
+    }
   }
 
   const itens = lista.dados ?? [];
@@ -210,6 +222,12 @@ export function Parceiros() {
               Exportar para Excel
             </LinkDeArquivo>
           )}
+          <input className="entrada" type="month" aria-label="Mês dos relatórios" value={mesDoRelatorio}
+            style={{ width: "auto" }} onChange={(e) => definirMesDoRelatorio(e.target.value)} />
+          <button type="button" className="botao botao-secundario" onClick={relatoriosDoMes} disabled={!mesDoRelatorio}
+            title="Um relatório por parceiro com indicação, pronto para salvar em PDF">
+            Relatórios do mês
+          </button>
           {pode("parceiros.editar") && (
             <button type="button" className="botao botao-primario" onClick={() => definirAberto("novo")}>Novo parceiro</button>
           )}

@@ -47,7 +47,8 @@ def validar(token: str) -> dict:
 def indicacao(**campos):
     base = dict(id=1, nome="x", situacao=Situacao.ENVIAR_PROPOSTA, data_colocacao=None, data_aceite=None,
                 data_envio_proposta=None, preco_mensal=None, preco_anual=None, indicacao_recebida_em=None,
-                indicacao_validada_em=None, indicacao_recusada=None, linha_servico=LinhaServico.C1)
+                indicacao_validada_em=None, indicacao_recusada=None, linha_servico=LinhaServico.C1,
+                proxima_acao_em=None, servico=None)
     return SimpleNamespace(**{**base, **campos})
 
 
@@ -240,3 +241,79 @@ def test_acesso_e_nome_unico_e_exportacao(cliente):
     assert cliente.get("/api/parceiros/exportar", headers=KARINE).status_code == 403
     r = cliente.get("/api/parceiros/exportar", headers=ADMIN)
     assert r.status_code == 200 and r.content[:2] == b"PK"
+
+
+# ------------------------------------------------------------------ Registrar indicação e relatório (19/10/2026)
+
+def test_registrar_indicacao_de_empresa_nova_exige_lgpd_e_cria_a_oportunidade(cliente):
+    p = _criar(cliente, "Ficus")
+    base = {"empresa_nova": {"nome": "Comércio Exemplo"}, "servico": "BPO Contábil e Fiscal", "recebida_em": "2026-10-14",
+            "contato_nome": "Maria", "contato_meio": "maria@exemplo.com"}
+    sem = cliente.post(f"/api/parceiros/{p['id']}/indicacoes/registrar", headers=ADMIN,
+                       json={**base, "autorizado_pelo_cliente": False})
+    assert sem.status_code == 422 and "LGPD" in sem.json()["detail"]
+    r = cliente.post(f"/api/parceiros/{p['id']}/indicacoes/registrar", headers=ADMIN,
+                     json={**base, "autorizado_pelo_cliente": True})
+    assert r.status_code == 201, r.text
+    [i] = r.json()["indicacoes"]
+    assert (i["grupo"], i["situacao"], i["recebida_em"], i["validada_em"]) == (
+        "Comércio Exemplo", "Enviar proposta", "2026-10-14", None)
+    [achada] = cliente.get("/api/parceiros/oportunidades", headers=ADMIN, params={"busca": "Comércio"}).json()
+    assert (achada["canal"], achada["parceiro"]) == ("Ficus", "Ficus")
+
+
+def test_alertas_avisam_negociacao_aberta_e_outro_parceiro(cliente, engine):
+    from crm.db.modelos import Empresa
+    with Session(engine) as s:
+        beta = s.query(GrupoEconomico).filter_by(nome="Grupo Beta").one()
+        e = Empresa(grupo_id=beta.id, razao_social="Beta Ltda")
+        s.add(e)
+        s.commit()
+        empresa_id = e.id
+    ficus, guto = _criar(cliente, "Ficus"), _criar(cliente, "Guto")
+    [a] = cliente.get(f"/api/parceiros/{ficus['id']}/alertas", headers=ADMIN, params={"empresa_id": empresa_id}).json()
+    assert a["tipo"] == "em_negociacao" and "Consultoria Beta" in a["texto"]
+    cliente.post(f"/api/parceiros/{guto['id']}/indicacoes/registrar", headers=ADMIN, json={
+        "empresa_id": empresa_id, "servico": "BPO Financeiro", "autorizado_pelo_cliente": True})
+    tipos = {x["tipo"] for x in cliente.get(f"/api/parceiros/{ficus['id']}/alertas", headers=ADMIN,
+                                            params={"empresa_id": empresa_id}).json()}
+    assert tipos == {"em_negociacao", "outro_parceiro"}
+
+
+def test_relatorio_mensal_mostra_a_etapa_e_o_fee_sem_dado_do_cliente(cliente):
+    molina = _criar(cliente, contato="molina@exemplo.com", socio_responsavel="Eduardo")
+    cliente.post("/api/parceiros/conferencia", headers=ADMIN, json={"texto": "Molina", "parceiro_id": molina["id"]})
+    cliente.post("/api/parceiros/fees/calcular", headers=ADMIN)
+    [fee] = cliente.get("/api/parceiros/fees", headers=ADMIN).json()
+    cliente.post(f"/api/parceiros/fees/{fee['id']}/aprovar", headers=SOCIO, json={"valor": "10500"})
+    cliente.post(f"/api/parceiros/fees/{fee['id']}/pago", headers=SOCIO, json={"pago_em": "2026-07-10"})
+
+    rel = cliente.get(f"/api/parceiros/{molina['id']}/relatorio", headers=ADMIN, params={"mes": "2026-07"}).json()
+    assert (rel["indicacoes"], rel["novas_no_mes"], rel["viraram_cliente"], rel["fee_pago_no_mes"]) == (2, 1, 1, "10500.00")
+    etapas = {l["empresa"]: (l["etapa"], l["servico_contratado"]) for l in rel["linhas"]}
+    assert etapas == {"Grupo Alfa": ("Cliente", "BPO Alfa"), "Grupo Beta": ("Não seguiu", None)}
+    assert rel["fees"] == [{"empresa": "Grupo Alfa", "competencia": "2026-06-01", "valor": "10500.00",
+                            "situacao": "Pago em 10/07/2026"}]
+    texto = str(rel)
+    assert "12000" not in texto and "13000" not in texto  # nenhum preço do cliente
+
+    abril = cliente.get(f"/api/parceiros/{molina['id']}/relatorio", headers=ADMIN, params={"mes": "2026-04"}).json()
+    assert abril["indicacoes"] == 1 and abril["fees"] == []
+    todos = cliente.get("/api/parceiros/relatorios", headers=ADMIN, params={"mes": "2026-07"}).json()
+    assert [t["parceiro"] for t in todos] == ["Molina"]
+    assert cliente.get("/api/parceiros/relatorios", headers=ADMIN, params={"mes": "julho"}).status_code == 422
+
+
+def test_relatorio_em_validacao_e_recusada():
+    em_validacao = indicacao(indicacao_recebida_em=date(2026, 10, 16))
+    linha = regras.linha_do_relatorio(em_validacao, "Grupo X", date(2026, 10, 31), HOJE)
+    assert (linha.etapa, linha.proximo_passo) == ("Em validação", "Confirmação até 23/10/2026")
+    vencida = indicacao(indicacao_recebida_em=date(2026, 9, 10), situacao=Situacao.EM_AVALIACAO)
+    assert regras.linha_do_relatorio(vencida, "Grupo X", date(2026, 10, 31), HOJE).etapa == "Proposta enviada"
+    antiga = indicacao(indicacao_recebida_em=date(2026, 9, 10))
+    assert regras.linha_do_relatorio(antiga, "Grupo X", date(2026, 10, 31), HOJE).etapa == "Em conversa"
+    recusada = indicacao(indicacao_recebida_em=date(2026, 10, 1), indicacao_recusada=MotivoDeIndicacaoRecusada.JA_CLIENTE)
+    assert regras.linha_do_relatorio(recusada, "Grupo X", date(2026, 10, 31), HOJE).etapa == "Não aceita: já é cliente"
+    conversa = indicacao(indicacao_validada_em=date(2026, 10, 2), proxima_acao_em=date(2026, 10, 28))
+    linha = regras.linha_do_relatorio(conversa, "Grupo X", date(2026, 10, 31), HOJE)
+    assert (linha.etapa, linha.proximo_passo) == ("Em conversa", "Próximo contato em 28/10/2026")

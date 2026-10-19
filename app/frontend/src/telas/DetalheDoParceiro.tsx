@@ -8,6 +8,8 @@ import type { CadastroDoParceiro, IndicacaoDoParceiro, OportunidadeParaIndicar, 
 import { CampoDeData } from "../componentes/CampoDeData";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { PainelLateral } from "../componentes/PainelLateral";
+import { RegistrarIndicacao } from "../componentes/RegistrarIndicacao";
+import { abrirParaImprimir, mesPadrao } from "../relatorioDoParceiro";
 import { Carregando, Erro } from "../componentes/estados";
 import { usarAcesso } from "../entrada";
 import { data, dinheiro, hojeIso } from "../formato";
@@ -158,6 +160,7 @@ function Formulario({ parceiro, aoFechar, aoSalvar }: {
         </div>
       </div>
 
+      {atual && <RelatorioDoMes parceiroId={atual.id} />}
       {atual && <Indicacoes parceiro={atual} editavel={editavel} aoMudar={(p) => { definirAtual(p); aoSalvar(p); }} />}
       {atual && atual.fees.length > 0 && (
         <section className="secao-do-painel">
@@ -191,6 +194,7 @@ function Indicacoes({ parceiro, editavel, aoMudar }: {
   aoMudar: (p: ParceiroDetalhe) => void;
 }) {
   const [falha, definirFalha] = useState<string | null>(null);
+  const [registrando, definirRegistrando] = useState(false);
   async function agir(acao: () => Promise<ParceiroDetalhe>) {
     definirFalha(null);
     try {
@@ -201,7 +205,21 @@ function Indicacoes({ parceiro, editavel, aoMudar }: {
   }
   return (
     <section className="secao-do-painel">
-      <h3>Indicações ({parceiro.indicacoes.length})</h3>
+      <div className="indicacao-topo">
+        <h3>Indicações ({parceiro.indicacoes.length})</h3>
+        {editavel && (
+          <button type="button" className="botao botao-secundario" onClick={() => definirRegistrando(true)}>
+            Registrar indicação
+          </button>
+        )}
+      </div>
+      {registrando && (
+        <RegistrarIndicacao parceiro={parceiro} aoFechar={() => definirRegistrando(false)}
+          aoRegistrar={(p) => {
+            definirRegistrando(false);
+            aoMudar(p);
+          }} />
+      )}
       {falha && <div className="estado estado-erro" role="alert"><p className="estado-texto">{falha}</p></div>}
       {parceiro.indicacoes.length === 0 ? (
         <p className="campo-ajuda">Nenhuma indicação ligada ainda.</p>
@@ -271,7 +289,7 @@ function LigarOportunidade({ parceiro, agir }: {
   }
   return (
     <div className="formulario" style={{ marginTop: "var(--e3)" }}>
-      <div className="formulario-duplo">
+      <div className="campo-bloco">
         <div className="campo-bloco">
           <label className="campo-rotulo" htmlFor="p-ligar">Ligar uma oportunidade do funil</label>
           <input id="p-ligar" className="entrada" placeholder="Nome da oportunidade ou do grupo" value={busca}
@@ -306,5 +324,31 @@ function LigarOportunidade({ parceiro, agir }: {
         </ul>
       )}
     </div>
+  );
+}
+
+function RelatorioDoMes({ parceiroId }: { parceiroId: number }) {
+  const [mes, definirMes] = useState(mesPadrao());
+  const [aviso, definirAviso] = useState<string | null>(null);
+  async function emitir() {
+    definirAviso(null);
+    try {
+      const relatorio = await api.relatorioDoParceiro(parceiroId, mes);
+      if (!abrirParaImprimir([relatorio])) definirAviso("Não consegui preparar a impressão do relatório.");
+    } catch (e) {
+      definirAviso(e instanceof ErroDaApi ? e.message : "Não consegui montar o relatório.");
+    }
+  }
+  return (
+    <section className="secao-do-painel">
+      <h3>Relatório ao parceiro</h3>
+      <div className="indicacao-acoes">
+        <input className="entrada" type="month" aria-label="Mês do relatório" value={mes} style={{ width: "auto" }}
+          onChange={(e) => definirMes(e.target.value)} />
+        <button type="button" className="botao botao-secundario" onClick={emitir} disabled={!mes}>Relatório do mês (PDF)</button>
+      </div>
+      <p className="campo-ajuda">Abre a página pronta para imprimir: escolha "Salvar como PDF". Quem envia ao parceiro é você.</p>
+      {aviso && <p className="campo-ajuda" role="status">{aviso}</p>}
+    </section>
   );
 }

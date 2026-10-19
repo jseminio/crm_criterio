@@ -41,6 +41,15 @@ Perfis: ver, editar, aprovar e marcar pago o fee, exportar). Segue o padrão do 
   mensal. Não recorrente: 10% de cada recebimento até o valor do contrato. O recebido é bruto e por grupo: o **sócio da
   conta** confere o valor líquido de impostos, aprova (ou recusa, com o motivo) e marca pago.
 
+- **Registrar indicação** (painel do parceiro): empresa da base ou nova (nome e CNPJ), serviço de interesse, data,
+  contato no cliente e a autorização do cliente para o contato (LGPD), obrigatória. Cria a oportunidade no Funil
+  comercial em "Enviar proposta", com Tipo de canal Parceiros e o parceiro ligado. Avisa, sem impedir, se a empresa já é
+  cliente, já está em negociação ou já veio de outro parceiro (cláusula 2.2).
+- **Relatório mensal ao parceiro**: no painel ("Relatório do mês (PDF)") ou para todos ("Relatórios do mês"), uma página
+  por parceiro, pronta para "Salvar como PDF" na impressão do navegador. Mostra a etapa de cada indicação como o parceiro
+  lê (Em validação, Não aceita com o motivo, Em conversa, Proposta enviada, Em espera, Cliente, Não seguiu), só a data do
+  próximo contato e os fees dele. Nenhum dado financeiro do cliente. O CRM não envia: quem manda é o sócio.
+
 Migração `7d3a9c2e5f14`: tabelas `parceiro` e `fee_de_parceiro` e quatro colunas em branco em `oportunidade`. Não mexe em
 dado existente; aplica sozinha no Redeploy.
 

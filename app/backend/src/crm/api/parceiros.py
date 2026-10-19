@@ -10,7 +10,7 @@ from __future__ import annotations
 import io
 from collections import defaultdict
 from collections.abc import Callable, Iterator
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
 
@@ -23,14 +23,20 @@ from sqlalchemy.orm import Session
 
 from crm.api.acesso import quem_fez
 from crm.db.base import agora
-from crm.db.modelos import FeeDeParceiro, GrupoEconomico, Oportunidade, Parceiro, Recebimento
+from crm.db.modelos import Contrato, Empresa, FeeDeParceiro, GrupoEconomico, Oportunidade, Parceiro, Recebimento
 from crm.domain import parceiros as regras
+from crm.domain.servicos import linha_do_servico
+from crm.carga.lacunas_contato import cnpj_valido
 from crm.domain.listas import (
     AcordoDoParceiro,
     EtapaDoParceiro,
     MotivoDeIndicacaoRecusada,
     NivelDeParceiro,
+    Origem,
+    Situacao,
+    SituacaoContrato,
     SituacaoDoFee,
+    SituacaoGrupo,
     TipoCanal,
     TipoDePessoa,
 )
@@ -222,6 +228,60 @@ class OportunidadeEncontrada(BaseModel):
     parceiro: str | None
 
 
+class EmpresaNovaIndicada(BaseModel):
+    nome: str = Field(min_length=2, max_length=200)
+    cnpj: str | None = Field(default=None, max_length=20)
+
+
+class IndicacaoRegistrada(BaseModel):
+    """O botão Registrar indicação (19/10/2026): a empresa da base ou uma nova, o serviço de interesse, quem falar no
+    cliente e a autorização do cliente para o contato (LGPD), que é obrigatória."""
+
+    empresa_id: int | None = None
+    empresa_nova: EmpresaNovaIndicada | None = None
+    servico: str = Field(min_length=2, max_length=120)
+    recebida_em: date | None = None
+    contato_nome: str | None = Field(default=None, max_length=120)
+    contato_meio: str | None = Field(default=None, max_length=200)
+    autorizado_pelo_cliente: bool
+
+
+class AlertaDaIndicacao(BaseModel):
+    tipo: Literal["ja_cliente", "em_negociacao", "outro_parceiro"]
+    motivo_sugerido: str
+    texto: str
+
+
+class LinhaDoRelatorioResposta(BaseModel):
+    empresa: str
+    indicada_em: date | None
+    etapa: str
+    proximo_passo: str | None
+    servico_contratado: str | None
+
+
+class FeeDoRelatorio(BaseModel):
+    empresa: str
+    competencia: date
+    valor: Decimal
+    situacao: str
+
+
+class RelatorioDoParceiro(BaseModel):
+    parceiro_id: int
+    parceiro: str
+    contato: str | None
+    mes: str
+    emitido_em: date
+    responsavel: str | None
+    indicacoes: int
+    novas_no_mes: int
+    viraram_cliente: int
+    fee_pago_no_mes: Decimal
+    linhas: list[LinhaDoRelatorioResposta]
+    fees: list[FeeDoRelatorio]
+
+
 # ------------------------------------------------------------------ apoio
 
 def _hoje() -> date:
@@ -305,6 +365,68 @@ def _detalhe(sessao: Session, p: Parceiro, hoje: date) -> ParceiroDetalhe:
             for o in indicacoes
         ],
         fees=[_fee(f) for f in fees],
+    )
+
+
+def _alertas(sessao: Session, grupo: GrupoEconomico, parceiro: Parceiro) -> list[AlertaDaIndicacao]:
+    """Cláusula 2.2: já cliente, já em negociação ou já apresentada por outro. Só avisa; quem decide é a validação."""
+    alertas = []
+    ativo = sessao.scalar(sa.select(sa.func.count()).select_from(Contrato).where(
+        Contrato.grupo_id == grupo.id, Contrato.situacao == SituacaoContrato.ATIVO))
+    if ativo or grupo.situacao is SituacaoGrupo.CLIENTE:
+        alertas.append(AlertaDaIndicacao(
+            tipo="ja_cliente", motivo_sugerido=MotivoDeIndicacaoRecusada.JA_CLIENTE.value,
+            texto=f"{grupo.nome} já é cliente da Critério."))
+    for o in sessao.scalars(sa.select(Oportunidade).where(Oportunidade.grupo_id == grupo.id)):
+        if o.parceiro_id is not None and o.parceiro_id != parceiro.id and o.indicacao_recusada is None:
+            outro = sessao.get(Parceiro, o.parceiro_id)
+            alertas.append(AlertaDaIndicacao(
+                tipo="outro_parceiro", motivo_sugerido=MotivoDeIndicacaoRecusada.OUTRO_PARCEIRO.value,
+                texto=f"\"{o.nome}\" já foi indicada por {outro.nome if outro else 'outro parceiro'}"
+                      f"{f' em {regras.data_da_indicacao(o):%d/%m/%Y}' if regras.data_da_indicacao(o) else ''}."))
+        elif not o.situacao.decidida and o.parceiro_id is None:
+            desde = o.data_colocacao
+            alertas.append(AlertaDaIndicacao(
+                tipo="em_negociacao", motivo_sugerido=MotivoDeIndicacaoRecusada.EM_NEGOCIACAO.value,
+                texto=f"\"{o.nome}\" está em {o.situacao.value.lower()}{f' desde {desde:%d/%m/%Y}' if desde else ''}."))
+    return alertas
+
+
+def _fim_do_mes(mes: str) -> tuple[date, date]:
+    try:
+        ano, m = (int(x) for x in mes.split("-"))
+        inicio = date(ano, m, 1)
+    except ValueError as falha:
+        raise HTTPException(422, "mês no formato AAAA-MM") from falha
+    fim = (date(ano + (m == 12), m % 12 + 1, 1)) - timedelta(days=1)
+    return inicio, fim
+
+
+def _relatorio(sessao: Session, p: Parceiro, mes: str) -> RelatorioDoParceiro:
+    inicio, fim = _fim_do_mes(mes)
+    linhas = sessao.execute(
+        sa.select(Oportunidade, GrupoEconomico.nome).join(GrupoEconomico, GrupoEconomico.id == Oportunidade.grupo_id)
+        .where(Oportunidade.parceiro_id == p.id)
+    ).all()
+    do_periodo = [(o, g) for o, g in linhas if (d := regras.data_da_indicacao(o)) is None or d <= fim]
+    do_periodo.sort(key=lambda par: regras.data_da_indicacao(par[0]) or date.min, reverse=True)
+    fees = [f for f in sessao.scalars(sa.select(FeeDeParceiro).where(FeeDeParceiro.parceiro_id == p.id)
+                                      .order_by(FeeDeParceiro.competencia.desc()))
+            if f.situacao is not SituacaoDoFee.RECUSADO and f.competencia <= fim]
+    situacao = {SituacaoDoFee.A_APROVAR: "Em aprovação", SituacaoDoFee.APROVADO: "Aprovado, a pagar"}
+    return RelatorioDoParceiro(
+        parceiro_id=p.id, parceiro=p.nome, contato=p.contato, mes=mes, emitido_em=_hoje(),
+        responsavel=p.socio_responsavel,
+        indicacoes=len(do_periodo),
+        novas_no_mes=sum(1 for o, _ in do_periodo if (d := regras.data_da_indicacao(o)) and inicio <= d <= fim),
+        viraram_cliente=sum(1 for o, _ in do_periodo if o.situacao.ganha and o.indicacao_recusada is None),
+        fee_pago_no_mes=sum((f.valor_aprovado or f.calculado for f in fees
+                             if f.pago_em and inicio <= f.pago_em <= fim), Decimal("0")),
+        linhas=[LinhaDoRelatorioResposta(**regras.linha_do_relatorio(o, g, fim, _hoje()).__dict__) for o, g in do_periodo],
+        fees=[FeeDoRelatorio(empresa=f.oportunidade.grupo.nome, competencia=f.competencia,
+                             valor=f.valor_aprovado or f.calculado,
+                             situacao=f"Pago em {f.pago_em:%d/%m/%Y}" if f.pago_em else situacao[f.situacao])
+              for f in fees],
     )
 
 
@@ -494,6 +616,74 @@ def roteador_de_parceiros(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
         f.situacao, f.pago_em = SituacaoDoFee.PAGO, corpo.pago_em
         sessao.flush()
         return _fee(f)
+
+    # relatório mensal ao parceiro
+    @r.get("/api/parceiros/relatorios", response_model=list[RelatorioDoParceiro])
+    def relatorios(mes: str, sessao: Session = Sessao) -> list[RelatorioDoParceiro]:
+        """Os relatórios do mês de todos os parceiros com alguma indicação até o fim do mês, um por página."""
+        saida = []
+        for p in sessao.scalars(sa.select(Parceiro).order_by(Parceiro.nome)):
+            rel = _relatorio(sessao, p, mes)
+            if rel.indicacoes:
+                saida.append(rel)
+        return saida
+
+    @r.get("/api/parceiros/{parceiro_id}/relatorio", response_model=RelatorioDoParceiro)
+    def relatorio(parceiro_id: int, mes: str, sessao: Session = Sessao) -> RelatorioDoParceiro:
+        return _relatorio(sessao, _parceiro_ou_404(sessao, parceiro_id), mes)
+
+    @r.get("/api/parceiros/{parceiro_id}/alertas", response_model=list[AlertaDaIndicacao])
+    def alertas(parceiro_id: int, empresa_id: int, sessao: Session = Sessao) -> list[AlertaDaIndicacao]:
+        p = _parceiro_ou_404(sessao, parceiro_id)
+        e = sessao.get(Empresa, empresa_id)
+        if e is None:
+            raise HTTPException(404, "Empresa não encontrada")
+        return _alertas(sessao, e.grupo, p)
+
+    @r.post("/api/parceiros/{parceiro_id}/indicacoes/registrar", response_model=ParceiroDetalhe, status_code=201)
+    def registrar(parceiro_id: int, corpo: IndicacaoRegistrada, sessao: Session = Sessao) -> ParceiroDetalhe:
+        """Cria a oportunidade no Funil comercial em "Enviar proposta", com Tipo de canal Parceiros, o parceiro ligado e
+        a data da indicação. A validação fica para o sócio."""
+        p = _parceiro_ou_404(sessao, parceiro_id)
+        if not corpo.autorizado_pelo_cliente:
+            raise HTTPException(422, "Sem a autorização do cliente para o contato (LGPD), a indicação não entra")
+        if (corpo.empresa_id is None) == (corpo.empresa_nova is None):
+            raise HTTPException(422, "Escolha uma empresa da base ou cadastre uma nova")
+        if corpo.empresa_id is not None:
+            empresa = sessao.get(Empresa, corpo.empresa_id)
+            if empresa is None:
+                raise HTTPException(404, "Empresa não encontrada")
+            grupo = empresa.grupo
+        else:
+            nome = " ".join(corpo.empresa_nova.nome.split())
+            cnpj = _documento(corpo.empresa_nova.cnpj)
+            if cnpj is not None:
+                if not cnpj_valido(cnpj):
+                    raise HTTPException(422, "CNPJ inválido")
+                if sessao.scalar(sa.select(Empresa).where(Empresa.cnpj == cnpj)) is not None:
+                    raise HTTPException(409, "Este CNPJ já está na base: escolha a empresa na busca")
+            grupo = sessao.scalar(sa.select(GrupoEconomico).where(
+                sa.func.lower(GrupoEconomico.nome) == nome.casefold(), GrupoEconomico.fundido_em_id.is_(None)))
+            if grupo is None:
+                grupo = GrupoEconomico(nome=nome, situacao=SituacaoGrupo.PROSPECT, origem=Origem.CRM)
+                sessao.add(grupo)
+                sessao.flush()
+            empresa = Empresa(grupo_id=grupo.id, razao_social=nome, cnpj=cnpj)
+            sessao.add(empresa)
+            sessao.flush()
+        recebida = corpo.recebida_em or _hoje()
+        contato = " · ".join(x for x in (corpo.contato_nome, corpo.contato_meio) if x)
+        registro = (f"Indicada por {p.nome} em {recebida:%d/%m/%Y}. O cliente autorizou o contato da Critério (LGPD); "
+                    f"registrado por {quem_fez(None) or 'quem usou a tela'} em {_hoje():%d/%m/%Y}.")
+        sessao.add(Oportunidade(
+            grupo_id=grupo.id, empresa_id=empresa.id, nome=f"{corpo.servico} — {empresa.nome_fantasia or empresa.razao_social}",
+            servico=corpo.servico, linha_servico=linha_do_servico(corpo.servico), situacao=Situacao.ENVIAR_PROPOSTA,
+            tipo_canal=TipoCanal.PARCEIROS, canal=p.nome, data_colocacao=recebida, origem=Origem.CRM,
+            parceiro_id=p.id, indicacao_recebida_em=recebida,
+            observacao=f"{registro}\nContato indicado: {contato}" if contato else registro,
+        ))
+        sessao.flush()
+        return _detalhe(sessao, p, _hoje())
 
     # cadastro
     def _parceiro_ou_404(sessao: Session, parceiro_id: int) -> Parceiro:

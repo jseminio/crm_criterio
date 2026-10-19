@@ -103,7 +103,7 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("POST", r"/api/contatos/pessoas", ("contatos.editar",)),
     ("PATCH", r"/api/contatos/pessoas/\d+", ("contatos.editar",)),
     ("DELETE", r"/api/contatos/pessoas/\d+", ("contatos.excluir",)),
-    ("GET", r"/api/empresas/busca", ("contatos.ver", "funil.ver", "grupos.ver")),
+    ("GET", r"/api/empresas/busca", ("contatos.ver", "funil.ver", "grupos.ver", "parceiros.editar")),
     ("POST", r"/api/empresas", ("contatos.editar",)),
     ("PATCH", r"/api/empresas/\d+", ("contatos.editar",)),
     ("DELETE", r"/api/empresas/\d+", ("contatos.excluir",)),
@@ -218,10 +218,10 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("POST|PATCH", r"/api/sdr/base/(carga-inicial|fichas(/\d+(/(revisao|arquivar|reabrir))?)?)", ("sdr.base",)),
     # parceiros (19/10/2026): menu próprio; o fee é do sócio da conta
     ("GET", r"/api/parceiros/exportar", ("parceiros.exportar",)),
-    ("GET", r"/api/parceiros(/indicadores(/composicao)?|/conferencia|/fees|/oportunidades|/\d+)?", ("parceiros.ver",)),
+    ("GET", r"/api/parceiros(/indicadores(/composicao)?|/conferencia|/fees|/oportunidades|/relatorios|/\d+(/relatorio|/alertas)?)?", ("parceiros.ver",)),
     ("POST", r"/api/parceiros/fees/\d+/(aprovar|recusar|pago)", ("parceiros.aprovar_fee",)),
     ("POST", r"/api/parceiros/fees/calcular", ("parceiros.editar", "parceiros.aprovar_fee")),
-    ("POST", r"/api/parceiros(/conferencia|/\d+/(etapa|indicacoes)|/indicacoes/\d+/desligar)?", ("parceiros.editar",)),
+    ("POST", r"/api/parceiros(/conferencia|/\d+/(etapa|indicacoes|indicacoes/registrar)|/indicacoes/\d+/desligar)?", ("parceiros.editar",)),
     ("PATCH", r"/api/parceiros/(\d+|indicacoes/\d+)", ("parceiros.editar",)),
     # conferência da carga
     ("GET", r"/api/cargas(/\d+(/ocorrencias)?)?", ("conferencia.ver",)),

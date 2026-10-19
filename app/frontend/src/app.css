@@ -1519,9 +1519,16 @@ td > .celula-fonte { display: block; }
 .composicao h3 { margin: var(--e3) 0 var(--e2); }
 .recortes .ind-composicao-solto { --cor: var(--foco); }
 
-/* KPIs da liderança no padrão dos indicadores (10/10/2026): cinco por linha. */
-.numeros-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* KPIs da liderança em duas linhas (19/10/2026): quatro por linha; o último, sozinho no fim da grade,
+   ocupa as duas vagas que sobram. Até 1100px, dois por linha; no celular, um. */
+.numeros-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .numeros-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .numeros-kpis { grid-template-columns: minmax(0, 1fr); } }
+@media (min-width: 721px) { .numeros-kpis > .ind:last-child:nth-child(4n + 3) { grid-column: span 2; } }
+/* A janela explicativa abre para dentro: a da coluna da direita encosta na borda direita. */
+.numeros-kpis > .ind:nth-child(n) .ind-janela { left: 0; right: auto; }
+.numeros-kpis > .ind:nth-child(4n) .ind-janela { left: auto; right: 0; }
+@media (max-width: 1100px) and (min-width: 721px) { .numeros-kpis > .ind:nth-child(2n) .ind-janela { left: auto; right: 0; } }
 .numeros-kpis .ind .campo-ajuda, .numeros-kpis .ind .aviso-de-movimento { font-size: 11px; }
 
 /* Explicação ao passar o mouse fora dos cards (10/10/2026): sublinhado pontilhado diz que há explicação. */

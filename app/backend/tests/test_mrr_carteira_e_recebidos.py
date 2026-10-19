@@ -298,3 +298,54 @@ def test_tarefa_poe_12_parcelas_so_na_menino_da_ilha(engine):
         outros = s.scalars(sa.select(Contrato).where(Contrato.id != bpo.id)).all()
         assert all(c.parcelas_no_ano == 13 for c in outros)
         assert "nada a mudar" in menino_da_ilha_em_12_parcelas.executar(s)
+
+
+# ── Contas a receber do Omie (19/10/2026) ────────────────────────────────────────────────────────────
+
+def _omie() -> str:
+    """O formato do contas a receber do Omie: resumo, por mês (sem CNPJ) e a aba Títulos, que é a que vale."""
+    from datetime import datetime
+    import io
+
+    livro = Workbook()
+    resumo = livro.active
+    resumo.title = "Resumo"
+    resumo.append([None, "Indicador", "Valor"])
+    por_mes = livro.create_sheet("Por Mês")
+    por_mes.append([None, "Cliente", "Mês", "Faturado", "Recebido", "Vencido"])
+    por_mes.append([None, "Beta Serviços", "Out/26", 3600, 3600, 0])
+    titulos = livro.create_sheet("Títulos")
+    titulos.append(["Contas a Receber 2026 - títulos"])
+    titulos.append([])
+    titulos.append(["Empresa", "Cliente", "CNPJ/CPF", "Parcela", "Emissão", "Vencimento", "Mês", "Valor do Título",
+                    "Recebido", "Em Aberto", "Em Atraso", "Situação", "Dias em Atraso", "Data do Recebimento"])
+    def titulo(cliente, doc, venc, valor, recebido, pago=None):
+        titulos.append(["CCE", cliente, doc, "001/013", datetime(2026, 9, 25), venc, venc.month, valor, recebido,
+                        valor - recebido, 0, "", None, pago])
+    titulo("ALFA COMERCIO LTDA", "11.222.333/0001-81", datetime(2026, 10, 3), 12000, 12000, datetime(2026, 10, 6))
+    titulo("Beta Serviços", "98.765.432/0001-10", datetime(2026, 10, 5), 3600, 3600, datetime(2026, 10, 5))  # CNPJ fora do cadastro
+    titulo("Beta Serviços", "123.456.789-09", datetime(2026, 9, 5), 3600, 1000, datetime(2026, 9, 9))  # CPF: vale o nome
+    titulo("Grupo Alfa", "11.222.333/0001-81", datetime(2026, 11, 3), 12000, 0)  # a vencer: não entra
+    titulo("Desconhecida SA", None, datetime(2026, 10, 3), 500, 500, datetime(2026, 10, 3))
+    saida = io.BytesIO()
+    livro.save(saida)
+    return base64.b64encode(saida.getvalue()).decode()
+
+
+def test_contas_a_receber_do_omie_entra_como_sai(cliente):
+    p = cliente.post("/api/recebimentos/previa", json={"arquivo": "omie.xlsx", "conteudo_base64": _omie()}, headers=ADMIN).json()
+    assert p["reconhecidas"] == 3 and D(p["total"]) == D("16600")
+    assert [(m["competencia"], D(m["total"])) for m in p["meses"]] == [("2026-09", D("1000")), ("2026-10", D("15600"))]
+    assert p["sem_recebimento"] == 1
+    assert [(x["linha"], x["motivo"]) for x in p["problemas"]] == [(8, "nome não encontrado entre os grupos e empresas do CRM")]
+
+    cliente.post("/api/recebimentos/importar", json={"arquivo": "omie.xlsx", "conteudo_base64": _omie()}, headers=ADMIN)
+    carteira = cliente.get("/api/mrr/carteira", params={"hoje": HOJE}, headers=ADMIN).json()
+    por_nome = {g["grupo"]: g for g in carteira["itens"]}
+    assert D(por_nome["Grupo Alfa"]["recebido"]) == D("12000") and D(por_nome["Beta"]["recebido"]) == D("3600")
+    assert por_nome["Beta"]["situacao"] == "Em dia"
+
+
+def test_cnpj_fora_do_cadastro_sem_nome_continua_de_fora():
+    leitura = regra.ler_planilha("CNPJ;Competência;Valor\n123;10/2026;10\n".encode(), "r.csv")
+    assert [p.motivo for p in leitura.problemas] == ["CNPJ sem 14 dígitos"]

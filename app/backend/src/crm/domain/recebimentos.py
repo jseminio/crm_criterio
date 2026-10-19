@@ -97,12 +97,14 @@ def normalizar(texto: object) -> str:
 # ── Leitura da planilha ──────────────────────────────────────────────────────────────────────────────
 
 COLUNAS = {
-    "cnpj": ("cnpj",),
+    "cnpj": ("cnpj", "cnpj/cpf"),
     "grupo": ("grupo", "cliente", "grupo economico", "razao social", "nome"),
-    "competencia": ("competencia", "mes", "mes de competencia", "referencia"),
-    "valor": ("valor", "valor recebido", "recebido", "valor pago"),
-    "data": ("data", "data do recebimento", "data de recebimento", "recebido em", "data do pagamento"),
+    "competencia": ("competencia", "mes de competencia", "referencia", "vencimento", "mes"),
+    "valor": ("valor recebido", "recebido", "valor pago", "valor"),
+    "data": ("data do recebimento", "data de recebimento", "recebido em", "data do pagamento", "data"),
 }
+"""Os apelidos de cada coluna, na ordem de preferência: quando a planilha traz dois (o contas a receber do Omie
+tem Vencimento e Mês, Valor do Título e Recebido), vale o primeiro da lista."""
 
 
 @dataclass(frozen=True)
@@ -129,6 +131,9 @@ class Problema:
 class Leitura:
     linhas: list[LinhaLida] = field(default_factory=list)
     problemas: list[Problema] = field(default_factory=list)
+    sem_recebimento: int = 0
+    """Títulos com recebido zero (contas a receber do Omie: em aberto ou a vencer). Não são recebimento e não
+    entram; a prévia diz quantos foram. O cliente aparece como Em aberto no mês."""
 
 
 @dataclass(frozen=True)
@@ -138,20 +143,20 @@ class LinhaReconhecida:
     empresa_id: int | None
 
 
-def _celulas(conteudo: bytes, nome: str) -> list[list[object]]:
+def _folhas(conteudo: bytes, nome: str) -> list[list[list[object]]]:
+    """As abas da planilha (o .csv é uma aba só)."""
     if nome.lower().endswith((".xlsx", ".xlsm")):
         from openpyxl import load_workbook
 
         livro = load_workbook(io.BytesIO(conteudo), read_only=True, data_only=True)
-        folha = livro.worksheets[0]
-        return [list(l) for l in folha.iter_rows(values_only=True)]
+        return [[list(l) for l in folha.iter_rows(values_only=True)] for folha in livro.worksheets]
     if nome.lower().endswith(".csv"):
         try:
             texto = conteudo.decode("utf-8-sig")
         except UnicodeDecodeError:
             texto = conteudo.decode("latin-1")
         dialeto = csv.Sniffer().sniff(texto[:2000], delimiters=";,\t") if texto.strip() else csv.excel
-        return [list(l) for l in csv.reader(io.StringIO(texto), dialeto)]
+        return [[list(l) for l in csv.reader(io.StringIO(texto), dialeto)]]
     raise ValueError("a planilha precisa ser .xlsx ou .csv")
 
 
@@ -206,22 +211,34 @@ def _data(v: object) -> date | None:
     return None
 
 
+def _cabecalho(linha: list[object]) -> dict[str, int]:
+    nomes = [normalizar(c) for c in linha]
+    return {chave: nomes.index(a) for chave, apelidos in COLUNAS.items() for a in reversed(apelidos) if a in nomes}
+
+
+def _achar_cabecalho(folhas: list[list[list[object]]]) -> tuple[list[list[object]], dict[str, int], int] | None:
+    """A aba e a linha do cabeçalho (nas 20 primeiras linhas, a primeira com competência e valor). Entre as abas
+    que servem, a que tem CNPJ ganha: no Omie, a aba Títulos (com CNPJ) vem depois do resumo por mês (sem)."""
+    achados = []
+    for celulas in folhas:
+        for i, linha in enumerate(celulas[:20]):
+            achadas = _cabecalho(linha)
+            if "competencia" in achadas and "valor" in achadas and ("cnpj" in achadas or "grupo" in achadas):
+                achados.append((celulas, achadas, i + 1))
+                break
+    return max(achados, key=lambda a: "cnpj" in a[1], default=None)
+
+
 def ler_planilha(conteudo: bytes, nome: str) -> Leitura:
-    """Acha o cabeçalho (na primeira linha que tiver competência e valor) e lê as linhas. Nada é
-    descartado em silêncio: o que não dá para ler vira `Problema` com o número da linha."""
+    """Acha o cabeçalho e lê as linhas. Nada é descartado em silêncio: o que não dá para ler vira `Problema`
+    com o número da linha, e o título com recebido zero conta em `sem_recebimento`."""
     leitura = Leitura()
-    celulas = _celulas(conteudo, nome)
-    cabecalho, inicio = None, 0
-    for i, linha in enumerate(celulas[:20]):
-        nomes = [normalizar(c) for c in linha]
-        achadas = {chave: nomes.index(n) for chave, apelidos in COLUNAS.items() for n in nomes if n in apelidos}
-        if "competencia" in achadas and "valor" in achadas and ("cnpj" in achadas or "grupo" in achadas):
-            cabecalho, inicio = achadas, i + 1
-            break
-    if cabecalho is None:
+    achado = _achar_cabecalho(_folhas(conteudo, nome))
+    if achado is None:
         raise ValueError(
             "não achei o cabeçalho: a planilha precisa das colunas CNPJ (ou Grupo), Competência e Valor recebido"
         )
+    celulas, cabecalho, inicio = achado
 
     def pegar(linha: list[object], chave: str) -> object:
         i = cabecalho.get(chave)
@@ -234,8 +251,10 @@ def ler_planilha(conteudo: bytes, nome: str) -> Leitura:
         grupo = str(pegar(linha, "grupo") or "").strip() or None
         trecho = " · ".join(str(c) for c in (cnpj or grupo, pegar(linha, "competencia"), pegar(linha, "valor")) if c)[:120]
         if cnpj and len(cnpj) != 14:
-            leitura.problemas.append(Problema(n, "CNPJ sem 14 dígitos", trecho))
-            continue
+            if not grupo:
+                leitura.problemas.append(Problema(n, "CNPJ sem 14 dígitos", trecho))
+                continue
+            cnpj = None  # CPF ou CNPJ truncado: vale o nome do cliente
         if not cnpj and not grupo:
             leitura.problemas.append(Problema(n, "sem CNPJ e sem grupo", trecho))
             continue
@@ -244,7 +263,10 @@ def ler_planilha(conteudo: bytes, nome: str) -> Leitura:
             leitura.problemas.append(Problema(n, "competência ilegível (use mês/ano, como 10/2026)", trecho))
             continue
         valor = _valor(pegar(linha, "valor"))
-        if valor is None or valor <= 0:
+        if valor == 0:
+            leitura.sem_recebimento += 1
+            continue
+        if valor is None or valor < 0:
             leitura.problemas.append(Problema(n, "valor recebido vazio, zero ou ilegível", trecho))
             continue
         bruto_data = pegar(linha, "data")

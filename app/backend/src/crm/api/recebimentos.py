@@ -159,6 +159,8 @@ class PreviaResposta(BaseModel):
     total: Decimal
     meses: list[MesDaPrevia]
     problemas: list[ProblemaResposta]
+    sem_recebimento: int = 0
+    """Títulos com recebido zero (em aberto ou a vencer): não entram, e o cliente fica Em aberto no mês."""
 
 
 class ImportacaoResposta(BaseModel):
@@ -277,14 +279,18 @@ def reconhecer(sessao: Session, leitura: regra.Leitura) -> tuple[list[regra.Linh
         trecho = f"{linha.cnpj or linha.grupo} · {linha.competencia:%m/%Y} · {linha.valor}"
         if linha.cnpj:
             empresa = por_cnpj.get(linha.cnpj)
-            if empresa is None:
+            if empresa is not None:
+                reconhecidas.append(regra.LinhaReconhecida(linha, empresa.grupo_id, empresa.id))
+                continue
+            if not linha.grupo:
                 problemas.append(regra.Problema(linha.numero, "CNPJ não cadastrado em nenhuma empresa do CRM", trecho))
                 continue
-            reconhecidas.append(regra.LinhaReconhecida(linha, empresa.grupo_id, empresa.id))
-            continue
+            # CNPJ fora do cadastro, mas a linha traz o nome do cliente: tenta pelo nome
         achados = por_nome.get(regra.normalizar(linha.grupo), set())
         grupos = {g for g, _ in achados}
-        if not grupos:
+        if not grupos and linha.cnpj:
+            problemas.append(regra.Problema(linha.numero, "CNPJ não cadastrado e nome não encontrado no CRM", trecho))
+        elif not grupos:
             problemas.append(regra.Problema(linha.numero, "nome não encontrado entre os grupos e empresas do CRM", trecho))
         elif len(grupos) > 1:
             problemas.append(regra.Problema(linha.numero, "nome casa com mais de um grupo: use o CNPJ", trecho))
@@ -315,7 +321,8 @@ def _so_administrador() -> None:
 
 
 def _previa(sessao: Session, corpo: Planilha) -> tuple[PreviaResposta, list[regra.LinhaReconhecida], list[regra.Problema]]:
-    reconhecidas, problemas = reconhecer(sessao, _ler(corpo))
+    leitura = _ler(corpo)
+    reconhecidas, problemas = reconhecer(sessao, leitura)
     por_mes: dict[date, list[regra.LinhaReconhecida]] = defaultdict(list)
     for r in reconhecidas:
         por_mes[r.linha.competencia].append(r)
@@ -331,6 +338,7 @@ def _previa(sessao: Session, corpo: Planilha) -> tuple[PreviaResposta, list[regr
     return PreviaResposta(
         arquivo=corpo.arquivo, reconhecidas=len(reconhecidas), total=sum((r.linha.valor for r in reconhecidas), ZERO),
         meses=meses, problemas=[ProblemaResposta(linha=p.numero, motivo=p.motivo, trecho=p.trecho) for p in problemas],
+        sem_recebimento=leitura.sem_recebimento,
     ), reconhecidas, problemas
 
 

@@ -447,6 +447,10 @@ precisam estar na mesma versão do banco: a prévia recusa e diz por quê. Rotas
   ficou de fora com o motivo. Reimportar um mês **substitui** o que havia (as linhas antigas ficam desligadas;
   o histórico em `GET /api/recebimentos/importacoes`). A fusão de grupos leva os recebimentos junto. O CRM
   mostra; não cobra.
+  O **contas a receber do Omie** entra como sai (19/10/2026): de todas as abas, vale a que tem cabeçalho com
+  CNPJ (a aba Títulos); a competência é o mês do **vencimento** e o valor é a coluna Recebido. Título com
+  recebido zero (em aberto ou a vencer) não entra e a prévia diz quantos foram. CPF, CNPJ sem 14 dígitos ou
+  CNPJ fora do cadastro caem para o nome do cliente.
 - **Movimento do MRR** em Gestão de contratos: cada linha (novos, expansão, reajuste, contração, churn) tem "ver
   composição" com cada contrato ou evento, cliente, data e valor (`GET /api/mrr/movimento?de=`).
 - **Meta de MRR em 13 parcelas**: R$ 400 mil → **R$ 433.333,33**; alerta R$ 200 mil → **R$ 216.666,67**. A tarefa

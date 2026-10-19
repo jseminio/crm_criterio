@@ -17,6 +17,7 @@
  * 30/09/2026.
  */
 
+import { CANAIS_DE_PARCEIRO, EscolhaDeParceiro } from "./EscolhaDeParceiro";
 import { useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { EmpresaEncontrada, Listas, ServicoDoCatalogo } from "../api/tipos";
@@ -46,6 +47,7 @@ const CAMPOS_VAZIOS = {
   temperatura: "",
   tipo_canal: "",
   canal: "",
+  parceiro_id: "",
 };
 
 export function NovaOportunidade({
@@ -89,6 +91,8 @@ export function NovaOportunidade({
       const corpo = Object.fromEntries(
         Object.entries(valores).filter(([, v]) => v !== ""),
       );
+      // O parceiro só vale com tipo de canal Parceiros ou Advogados (19/10/2026).
+      if (!CANAIS_DE_PARCEIRO.includes(campos.tipo_canal)) delete corpo.parceiro_id;
       await api.criarOportunidade({ ...corpo, empresa_id: empresa?.id });
       aoCriar();
       aoFechar();
@@ -241,7 +245,13 @@ export function NovaOportunidade({
 
         <div className="formulario-duplo">
           {seletor("tipo_canal", "Tipo de canal", listas?.tipos_de_canal, "Não informado")}
-          {campo("canal", "Canal", { placeholder: "Nome de quem indicou" })}
+          {CANAIS_DE_PARCEIRO.includes(campos.tipo_canal) ? (
+            <EscolhaDeParceiro id="n-parceiro" parceiroId={campos.parceiro_id} canal={campos.canal}
+              aoMudar={(parceiroId, canal) => {
+                mudar("parceiro_id", parceiroId);
+                mudar("canal", canal);
+              }} />
+          ) : campo("canal", "Canal", { placeholder: "Nome de quem indicou" })}
         </div>
       </div>
 

@@ -283,6 +283,8 @@ class OportunidadeDetalhe(OportunidadeResumo):
     tem_contrato: bool = False
     """Já virou contrato: a empresa não troca mais por aqui."""
     canal: str | None = None
+    parceiro_id: int | None = None
+    """O parceiro do Funil de Parceiros que indicou (19/10/2026)."""
     linha_servico: LinhaServico | None = None
     servico_descricao: str | None = None
     servico_tema: str | None = None
@@ -348,6 +350,9 @@ class OportunidadeEdicao(BaseModel):
     canal: str | None = Field(default=None, max_length=120)
     """Captador e origem (tipo de canal e canal) editáveis no painel — Karine, 07/10/2026. Como os
     outros campos da carga, o que mudar aqui entra em `campos_do_crm` e a recarga não desfaz."""
+    parceiro_id: int | None = None
+    """Com tipo de canal Parceiros ou Advogados, o parceiro escolhido na lista do Funil de Parceiros (19/10/2026): liga a
+    indicação e põe o nome dele em `canal`."""
     motivo_recusa: MotivoRecusa | None = None
     motivo_recusa_detalhe: str | None = Field(default=None, max_length=300)
     """Obrigatória quando o motivo da perda é “Outro” (10/10/2026)."""
@@ -422,6 +427,8 @@ class OportunidadeNova(BaseModel):
     temperatura: Temperatura | None = None
     tipo_canal: TipoCanal | None = None
     canal: str | None = Field(default=None, max_length=120)
+    parceiro_id: int | None = None
+    """O parceiro do Funil de Parceiros que indicou, escolhido na lista (19/10/2026)."""
 
 
 class LeadResumo(Base):

@@ -96,6 +96,7 @@ from crm.db.modelos import (
     Contrato,
     Empresa,
     EventoDeContrato,
+    FeeDeParceiro,
     FusaoDeGrupos,
     HistoricoDePreco,
     ReuniaoComLead,
@@ -104,6 +105,7 @@ from crm.db.modelos import (
     Lead,
     OcorrenciaDeCarga,
     Oportunidade,
+    Parceiro,
     PendenciaDaProposta,
     Proposta,
 )
@@ -396,6 +398,29 @@ def _empresa_no_resumo(saida: e.OportunidadeResumo, oportunidade: Oportunidade) 
     if oportunidade.empresa is not None:
         saida.empresa_razao_social = oportunidade.empresa.razao_social
         saida.empresa_cnpj = oportunidade.empresa.cnpj
+
+
+def _trocar_parceiro(sessao: Session, oportunidade: Oportunidade, parceiro_id: int | None) -> None:
+    """Liga (ou desliga) a oportunidade a um parceiro do Funil de Parceiros (19/10/2026). Ligar põe o nome do parceiro
+    no canal e a originação como data da indicação; desligar não vale se já houver fee calculado."""
+    if parceiro_id == oportunidade.parceiro_id:
+        return
+    if parceiro_id is None:
+        if sessao.scalar(sa.select(sa.func.count()).select_from(FeeDeParceiro)
+                         .where(FeeDeParceiro.oportunidade_id == oportunidade.id)):
+            raise HTTPException(409, "esta indicação já tem fee calculado: recuse o fee no Funil de Parceiros antes")
+        oportunidade.parceiro_id = None
+        oportunidade.indicacao_validada_em = oportunidade.indicacao_recusada = None
+        return
+    parceiro = sessao.get(Parceiro, parceiro_id)
+    if parceiro is None:
+        raise HTTPException(404, "parceiro não encontrado")
+    oportunidade.parceiro_id = parceiro.id
+    oportunidade.canal = parceiro.nome
+    if oportunidade.tipo_canal not in (TipoCanal.PARCEIROS, TipoCanal.ADVOGADOS):
+        oportunidade.tipo_canal = TipoCanal.PARCEIROS
+    oportunidade.indicacao_recebida_em = (oportunidade.indicacao_recebida_em or oportunidade.data_colocacao
+                                          or date.today())
 
 
 def _detalhe_de(oportunidade: Oportunidade, nome_do_grupo: str | None) -> e.OportunidadeDetalhe:
@@ -971,6 +996,9 @@ def _registrar(api: FastAPI) -> None:
         )
         sessao.add(oportunidade)
         sessao.flush()
+        if corpo.parceiro_id is not None:
+            _trocar_parceiro(sessao, oportunidade, corpo.parceiro_id)
+            sessao.flush()
 
         return _detalhe_de(oportunidade, grupo.nome)
 
@@ -1341,6 +1369,11 @@ def _registrar(api: FastAPI) -> None:
                     raise HTTPException(409, "esta oportunidade já virou contrato e não troca de empresa")
                 oportunidade.empresa = empresa
                 oportunidade.grupo = empresa.grupo
+        # O parceiro do Funil de Parceiros (19/10/2026): escolhido na lista, liga a indicação e dá nome ao canal.
+        if "parceiro_id" in mudancas:
+            _trocar_parceiro(sessao, oportunidade, mudancas.pop("parceiro_id"))
+            if oportunidade.parceiro_id is not None:
+                mudancas["canal"] = oportunidade.canal
         # Estes dois não são colunas da oportunidade que se copiam por `setattr`:
         # o motivo vai para a linha do histórico, e a origem tem validação própria.
         motivo_do_preco = mudancas.pop("motivo_do_preco", None)

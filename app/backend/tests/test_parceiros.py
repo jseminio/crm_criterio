@@ -317,3 +317,25 @@ def test_relatorio_em_validacao_e_recusada():
     conversa = indicacao(indicacao_validada_em=date(2026, 10, 2), proxima_acao_em=date(2026, 10, 28))
     linha = regras.linha_do_relatorio(conversa, "Grupo X", date(2026, 10, 31), HOJE)
     assert (linha.etapa, linha.proximo_passo) == ("Em conversa", "Próximo contato em 28/10/2026")
+
+
+# ------------------------------------------------------------------ parceiro escolhido na oportunidade (19/10/2026)
+
+def test_oportunidade_escolhe_o_parceiro_na_lista_e_liga_a_indicacao(cliente, engine):
+    ficus = _criar(cliente, "Ficus", tipo="Advocacia tributária")
+    nomes = cliente.get("/api/parceiros/nomes", headers=ADMIN).json()
+    assert nomes == [{"id": ficus["id"], "nome": "Ficus", "tipo": "Advocacia tributária"}]
+
+    [o] = cliente.get("/api/parceiros/oportunidades", headers=ADMIN, params={"busca": "Consultoria Beta"}).json()
+    d = cliente.patch(f"/api/oportunidades/{o['id']}", headers=ADMIN,
+                      json={"tipo_canal": "Parceiros", "canal": "texto qualquer", "parceiro_id": ficus["id"]}).json()
+    assert (d["parceiro_id"], d["canal"], d["tipo_canal"]) == (ficus["id"], "Ficus", "Parceiros")
+    [i] = cliente.get(f"/api/parceiros/{ficus['id']}", headers=ADMIN).json()["indicacoes"]
+    assert (i["nome"], i["recebida_em"]) == ("Consultoria Beta", "2026-09-01")
+
+    # Salvar o painel de novo, com o mesmo parceiro, não mexe em nada; trocar para nenhum desliga.
+    assert cliente.patch(f"/api/oportunidades/{o['id']}", headers=ADMIN, json={"parceiro_id": ficus["id"]}).status_code == 200
+    d = cliente.patch(f"/api/oportunidades/{o['id']}", headers=ADMIN, json={"parceiro_id": None, "tipo_canal": "Sócios"}).json()
+    assert d["parceiro_id"] is None
+    assert cliente.get(f"/api/parceiros/{ficus['id']}", headers=ADMIN).json()["indicacoes"] == []
+    assert cliente.patch(f"/api/oportunidades/{o['id']}", headers=ADMIN, json={"parceiro_id": 999}).status_code == 404

@@ -1,5 +1,6 @@
 /** O painel de detalhe, onde a oportunidade se move pelo funil. */
 
+import { CANAIS_DE_PARCEIRO, EscolhaDeParceiro } from "../componentes/EscolhaDeParceiro";
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type {
@@ -347,6 +348,7 @@ export function DetalheDaOportunidade({
           captador: d.captador ?? "",
           tipo_canal: d.tipo_canal ?? "",
           canal: d.canal ?? "",
+          parceiro_id: d.parceiro_id?.toString() ?? "",
           motivo_recusa: d.motivo_recusa ?? "",
           motivo_recusa_detalhe: d.motivo_recusa_detalhe ?? "",
           data_aceite: d.data_aceite ?? "",
@@ -1002,7 +1004,11 @@ export function DetalheDaOportunidade({
                   id="d-tipo-canal"
                   className="selecao"
                   value={rascunho.tipo_canal}
-                  onChange={(e) => mudar("tipo_canal", e.target.value)}
+                  onChange={(e) => {
+                    mudar("tipo_canal", e.target.value);
+                    // Saiu de Parceiros/Advogados: a indicação deixa de ser de um parceiro.
+                    if (!CANAIS_DE_PARCEIRO.includes(e.target.value)) mudar("parceiro_id", "");
+                  }}
                 >
                   <option value="">Não informado</option>
                   {listas?.tipos_de_canal.map((t) => (
@@ -1015,18 +1021,26 @@ export function DetalheDaOportunidade({
               </div>
             </div>
 
-            <div className="campo-bloco">
-              <label className="campo-rotulo" htmlFor="d-canal">
-                Canal
-              </label>
-              <input
-                id="d-canal"
-                className="entrada"
-                placeholder="Nome de quem indicou"
-                value={rascunho.canal}
-                onChange={(e) => mudar("canal", e.target.value)}
-              />
-            </div>
+            {CANAIS_DE_PARCEIRO.includes(rascunho.tipo_canal) ? (
+              <EscolhaDeParceiro id="d-parceiro" parceiroId={rascunho.parceiro_id ?? ""} canal={rascunho.canal}
+                aoMudar={(parceiroId, canal) => {
+                  mudar("parceiro_id", parceiroId);
+                  mudar("canal", canal);
+                }} />
+            ) : (
+              <div className="campo-bloco">
+                <label className="campo-rotulo" htmlFor="d-canal">
+                  Canal
+                </label>
+                <input
+                  id="d-canal"
+                  className="entrada"
+                  placeholder="Nome de quem indicou"
+                  value={rascunho.canal}
+                  onChange={(e) => mudar("canal", e.target.value)}
+                />
+              </div>
+            )}
 
             <p className="campo-ajuda" style={{ margin: 0 }}>
               O que você mudar em situação, temperatura, motivo, data do aceite, captador e origem{" "}

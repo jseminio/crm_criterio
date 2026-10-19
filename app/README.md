@@ -45,6 +45,9 @@ Perfis: ver, editar, aprovar e marcar pago o fee, exportar). Segue o padrão do 
   contato no cliente e a autorização do cliente para o contato (LGPD), obrigatória. Cria a oportunidade no Funil
   comercial em "Enviar proposta", com Tipo de canal Parceiros e o parceiro ligado. Avisa, sem impedir, se a empresa já é
   cliente, já está em negociação ou já veio de outro parceiro (cláusula 2.2).
+- **Parceiro escolhido na oportunidade**: no Funil comercial (painel e Nova oportunidade), com Tipo de canal Parceiros
+  ou Advogados, o Canal vira a lista dos parceiros cadastrados. Escolher liga a indicação ao parceiro. "Não está na
+  lista" deixa escrever o nome, que aparece na conferência do Funil de Parceiros.
 - **Relatório mensal ao parceiro**: no painel ("Relatório do mês (PDF)") ou para todos ("Relatórios do mês"), uma página
   por parceiro, pronta para "Salvar como PDF" na impressão do navegador. Mostra a etapa de cada indicação como o parceiro
   lê (Em validação, Não aceita com o motivo, Em conversa, Proposta enviada, Em espera, Cliente, Não seguiu), só a data do

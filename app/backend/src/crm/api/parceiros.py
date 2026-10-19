@@ -219,6 +219,12 @@ class ResultadoDoCalculo(BaseModel):
     novos: int
 
 
+class ParceiroNome(BaseModel):
+    id: int
+    nome: str
+    tipo: str | None
+
+
 class OportunidadeEncontrada(BaseModel):
     id: int
     nome: str
@@ -537,6 +543,12 @@ def roteador_de_parceiros(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
             p.textos_do_canal = [*(p.textos_do_canal or []), corpo.texto]
         sessao.flush()
         return _detalhe(sessao, p, _hoje())
+
+    @r.get("/api/parceiros/nomes", response_model=list[ParceiroNome])
+    def nomes(sessao: Session = Sessao) -> list[ParceiroNome]:
+        """A lista de parceiros para o campo Canal da oportunidade e do lead, sem exigir acesso ao Funil de Parceiros."""
+        return [ParceiroNome(id=p.id, nome=p.nome, tipo=p.tipo)
+                for p in sessao.scalars(sa.select(Parceiro).order_by(Parceiro.nome))]
 
     @r.get("/api/parceiros/oportunidades", response_model=list[OportunidadeEncontrada])
     def buscar_oportunidades(busca: str = Query(min_length=2), sessao: Session = Sessao) -> list[OportunidadeEncontrada]:

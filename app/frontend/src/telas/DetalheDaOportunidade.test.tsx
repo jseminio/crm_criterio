@@ -17,7 +17,7 @@ import { DetalheDaOportunidade } from "./DetalheDaOportunidade";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(), pendencias: vi.fn(), ficha: vi.fn(),
+  return { ...real, api: { oportunidade: vi.fn(), editarOportunidade: vi.fn(), nomesDosParceiros: vi.fn(), pendencias: vi.fn(), ficha: vi.fn(),
     exclusaoDaOportunidade: vi.fn(), excluirOportunidade: vi.fn(), converterEmContrato: vi.fn(),
     servicosEContratos: vi.fn().mockResolvedValue([
       { servico: "BPO Financeiro", linha: "C1", tipo: "Recorrente", parcelas: 13, temas: 0, modelo: "Recorrente padrão",
@@ -197,6 +197,7 @@ describe("DetalheDaOportunidade", () => {
 
   it("captador, tipo de canal e canal são editáveis no painel (07/10/2026)", async () => {
     vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
+    vi.mocked(api.nomesDosParceiros).mockResolvedValue([{ id: 5, nome: "Guto", tipo: null }]);
     // O captador gravado (EL) não está na lista: continua aparecendo e selecionado.
     const listas = { ...LISTAS, captadores: ["BO"], tipos_de_canal: ["Sócios", "Parceiros"] };
     vi.mocked(api.oportunidade).mockResolvedValue(oportunidade());
@@ -206,12 +207,31 @@ describe("DetalheDaOportunidade", () => {
     expect(screen.getByLabelText("Captador")).toHaveValue("EL");
     await userEvent.selectOptions(screen.getByLabelText("Captador"), "BO");
     await userEvent.selectOptions(screen.getByLabelText("Tipo de canal"), "Parceiros");
-    await userEvent.type(screen.getByLabelText("Canal"), "Guto");
+    // Com tipo de canal Parceiros, o canal sai da lista do Funil de Parceiros (19/10/2026).
+    await screen.findByRole("option", { name: "Guto" });
+    await userEvent.selectOptions(screen.getByLabelText("Parceiro que indicou"), "5");
     await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
 
     await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledOnce());
     const [, mudancas] = vi.mocked(api.editarOportunidade).mock.calls[0];
-    expect([mudancas.captador, mudancas.tipo_canal, mudancas.canal]).toEqual(["BO", "Parceiros", "Guto"]);
+    expect([mudancas.captador, mudancas.tipo_canal, mudancas.canal, mudancas.parceiro_id]).toEqual(["BO", "Parceiros", "Guto", "5"]);
+  });
+
+  it("parceiro fora da lista ainda pode ser escrito, sem ligar (19/10/2026)", async () => {
+    vi.mocked(api.editarOportunidade).mockResolvedValue(oportunidade());
+    vi.mocked(api.nomesDosParceiros).mockResolvedValue([{ id: 5, nome: "Guto", tipo: null }]);
+    vi.mocked(api.oportunidade).mockResolvedValue(oportunidade());
+    render(<DetalheDaOportunidade id={1} listas={{ ...LISTAS, tipos_de_canal: ["Sócios", "Parceiros"] }}
+      aoFechar={() => {}} aoSalvar={vi.fn()} />);
+    await screen.findByLabelText("Situação");
+    await userEvent.selectOptions(screen.getByLabelText("Tipo de canal"), "Parceiros");
+    await screen.findByRole("option", { name: "Guto" });
+    await userEvent.selectOptions(screen.getByLabelText("Parceiro que indicou"), "fora");
+    await userEvent.type(screen.getByLabelText("Nome de quem indicou"), "Dr. Fulano");
+    await userEvent.click(screen.getByRole("button", { name: /salvar alterações/i }));
+    await waitFor(() => expect(api.editarOportunidade).toHaveBeenCalledOnce());
+    const [, mudancas] = vi.mocked(api.editarOportunidade).mock.calls[0];
+    expect([mudancas.canal, mudancas.parceiro_id]).toEqual(["Dr. Fulano", null]);
   });
 
   it("mostra o erro da API sem fechar o painel, e permite tentar salvar de novo", async () => {

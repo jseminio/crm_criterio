@@ -89,6 +89,8 @@ export interface OportunidadeDetalhe extends OportunidadeResumo {
   /** Já virou contrato: a empresa não troca mais pelo detalhe. */
   tem_contrato?: boolean;
   canal: string | null;
+  /** O parceiro do Funil de Parceiros que indicou (19/10/2026). */
+  parceiro_id?: number | null;
   linha_servico: string | null;
   servico_descricao?: string | null;
   servico_tema?: string | null;

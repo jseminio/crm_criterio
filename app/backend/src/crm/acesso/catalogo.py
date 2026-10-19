@@ -218,6 +218,7 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("POST|PATCH", r"/api/sdr/base/(carga-inicial|fichas(/\d+(/(revisao|arquivar|reabrir))?)?)", ("sdr.base",)),
     # parceiros (19/10/2026): menu próprio; o fee é do sócio da conta
     ("GET", r"/api/parceiros/exportar", ("parceiros.exportar",)),
+    ("GET", r"/api/parceiros/nomes", ("parceiros.ver", "funil.ver", "funil.editar")),
     ("GET", r"/api/parceiros(/indicadores(/composicao)?|/conferencia|/fees|/oportunidades|/relatorios|/\d+(/relatorio|/alertas)?)?", ("parceiros.ver",)),
     ("POST", r"/api/parceiros/fees/\d+/(aprovar|recusar|pago)", ("parceiros.aprovar_fee",)),
     ("POST", r"/api/parceiros/fees/calcular", ("parceiros.editar", "parceiros.aprovar_fee")),

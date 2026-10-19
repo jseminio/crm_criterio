@@ -813,6 +813,7 @@ export const api = {
     pedir<ParceiroDetalhe>(`/api/parceiros/indicacoes/${oportunidadeId}`, { method: "PATCH", body: JSON.stringify(dados) }),
   desligarIndicacao: (oportunidadeId: number) =>
     pedir<ParceiroDetalhe>(`/api/parceiros/indicacoes/${oportunidadeId}/desligar`, { method: "POST" }),
+  nomesDosParceiros: () => pedir<{ id: number; nome: string; tipo: string | null }[]>("/api/parceiros/nomes"),
   alertasDaIndicacao: (parceiroId: number, empresaId: number) =>
     pedir<AlertaDaIndicacao[]>(comParametros(`/api/parceiros/${parceiroId}/alertas`, { empresa_id: empresaId })),
   registrarIndicacao: (parceiroId: number, dados: IndicacaoRegistrada) =>

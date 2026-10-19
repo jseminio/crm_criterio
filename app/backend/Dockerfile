@@ -50,8 +50,11 @@ RUN python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml
     && pip install -r /tmp/dependencias.txt \
     && rm /tmp/dependencias.txt
 
+# DATA_DO_BUILD: a data deste build, que a tela mostra na versão (crm/versao.py). Fica na camada do código:
+# só muda quando o código da API muda.
 COPY . .
 RUN pip install --no-deps -e . \
+    && date +%Y-%m-%d > DATA_DO_BUILD \
     && chmod 0755 entrypoint.sh atualizador.sh \
     && chown -R root:root /app \
     && chmod -R a+rX /app \

@@ -109,6 +109,8 @@ CATALOGO: tuple[Variavel, ...] = (
              padrao="7", validar=_inteiro_positivo),
     Variavel("ESPERA_BANCO_SEGUNDOS", "quanto o entrypoint espera o PostgreSQL responder", padrao="60",
              validar=_inteiro_positivo),
+    # --- Do próprio Coolify (crm/versao.py) -------------------------------------------------------
+    Variavel("SOURCE_COMMIT", "commit publicado, que o Coolify entrega ao container; a tela o mostra como versão"),
     # --- Fixas no compose (scripts/servir_producao.py) -----------------------------------------
     Variavel("CRM_HOST", "onde a API escuta", padrao="127.0.0.1", origem="fixa", valor_fixo="0.0.0.0"),
     Variavel("CRM_PORTA", "porta da API", padrao="8000", origem="fixa", valor_fixo="8000"),

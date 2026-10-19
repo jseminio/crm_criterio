@@ -346,6 +346,10 @@ Falha no backup, numa migração ou numa tarefa: a API **não sobe** (`STRICT_UP
 responde 502 até corrigir: melhor que gravar em esquema desalinhado. A versão anterior do banco está
 no backup da etapa 2. Durante o Deploy, o CRM fica fora por alguns segundos.
 
+**Conferir o que subiu:** a barra lateral mostra `v<data do build> · <commit>`; o commit é o da `main` no
+GitHub. Sem o commit (só a data), o Coolify não entregou `SOURCE_COMMIT` ao container: confira em
+`GET /api/versao`.
+
 **Voltar ao backup de antes da migração** (só em incidente, decisão de quem responde pelo CRM):
 o arquivo está em *Persistent Storage › crmcs_backups*; a restauração é `pg_restore --clean
 --if-exists -d <banco>` com o cliente 18, numa subida com `SKIP_MIGRATIONS=1`, e a imagem da versão

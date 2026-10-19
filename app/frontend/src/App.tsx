@@ -16,7 +16,7 @@ import { SucessoDoCliente, type AbaDoSucesso } from "./telas/SucessoDoCliente";
 import { AjustesDaAreaTecnica } from "./componentes/AjustesDaAreaTecnica";
 import { TrocarSenha } from "./componentes/TrocarSenha";
 import { usarDados } from "./usarDados";
-import { VERSAO } from "./versao";
+import { DATA_DA_TELA, detalheDaVersao, rotuloDaVersao, type VersaoDaApi } from "./versao";
 
 type Tela =
   | "agenda"
@@ -91,6 +91,7 @@ export default function App() {
   const [abaDoSucesso, definirAbaDoSucesso] = useState<{ aba: AbaDoSucesso; vez: number } | null>(null);
   const tela = visiveis.some((t) => t.chave === escolhida) ? escolhida : (visiveis[0]?.chave ?? escolhida);
   const { dados: listas } = usarDados<Listas>(() => api.listas(), []);
+  const { dados: versaoDaApi } = usarDados<VersaoDaApi>(() => api.versao(), []);
   const atual = TELAS.find((t) => t.chave === tela)!;
 
   useEffect(() => {
@@ -114,7 +115,9 @@ export default function App() {
         <div className="marca">
           Critério
           <span className="marca-linha2">CRM</span>
-          <span className="marca-versao">Versão {VERSAO}</span>
+          <span className="marca-versao" title={detalheDaVersao(DATA_DA_TELA, versaoDaApi)}>
+            {rotuloDaVersao(DATA_DA_TELA, versaoDaApi)}
+          </span>
         </div>
 
         <div className="menu">

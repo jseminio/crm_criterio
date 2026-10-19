@@ -139,6 +139,7 @@ import type {
   MatrizDeContratoResumo,
   MatrizDoContrato,
 } from "./tipos";
+import type { VersaoDaApi } from "../versao";
 
 export class ErroDaApi extends Error {
   readonly status: number;
@@ -415,6 +416,8 @@ async function enviarArquivo<T = ResumoDeBackup>(caminho: string, arquivo: File,
 export const api = {
   entrada: () => pedir<ConfiguracaoDeEntrada>("/api/acesso/entrada"),
   eu: () => pedir<Eu>("/api/eu"),
+  // Sem aviso de erro: a versão na barra lateral não vale um alerta na tela se a API não responder.
+  versao: () => pedir<VersaoDaApi>("/api/versao", undefined, false),
   login: (email: string, senha: string) =>
     pedir<SessaoAberta>("/api/acesso/login", { method: "POST", body: JSON.stringify({ email, senha }) }, false),
   /** 200 com a sessão nova (o servidor invalida os tokens antigos ao trocar a senha). */

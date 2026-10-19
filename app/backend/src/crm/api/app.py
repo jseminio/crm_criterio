@@ -38,6 +38,7 @@ from starlette.responses import JSONResponse
 from crm.acesso import auditoria
 from crm.acesso.auditoria import usuario_atual
 from crm.acesso.catalogo import PUBLICAS, permissoes_da_rota
+from crm.versao import identidade
 from crm.acesso.entrada import (
     ConfiguracaoDeEntrada, ConfiguracaoDeSenha, EntradaRecusada, ler_configuracao, pessoa_do_email, pessoa_do_token,
     semear_administrador, validador_da_microsoft,
@@ -269,6 +270,12 @@ def criar_app(
         (`pool_pre_ping`); um soluço do PostgreSQL marcaria a API como doente sem nada nela a corrigir.
         Diz só que o processo está de pé e respondendo."""
         return {"status": "healthy"}
+
+    @api.get("/api/versao", tags=["referência"])
+    def versao() -> dict[str, str | None]:
+        """O build que está no ar: commit publicado e data do build da API (`crm.versao`). A tela o mostra
+        na barra lateral, ao lado do nome "Critério"."""
+        return identidade()
 
     validador: list[Callable[[str], dict]] = [validar_token] if validar_token else []
 

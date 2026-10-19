@@ -19,7 +19,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Iterable, Protocol
 
 from crm.domain.indicadores import e_recorrente
-from crm.domain.listas import AcordoDoParceiro, EtapaDoParceiro, RegraDoFee, Situacao, SituacaoDoFee
+from crm.domain.listas import AcordoDoParceiro, EtapaDoParceiro, NivelDeParceiro, RegraDoFee, Situacao, SituacaoDoFee
 from crm.domain.mrr import mensalizar
 
 __all__ = [
@@ -152,6 +152,8 @@ class ResumoDoParceiro:
     socio_responsavel: str | None
     indicacoes: list = field(default_factory=list)
     """As indicações válidas do período."""
+    proximo_follow_up: str | None = None
+    proximo_follow_up_em: date | None = None
 
     @property
     def quantas(self) -> int:
@@ -184,6 +186,8 @@ def resumir(parceiro, indicacoes: list[Indicacao], periodo: Periodo, hoje: date)
         etapa=etapa_do_parceiro(parceiro.etapa_manual, parceiro.acordo, indicacoes, hoje),
         socio_responsavel=parceiro.socio_responsavel,
         indicacoes=[o for o in indicacoes if _valida(o) and periodo.contem(o)],
+        proximo_follow_up=getattr(parceiro, "proximo_follow_up", None),
+        proximo_follow_up_em=getattr(parceiro, "proximo_follow_up_em", None),
     )
 
 
@@ -199,6 +203,8 @@ INDICADORES: dict[str, str] = {
                     "regularização e não depende do período.",
     "fees": "Fees calculados a partir dos recebidos do Omie que esperam o sócio da conta aprovar. Não dependem do "
             "período.",
+    "sem_follow_up": "Parceiros sem data de próximo follow-up. A composição traz também os atrasados (data já passou). "
+                     "Não depende do período.",
 }
 
 
@@ -221,9 +227,12 @@ def _conversao(resumos: list[ResumoDoParceiro]) -> Decimal | None:
     return (Decimal(fechadas) * 100 / decididas).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
 
 
-def indicadores(resumos: list[ResumoDoParceiro], fees_a_aprovar: list) -> dict[str, Decimal | int | None]:
-    """Os seis números do topo, da mesma conta da composição (`composicao`)."""
+def indicadores(resumos: list[ResumoDoParceiro], fees_a_aprovar: list, hoje: date | None = None) -> dict:
+    """Os números do topo, da mesma conta da composição (`composicao`)."""
+    hoje = hoje or date.today()
     return {
+        "sem_follow_up": sum(1 for r in resumos if r.proximo_follow_up_em is None),
+        "follow_up_atrasado": sum(1 for r in resumos if r.proximo_follow_up_em and r.proximo_follow_up_em < hoje),
         "ativos": sum(1 for r in resumos if r.quantas),
         "indicacoes": sum(r.quantas for r in resumos),
         "conversao": _conversao(resumos),
@@ -233,8 +242,17 @@ def indicadores(resumos: list[ResumoDoParceiro], fees_a_aprovar: list) -> dict[s
     }
 
 
-def composicao(indicador: str, resumos: list[ResumoDoParceiro], fees_a_aprovar: list) -> list[ItemDaComposicao]:
+def composicao(indicador: str, resumos: list[ResumoDoParceiro], fees_a_aprovar: list,
+               hoje: date | None = None) -> list[ItemDaComposicao]:
     """As linhas que somam o número do card, com o mesmo filtro. Quem entra na conta vem primeiro."""
+    hoje = hoje or date.today()
+    if indicador == "sem_follow_up":
+        sem = [ItemDaComposicao(r.nome, r.nivel, Decimal(1), "Sem data") for r in resumos if r.proximo_follow_up_em is None]
+        atrasados = [ItemDaComposicao(r.nome, f"{r.proximo_follow_up or 'Follow-up'} · era {r.proximo_follow_up_em:%d/%m/%Y}",
+                                      Decimal((hoje - r.proximo_follow_up_em).days), "Atrasado")
+                     for r in sorted(resumos, key=lambda x: x.proximo_follow_up_em or date.max)
+                     if r.proximo_follow_up_em and r.proximo_follow_up_em < hoje]
+        return sem + atrasados
     if indicador == "ativos":
         return [ItemDaComposicao(r.nome, r.etapa.value, Decimal(r.quantas)) for r in resumos if r.quantas]
     if indicador == "indicacoes":
@@ -355,3 +373,18 @@ def linha_do_relatorio(o, grupo: str, fim: date, hoje: date) -> LinhaDoRelatorio
         proximo = f"Próximo contato em {o.proxima_acao_em:%d/%m/%Y}"
     contratado = (o.servico or o.nome) if o.situacao.ganha else None
     return LinhaDoRelatorio(grupo, recebida, etapa, proximo, contratado)
+
+
+# ------------------------------------------------------------------ follow-up (19/10/2026)
+
+MESES_DE_CADENCIA: dict[NivelDeParceiro, int] = {
+    NivelDeParceiro.ESTRATEGICO: 1,
+    NivelDeParceiro.ESTRUTURADO: 3,
+    NivelDeParceiro.INDICADOR: 6,
+}
+"""A cadência sugerida do follow-up por nível, hipótese em validação aprovada por Eduardo em 19/10/2026. A data é só
+sugestão: quem registra pode mudar."""
+
+
+def sugerir_proximo_follow_up(nivel: NivelDeParceiro, a_partir_de: date) -> date:
+    return _mais_meses(a_partir_de, MESES_DE_CADENCIA[nivel])

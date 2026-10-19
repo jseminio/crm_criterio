@@ -7,7 +7,7 @@ import { Agenda } from "./Agenda";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
-  return { ...real, api: { agenda: vi.fn(), editarOportunidade: vi.fn(), oportunidade: vi.fn(), aprovacoes: vi.fn().mockResolvedValue([]), questionarios: vi.fn().mockResolvedValue([]) } };
+  return { ...real, api: { agenda: vi.fn(), editarOportunidade: vi.fn(), oportunidade: vi.fn(), parceiro: vi.fn(), aprovacoes: vi.fn().mockResolvedValue([]), questionarios: vi.fn().mockResolvedValue([]) } };
 });
 
 const item = (o: Partial<ItemDaAgenda>): ItemDaAgenda => ({
@@ -112,5 +112,24 @@ describe("Agenda", () => {
     await screen.findByText("Grupo Alfa");
     await userEvent.click(screen.getByRole("tab", { name: /Atrasadas/ }));
     expect(screen.getByText(/Nada em “Atrasadas”/)).toBeInTheDocument();
+  });
+
+  it("parceiro com follow-up entra na fila, filtra por tipo e abre o painel do parceiro (19/10/2026)", async () => {
+    vi.mocked(api.agenda).mockResolvedValue(agenda([
+      item({ id: 1, balde: "atrasada", titulo: "Grupo Alfa" }),
+      item({ tipo: "parceiro", id: 7, titulo: "Ficus", subtitulo: "Estratégico · Qualificado", situacao: "Qualificado",
+        balde: "atrasada", proxima_acao: "Fechar a lista", proxima_acao_em: "2026-10-15", dias_de_atraso: 4, valor_anual: null }),
+    ], { atrasada: 2 }));
+    vi.mocked(api.parceiro).mockReturnValue(new Promise(() => {}));
+    render(<Agenda listas={null} aoAbrirLeads={() => {}} />);
+    expect(await screen.findByText("Ficus")).toBeTruthy();
+    expect(screen.getByText("Parceiro")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "parceiros" } });
+    expect(screen.queryByText("Grupo Alfa")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "oportunidades" } });
+    expect(screen.queryByText("Ficus")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "todos" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ficus" }));
+    expect(api.parceiro).toHaveBeenCalledWith(7);
   });
 });

@@ -37,3 +37,18 @@ describe("relatório mensal ao parceiro", () => {
     expect(nomeDoMes("2026-03")).toBe("março de 2026");
   });
 });
+
+describe("follow-up de parceiros", async () => {
+  const { somarMeses, seloDoFollowUp } = await import("./componentes/ParceirosApoio");
+  it("soma meses como a API, no último dia quando o dia não existe", () => {
+    expect(somarMeses("2026-10-19", 1)).toBe("2026-11-19");
+    expect(somarMeses("2026-11-30", 3)).toBe("2027-02-28");
+    expect(somarMeses("2026-10-19", 6)).toBe("2027-04-19");
+  });
+  it("o selo diz atrasado, hoje, a data ou sem data", () => {
+    expect(seloDoFollowUp("2026-10-15", "2026-10-19")).toEqual({ texto: "FUP atrasado 4 dias", tom: "perda" });
+    expect(seloDoFollowUp("2026-10-19", "2026-10-19").texto).toBe("FUP hoje");
+    expect(seloDoFollowUp("2026-11-10", "2026-10-19").texto).toBe("FUP 10/11/2026");
+    expect(seloDoFollowUp(null, "2026-10-19").texto).toBe("FUP sem data");
+  });
+});

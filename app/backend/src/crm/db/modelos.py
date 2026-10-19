@@ -61,6 +61,7 @@ from crm.domain.listas import (
     MotivoDeIndicacaoRecusada,
     NivelDeParceiro,
     RegraDoFee,
+    ResultadoDoFollowUp,
     SituacaoDoFee,
     TipoDePessoa,
 )
@@ -90,6 +91,7 @@ __all__ = [
     "InvestimentoEmMidia",
     "Parceiro",
     "FeeDeParceiro",
+    "FollowUpDeParceiro",
 ]
 
 #: Dinheiro é guardado em centavos exatos.
@@ -2169,6 +2171,23 @@ class Parceiro(CarimboMixin, Base):
     """Os textos de `canal` já ligados a este parceiro pela conferência: a oportunidade nova com o mesmo texto
     aparece como sugestão."""
     observacao: Mapped[str | None] = mapped_column(sa.Text)
+    proximo_follow_up: Mapped[str | None] = mapped_column(sa.String(200))
+    """O próximo follow-up com o parceiro (19/10/2026): o que fazer. Entra na Agenda de follow-up."""
+    proximo_follow_up_em: Mapped[date | None] = mapped_column(sa.Date, index=True)
+
+
+class FollowUpDeParceiro(Base):
+    """Um follow-up feito com o parceiro (19/10/2026): quando, o resultado e o que conversaram. Não se apaga."""
+
+    __tablename__ = "follow_up_de_parceiro"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    parceiro_id: Mapped[int] = mapped_column(sa.ForeignKey("parceiro.id"), nullable=False, index=True)
+    feito_em: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    resultado: Mapped[ResultadoDoFollowUp] = mapped_column(coluna_lista(ResultadoDoFollowUp), nullable=False)
+    nota: Mapped[str | None] = mapped_column(sa.Text)
+    registrado_por: Mapped[str | None] = mapped_column(sa.String(200))
+    registrado_em: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=agora)
 
 
 class FeeDeParceiro(CarimboMixin, Base):

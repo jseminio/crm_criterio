@@ -518,7 +518,7 @@ export interface LinhaDeRecorte {
 export type BaldeDaAgenda = "atrasada" | "hoje" | "proximos_7_dias" | "depois" | "sem_data" | "sem_acao";
 
 export interface ItemDaAgenda {
-  tipo: "oportunidade" | "lead" | "contrato" | "pendencia";
+  tipo: "oportunidade" | "lead" | "contrato" | "pendencia" | "parceiro";
   id: number;
   titulo: string;
   subtitulo: string | null;
@@ -2806,6 +2806,8 @@ export interface ParceiroResumo {
   fechadas: number;
   mrr: string;
   pontual: string;
+  proximo_follow_up: string | null;
+  proximo_follow_up_em: string | null;
 }
 
 export interface IndicacaoDoParceiro {
@@ -2858,6 +2860,16 @@ export interface CadastroDoParceiro {
   perfil_pedido: string | null;
   contato: string | null;
   observacao: string | null;
+  proximo_follow_up: string | null;
+  proximo_follow_up_em: string | null;
+}
+
+export interface FollowUpDoParceiro {
+  id: number;
+  feito_em: string;
+  resultado: string;
+  nota: string | null;
+  registrado_por: string | null;
 }
 
 export interface ParceiroDetalhe extends CadastroDoParceiro {
@@ -2866,9 +2878,11 @@ export interface ParceiroDetalhe extends CadastroDoParceiro {
   textos_do_canal: string[];
   indicacoes: IndicacaoDoParceiro[];
   fees: FeeDeParceiro[];
+  cadencia_meses: number;
+  follow_ups: FollowUpDoParceiro[];
 }
 
-export type IndicadorDosParceiros = "ativos" | "indicacoes" | "conversao" | "mrr" | "sem_contrato" | "fees";
+export type IndicadorDosParceiros = "ativos" | "indicacoes" | "conversao" | "mrr" | "sem_contrato" | "fees" | "sem_follow_up";
 
 export interface IndicadoresDosParceiros {
   ativos: number;
@@ -2878,6 +2892,8 @@ export interface IndicadoresDosParceiros {
   sem_contrato: number;
   fees: string;
   fees_quantos: number;
+  sem_follow_up: number;
+  follow_up_atrasado: number;
   explicacoes: Record<IndicadorDosParceiros, string>;
 }
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import asyncio
+from collections import defaultdict
 import contextlib
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
@@ -114,6 +115,7 @@ from crm.domain import indicadores as regras_de_indicadores
 from crm.domain.sugestoes_de_fusao import sugerir as sugerir_fusoes
 from crm.domain.sugestoes_de_fusao import sugerir_clientes
 from crm.domain import agenda as regras_da_agenda
+from crm.domain import parceiros as regras_de_parceiros
 from crm.domain import eventos_de_contrato as regras_de_eventos
 from crm.domain import mrr as regras_de_mrr
 from crm.domain import recortes as regras_de_recortes
@@ -1221,9 +1223,23 @@ def _registrar(api: FastAPI) -> None:
             for o in com_prazo:
                 if o.situacao is Situacao.ENVIAR_PROPOSTA and o.data_envio_proposta is None:
                     pendentes += [(i, o, o.grupo.nome) for i in pendencias_de(sessao, o)]
+        # Parceiros com follow-up marcado (19/10/2026): só para quem vê o Funil de Parceiros, e sem o filtro "só as
+        # minhas" do captador — o dono do parceiro é o sócio responsável.
+        quem = usuario_atual.get()
+        com_follow_up = []
+        if not captador and (quem is None or quem.pode("parceiros.ver")):
+            por = defaultdict(list)
+            for o in sessao.scalars(sa.select(Oportunidade).where(Oportunidade.parceiro_id.is_not(None))):
+                por[o.parceiro_id].append(o)
+            com_follow_up = [
+                (p, regras_de_parceiros.etapa_do_parceiro(p.etapa_manual, p.acordo, por.get(p.id, []), dia).value)
+                for p in sessao.scalars(sa.select(Parceiro).where(
+                    sa.or_(Parceiro.proximo_follow_up_em.is_not(None), Parceiro.proximo_follow_up.is_not(None))))
+            ]
         itens = regras_da_agenda.montar(
             oportunidades=em_aberto, leads=leads, hoje=dia, contratos=em_vigor,
             pendencias=[(n, *t) for n, t in enumerate(pendentes, start=1)],
+            parceiros=com_follow_up,
         )
         contagens = {b: 0 for b in regras_da_agenda.BALDES}
         for i in itens:

@@ -14,7 +14,9 @@ import { Carregando, Erro } from "../componentes/estados";
 import { usarAcesso } from "../entrada";
 import { data, dinheiro, hojeIso } from "../formato";
 import { usarDados } from "../usarDados";
-import { ACORDOS, ETAPAS_MANUAIS, NIVEIS } from "../componentes/ParceirosApoio";
+import {
+  ACORDOS, CADENCIA_EM_MESES, ETAPAS_MANUAIS, NIVEIS, RESULTADOS_DO_FOLLOW_UP, SeloDoFollowUp, somarMeses,
+} from "../componentes/ParceirosApoio";
 
 const MOTIVOS = ["Já é cliente", "Já estava em negociação", "Já apresentada por outro parceiro", "Fora do perfil"];
 
@@ -22,13 +24,22 @@ const EM_BRANCO: CadastroDoParceiro = {
   nome: "", tipo_pessoa: "PJ", documento: null, tipo: null, nivel: "Indicador", etapa_manual: "Mapeado",
   acordo: "Sem acordo", contrato_assinado_em: null, regra_combinada: null, combinado_por: null, combinado_em: null,
   socio_responsavel: null, perfil_pedido: null, contato: null, observacao: null,
+  proximo_follow_up: null, proximo_follow_up_em: null,
 };
+
+/** Parceiro novo já nasce com o primeiro follow-up sugerido pela cadência do nível (19/10/2026); dá para apagar. */
+function novoComFollowUp(): CadastroDoParceiro {
+  return { ...EM_BRANCO, proximo_follow_up: "Conversa de relacionamento",
+    proximo_follow_up_em: somarMeses(hojeIso(), CADENCIA_EM_MESES[EM_BRANCO.nivel]) };
+}
 
 function cadastroDe(p: ParceiroDetalhe): CadastroDoParceiro {
   const { nome, tipo_pessoa, documento, tipo, nivel, etapa_manual, acordo, contrato_assinado_em, regra_combinada,
-    combinado_por, combinado_em, socio_responsavel, perfil_pedido, contato, observacao } = p;
+    combinado_por, combinado_em, socio_responsavel, perfil_pedido, contato, observacao, proximo_follow_up,
+    proximo_follow_up_em } = p;
   return { nome, tipo_pessoa, documento, tipo, nivel, etapa_manual, acordo, contrato_assinado_em, regra_combinada,
-    combinado_por, combinado_em, socio_responsavel, perfil_pedido, contato, observacao };
+    combinado_por, combinado_em, socio_responsavel, perfil_pedido, contato, observacao, proximo_follow_up,
+    proximo_follow_up_em };
 }
 
 export function DetalheDoParceiro({ id, aoFechar, aoSalvar }: {
@@ -58,7 +69,8 @@ function Formulario({ parceiro, aoFechar, aoSalvar }: {
 }) {
   const { pode } = usarAcesso();
   const editavel = pode("parceiros.editar");
-  const [campos, definirCampos] = useState<CadastroDoParceiro>(parceiro ? cadastroDe(parceiro) : EM_BRANCO);
+  const [campos, definirCampos] = useState<CadastroDoParceiro>(parceiro ? cadastroDe(parceiro) : novoComFollowUp());
+  const [dataTocada, definirDataTocada] = useState(false);
   const [salvando, definirSalvando] = useState(false);
   const [falha, definirFalha] = useState<string | null>(null);
   const [atual, definirAtual] = useState<ParceiroDetalhe | null>(parceiro);
@@ -77,15 +89,23 @@ function Formulario({ parceiro, aoFechar, aoSalvar }: {
     <div className="campo-bloco">
       <label className="campo-rotulo" htmlFor={`p-${campo}`}>{rotulo}</label>
       <select id={`p-${campo}`} className="selecao" value={campos[campo] as string} disabled={!editavel}
-        onChange={(e) => mudar(campo, e.target.value as never)}>
+        onChange={(e) => {
+          mudar(campo, e.target.value as never);
+          if (campo === "nivel" && !atual && !dataTocada && campos.proximo_follow_up_em) {
+            mudar("proximo_follow_up_em", somarMeses(hojeIso(), CADENCIA_EM_MESES[e.target.value] ?? 3));
+          }
+        }}>
         {opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
     </div>
   );
-  const dataDe = (campo: "contrato_assinado_em" | "combinado_em", rotulo: string) => (
+  const dataDe = (campo: "contrato_assinado_em" | "combinado_em" | "proximo_follow_up_em", rotulo: string) => (
     <div className="campo-bloco">
       <label className="campo-rotulo" htmlFor={`p-${campo}`}>{rotulo}</label>
-      <CampoDeData id={`p-${campo}`} value={campos[campo]} disabled={!editavel} aoMudar={(v) => mudar(campo, v || null)} />
+      <CampoDeData id={`p-${campo}`} value={campos[campo]} disabled={!editavel} aoMudar={(v) => {
+        if (campo === "proximo_follow_up_em") definirDataTocada(true);
+        mudar(campo, v || null);
+      }} />
     </div>
   );
 
@@ -151,6 +171,17 @@ function Formulario({ parceiro, aoFechar, aoSalvar }: {
             </div>
           </>
         )}
+        <div className="secao-do-painel" style={{ marginTop: 0 }}>
+          <div className="indicacao-topo">
+            <h3>Próximo follow-up</h3>
+            <span className="campo-ajuda">Cadência do nível: {rotuloDaCadencia(CADENCIA_EM_MESES[campos.nivel] ?? 3)}</span>
+          </div>
+          <div className="formulario-duplo">
+            {texto("proximo_follow_up", "O que fazer", { placeholder: "Pedir indicação de porte médio" })}
+            {dataDe("proximo_follow_up_em", "Quando")}
+          </div>
+          <SeloDoFollowUp iso={campos.proximo_follow_up_em} hoje={hojeIso()} />
+        </div>
         {texto("perfil_pedido", "Perfil de cliente pedido", { placeholder: "Porte Médio a Extra Grande, fora de apostas" })}
         {texto("contato", "Contato", { placeholder: "E-mail ou telefone de quem fala pelo parceiro" })}
         <div className="campo-bloco">
@@ -160,6 +191,11 @@ function Formulario({ parceiro, aoFechar, aoSalvar }: {
         </div>
       </div>
 
+      {atual && <FollowUps parceiro={atual} editavel={editavel} aoMudar={(p) => {
+        definirAtual(p);
+        definirCampos((c) => ({ ...c, proximo_follow_up: p.proximo_follow_up, proximo_follow_up_em: p.proximo_follow_up_em }));
+        aoSalvar(p);
+      }} />}
       {atual && <RelatorioDoMes parceiroId={atual.id} />}
       {atual && <Indicacoes parceiro={atual} editavel={editavel} aoMudar={(p) => { definirAtual(p); aoSalvar(p); }} />}
       {atual && atual.fees.length > 0 && (
@@ -349,6 +385,106 @@ function RelatorioDoMes({ parceiroId }: { parceiroId: number }) {
       </div>
       <p className="campo-ajuda">Abre a página pronta para imprimir: escolha "Salvar como PDF". Quem envia ao parceiro é você.</p>
       {aviso && <p className="campo-ajuda" role="status">{aviso}</p>}
+    </section>
+  );
+}
+
+function rotuloDaCadencia(meses: number): string {
+  return meses === 1 ? "todo mês" : `a cada ${meses} meses`;
+}
+
+/** Registrar follow-up feito e o histórico (19/10/2026). O próximo vem sugerido pela cadência do nível. */
+function FollowUps({ parceiro, editavel, aoMudar }: {
+  parceiro: ParceiroDetalhe;
+  editavel: boolean;
+  aoMudar: (p: ParceiroDetalhe) => void;
+}) {
+  const [feitoEm, definirFeitoEm] = useState(hojeIso());
+  const [resultado, definirResultado] = useState(RESULTADOS_DO_FOLLOW_UP[0]);
+  const [nota, definirNota] = useState("");
+  const [proximo, definirProximo] = useState("");
+  const [proximoEm, definirProximoEm] = useState(somarMeses(hojeIso(), parceiro.cadencia_meses));
+  const [proximoTocado, definirProximoTocado] = useState(false);
+  const [salvando, definirSalvando] = useState(false);
+  const [falha, definirFalha] = useState<string | null>(null);
+
+  async function registrar() {
+    definirSalvando(true);
+    definirFalha(null);
+    try {
+      const p = await api.registrarFollowUp(parceiro.id, {
+        feito_em: feitoEm, resultado, nota: nota.trim() || null,
+        proximo_follow_up: proximo.trim() || parceiro.proximo_follow_up || "Follow-up com o parceiro",
+        proximo_follow_up_em: proximoEm || null,
+      });
+      definirNota("");
+      definirProximo("");
+      aoMudar(p);
+    } catch (e) {
+      definirFalha(e instanceof ErroDaApi ? e.message : "Não consegui registrar.");
+    } finally {
+      definirSalvando(false);
+    }
+  }
+
+  return (
+    <section className="secao-do-painel">
+      <h3>Follow-ups ({parceiro.follow_ups.length})</h3>
+      {editavel && (
+        <div className="formulario lista-de-indicacoes" style={{ marginBottom: "var(--e3)" }}>
+          <div className="formulario-duplo">
+            <div className="campo-bloco">
+              <label className="campo-rotulo" htmlFor="fu-feito">Feito em</label>
+              <CampoDeData id="fu-feito" value={feitoEm} aoMudar={(v) => {
+                definirFeitoEm(v);
+                if (!proximoTocado && v) definirProximoEm(somarMeses(v, parceiro.cadencia_meses));
+              }} />
+            </div>
+            <div className="campo-bloco">
+              <label className="campo-rotulo" htmlFor="fu-resultado">Resultado</label>
+              <select id="fu-resultado" className="selecao" value={resultado} onChange={(e) => definirResultado(e.target.value)}>
+                {RESULTADOS_DO_FOLLOW_UP.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="campo-bloco">
+            <label className="campo-rotulo" htmlFor="fu-nota">O que conversaram</label>
+            <input id="fu-nota" className="entrada" value={nota} onChange={(e) => definirNota(e.target.value)} />
+          </div>
+          <div className="campo-bloco">
+            <label className="campo-rotulo" htmlFor="fu-proximo">Próximo follow-up</label>
+            <input id="fu-proximo" className="entrada" value={proximo} placeholder={parceiro.proximo_follow_up ?? "Retomar os nomes"}
+              onChange={(e) => definirProximo(e.target.value)} />
+          </div>
+          <div className="campo-bloco">
+            <label className="campo-rotulo" htmlFor="fu-proximo-em">Data sugerida</label>
+            <CampoDeData id="fu-proximo-em" value={proximoEm} aoMudar={(v) => {
+              definirProximoTocado(true);
+              definirProximoEm(v);
+            }} />
+            <p className="campo-ajuda">Pela cadência do nível ({rotuloDaCadencia(parceiro.cadencia_meses)}); você pode mudar.</p>
+          </div>
+          {falha && <p className="estado-texto" role="alert">{falha}</p>}
+          <button type="button" className="botao botao-secundario" onClick={registrar} disabled={salvando || !feitoEm}>
+            {salvando ? "Registrando…" : "Registrar follow-up"}
+          </button>
+        </div>
+      )}
+      {parceiro.follow_ups.length === 0 ? (
+        <p className="campo-ajuda">Nenhum follow-up registrado ainda.</p>
+      ) : (
+        <ul className="lista-de-indicacoes">
+          {parceiro.follow_ups.map((f) => (
+            <li key={f.id}>
+              <div className="indicacao-topo">
+                <span className="indicacao-detalhe">{data(f.feito_em)}{f.registrado_por ? ` · ${f.registrado_por}` : ""}</span>
+                <Etiqueta texto={f.resultado} />
+              </div>
+              {f.nota && <span>{f.nota}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

@@ -719,3 +719,12 @@ class MotivoDeIndicacaoRecusada(Enum):
     EM_NEGOCIACAO = "Já estava em negociação"
     OUTRO_PARCEIRO = "Já apresentada por outro parceiro"
     FORA_DO_PERFIL = "Fora do perfil"
+
+
+class ResultadoDoFollowUp(Enum):
+    """O que saiu do follow-up com o parceiro (19/10/2026). "Relação em risco" é só sinal: não muda a etapa sozinho."""
+
+    PEDIU_INDICACAO = "Pediu indicação"
+    RECEBEU_INDICACAO = "Recebeu indicação"
+    SEM_NOVIDADE = "Sem novidade"
+    RELACAO_EM_RISCO = "Relação em risco"

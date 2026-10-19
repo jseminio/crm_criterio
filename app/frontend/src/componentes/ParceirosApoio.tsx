@@ -23,6 +23,35 @@ export const ETAPAS = ["Mapeado", "Qualificado", "Formalizado", "Ativado", "Prod
 export const ETAPAS_MANUAIS = ["Mapeado", "Qualificado", "Estratégico"];
 export const NIVEIS = ["Indicador", "Estruturado", "Estratégico"];
 export const ACORDOS = ["Contrato assinado", "Contrato em minuta", "Informal, com fee", "Sem acordo"];
+export const RESULTADOS_DO_FOLLOW_UP = ["Pediu indicação", "Recebeu indicação", "Sem novidade", "Relação em risco"];
+export const CADENCIA_EM_MESES: Record<string, number> = { "Estratégico": 1, Estruturado: 3, Indicador: 6 };
+
+/** A data a `meses` de `iso` (AAAA-MM-DD), no último dia do mês quando o dia não existe: a mesma conta da API. */
+export function somarMeses(iso: string, meses: number): string {
+  const [a, m, d] = iso.split("-").map(Number);
+  const alvo = new Date(a, m - 1 + meses, 1);
+  const ultimo = new Date(alvo.getFullYear(), alvo.getMonth() + 1, 0).getDate();
+  alvo.setDate(Math.min(d, ultimo));
+  return `${alvo.getFullYear()}-${String(alvo.getMonth() + 1).padStart(2, "0")}-${String(alvo.getDate()).padStart(2, "0")}`;
+}
+
+/** "Atrasado 4 dias", "Hoje", a data, ou "Sem data": o selo do follow-up no cartão, na Grade e no painel. */
+export function seloDoFollowUp(iso: string | null, hoje: string): { texto: string; tom: "perda" | "espera" | "ganho" } {
+  if (!iso) return { texto: "FUP sem data", tom: "espera" };
+  if (iso < hoje) {
+    const dias = Math.round((Date.parse(hoje) - Date.parse(iso)) / 86_400_000);
+    return { texto: `FUP atrasado ${dias} dia${dias === 1 ? "" : "s"}`, tom: "perda" };
+  }
+  if (iso === hoje) return { texto: "FUP hoje", tom: "espera" };
+  const [a, m, d] = iso.split("-");
+  return { texto: `FUP ${d}/${m}/${a}`, tom: "ganho" };
+}
+
+/** O selo com a palavra (regra do PAD-002: estado nunca só por cor). */
+export function SeloDoFollowUp({ iso, hoje }: { iso: string | null; hoje: string }) {
+  const { texto, tom } = seloDoFollowUp(iso, hoje);
+  return <span className={`etiqueta etiqueta-${tom}`}>{texto}</span>;
+}
 
 // ------------------------------------------------------------------ composição
 
@@ -30,10 +59,11 @@ type Item = ItemDaComposicaoDosParceiros;
 
 const DETALHE: Record<IndicadorDosParceiros, string> = {
   ativos: "Etapa", indicacoes: "Indicação", conversao: "Indicação", mrr: "Indicação", sem_contrato: "Acordo", fees: "Indicação",
+  sem_follow_up: "Nível ou follow-up",
 };
 const VALOR: Record<IndicadorDosParceiros, string> = {
   ativos: "Indicações", indicacoes: "Conta", conversao: "Fechada", mrr: "MRR (× 13 ÷ 12)", sem_contrato: "Indicações",
-  fees: "Fee calculado",
+  fees: "Fee calculado", sem_follow_up: "Dias de atraso",
 };
 const EM_DINHEIRO: IndicadorDosParceiros[] = ["mrr", "fees"];
 
@@ -47,7 +77,8 @@ export function ComposicaoDosParceiros({ indicador, filtros }: { indicador: Indi
   if (itens.length === 0) return <p className="estado-texto">Nada compõe este número com os filtros da tela.</p>;
   const dinheiroNaColuna = EM_DINHEIRO.includes(indicador);
   const mostrarValor = (i: Item) => (dinheiroNaColuna ? dinheiro(i.valor) : indicador === "conversao"
-    ? (Number(i.valor) ? "Sim" : "Não") : String(Number(i.valor)));
+    ? (Number(i.valor) ? "Sim" : "Não") : indicador === "sem_follow_up" && i.referencia === "Sem data" ? "—"
+      : String(Number(i.valor)));
   const colunas: ColunaDaComposicao<Item>[] = [
     { titulo: "Parceiro", valor: (i) => i.parceiro },
     { titulo: DETALHE[indicador], valor: (i) => i.detalhe },
@@ -59,7 +90,8 @@ export function ComposicaoDosParceiros({ indicador, filtros }: { indicador: Indi
   const soma = itens.reduce((s, i) => s + Number(i.valor), 0);
   const total = indicador === "conversao"
     ? percentual(((soma * 100) / itens.length).toFixed(1))
-    : indicador === "ativos" || indicador === "sem_contrato" ? `${itens.length} parceiro${itens.length === 1 ? "" : "s"}`
+    : indicador === "ativos" || indicador === "sem_contrato" || indicador === "sem_follow_up"
+      ? `${itens.length} parceiro${itens.length === 1 ? "" : "s"}`
       : dinheiroNaColuna ? dinheiro(soma) : String(soma);
   return (
     <TabelaDeComposicao colunas={colunas} linhas={itens} chave={(_, n) => n} rotulo="Composição"

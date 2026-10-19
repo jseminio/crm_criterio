@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from crm.api.acesso import quem_fez
 from crm.db.base import agora
-from crm.db.modelos import Contrato, Empresa, FeeDeParceiro, GrupoEconomico, Oportunidade, Parceiro, Recebimento
+from crm.db.modelos import Contrato, Empresa, FeeDeParceiro, FollowUpDeParceiro, GrupoEconomico, Oportunidade, Parceiro, Recebimento
 from crm.domain import parceiros as regras
 from crm.domain.servicos import linha_do_servico
 from crm.carga.lacunas_contato import cnpj_valido
@@ -33,6 +33,7 @@ from crm.domain.listas import (
     MotivoDeIndicacaoRecusada,
     NivelDeParceiro,
     Origem,
+    ResultadoDoFollowUp,
     Situacao,
     SituacaoContrato,
     SituacaoDoFee,
@@ -62,6 +63,8 @@ class ParceiroResumo(BaseModel):
     fechadas: int
     mrr: Decimal
     pontual: Decimal
+    proximo_follow_up: str | None = None
+    proximo_follow_up_em: date | None = None
 
 
 class ParceiroEntrada(BaseModel):
@@ -80,6 +83,8 @@ class ParceiroEntrada(BaseModel):
     perfil_pedido: str | None = Field(default=None, max_length=400)
     contato: str | None = Field(default=None, max_length=200)
     observacao: str | None = None
+    proximo_follow_up: str | None = Field(default=None, max_length=200)
+    proximo_follow_up_em: date | None = None
 
 
 class ParceiroEdicao(BaseModel):
@@ -98,6 +103,8 @@ class ParceiroEdicao(BaseModel):
     perfil_pedido: str | None = Field(default=None, max_length=400)
     contato: str | None = Field(default=None, max_length=200)
     observacao: str | None = None
+    proximo_follow_up: str | None = Field(default=None, max_length=200)
+    proximo_follow_up_em: date | None = None
 
 
 class IndicacaoDoParceiro(BaseModel):
@@ -134,6 +141,24 @@ class FeeResposta(BaseModel):
     motivo: str | None
 
 
+class FollowUpResposta(BaseModel):
+    id: int
+    feito_em: date
+    resultado: str
+    nota: str | None
+    registrado_por: str | None
+
+
+class FollowUpEntrada(BaseModel):
+    """Registrar follow-up feito (19/10/2026): o que aconteceu e, no mesmo passo, o próximo."""
+
+    feito_em: date
+    resultado: ResultadoDoFollowUp
+    nota: str | None = Field(default=None, max_length=2000)
+    proximo_follow_up: str | None = Field(default=None, max_length=200)
+    proximo_follow_up_em: date | None = None
+
+
 class ParceiroDetalhe(BaseModel):
     id: int
     nome: str
@@ -155,6 +180,11 @@ class ParceiroDetalhe(BaseModel):
     textos_do_canal: list[str]
     indicacoes: list[IndicacaoDoParceiro]
     fees: list[FeeResposta]
+    proximo_follow_up: str | None
+    proximo_follow_up_em: date | None
+    cadencia_meses: int
+    """A cadência sugerida do nível, em meses."""
+    follow_ups: list[FollowUpResposta]
 
 
 class IndicadoresDosParceiros(BaseModel):
@@ -165,6 +195,8 @@ class IndicadoresDosParceiros(BaseModel):
     sem_contrato: int
     fees: Decimal
     fees_quantos: int
+    sem_follow_up: int
+    follow_up_atrasado: int
     explicacoes: dict[str, str]
 
 
@@ -330,6 +362,7 @@ def _resposta(r: regras.ResumoDoParceiro) -> ParceiroResumo:
         id=r.id, nome=r.nome, tipo_pessoa=r.tipo_pessoa, nivel=r.nivel, acordo=r.acordo, etapa=r.etapa.value,
         socio_responsavel=r.socio_responsavel, indicacoes=r.quantas, abertas=r.abertas, fechadas=r.fechadas,
         mrr=r.mrr, pontual=r.pontual,
+        proximo_follow_up=r.proximo_follow_up, proximo_follow_up_em=r.proximo_follow_up_em,
     )
 
 
@@ -371,6 +404,12 @@ def _detalhe(sessao: Session, p: Parceiro, hoje: date) -> ParceiroDetalhe:
             for o in indicacoes
         ],
         fees=[_fee(f) for f in fees],
+        proximo_follow_up=p.proximo_follow_up, proximo_follow_up_em=p.proximo_follow_up_em,
+        cadencia_meses=regras.MESES_DE_CADENCIA[p.nivel],
+        follow_ups=[FollowUpResposta(id=f.id, feito_em=f.feito_em, resultado=f.resultado.value, nota=f.nota,
+                                     registrado_por=f.registrado_por)
+                    for f in sessao.scalars(sa.select(FollowUpDeParceiro).where(FollowUpDeParceiro.parceiro_id == p.id)
+                                            .order_by(FollowUpDeParceiro.feito_em.desc(), FollowUpDeParceiro.id.desc()))],
     )
 
 
@@ -438,8 +477,8 @@ def _relatorio(sessao: Session, p: Parceiro, mes: str) -> RelatorioDoParceiro:
 
 def _planilha(resumos: list[regras.ResumoDoParceiro]) -> bytes:
     colunas = ["Parceiro", "PF/PJ", "Nível", "Acordo", "Etapa", "Sócio", "Indicações", "Abertas", "Fechadas",
-               "MRR originado", "Pontual"]
-    larguras = [30, 7, 13, 20, 13, 14, 11, 9, 9, 15, 13]
+               "MRR originado", "Pontual", "Próximo follow-up", "Data do follow-up"]
+    larguras = [30, 7, 13, 20, 13, 14, 11, 9, 9, 15, 13, 36, 14]
     wb = Workbook()
     ws = wb.active
     ws.title = "Parceiros"
@@ -454,8 +493,10 @@ def _planilha(resumos: list[regras.ResumoDoParceiro]) -> bytes:
             ws.cell(row=n, column=col, value=valor)
         for col, valor in ((10, r.mrr), (11, r.pontual)):
             ws.cell(row=n, column=col, value=float(valor)).number_format = "R$ #,##0.00"
+        ws.cell(row=n, column=12, value=r.proximo_follow_up)
+        ws.cell(row=n, column=13, value=r.proximo_follow_up_em).number_format = "DD/MM/YYYY"
     ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:K{max(len(resumos) + 1, 1)}"
+    ws.auto_filter.ref = f"A1:M{max(len(resumos) + 1, 1)}"
     saida = io.BytesIO()
     wb.save(saida)
     return saida.getvalue()
@@ -494,15 +535,15 @@ def roteador_de_parceiros(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
     @r.get("/api/parceiros/indicadores", response_model=IndicadoresDosParceiros)
     def ver_indicadores(f: dict = Depends(filtros), sessao: Session = Sessao) -> IndicadoresDosParceiros:
         fees = _fees_a_aprovar(sessao)
-        valores = regras.indicadores(_resumos(sessao, **f), fees)
+        valores = regras.indicadores(_resumos(sessao, **f), fees, f["hoje"])
         return IndicadoresDosParceiros(**valores, fees_quantos=len(fees), explicacoes=regras.INDICADORES)
 
     @r.get("/api/parceiros/indicadores/composicao", response_model=list[ItemDaComposicaoResposta])
     def ver_composicao(
-        indicador: Literal["ativos", "indicacoes", "conversao", "mrr", "sem_contrato", "fees"],
+        indicador: Literal["ativos", "indicacoes", "conversao", "mrr", "sem_contrato", "fees", "sem_follow_up"],
         f: dict = Depends(filtros), sessao: Session = Sessao,
     ) -> list[ItemDaComposicaoResposta]:
-        itens = regras.composicao(indicador, _resumos(sessao, **f), _fees_a_aprovar(sessao))
+        itens = regras.composicao(indicador, _resumos(sessao, **f), _fees_a_aprovar(sessao), f["hoje"])
         return [ItemDaComposicaoResposta(parceiro=i.parceiro, detalhe=i.detalhe, valor=i.valor, referencia=i.referencia)
                 for i in itens]
 
@@ -740,6 +781,18 @@ def roteador_de_parceiros(obter_sessao: Callable[[], Iterator[Session]]) -> APIR
             if campo in {"nome", "tipo_pessoa", "nivel", "etapa_manual", "acordo"} and valor is None:
                 continue
             setattr(p, campo, valor)
+        sessao.flush()
+        return _detalhe(sessao, p, _hoje())
+
+    @r.post("/api/parceiros/{parceiro_id}/follow-ups", response_model=ParceiroDetalhe, status_code=201)
+    def registrar_follow_up(parceiro_id: int, corpo: FollowUpEntrada, sessao: Session = Sessao) -> ParceiroDetalhe:
+        """Grava o follow-up feito no histórico e marca o próximo. Sem próximo informado, fica o que já estava."""
+        p = _parceiro_ou_404(sessao, parceiro_id)
+        sessao.add(FollowUpDeParceiro(parceiro_id=p.id, feito_em=corpo.feito_em, resultado=corpo.resultado,
+                                      nota=(corpo.nota or "").strip() or None, registrado_por=quem_fez(None)))
+        if corpo.proximo_follow_up is not None or corpo.proximo_follow_up_em is not None:
+            p.proximo_follow_up = (corpo.proximo_follow_up or "").strip() or None
+            p.proximo_follow_up_em = corpo.proximo_follow_up_em
         sessao.flush()
         return _detalhe(sessao, p, _hoje())
 

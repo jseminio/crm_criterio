@@ -24,13 +24,16 @@ const m = vi.mocked(api);
 
 function parceiro(extra: Partial<ParceiroResumo>): ParceiroResumo {
   return { id: 1, nome: "MNGM", tipo_pessoa: "PJ", nivel: "Estruturado", acordo: "Informal, com fee", etapa: "Produtivo",
-    socio_responsavel: "Eduardo", indicacoes: 4, abertas: 1, fechadas: 2, mrr: "21000.00", pontual: "0.00", ...extra };
+    socio_responsavel: "Eduardo", indicacoes: 4, abertas: 1, fechadas: 2, mrr: "21000.00", pontual: "0.00",
+    proximo_follow_up: null, proximo_follow_up_em: null, ...extra };
 }
 
 const NUMEROS: IndicadoresDosParceiros = {
   ativos: 2, indicacoes: 9, conversao: "50.0", mrr: "35500.00", sem_contrato: 2, fees: "12000.00", fees_quantos: 1,
+  sem_follow_up: 1, follow_up_atrasado: 1,
   explicacoes: { ativos: "Parceiros com indicação.", indicacoes: "Indicações válidas.", conversao: "Fechadas ÷ decididas.",
-    mrr: "Parcela × 13 ÷ 12.", sem_contrato: "Fila da regularização.", fees: "Esperando o sócio." },
+    mrr: "Parcela × 13 ÷ 12.", sem_contrato: "Fila da regularização.", fees: "Esperando o sócio.",
+    sem_follow_up: "Sem data marcada." },
 };
 
 beforeEach(() => {
@@ -118,7 +121,8 @@ describe("Parceiros", () => {
       socio_responsavel: "Eduardo", perfil_pedido: null, contato: null, observacao: null, textos_do_canal: ["MNGM"],
       indicacoes: [{ oportunidade_id: 9, nome: "BPO Tupi", grupo: "Tupi", grupo_id: 3, situacao: "Em avaliação pela empresa",
         recebida_em: "2026-10-06", validada_em: null, recusada: null, vinculo_ate: null, mensal: null, anual: null, mrr: "0.00" }],
-      fees: [],
+      fees: [], proximo_follow_up: "Pedir indicação", proximo_follow_up_em: "2026-01-10", cadencia_meses: 3,
+      follow_ups: [{ id: 1, feito_em: "2025-10-10", resultado: "Recebeu indicação", nota: "Indicou a Tupi", registrado_por: "Eduardo" }],
     };
     m.parceiro.mockResolvedValue(detalhe);
     render(<Parceiros />);
@@ -126,5 +130,8 @@ describe("Parceiros", () => {
     expect(await screen.findByDisplayValue("1ª parcela de cada contrato")).toBeTruthy();
     expect(screen.getByText("Indicações (1)")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Validar hoje" })).toBeTruthy();
+    expect(screen.getByDisplayValue("Pedir indicação")).toBeTruthy();
+    expect(screen.getByText(/FUP atrasado/)).toBeTruthy();
+    expect(screen.getByText("Indicou a Tupi")).toBeTruthy();
   });
 });

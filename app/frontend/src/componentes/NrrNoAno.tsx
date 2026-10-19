@@ -60,7 +60,7 @@ function ComposicaoDoNrr({ de, movimento }: { de: string; movimento: Mrr["movime
             { titulo: "Contrato", valor: (i) => i.escopo ?? `Contrato ${i.contrato_id}` },
             { titulo: "Data", valor: (i) => i.data, mostrar: (i) => (i.data ? data(i.data) : "—") },
             { titulo: "MRR", valor: (i) => (PONTE.find((p) => p.categoria === i.categoria)?.sinal === "−" ? -1 : 1) * Number(i.valor),
-              mostrar: (i) => `${PONTE.find((p) => p.categoria === i.categoria)?.sinal ?? ""} ${dinheiro(i.valor)}`, numerico: true },
+              mostrar: (i) => `${PONTE.find((p) => p.categoria === i.categoria)?.sinal ?? ""}\u00a0${dinheiro(i.valor)}`, numerico: true },
           ]} />
       )}
     </>

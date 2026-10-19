@@ -45,7 +45,7 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         ("ver", "ver"), ("editar", "registrar conversas"), ("parametros", "parâmetros e custos"),
         ("base", "base de conhecimento: criar e editar fichas"), ("base_aprovar", "base de conhecimento: aprovar fichas"),
     )),
-    ("parceiros", "Parceiros", (
+    ("parceiros", "Funil de Parceiros", (
         ("ver", "ver"), ("editar", "cadastrar, editar e ligar indicações"),
         ("aprovar_fee", "aprovar e marcar pago o fee (sócio da conta)"), ("exportar", "exportar para Excel"),
     )),

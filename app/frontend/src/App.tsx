@@ -49,8 +49,8 @@ const TELAS: { chave: Tela; rotulo: string; titulo: string; descricao: string }[
   },
   {
     chave: "parceiros",
-    rotulo: "Parceiros",
-    titulo: "Parceiros",
+    rotulo: "Funil de Parceiros",
+    titulo: "Funil de Parceiros",
     descricao: "Quem indica clientes à Critério: o funil da relação, as indicações, os fees e o que cada parceiro gerou.",
   },
   {

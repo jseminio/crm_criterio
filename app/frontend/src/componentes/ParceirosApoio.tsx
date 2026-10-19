@@ -12,6 +12,7 @@ import type {
 } from "../api/tipos";
 import { CampoDeData } from "./CampoDeData";
 import { Etiqueta } from "./Etiqueta";
+import { ThOrdenavel, ordenar, usarOrdenacao } from "./Ordenacao";
 import { TabelaDeComposicao, type ColunaDaComposicao } from "./TabelaDeComposicao";
 import { Carregando, Erro } from "./estados";
 import { usarAcesso } from "../entrada";
@@ -81,6 +82,7 @@ export function FeesDosParceiros({ aoMudar }: { aoMudar: () => void }) {
   );
   const [aviso, definirAviso] = useState<string | null>(null);
   const [calculando, definirCalculando] = useState(false);
+  const { ordenacao, alternar } = usarOrdenacao();
 
   async function agir(acao: () => Promise<unknown>, depois?: string) {
     definirAviso(null);
@@ -123,12 +125,22 @@ export function FeesDosParceiros({ aoMudar }: { aoMudar: () => void }) {
         <table className="tabela">
           <thead>
             <tr>
-              <th>Parceiro</th><th>Conta</th><th>Regra</th><th>Competência</th>
-              <th className="tabela-numero">Recebido</th><th className="tabela-numero">Fee</th><th>Situação</th>{socio && <th>Ação</th>}
+              <ThOrdenavel coluna="parceiro" ordenacao={ordenacao} aoAlternar={alternar}>Parceiro</ThOrdenavel>
+              <ThOrdenavel coluna="conta" ordenacao={ordenacao} aoAlternar={alternar}>Conta</ThOrdenavel>
+              <ThOrdenavel coluna="regra" ordenacao={ordenacao} aoAlternar={alternar}>Regra</ThOrdenavel>
+              <ThOrdenavel coluna="competencia" ordenacao={ordenacao} aoAlternar={alternar}>Competência</ThOrdenavel>
+              <ThOrdenavel coluna="base" numerico ordenacao={ordenacao} aoAlternar={alternar}>Recebido</ThOrdenavel>
+              <ThOrdenavel coluna="fee" numerico ordenacao={ordenacao} aoAlternar={alternar}>Fee</ThOrdenavel>
+              <ThOrdenavel coluna="situacao" ordenacao={ordenacao} aoAlternar={alternar}>Situação</ThOrdenavel>
+              {socio && <th scope="col">Ação</th>}
             </tr>
           </thead>
           <tbody>
-            {dados.map((f) => <LinhaDoFee key={f.id} fee={f} socio={socio} agir={agir} />)}
+            {ordenar(dados, ordenacao, {
+              parceiro: (f) => f.parceiro, conta: (f) => f.grupo ?? f.oportunidade, regra: (f) => f.regra,
+              competencia: (f) => f.competencia, base: (f) => Number(f.base),
+              fee: (f) => Number(f.valor_aprovado ?? f.calculado), situacao: (f) => f.situacao,
+            }).map((f) => <LinhaDoFee key={f.id} fee={f} socio={socio} agir={agir} />)}
           </tbody>
         </table>
       )}
@@ -186,6 +198,7 @@ export function ConferenciaDosTextos({ aoLigar }: { aoLigar: () => void }) {
   const textos = usarDados<TextoSemParceiro[]>(() => api.conferenciaDosParceiros(), []);
   const parceiros = usarDados<ParceiroResumo[]>(() => api.parceiros(), []);
   const [aviso, definirAviso] = useState<string | null>(null);
+  const { ordenacao, alternar } = usarOrdenacao();
 
   if (textos.carregando || parceiros.carregando) return <Carregando rotulo="Lendo os canais do funil" />;
   if (textos.erro) return <Erro mensagem={textos.erro} aoTentarDeNovo={textos.recarregar} />;
@@ -217,10 +230,17 @@ export function ConferenciaDosTextos({ aoLigar }: { aoLigar: () => void }) {
       ) : (
         <table className="tabela">
           <thead>
-            <tr><th>Texto do canal</th><th>Tipo</th><th className="tabela-numero">Oportunidades</th><th>Parceiro</th></tr>
+            <tr>
+              <ThOrdenavel coluna="texto" ordenacao={ordenacao} aoAlternar={alternar}>Texto do canal</ThOrdenavel>
+              <ThOrdenavel coluna="tipo" ordenacao={ordenacao} aoAlternar={alternar}>Tipo</ThOrdenavel>
+              <ThOrdenavel coluna="oportunidades" numerico ordenacao={ordenacao} aoAlternar={alternar}>Oportunidades</ThOrdenavel>
+              <th scope="col">Parceiro</th>
+            </tr>
           </thead>
           <tbody>
-            {lista.map((t) => (
+            {ordenar(lista, ordenacao, {
+              texto: (t) => t.texto, tipo: (t) => t.tipo_canal, oportunidades: (t) => t.oportunidades,
+            }).map((t) => (
               <LinhaDaConferencia key={`${t.tipo_canal}-${t.texto}`} texto={t} parceiros={parceiros.dados ?? []} aoLigar={ligar} />
             ))}
           </tbody>

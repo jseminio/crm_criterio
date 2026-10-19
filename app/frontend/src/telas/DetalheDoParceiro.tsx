@@ -283,7 +283,12 @@ function LigarOportunidade({ parceiro, agir }: {
         </div>
       </div>
       <button type="button" className="botao botao-secundario" onClick={buscar} disabled={busca.trim().length < 2}>Buscar</button>
-      {achadas && achadas.length === 0 && <p className="campo-ajuda">Nenhuma oportunidade com esse nome.</p>}
+      {achadas && achadas.length === 0 && (
+        <p className="campo-ajuda">
+          Nenhuma oportunidade com esse nome. Crie a oportunidade no Funil comercial, com Tipo de canal Parceiros e o nome
+          do parceiro em Canal, e ligue aqui.
+        </p>
+      )}
       {achadas && achadas.length > 0 && (
         <ul className="lista-simples">
           {achadas.map((o) => (

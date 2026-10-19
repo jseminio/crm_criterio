@@ -550,8 +550,10 @@ export const api = {
     pedir<Parametros>("/api/carteira/parametros", { method: "POST", body: JSON.stringify(corpo) }),
   mrr: (de?: string) => pedir<Mrr>(comParametros("/api/mrr", { de })),
   mrrDaCarteira: (competencia?: string) => pedir<MrrDaCarteira>(comParametros("/api/mrr/carteira", { competencia })),
-  itensDoMovimento: (de: string) =>
-    pedir<{ de: string; ate: string; itens: ItemDoMovimento[]; churn_anunciado?: SaidaAnunciada[] }>(comParametros("/api/mrr/movimento", { de })),
+  /** `soExistentes`: só os contratos que já existiam em `de`, a conta do NRR (18/10/2026). */
+  itensDoMovimento: (de: string, soExistentes = false) =>
+    pedir<{ de: string; ate: string; itens: ItemDoMovimento[]; churn_anunciado?: SaidaAnunciada[] }>(
+      comParametros("/api/mrr/movimento", { de, so_existentes: soExistentes ? "true" : undefined })),
   previaDeRecebimentos: (arquivo: string, conteudo_base64: string) =>
     pedir<PreviaDeRecebimentos>("/api/recebimentos/previa", { method: "POST", body: JSON.stringify({ arquivo, conteudo_base64 }) }),
   importarRecebimentos: (arquivo: string, conteudo_base64: string) =>

@@ -1717,6 +1717,19 @@ fieldset.lacuna-prioritaria { border: 2px dashed var(--espera); padding: var(--e
 .aviso-de-alerta { background: var(--espera-suave); color: var(--espera); border: 1px solid var(--espera);
   border-radius: var(--raio-sm); padding: var(--e2) var(--e3); font-size: 13px; }
 .aviso-de-alerta ul { margin: var(--e1) 0; padding-left: var(--e4); }
+/* O "i" ao lado de Nível no painel do parceiro (21/10/2026) */
+.rotulo-com-info { display: flex; align-items: center; gap: var(--e1); }
+.botao-info { appearance: none; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--borda-forte);
+  background: var(--surface-card); color: var(--texto-medio); font: italic 600 12px/1 var(--fonte-titulo); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.botao-info:hover, .botao-info-aberto { background: var(--azul-destaque); border-color: var(--azul-destaque); color: var(--branco); }
+.info-dos-niveis { border: 1px solid var(--borda-forte); border-radius: var(--raio-md); background: var(--surface-card);
+  padding: var(--e3); display: grid; gap: var(--e2); font-size: 13px; }
+.info-do-nivel { border: 1px solid var(--borda); border-radius: var(--raio-sm); padding: var(--e2) var(--e3); }
+.info-do-nivel-escolhido { border: 2px solid var(--azul-destaque); background: var(--andamento-suave); }
+.info-do-nivel ul { margin: var(--e1) 0 0; padding-left: var(--e4); }
+.info-do-nivel li { margin: 2px 0; line-height: 1.45; }
+.info-do-nivel-titulo { font-weight: 600; }
 
 
 @media (prefers-reduced-motion: reduce) {

@@ -42,4 +42,10 @@ describe("InfoDosNiveis", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(aoFechar).toHaveBeenCalledOnce();
   });
+
+  it("o texto não usa siglas de parceiro (21/10/2026)", async () => {
+    const { NIVEIS_EXPLICADOS } = await import("./InfoDosNiveis");
+    const texto = JSON.stringify(NIVEIS_EXPLICADOS);
+    expect(texto).not.toMatch(/\b(GPF|MNGM|MSA|NMK)\b/);
+  });
 });

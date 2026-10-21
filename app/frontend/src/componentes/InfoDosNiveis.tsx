@@ -1,24 +1,25 @@
 /** O "i" ao lado de Nível no painel do parceiro (21/10/2026, amostra aprovada por Eduardo): a explicação dos três níveis,
  * com o texto que ele escreveu. Abre e fecha com clique (o texto é longo e o CRM também é usado no celular) e fecha com
  * Esc sem fechar o painel. O nível escolhido vem primeiro, em destaque e com a palavra "Escolhido" (PAD-002: estado
- * nunca só por cor). O texto mora só aqui: mudou a definição, muda aqui. */
+ * nunca só por cor). O texto mora só aqui: mudou a definição, muda aqui. Sem siglas (pedido de Eduardo em 21/10/2026):
+ * parceiro aparece pelo nome, nunca pela abreviação. */
 
 import { useEffect } from "react";
 
 export const NIVEIS_EXPLICADOS: Record<string, [string, string][]> = {
   Indicador: [
     ["O que é", "quem indica de vez em quando, sem rotina combinada. Pode ser pessoa física ou empresa."],
-    ["Como funciona", "contrato padrão de finder fee (o modelo da GPF). Recebe a 1ª parcela líquida nos contratos recorrentes e 10% do recebido nos não recorrentes, com vínculo de 12 meses."],
+    ["Como funciona", "contrato padrão de indicação com finder fee (o primeiro foi assinado com a empresa do Gustavo). Recebe a 1ª parcela líquida nos contratos recorrentes e 10% do recebido nos não recorrentes, com vínculo de 12 meses."],
     ["O que a Critério oferece", "retorno sobre cada indicação. O relatório mensal fica disponível, mas não é obrigatório."],
     ["Follow-up sugerido", "a cada 6 meses."],
-    ["Exemplos possíveis", "Gaidão, NMK."],
+    ["Exemplo possível", "Gaidão."],
   ],
   Estruturado: [
     ["O que é", "parceiro que indica com frequência e com quem se combina um perfil de cliente (porte, setor, o que fica fora)."],
     ["Como funciona", "mesmo finder fee, mais rotina. Pedido de indicação a cada trimestre (como no roteiro de abordagem), relatório mensal das indicações e sócio responsável nomeado."],
     ["O que se espera", "indicações dentro do perfil combinado."],
     ["Follow-up sugerido", "a cada 3 meses."],
-    ["Exemplos possíveis", "MNGM, Molina, MSA, pelo histórico de contas trazidas."],
+    ["Exemplo possível", "Molina, pelo histórico de contas trazidas."],
   ],
   "Estratégico": [
     ["O que é", "parceria de co-entrega. Os dois atendem o mesmo cliente, cada um na sua parte."],

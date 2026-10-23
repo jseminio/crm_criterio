@@ -61,8 +61,8 @@ def casar_lead(sessao: Session, emails: set[str]) -> tuple[int | None, str | Non
     if grupos:
         ids |= set(sessao.scalars(sa.select(Oportunidade.id).where(
             Oportunidade.grupo_id.in_(grupos), Oportunidade.situacao.in_(EM_ABERTO))))
-    do_lead = set(sessao.scalars(sa.select(Lead.oportunidade_id).where(
-        sa.func.lower(Lead.email).in_(emails), Lead.oportunidade_id.is_not(None))))
+    do_lead = set(sessao.scalars(sa.select(Lead.convertido_em_id).where(
+        sa.func.lower(Lead.email).in_(emails), Lead.convertido_em_id.is_not(None))))
     if do_lead:
         ids |= set(sessao.scalars(sa.select(Oportunidade.id).where(
             Oportunidade.id.in_(do_lead), Oportunidade.situacao.in_(EM_ABERTO))))

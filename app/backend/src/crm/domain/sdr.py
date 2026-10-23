@@ -337,6 +337,15 @@ def _na_origem(lead: LeadLido, origem: str | None) -> bool:
     return True
 
 
+_NAO_SAIU = ("rascunho", "descartada", "bloqueada")
+
+
+def _saiu_da_ia(m: MensagemLida) -> bool:
+    """Resposta da IA que o lead recebeu. Rascunho, descartada e barrada pela trava (fase 1, 23/10/2026) contam
+    no custo, que foi gasto, mas não como resposta."""
+    return m.autor is AutorDaMensagem.IA and getattr(m, "entrega", None) not in _NAO_SAIU
+
+
 def _mensagens(lead: LeadLido) -> list[MensagemLida]:
     return [m for c in lead.conversas for m in c.mensagens]
 
@@ -607,7 +616,7 @@ def calcular_painel(
     for lead in coorte:
         if lead.tipo_canal is not TipoCanal.TRAFEGO_PAGO:
             continue
-        da_ia = [_utc(m.enviada_em) for m in _mensagens(lead) if m.autor is AutorDaMensagem.IA]
+        da_ia = [_utc(m.enviada_em) for m in _mensagens(lead) if _saiu_da_ia(m)]
         if da_ia:
             esperas.append(max(0.0, (min(da_ia) - _utc(lead.criado_em)).total_seconds()))
     primeira = statistics.median(esperas) if esperas else None
@@ -672,7 +681,8 @@ def calcular_painel(
             "Outros assuntos",
         ),
         confianca=_confianca(respostas_da_ia),
-        falhas_por_resposta=Taxa.de(sum(1 for m in respostas_da_ia if m.fallback), len(respostas_da_ia)),
+        falhas_por_resposta=Taxa.de(sum(1 for m in respostas_da_ia if m.fallback),
+                                     sum(1 for m in respostas_da_ia if _saiu_da_ia(m))),
         falhas_por_conversa=falhas_por_conversa,
         indicador_falhas=Indicador(
             falhas_por_conversa.valor,
@@ -780,7 +790,7 @@ def composicao_do_painel(*, mes: str, leads: Iterable[LeadLido], origem: str | N
         for l in coorte:
             if l.tipo_canal is not TipoCanal.TRAFEGO_PAGO:
                 continue
-            da_ia = [_utc(m.enviada_em) for m in _mensagens(l) if m.autor is AutorDaMensagem.IA]
+            da_ia = [_utc(m.enviada_em) for m in _mensagens(l) if _saiu_da_ia(m)]
             if da_ia:
                 itens.append(I(l, "minutos até a 1ª resposta", True, round(max(0.0, (min(da_ia) - _utc(l.criado_em)).total_seconds()) / 60, 1)))
         return itens

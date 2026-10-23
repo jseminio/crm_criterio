@@ -1173,8 +1173,14 @@ export interface MensagemDoSdr {
   fallback: boolean;
   termo_nao_reconhecido: string | null;
   tom: string | null;
-  /** Enviada, entregue, lida ou falhou: as da Critério pelo WhatsApp (14/10/2026). */
+  /** Enviada, entregue, lida ou falhou: as da Critério pelo WhatsApp (14/10/2026). Nas respostas da IA que não
+   * saíram (23/10/2026): rascunho, descartada ou bloqueada. */
   entrega?: string | null;
+  /** Fase 1 do SDR de IA (23/10/2026): custo, modelo, caminho (leve, principal, regra, trava) e a anotação do servidor. */
+  custo_usd?: string | null;
+  modelo?: string | null;
+  rota?: string | null;
+  observacao?: string | null;
 }
 
 export interface ConversaDoSdr {
@@ -1190,6 +1196,10 @@ export interface ConversaDoSdr {
   nota: number | null;
   /** A última mensagem do lead: abre a janela de 24 h do WhatsApp (14/10/2026). */
   ultima_do_lead_em?: string | null;
+  /** Com a equipe desde (23/10/2026): a IA não responde mais nesta conversa. */
+  equipe_desde?: string | null;
+  equipe_motivo?: string | null;
+  atendida_por?: string | null;
   mensagens: MensagemDoSdr[];
 }
 

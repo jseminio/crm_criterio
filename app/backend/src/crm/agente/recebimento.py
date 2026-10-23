@@ -1,8 +1,10 @@
 """Mensagens do WhatsApp que chegam ao CRM — fase 0 do SDR de IA (amostra aprovada em 14/10/2026).
 
 A Meta entrega cada mensagem do lead no webhook do CRM (`crm.api.whatsapp_recebido`). Este módulo
-só confere e grava; **ninguém responde sozinho nesta fase**. Regras:
+só confere e grava. Regras:
 
+- a mensagem entra na conversa em andamento ou na que está com a equipe; quem responde é
+  `crm.agente.respostas_do_sdr` (fase 1), conforme o modo escolhido em Integrações;
 - a entrega só vale com a assinatura `X-Hub-Signature-256` feita com a chave secreta do aplicativo
   (HMAC-SHA256 do corpo bruto, comparado em tempo constante). Sem ela, nada é gravado;
 - só o número configurado em Integrações: entrega de outro número é ignorada;
@@ -132,10 +134,12 @@ def _lead_do_numero(sessao: Session, wa_id: str, nome: str | None, momento: date
 
 
 def _conversa_aberta(sessao: Session, lead: Lead, momento: datetime) -> ConversaDoSdr:
+    """A conversa em andamento ou a que está com a equipe (fase 1, 23/10/2026): depois da passagem, a
+    resposta do lead vai para a mesma conversa, não para uma nova que a IA responderia."""
     conversa = sessao.scalar(
         sa.select(ConversaDoSdr)
         .where(ConversaDoSdr.lead_id == lead.id, ConversaDoSdr.canal == CanalDeAbordagem.WHATSAPP,
-               ConversaDoSdr.encerrada_em.is_(None))
+               sa.or_(ConversaDoSdr.encerrada_em.is_(None), ConversaDoSdr.equipe_desde.is_not(None)))
         .order_by(ConversaDoSdr.iniciada_em.desc(), ConversaDoSdr.id.desc())
         .limit(1)
     )

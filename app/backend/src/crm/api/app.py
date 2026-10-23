@@ -66,6 +66,7 @@ from crm.api.leads_do_meta import (
 from crm.api.conversoes import enviadores_reais, laco_das_conversoes, roteador_de_conversoes
 from crm.api.sdr import roteador as roteador_do_sdr
 from crm.api.whatsapp_recebido import roteador_do_whatsapp_recebido
+from crm.api.respostas_do_sdr import clientes_reais, envio_real, laco_das_respostas, roteador_das_respostas
 from crm.api.ficha import pendencias_de, roteador_da_ficha
 from crm.api.propostas import roteador_de_propostas
 from crm.api.busca_automatica import laco_da_busca
@@ -197,6 +198,9 @@ def criar_app(
     busca_de_leads_do_google: Callable[[], object] | None = None,
     http_da_clicksign: Callable[[], object] | None = None,
     leitor_de_documentos: Leitor | None = None,
+    respostas_automaticas: bool | None = None,
+    ia_das_respostas: Callable[..., object] | None = None,
+    envio_de_texto: Callable[[], object] | None = None,
     http_do_granola: Callable[[], object] | None = None,
     granola_automatico: bool | None = None,
 ) -> FastAPI:
@@ -246,6 +250,12 @@ def criar_app(
         leads_do_google = asyncio.create_task(laco_dos_leads_do_meta(
             _fabrica, busca_de_leads_do_google or buscador_do_google, estado=ESTADO_DO_GOOGLE)
         ) if com_leads_do_meta else None
+        # Respostas do SDR de IA no WhatsApp (23/10/2026): o laço sobe no uso real e só responde com o modo
+        # ligado em Configurações › Integrações › Respostas do SDR; no teste, só se pedir.
+        com_respostas = respostas_automaticas if respostas_automaticas is not None else fabrica is None
+        respostas = asyncio.create_task(laco_das_respostas(
+            _fabrica, ia_das_respostas or clientes_reais, envio_de_texto or envio_real)
+        ) if com_respostas else None
         # Notas do Granola (23/10/2026): o laço sobe no uso real e só busca com a busca ligada em
         # Configurações › Integrações › Granola; no teste, só se pedir.
         com_granola = granola_automatico if granola_automatico is not None else fabrica is None
@@ -253,7 +263,7 @@ def criar_app(
         try:
             yield
         finally:
-            for t in (tarefa, disparo, saidas, conversoes, leads_do_meta, leads_do_google, granola):
+            for t in (tarefa, disparo, saidas, conversoes, leads_do_meta, leads_do_google, respostas, granola):
                 if t is not None:
                     t.cancel()
                     with contextlib.suppress(asyncio.CancelledError):
@@ -382,6 +392,7 @@ def criar_app(
         testadores or Testadores(granola=lambda _: testar_granola(http_granola))))
     api.include_router(roteador_do_granola(obter_sessao, http_granola))
     api.include_router(roteador_do_whatsapp_recebido(obter_sessao))
+    api.include_router(roteador_das_respostas(obter_sessao, envio_de_texto or envio_real))
     api.include_router(roteador_de_kpis(obter_sessao))
     api.include_router(roteador_de_lacunas(obter_sessao))
     api.include_router(roteador_de_recebimentos(obter_sessao))

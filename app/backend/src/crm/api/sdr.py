@@ -283,6 +283,9 @@ def roteador(
         conversa.encerrada_em = agora()
         conversa.motivo_transbordo = corpo.motivo_transbordo
         conversa.destino_transbordo = corpo.destino_transbordo
+        if corpo.desfecho is D.TRANSBORDO:  # a conversa fica com a equipe (fase 1, 23/10/2026)
+            conversa.equipe_desde = conversa.encerrada_em
+            conversa.equipe_motivo = corpo.motivo_transbordo.value
         sessao.flush()
         return e.ConversaResposta.model_validate(conversa)
 

@@ -277,10 +277,8 @@ Conversão, para quem vê o Funil (`GET /api/inteligencia/propostas-em-aberto`; 
 
 ## SDR de IA, fase 0: o CRM recebe as mensagens do WhatsApp (14/10/2026)
 
-Amostra aprovada por Eduardo em 14/10/2026. A Meta entrega cada mensagem do lead no webhook do CRM;
-**nesta fase o CRM só recebe e mostra: ninguém responde sozinho.** As respostas automáticas, o
-roteador de custo (modelo pequeno para a qualificação) e o transbordo de dúvida técnica para um
-especialista humano são a fase 1, sem mudar as regras de `sdr-ia-limites-de-atuacao.md`.
+Amostra aprovada por Eduardo em 14/10/2026. A Meta entrega cada mensagem do lead no webhook do CRM, que
+grava e mostra. Quem responde é a fase 1, logo abaixo.
 
 - **Onde liga:** Configurações › Integrações › WhatsApp › "Receber as mensagens dos leads":
   recebimento ligado, token de verificação (gerado no navegador; depois de salvo, só os 4 últimos
@@ -299,7 +297,8 @@ especialista humano são a fase 1, sem mudar as regras de `sdr-ia-limites-de-atu
   - no log, só contagens e o motivo da recusa: nem texto, nem telefone, nem nome. Falha ao gravar
     registra só o tipo do erro, e a Meta reenvia.
 - **O que grava** (`crm.agente.recebimento`):
-  - a mensagem do lead entra na conversa de WhatsApp aberta do lead (ou numa nova), na ordem do horário;
+  - a mensagem do lead entra na conversa de WhatsApp aberta do lead, ou na que está com a equipe (fase 1),
+    ou numa nova, na ordem do horário;
   - a Meta repete entregas: o ID da mensagem faz cada uma gravar uma vez;
   - número que não está em nenhum lead vira **lead novo**, canal "WhatsApp", com o nome do perfil
     (decisão de Eduardo). O telefone casa com e sem o nono dígito do celular;
@@ -312,12 +311,76 @@ especialista humano são a fase 1, sem mudar as regras de `sdr-ia-limites-de-atu
     guardar o ID que a Meta devolve no envio (`crm.db.questionario_do_lead.marcar`), então a entrega
     aparece neles desde já; as respostas da fase 1 seguem o mesmo caminho.
 - **Na tela do lead:** a conversa mostra a janela de 24 horas do WhatsApp (aberta até quando, ou
-  fechada: só modelo aprovado) e a entrega das mensagens da Critério.
+  fechada: só modelo aprovado), quem responde (o modo da fase 1) e a entrega das mensagens da Critério.
 - **Testar sem a Meta** (que não alcança o CRM do computador): `scripts/simular_whatsapp.py` monta uma
   entrega no formato da Meta, assina com a chave secreta salva na tela e manda para o CRM local
   (`--texto "SAIR"`, `--de`, `--nome`, `--assinatura-errada`). Só manda para 127.0.0.1 ou localhost.
 - Migração `a8d2c6e4f0b1`, só aditiva: `mensagem_do_sdr.externo_id` e `.entrega`,
   `conversa_do_sdr.ultima_do_lead_em`. Sem variável de ambiente nova: tudo pela tela.
+
+## SDR de IA, fase 1: a IA responde no WhatsApp, pelo roteador de custo (23/10/2026)
+
+Amostra e as quatro recomendações aprovadas por Eduardo em 23/10/2026. **Nasce desligado.** Liga em
+Configurações › Integrações › **Respostas do SDR**: modo *Desligado*, *Supervisionado* (a IA rascunha e a equipe
+envia) ou *Automático* (a IA envia sozinha). **O automático só depois do ensaio sem violação** (abaixo) **e de
+`sdr-ia-limites-de-atuacao.md` aprovado por Eduardo e Bruno**: o documento ainda é proposta.
+
+- **O roteador** (`crm.agente.roteador_do_sdr`), nesta ordem:
+  1. **Regras, sem IA:** pedido de pessoa (T1), urgência com prazo legal (T9) e "já sou cliente" (T11) vão
+     direto para a equipe, com a frase aprovada do gatilho.
+  2. **Modelo leve** (Claude Haiku 4.5, `sdr.modelo_leve`; com a OpenAI, `gpt-6-luna`): as perguntas do roteiro
+     SPIN. Escolhe entre saídas fechadas: responder, passar para a equipe (com o gatilho T), marcar a reunião ou
+     chamar o principal. Confiança declarada pelo modelo não decide nada.
+  3. **Modelo principal** (o da aba IA, com a reserva atrás): só quando o leve pede ou falha. Ele não pode escalar.
+  4. **Travas do servidor**, antes de sair: preço (`fala_de_preco`), termo proibido do tom de voz, dado sensível
+     (P10), link que não é o do questionário e mais de 1.200 caracteres. Barrou, nada sai: o texto fica registrado
+     como "barrada pela trava" e vai a frase do T5, com a conversa para a equipe.
+- **Dúvida técnica nunca é respondida por modelo** (decisão de Eduardo): é o gatilho T4, destino Técnico fiscal, e a
+  frase de passagem é sempre a aprovada, nunca texto do modelo. O mesmo vale para todos os gatilhos.
+- **A primeira mensagem se apresenta** como assistente virtual da Critério; se o modelo esquecer, o servidor põe a
+  apresentação na frente.
+- **A rodada** (`crm.agente.respostas_do_sdr`, laço a cada 10 segundos em `crm.api.respostas_do_sdr`): responde a
+  conversa do WhatsApp em andamento cujo lead parou de escrever há a **espera** (20 s; junta as mensagens picadas).
+  Não responde a quem pediu para não ser contatado nem com a janela de 24 horas fechada. Lê a conversa, chama o
+  roteador sem segurar o banco e, antes de gravar, confere se nada mudou: se o lead escreveu de novo ou a equipe
+  assumiu, a resposta não sai (fica como descartada, com o custo). Grava antes de enviar, para nada sair duas vezes.
+- **Vai para a equipe, sem a IA:** lead que já virou oportunidade (em silêncio), **máximo de respostas** (12) e
+  **teto de custo** (US$ 0,50) por conversa (com a frase de passagem), IA fora do ar ou sem chave (em silêncio,
+  "Sistema externo fora do ar") e WhatsApp que não enviou.
+- **Com a equipe** (`conversa_do_sdr.equipe_desde`): a IA não responde mais na conversa, e a resposta do lead entra
+  nela mesmo que a passagem a tenha encerrado (`crm.agente.recebimento`). Transbordo (gatilho T, trava, limites)
+  encerra como "Passou para a equipe", com motivo e destino, e conta no painel; a reunião aceita e o rascunho
+  descartado só passam a conversa, sem desfecho. Motivos novos: "Serviço sem roteiro" (T8), "Urgência com prazo
+  legal" (T9); destino novo: "Sucesso do Cliente" (T11).
+- **Na tela do lead** (SDR da IA › Leads › Abrir, permissão `sdr.editar` para agir):
+  - cada resposta da IA mostra o caminho (modelo leve, principal, regra do servidor, frase da trava) e o custo; a
+    conversa mostra o custo somado;
+  - **rascunho** (supervisionado): a equipe ajusta, **Enviar** ou **Descartar e passar para a equipe**;
+  - faixa **⚑ Aguardando a equipe / Com a equipe**, com o motivo, o destino e quem respondeu;
+  - **Responder ao lead**: a equipe escreve pelo CRM (o número da Critério está na API da Meta, então não
+    funciona no aplicativo do WhatsApp ao mesmo tempo). Só com a janela aberta. Responder tira a conversa da IA;
+    **Devolver para a IA** devolve (se a passagem a encerrou, abre uma conversa nova, e a IA lê a anterior).
+  - O botão **Enviar** da conversa é secundário: a ação primária do painel continua sendo salvar o lead (PAD-002).
+- **O que vai para a IA:** o prompt do roteiro (`crm.agente.prompt_do_sdr`, cópia do bloco da seção 7 de
+  `sdr-ia-roteiro-spin.md`; um teste falha se divergirem), as fichas que valem para a IA e as últimas 40 mensagens
+  que saíram, com o serviço de interesse, a origem e o passo do questionário. **Sem nome, telefone nem e-mail.**
+- **Registro no banco, não em arquivo:** cada resposta guarda o modelo, a rota, o custo e a anotação do servidor
+  (`mensagem_do_sdr.modelo`, `.rota`, `.custo_usd`, `.observacao`); `entrega` ganha rascunho, descartada e
+  bloqueada. No log, só contagens e o tipo da falha. O painel do SDR não conta rascunho, descartada nem barrada como
+  resposta (primeira resposta, falhas), mas soma o custo delas, que foi gasto.
+- **A aba Respostas do SDR** mostra os últimos 30 dias: conversas, respostas por rota, barradas, passadas para a
+  equipe, custo total e por conversa, e a última falha.
+- **Custo estimado** (tabela de preços do código; confira na fatura): com Haiku 4.5 a US$ 1/5 por milhão e Opus 5 a
+  US$ 5/25, uma conversa de 8 respostas com o principal em 1 de cada 5 sai perto de US$ 0,12, contra US$ 0,30 só
+  com o Opus. O número real sai do ensaio.
+- **O ensaio que libera o automático:** `scripts/ensaio_sdr.py <pasta fora do repositório> --roteador` passa as
+  perguntas de `sdr-ia-perguntas-teste.md` e as conversas SPIN pelo mesmo roteador, com os modelos e as chaves da
+  tela. O relatório traz a rota e o custo de cada resposta, as passagens, as barradas e o custo médio por conversa.
+  Critério: **zero violação de P1 a P12 e a passagem certa em todos os gatilhos T**. A correção é humana.
+- Migração `c3e9a1f7d5b2`, só aditiva: `conversa_do_sdr.equipe_desde`, `.equipe_motivo`, `.atendida_por`;
+  `mensagem_do_sdr.modelo`, `.rota`, `.observacao`. Sem variável de ambiente nova: tudo pela tela.
+- Rotas: `GET /api/sdr/respostas` (o modo), `POST /api/sdr/conversas/{id}/responder`, `.../devolver`,
+  `POST /api/sdr/mensagens/{id}/enviar` e `.../descartar` (`sdr.editar`).
 
 ## Contrato recorrente gerado em Word (14/10/2026)
 
@@ -1412,14 +1475,14 @@ Atualizado em 05/10/2026.
 
 | | |
 |---|---|
-| O que roda | Banco PostgreSQL, carga de 2026 repetível, funil (com exclusão de oportunidade), contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", plano de MRR (Inteligência de Conversão), agente SDR, SDR de IA com base de conhecimento, backup lógico (manual e diário) e as telas abaixo |
+| O que roda | Banco PostgreSQL, carga de 2026 repetível, funil (com exclusão de oportunidade), contratos e eventos de contrato, carteira classificada, questionário do site, proposta em PowerPoint com ficha e "o que falta", plano de MRR (Inteligência de Conversão), agente SDR, SDR de IA com base de conhecimento e respostas no WhatsApp pelo roteador de custo (desligadas por padrão), backup lógico (manual e diário) e as telas abaixo |
 | Testes | **1.394** no backend e **563** nas telas, todos passando. Backend com pytest; telas com Vitest e Testing Library. `npm run build` compila sem erro |
 | Banco | PostgreSQL 18 local, 46 tabelas no modelo, migrações até `b8d3f1a6c2e4` (manutenção aplicada, 05/10/2026, #93). Antes de cada `alembic upgrade head`, rode `scripts/backup.py exportar` |
 | API | 156 rotas, em `127.0.0.1:8000`. **Com login configurado (e-mail e senha ou conta Microsoft), toda rota exige entrada e permissão do perfil**; sem a configuração, segue sem login, só na máquina |
 | Entrada | **Login com e-mail e senha do CRM** (05/10/2026, #89), o do servidor. O login pela conta Microsoft, ativo na máquina de Eduardo desde 03/10/2026, fica no código e vale só sem `CRM_ADMIN_EMAIL`. Perfis, permissões e histórico de alterações valem para todos |
 | Telas | Agenda, Contatos, Funil comercial (Oportunidades, Questionários e Inteligência de Conversão), Sucesso do Cliente (Saúde da carteira, Gestão de contratos e Funil do Sucesso do Cliente), SDR - Abordagens e conhecimento (Abordagens, SDR da IA e Base de conhecimento) e Configurações (com Grupos e Conferência em abas). React com TypeScript, em `../frontend` |
 | Incrementos | E2, E3, E4 e E5 prontos (o MRR da carteira inteira se compara com a meta oficial desde 02/10/2026). E1: login, perfis e histórico prontos e em uso; faltam a nuvem e o backup fora da máquina |
-| Fora do ar | **E1:** nuvem em região brasileira e backup fora da máquina com restauração testada. Comparação de provedores feita em 04/10/2026 (Magalu Cloud, AWS Lightsail e Azure, todos em São Paulo; a mais barata que atende é a Magalu, ~R$ 140/mês); Eduardo lembra de um servidor já contratado, a confirmar (nome, local do data center e o que inclui) antes de decidir. Enquanto isso, o CRM para quando o Mac desliga ou reinicia. O passo a passo para a equipe do servidor está em `IMPLANTACAO.md` (05/10/2026). **Etapa 2:** Clicksign, renovação, saldo de horas de conforto. O dashboard do cliente para as reuniões de resultado (fonte dos números e ferramenta a decidir). Buscar a transcrição direto no Granola, sem colar (depende de o plano do Granola ter API). **SDR de IA:** a conversa com o lead pelo WhatsApp ainda não existe (há um rascunho do envio pela API da Meta na branch `claude/great-wozniak-hxnd8u`, de 28/09) |
+| Fora do ar | **E1:** nuvem em região brasileira e backup fora da máquina com restauração testada. Comparação de provedores feita em 04/10/2026 (Magalu Cloud, AWS Lightsail e Azure, todos em São Paulo; a mais barata que atende é a Magalu, ~R$ 140/mês); Eduardo lembra de um servidor já contratado, a confirmar (nome, local do data center e o que inclui) antes de decidir. Enquanto isso, o CRM para quando o Mac desliga ou reinicia. O passo a passo para a equipe do servidor está em `IMPLANTACAO.md` (05/10/2026). **Etapa 2:** Clicksign, renovação, saldo de horas de conforto. O dashboard do cliente para as reuniões de resultado (fonte dos números e ferramenta a decidir). Buscar a transcrição direto no Granola, sem colar (depende de o plano do Granola ter API). **SDR de IA:** a conversa pelo WhatsApp existe desde 23/10/2026 (fases 0 e 1), desligada; o modo automático espera o ensaio pelo roteador com a chave real e a aprovação de `sdr-ia-limites-de-atuacao.md` por Eduardo e Bruno |
 
 ## Como rodar
 

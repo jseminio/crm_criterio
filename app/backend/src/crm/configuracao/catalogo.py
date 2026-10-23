@@ -170,6 +170,24 @@ GRUPOS: tuple[Grupo, ...] = (
         Campo("disparo.ligado", "Disparo ligado", variavel="CRM_DISPARO_DO_QUESTIONARIO", padrao="false",
               opcoes=("true", "false"), ajuda="A cada 10 minutos, de segunda a sexta, das 9h às 18h."),
     ), testavel=False),
+    # Respostas do SDR de IA no WhatsApp (fase 1, amostra aprovada em 23/10/2026).
+    Grupo("sdr_respostas", "Respostas do SDR", (
+        Campo("sdr.modo", "Modo das respostas", padrao="Desligado",
+              opcoes=("Desligado", "Supervisionado", "Automático"),
+              ajuda="Supervisionado: a IA rascunha e a equipe envia. Automático: a IA envia sozinha, só depois do "
+                    "ensaio sem nenhuma violação e das regras de atuação aprovadas."),
+        Campo("sdr.modelo_leve", "Modelo leve da Anthropic", padrao="claude-haiku-4-5", exemplo="claude-haiku-4-5",
+              ajuda="Responde as perguntas do roteiro. O principal, quando o leve não basta, é o “Modelo da "
+                    "Anthropic” da aba IA."),
+        Campo("sdr.modelo_leve_openai", "Modelo leve da OpenAI", padrao="gpt-6-luna", exemplo="gpt-6-luna",
+              ajuda="Só vale quando a OpenAI é a IA principal ou a de reserva."),
+        Campo("sdr.teto_por_conversa", "Teto de custo por conversa (US$)", padrao="0.50", exemplo="0.50",
+              ajuda="Passou do teto, a conversa vai para a equipe."),
+        Campo("sdr.maximo_de_respostas", "Máximo de respostas da IA por conversa", padrao="12", exemplo="12",
+              ajuda="Chegou ao máximo, a conversa vai para a equipe."),
+        Campo("sdr.espera_segundos", "Espera para juntar mensagens (segundos)", padrao="20", exemplo="20",
+              ajuda="O lead costuma mandar a frase em pedaços: a IA responde ao conjunto."),
+    ), testavel=False),
 )
 
 CAMPOS: dict[str, Campo] = {c.chave: c for g in GRUPOS for c in g.campos}

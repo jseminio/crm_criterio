@@ -38,6 +38,7 @@ __all__ = [
     "montar_contexto",
     "alertas",
     "rodar",
+    "rodar_roteador",
     "relatorio",
 ]
 
@@ -147,6 +148,8 @@ class Resultado:
     perguntas: list[dict[str, Any]] = field(default_factory=list)
     cenarios: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     recusas: int = 0
+    roteador: bool = False
+    """Ensaio pelo roteador de custo (fase 1, 23/10/2026): cada resposta traz a rota e o custo."""
 
 
 def rodar(
@@ -198,6 +201,95 @@ def rodar(
     return resultado
 
 
+def rodar_roteador(
+    clientes: Any,
+    sistema: str,
+    fichas: list[str],
+    perguntas: Sequence[Pergunta],
+    link_do_questionario: str = LINK_DO_QUESTIONARIO_PADRAO,
+    cenarios: dict[str, Sequence[str]] = CENARIOS,
+    paralelo: int = 4,
+) -> Resultado:
+    """O ensaio pelo mesmo roteador do agente (`crm.agente.roteador_do_sdr.decidir`): regras, modelo leve,
+    principal e travas. Como no WhatsApp, a conversa para quando passa para a equipe."""
+    from crm.agente.roteador_do_sdr import IAFora, Pedido, cabecalho_do_lead, decidir, formatar_conversa
+    from crm.domain.listas import DestinoDoTransbordo
+
+    cabecalho = cabecalho_do_lead(None, None, "Tráfego pago", "Não enviado")
+    resultado = Resultado(modelo=f"{clientes.modelo_leve} → {clientes.modelo_principal}", fichas=fichas, roteador=True)
+
+    def turno(falas: list[tuple[str, str, str]], pendente: str, primeira: bool) -> dict[str, Any]:
+        pedido = Pedido(sistema=sistema, conversa=formatar_conversa(cabecalho, falas), pendente=pendente,
+                        primeira=primeira, links_permitidos=(link_do_questionario,),
+                        destino_do_servico=DestinoDoTransbordo.COMERCIAL_C1)
+        try:
+            r = decidir(pedido, clientes)
+        except IAFora as falha:
+            return {"ia": f"(a IA não respondeu: {falha})", "rota": "falha", "custo_usd": None, "passagem": None,
+                    "alertas": ["a IA não respondeu"]}
+        achados = alertas(r.texto or "")
+        if r.bloqueada:
+            achados.append(f"trava barrou: {r.motivo_do_bloqueio} — texto do modelo: {r.bloqueada}")
+        return {"ia": r.texto or "(nada sai)", "rota": r.rota, "modelo": r.modelo,
+                "custo_usd": str(r.custo_usd) if r.custo_usd is not None else None,
+                "passagem": r.passagem.tela if r.passagem else None, "alertas": achados}
+
+    def isolada(p: Pergunta) -> dict[str, Any]:
+        return {"id": p.id, "lead": p.lead, "esperado": p.esperado, "armadilha": p.armadilha,
+                **turno([("—", "Lead", p.lead)], p.lead, True)}
+
+    def conversa(nome: str) -> tuple[str, list[dict[str, Any]]]:
+        falas: list[tuple[str, str, str]] = []
+        turnos, primeira = [], True
+        for fala in cenarios[nome]:
+            falas.append(("—", "Lead", fala))
+            t = turno(list(falas), fala, primeira)
+            turnos.append({"lead": fala, **t})
+            if t["passagem"] or t["rota"] == "falha":
+                break  # com a equipe, a IA não responde mais
+            falas.append(("—", "Critério (IA)", t["ia"]))
+            primeira = primeira and "assistente virtual" not in t["ia"].casefold()
+        return nome, turnos
+
+    if perguntas:  # aquece o cache antes das chamadas em paralelo
+        resultado.perguntas.append(isolada(perguntas[0]))
+    with ThreadPoolExecutor(max(1, paralelo)) as executor:
+        resultado.perguntas.extend(executor.map(isolada, perguntas[1:]))
+        resultado.cenarios = dict(executor.map(conversa, cenarios))
+    return resultado
+
+
+def _resumo_do_roteador(r: Resultado) -> list[str]:
+    from decimal import Decimal
+
+    respostas = [*r.perguntas, *(t for ts in r.cenarios.values() for t in ts)]
+    rotas: dict[str, int] = {}
+    for t in respostas:
+        rotas[t["rota"]] = rotas.get(t["rota"], 0) + 1
+    custos = [Decimal(t["custo_usd"]) for t in respostas if t.get("custo_usd")]
+    sem_preco = sum(1 for t in respostas if t["rota"] in ("leve", "principal") and not t.get("custo_usd"))
+    por_conversa = [sum((Decimal(t["custo_usd"]) for t in ts if t.get("custo_usd")), Decimal(0))
+                    for ts in r.cenarios.values()]
+    linhas = [
+        "Rotas: " + " · ".join(f"{k} {v}" for k, v in sorted(rotas.items())) +
+        f" · passadas para a equipe: {sum(1 for t in respostas if t['passagem'])}"
+        f" · barradas pela trava: {sum(1 for t in respostas if any(a.startswith('trava barrou') for a in t['alertas']))}",
+        f"Custo estimado: US$ {sum(custos, Decimal(0)):.4f} em {len(respostas)} respostas"
+        + (f" · média por conversa SPIN: US$ {sum(por_conversa, Decimal(0)) / len(por_conversa):.4f}" if por_conversa else "")
+        + (f" · {sem_preco} respostas sem preço na tabela (custo incompleto)" if sem_preco else ""),
+        "",
+    ]
+    return linhas
+
+
+def _rota(t: dict[str, Any]) -> str:
+    if "rota" not in t:
+        return ""
+    partes = [t["rota"]] + ([f"US$ {t['custo_usd']}"] if t.get("custo_usd") else []) + (
+        [f"para a equipe: {t['passagem']}"] if t.get("passagem") else [])
+    return f" _({' · '.join(partes)})_"
+
+
 def relatorio(r: Resultado) -> str:
     """O relatório para a correção: cada resposta ao lado do esperado, com os alertas."""
     total_alertas = sum(bool(p["alertas"]) for p in r.perguntas) + sum(
@@ -209,19 +301,20 @@ def relatorio(r: Resultado) -> str:
         f"respostas com alerta: {total_alertas} · recusas do modelo: {r.recusas}", "",
         "Nota de cada resposta: **Certo**, **Parcial**, **Errado** ou **Violação** "
         "(`sdr-ia-perguntas-teste.md`, seção 3).", "",
+        *(_resumo_do_roteador(r) if r.roteador else []),
         "## Perguntas", "",
     ]
     for p in r.perguntas:
         marca = " · armadilha" if p["armadilha"] else ""
         linhas += [f"**{p['id']}**{marca} — {p['lead']}", "", f"- Esperado: {p['esperado']}",
-                   f"- IA: {p['ia']}"]
+                   f"- IA: {p['ia']}{_rota(p)}"]
         linhas += [f"- ⚠ {a}" for a in p["alertas"]]
         linhas.append("")
     linhas += ["## Conversas", ""]
     for nome, turnos in r.cenarios.items():
         linhas += [f"### {nome}", ""]
         for i, t in enumerate(turnos, 1):
-            linhas += [f"{i}. Lead: {t['lead']}", f"   IA: {t['ia']}"]
+            linhas += [f"{i}. Lead: {t['lead']}", f"   IA: {t['ia']}{_rota(t)}"]
             linhas += [f"   ⚠ {a}" for a in t["alertas"]]
         linhas.append("")
     return "\n".join(linhas)

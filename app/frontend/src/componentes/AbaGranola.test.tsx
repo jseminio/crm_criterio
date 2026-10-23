@@ -14,6 +14,7 @@ vi.mock("../api/cliente", async () => {
     api: {
       abaDaProposta: vi.fn(), gerarProposta: vi.fn(), marcarPropostaEnviada: vi.fn(),
       sugerirContextoDaReuniao: vi.fn(), guardarReuniaoComLead: vi.fn(),
+      notasDoGranolaDaOportunidade: vi.fn(), descartarNotaDaOportunidade: vi.fn(),
     },
   };
 });
@@ -40,6 +41,12 @@ const ABA: AbaDaProposta = {
   propostas: [], perfil_da_reuniao: [], reunioes_com_o_lead: [],
 };
 
+const NOTA = {
+  id: 31, tipo: "Reunião com o lead" as const, titulo: "Conversa inicial · Exemplo Alfa", data: "2026-10-22",
+  participantes: "Ana Souza <ana@alfa.com.br>", link: "https://notes.granola.ai/d/not_1", motivo: null,
+  resumo: "## Empresa\nDistribuidora de insumos hospitalares, matriz no Rio e filiais em Niterói e Campinas. Usa o Omie.",
+  transcricao: null, chegou_em: "2026-10-22T15:00:00Z",
+};
 const RESUMO = "## Empresa\nDistribuidora de insumos hospitalares, matriz no Rio e filiais em Niterói e Campinas. Usa o Omie.";
 const CONTEXTO = "A Exemplo Alfa distribui insumos hospitalares.\nEsta proposta foi construída…";
 
@@ -83,6 +90,43 @@ describe("aba Granola", () => {
     vi.mocked(api.abaDaProposta).mockResolvedValue(ABA);
     vi.mocked(api.sugerirContextoDaReuniao).mockResolvedValue(SUGESTAO);
     vi.mocked(api.guardarReuniaoComLead).mockResolvedValue(DEPOIS);
+    vi.mocked(api.notasDoGranolaDaOportunidade).mockResolvedValue([]);
+  });
+
+  it("a nota que chegou do Granola preenche o formulário e, aplicada, sai da lista", async () => {
+    vi.mocked(api.notasDoGranolaDaOportunidade).mockResolvedValue([NOTA]);
+    render(<AbaGranola oportunidadeId={10} />);
+    const chegou = await screen.findByRole("group", { name: /Chegou do Granola \(1\)/ });
+    expect(within(chegou).getByText("A usar")).toBeInTheDocument();
+    await userEvent.click(within(chegou).getByRole("button", { name: "Usar esta nota" }));
+    expect(screen.getByLabelText("Resumo da nota [Potencial Cliente]")).toHaveValue(NOTA.resumo);
+    expect(screen.getByLabelText("Participantes")).toHaveValue("Ana Souza <ana@alfa.com.br>");
+    expect(within(chegou).getByText("No formulário")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Sugerir contexto e perfil com a IA" }));
+    await screen.findByLabelText("Sugestão da IA");
+    // a ciência da gravação continua sendo da pessoa
+    expect(screen.getByRole("button", { name: "Aplicar à proposta" })).toBeDisabled();
+    await userEvent.click(screen.getByLabelText(/O lead foi avisado/));
+    await userEvent.click(screen.getByRole("button", { name: "Aplicar à proposta" }));
+    expect(api.guardarReuniaoComLead).toHaveBeenCalledWith(10, expect.objectContaining({
+      data: "2026-10-22", resumo: NOTA.resumo, link_do_granola: NOTA.link, nota_do_granola_id: 31,
+    }));
+    expect(screen.queryByRole("group", { name: /Chegou do Granola/ })).not.toBeInTheDocument();
+  });
+
+  it("descartar a nota que chegou pede confirmação", async () => {
+    vi.mocked(api.notasDoGranolaDaOportunidade).mockResolvedValue([NOTA]);
+    vi.mocked(api.descartarNotaDaOportunidade).mockResolvedValue([]);
+    const confirmar = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    render(<AbaGranola oportunidadeId={10} />);
+    const chegou = await screen.findByRole("group", { name: /Chegou do Granola/ });
+    await userEvent.click(within(chegou).getByRole("button", { name: "Descartar" }));
+    expect(api.descartarNotaDaOportunidade).not.toHaveBeenCalled();
+    await userEvent.click(within(chegou).getByRole("button", { name: "Descartar" }));
+    expect(api.descartarNotaDaOportunidade).toHaveBeenCalledWith(10, 31);
+    expect(await screen.findByText("Nenhuma reunião com o lead guardada ainda.")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: /Chegou do Granola/ })).not.toBeInTheDocument();
+    confirmar.mockRestore();
   });
 
   it("sem reunião: abre colando, com a lista vazia dita em palavras", async () => {

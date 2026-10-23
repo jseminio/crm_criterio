@@ -1561,6 +1561,8 @@ export interface NovaReuniaoComLead {
   ciencia_da_gravacao: boolean;
   contextualizacao: string | null;
   perfil: Record<string, string>;
+  /** A nota que chegou do Granola e foi usada aqui: passa a "Usada". */
+  nota_do_granola_id?: number;
 }
 
 export interface ConfiguracaoDeProposta {
@@ -1911,6 +1913,8 @@ export interface NovaReuniaoDeResultado {
     valor: string | null;
     abrir_no_funil: boolean;
   }[];
+  /** A nota que chegou do Granola e foi usada aqui: passa a "Usada". */
+  nota_do_granola_id?: number;
 }
 
 export interface CadenciaDeReunioes {
@@ -2198,6 +2202,40 @@ export interface GrupoDeIntegracao {
 
 export interface Integracoes {
   grupos: GrupoDeIntegracao[];
+}
+
+/** Notas do Granola chegando sozinhas (amostra aprovada por Eduardo em 23/10/2026). */
+export interface NotaDoGranola {
+  id: number;
+  tipo: "Reunião com o lead" | "Reunião de Resultado";
+  titulo: string;
+  data: string;
+  participantes: string | null;
+  link: string | null;
+  motivo: string | null;
+  resumo: string | null;
+  /** Só da Reunião de Resultado, para montar a ata. */
+  transcricao: string | null;
+  chegou_em: string;
+}
+
+export interface BuscaDoGranola {
+  em: string;
+  lidas: number;
+  novas: number;
+  a_usar: number;
+  precisam: number;
+  erro: string | null;
+  aviso: string | null;
+}
+
+export interface SituacaoDoGranola {
+  ligada: boolean;
+  ultima: BuscaDoGranola | null;
+  proxima: string | null;
+  precisam: NotaDoGranola[];
+  oportunidades: { id: number; nome: string }[];
+  grupos: { id: number; nome: string }[];
 }
 
 export interface ResultadoDoTeste {

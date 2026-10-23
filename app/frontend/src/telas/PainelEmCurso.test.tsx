@@ -9,7 +9,10 @@ vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
   return {
     ...real,
-    api: { reunioesDoGrupo: vi.fn(), registrarReuniao: vi.fn(), montarAta: vi.fn(), responsaveisPorAjuste: vi.fn(), servicos: vi.fn() },
+    api: {
+      reunioesDoGrupo: vi.fn(), registrarReuniao: vi.fn(), montarAta: vi.fn(), responsaveisPorAjuste: vi.fn(), servicos: vi.fn(),
+      notasDoGranolaDoGrupo: vi.fn(), descartarNotaDoGrupo: vi.fn(),
+    },
   };
 });
 
@@ -71,6 +74,26 @@ describe("Ata da reunião pela transcrição do Granola (02/10/2026)", () => {
       { email: "jefferson@grupocriterio.com.br", nome: "Jefferson Souza", perfil: "Área técnica" },
     ]);
     vi.mocked(api.servicos).mockResolvedValue(CATALOGO);
+    vi.mocked(api.notasDoGranolaDoGrupo).mockResolvedValue([]);
+  });
+
+  it("a nota da Reunião de Resultado que chegou do Granola preenche a transcrição e vai junto ao registrar", async () => {
+    vi.mocked(api.notasDoGranolaDoGrupo).mockResolvedValue([{
+      id: 41, tipo: "Reunião de Resultado", titulo: "Trimestral Rede Farma", data: "2026-10-21",
+      participantes: "Rita <rita@farma.com.br>", link: null, motivo: null, resumo: "Resumo.",
+      transcricao: TRANSCRICAO, chegou_em: "2026-10-21T18:00:00Z",
+    }]);
+    vi.mocked(api.registrarReuniao).mockResolvedValue(G);
+    painel();
+    const chegou = await screen.findByRole("group", { name: /Chegou do Granola \(1\)/ });
+    await userEvent.click(within(chegou).getByRole("button", { name: "Usar esta nota" }));
+    expect(screen.getByLabelText("Transcrição do Granola")).toHaveValue(TRANSCRICAO);
+    expect(screen.getByLabelText("Participantes")).toHaveValue("Rita <rita@farma.com.br>");
+    await userEvent.click(screen.getByRole("button", { name: "Registrar reunião" }));
+    expect(api.registrarReuniao).toHaveBeenCalledWith(7, expect.objectContaining({
+      data: "2026-10-21", transcricao: TRANSCRICAO, nota_do_granola_id: 41,
+    }));
+    expect(screen.queryByRole("group", { name: /Chegou do Granola/ })).not.toBeInTheDocument();
   });
 
   it("monta o rascunho com o responsável lido da ata, exige responsável em cada ajuste e registra tudo", async () => {

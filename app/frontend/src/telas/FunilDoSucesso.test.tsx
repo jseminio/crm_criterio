@@ -14,6 +14,7 @@ vi.mock("../api/cliente", async () => {
       funilDoSucesso: vi.fn(), marcarItemDoSucesso: vi.fn(), concluirEtapaDoSucesso: vi.fn(),
       reunioesDoGrupo: vi.fn(), registrarReuniao: vi.fn(), montarAta: vi.fn(), responsaveisPorAjuste: vi.fn(),
       servicos: vi.fn(), reunioesDaCarteira: vi.fn(), registrarReuniaoDaCarteira: vi.fn(),
+      notasDoGranolaDoGrupo: vi.fn(), descartarNotaDoGrupo: vi.fn(),
     },
   };
 });
@@ -84,6 +85,7 @@ describe("Funil do Sucesso do Cliente por classe (03/10/2026)", () => {
     localStorage.clear();
     vi.mocked(api.funilDoSucesso).mockResolvedValue(FUNIL);
     vi.mocked(api.reunioesDoGrupo).mockResolvedValue([]);
+    vi.mocked(api.notasDoGranolaDoGrupo).mockResolvedValue([]);
     vi.mocked(api.servicos).mockResolvedValue([]);
     vi.mocked(api.responsaveisPorAjuste).mockResolvedValue([
       { email: "bruno@grupocriterio.com.br", nome: "Bruno Soares", perfil: "Área técnica" },

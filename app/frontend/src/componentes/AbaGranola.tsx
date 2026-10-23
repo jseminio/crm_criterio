@@ -6,17 +6,19 @@
  * muda na proposta até "Aplicar": a pessoa escolhe entre a sugestão e o texto atual e marca os campos.
  * O questionário prevalece: campo que diverge vem desmarcado, com ⚠. Do lead guarda-se só o resumo,
  * com a ciência de que a reunião foi gravada. Abaixo, o histórico de todas as reuniões guardadas.
- * Quando houver a API do Granola, a nota nova chega aqui sozinha para revisar.
+ * Desde 23/10/2026, a nota da pasta [Potencial Cliente] chega aqui sozinha ("Chegou do Granola"): "Usar esta nota"
+ * preenche o formulário, e o resto segue igual.
  */
 
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { AbaDaProposta, ReuniaoComLead, SugestaoDoContexto } from "../api/tipos";
+import type { AbaDaProposta, NotaDoGranola, ReuniaoComLead, SugestaoDoContexto } from "../api/tipos";
 import { usarAcesso } from "../entrada";
 import { data } from "../formato";
 import { lerRascunho, trocarContextualizacaoGuardada } from "../rascunhoDaProposta";
 import { CampoDeData } from "./CampoDeData";
 import { Carregando, Erro } from "./estados";
+import { NotasQueChegaram } from "./NotasQueChegaram";
 
 /** O mesmo mínimo do servidor: menos que isso não é um resumo de reunião. */
 export const MINIMO_DO_RESUMO = 80;
@@ -84,6 +86,8 @@ export function AbaGranola({
   const [ocupado, definirOcupado] = useState<"sugerindo" | "aplicando" | null>(null);
   const [falha, definirFalha] = useState<string | null>(null);
   const [feito, definirFeito] = useState<string | null>(null);
+  const [chegadas, definirChegadas] = useState<NotaDoGranola[]>([]);
+  const [notaEmUso, definirNotaEmUso] = useState<number | null>(null);
 
   const carregar = () => {
     definirErroAoAbrir(null);
@@ -96,6 +100,29 @@ export function AbaGranola({
       .catch((f) => definirErroAoAbrir(f instanceof ErroDaApi ? f.message : "Falha ao abrir as reuniões."));
   };
   useEffect(carregar, [oportunidadeId]);
+  useEffect(() => {
+    if (!podeEditar) return;
+    let vivo = true;
+    api.notasDoGranolaDaOportunidade(oportunidadeId).then((n) => { if (vivo) definirChegadas(n); }, () => undefined);
+    return () => { vivo = false; };
+  }, [oportunidadeId, podeEditar]);
+  const limpar = () => { definirCampos(VAZIO()); definirNotaEmUso(null); };
+  const usar = (n: NotaDoGranola) => {
+    definirCampos({ data: n.data, participantes: n.participantes ?? "", link: n.link ?? "", resumo: n.resumo ?? "", ciencia: false });
+    definirNotaEmUso(n.id);
+    definirSugestao(null);
+    definirFeito(null);
+    definirColando(true);
+  };
+  const descartarNota = async (n: NotaDoGranola) => {
+    definirFalha(null);
+    try {
+      definirChegadas(await api.descartarNotaDaOportunidade(oportunidadeId, n.id));
+      if (notaEmUso === n.id) limpar();
+    } catch (e) {
+      definirFalha(e instanceof ErroDaApi ? e.message : "Não consegui descartar a nota. Tente de novo.");
+    }
+  };
 
   const mudar = <K extends keyof Campos>(campo: K, valor: Campos[K]) => definirCampos((c) => ({ ...c, [campo]: valor }));
   const curto = campos.resumo.trim().length < MINIMO_DO_RESUMO;
@@ -137,11 +164,13 @@ export function AbaGranola({
         data: campos.data, participantes: campos.participantes || undefined, link_do_granola: campos.link || undefined,
         resumo: campos.resumo, ciencia_da_gravacao: campos.ciencia, contextualizacao,
         perfil: Object.fromEntries(sugestao.perfil.filter((p) => marcados.has(p.campo)).map((p) => [p.campo, p.valor])),
+        ...(notaEmUso !== null ? { nota_do_granola_id: notaEmUso } : {}),
       });
+      if (notaEmUso !== null) definirChegadas((c) => c.filter((n) => n.id !== notaEmUso));
       if (contextualizacao !== null) trocarContextualizacaoGuardada(oportunidadeId, contextualizacao);
       definirAba(nova);
       definirSugestao(null);
-      definirCampos(VAZIO());
+      limpar();
       definirColando(false);
       definirFeito("Reunião guardada e aplicada à proposta.");
       aoMudar?.((nova.reunioes_com_o_lead ?? []).length);
@@ -169,6 +198,11 @@ export function AbaGranola({
             <button type="button" className="link-de-tabela" onClick={aoIrParaProposta}>Ver na aba Proposta</button>
           )}
         </p>
+      )}
+
+      {podeEditar && (
+        <NotasQueChegaram notas={chegadas} emUso={notaEmUso} aoUsar={usar} aoDescartar={(n) => void descartarNota(n)}
+          ocupado={ocupado !== null} />
       )}
 
       {colando && podeEditar && (
@@ -218,7 +252,7 @@ export function AbaGranola({
                   : "· a IA só sugere; nada muda na proposta até você aplicar"}
             </span>
             {reunioes.length > 0 && !sugestao && (
-              <button type="button" className="link-de-tabela" onClick={() => { definirColando(false); definirCampos(VAZIO()); }}>
+              <button type="button" className="link-de-tabela" onClick={() => { definirColando(false); limpar(); }}>
                 cancelar
               </button>
             )}

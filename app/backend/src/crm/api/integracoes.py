@@ -1,6 +1,6 @@
 """Configurações › Integrações (amostra aprovada por Eduardo em 07/10/2026).
 
-Chave de IA, WhatsApp, e-mail, questionário, disparo, Meta Ads (13/10/2026), Google Ads (14/10/2026) e Clicksign (18/10/2026) se cadastram, trocam e testam pela tela, sem
+Chave de IA, WhatsApp, e-mail, questionário, disparo, Meta Ads (13/10/2026), Google Ads (14/10/2026), Clicksign (18/10/2026) e Granola (23/10/2026) se cadastram, trocam e testam pela tela, sem
 nada no painel do servidor. Regras:
 
 - vale primeiro o que está na tela; sem valor na tela, a variável de ambiente antiga; depois o padrão
@@ -134,6 +134,20 @@ def _testar_clicksign(_: ConfiguracaoDoAgente) -> str:
     return texto + (f" Falta salvar {' e '.join(faltas)}." if faltas else "")
 
 
+def testar_granola(http: Callable[[], object] | None = None) -> str:
+    """A chave abre as pastas e as duas pastas escolhidas existem. Não precisa da busca ligada; não grava nada."""
+    from crm.granola import cliente as granola
+
+    config = granola.ler_configuracao(exigir_ligada=False)
+    if config is None:
+        raise Falhou("Salve a chave da API do Granola.")
+    try:
+        with (http or granola.novo_http)() as cliente:
+            return granola.conferir(cliente, config)
+    except granola.FalhaNoGranola as falha:
+        raise Falhou(str(falha)) from falha
+
+
 def _enviar_whatsapp(config: ConfiguracaoDoAgente, para: str) -> str:
     if config.whatsapp is None:
         raise Falhou("Faltam o token e o ID do número.")
@@ -171,6 +185,7 @@ class Testadores:
     meta_ads: Callable[[ConfiguracaoDoAgente], str] = _testar_meta_ads
     google_ads: Callable[[ConfiguracaoDoAgente], str] = _testar_google_ads
     clicksign: Callable[[ConfiguracaoDoAgente], str] = _testar_clicksign
+    granola: Callable[[ConfiguracaoDoAgente], str] = lambda _: testar_granola()
     enviar: dict[str, Callable[[ConfiguracaoDoAgente, str], str]] = field(
         default_factory=lambda: {"whatsapp": _enviar_whatsapp, "email": _enviar_email}
     )
@@ -249,6 +264,13 @@ def _problema(campo: configuracao.Campo, valor: str) -> str | None:
         return "ID da conta de anúncios: só os números, como 1708029123631617"
     if campo.chave in ("questionario.link", "questionario.url") and not valor.startswith("https://"):
         return f"{campo.rotulo}: o endereço começa com https://"
+    if campo.chave == "granola.desde":
+        from crm.granola.cliente import data_de_texto
+
+        try:
+            data_de_texto(valor)
+        except ValueError:
+            return "Trazer notas a partir de: use o formato 01/10/2026"
     if campo.chave == "m365.remetente" and "@" not in valor:
         return "Caixa remetente: digite um e-mail"
     return None
@@ -262,7 +284,7 @@ def _configurado(grupo: str, linhas: dict[str, configuracao.Linha]) -> bool:
         em_uso = {linhas["ia.principal"].valor, linhas["ia.reserva"].valor} - {NENHUMA, None}
         return all(linhas[f"{n.casefold()}.chave"].origem != "vazio" for n in em_uso)
     opcionais = {"whatsapp.recebimento", "whatsapp.token_verificacao", "whatsapp.app_secret", "google_ads.conta_admin", "meta_ads.conjunto", "meta_ads.pagina", "meta_ads.token_pagina", "google_ads.acao_qualificado",
-                 "google_ads.acao_reuniao", "google_ads.acao_contrato"}
+                 "google_ads.acao_reuniao", "google_ads.acao_contrato", "granola.desde"}
     return all(l.origem != "vazio" for l in linhas.values() if configuracao.CAMPOS[l.campo.chave] in
                configuracao.catalogo.grupo(grupo).campos and l.campo.chave not in opcionais)
 
@@ -353,7 +375,7 @@ def roteador_de_integracoes(
         if g.chave == "questionario":
             return _cronometrar(_questionario)
         testador = {"ia": t.ia, "whatsapp": t.whatsapp, "email": t.email, "meta_ads": t.meta_ads,
-                    "google_ads": t.google_ads, "clicksign": t.clicksign}[g.chave]
+                    "google_ads": t.google_ads, "clicksign": t.clicksign, "granola": t.granola}[g.chave]
         return _cronometrar(lambda: testador(ler_configuracao()))
 
     @r.post("/{chave}/enviar-teste", response_model=ResultadoDoTeste)

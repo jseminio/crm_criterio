@@ -27,6 +27,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from crm.db.base import Base, CarimboMixin, agora, coluna_lista
 from crm.domain.base_de_conhecimento import BlocoDaBase, SituacaoDaFicha
+from crm.domain.granola import SituacaoDaNota, TipoDaNota
 from crm.domain.listas import (
     AderenciaDaPromessa,
     AutorDaMensagem,
@@ -2217,3 +2218,33 @@ class FeeDeParceiro(CarimboMixin, Base):
 
     parceiro: Mapped[Parceiro] = relationship()
     oportunidade: Mapped[Oportunidade] = relationship()
+
+
+class NotaDoGranola(CarimboMixin, Base):
+    """Uma nota que chegou sozinha do Granola (amostra aprovada por Eduardo em 23/10/2026).
+
+    Casada pelos participantes, espera "A usar" na aba Granola da oportunidade (`oportunidade_id`) ou na reunião do
+    cliente no Funil do Sucesso (`grupo_id`); sem casar, fica em "Precisa de você", em Configurações › Integrações.
+    Nada é aplicado sozinho: quem usa é a pessoa. Do lead guarda-se **só o resumo**; a transcrição, só da Reunião de
+    Resultado. Descartada, o resumo e a transcrição saem do banco e fica o ID do Granola, para a nota não voltar.
+    Dado de cliente: só no banco, fora do histórico de alterações."""
+
+    __tablename__ = "nota_do_granola"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    granola_id: Mapped[str] = mapped_column(sa.String(60), nullable=False, unique=True)
+    tipo: Mapped[TipoDaNota] = mapped_column(coluna_lista(TipoDaNota), nullable=False)
+    situacao: Mapped[SituacaoDaNota] = mapped_column(coluna_lista(SituacaoDaNota), nullable=False, index=True)
+    titulo: Mapped[str] = mapped_column(sa.String(300), nullable=False)
+    data: Mapped[date] = mapped_column(sa.Date, nullable=False)
+    participantes: Mapped[str | None] = mapped_column(sa.String(300))
+    link: Mapped[str | None] = mapped_column(sa.String(400))
+    resumo: Mapped[str | None] = mapped_column(sa.Text)
+    transcricao: Mapped[str | None] = mapped_column(sa.Text)
+    motivo: Mapped[str | None] = mapped_column(sa.String(200))
+    """Por que precisa de você: "nenhum participante é contato do CRM", "2 oportunidades em aberto"."""
+    oportunidade_id: Mapped[int | None] = mapped_column(
+        sa.ForeignKey("oportunidade.id", ondelete="SET NULL"), index=True)
+    grupo_id: Mapped[int | None] = mapped_column(sa.ForeignKey("grupo_economico.id"), index=True)
+    resolvida_por: Mapped[str | None] = mapped_column(sa.String(200))
+    resolvida_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))

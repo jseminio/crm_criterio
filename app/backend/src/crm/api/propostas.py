@@ -173,6 +173,8 @@ class NovaReuniaoComLead(BaseModel):
     """A sugestão escolhida; vazia quando a pessoa mantém a atual."""
     perfil: dict[str, str] = {}
     """Só os campos marcados para usar."""
+    nota_do_granola_id: int | None = None
+    """A nota que chegou sozinha do Granola e foi usada aqui: passa a "Usada" (23/10/2026)."""
 
 
 class AbaDaProposta(BaseModel):
@@ -462,6 +464,9 @@ def roteador_de_propostas(
                 raise HTTPException(422, f"Valor do perfil vazio ou longo demais: {campo}")
             perfil[campo] = valor
         contextualizacao = (corpo.contextualizacao or "").strip() or None
+        from crm.api.granola import usar_nota
+
+        usar_nota(sessao, corpo.nota_do_granola_id, oportunidade_id=o.id)
         sessao.add(ReuniaoComLead(
             oportunidade_id=o.id, data=corpo.data, participantes=_texto(corpo.participantes),
             link_do_granola=_texto(corpo.link_do_granola), resumo_do_granola=resumo,

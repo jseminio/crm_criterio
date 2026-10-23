@@ -1563,7 +1563,52 @@ reabrir a aba. Custa centavos de dólar por sugestão; usa a mesma chave de IA d
 - Rotas: `POST /api/oportunidades/{id}/proposta/reuniao-com-lead/sugestao` (não grava) e
   `POST /api/oportunidades/{id}/proposta/reuniao-com-lead` (grava e devolve a aba). Permissão: gerar
   proposta.
-- **Etapa seguinte:** com o plano Business do Granola, a nota chega sozinha, sem colar.
+- **Etapa seguinte:** com o plano Business do Granola, a nota chega sozinha, sem colar. Feito em
+  23/10/2026: ver a seção abaixo.
+
+## Notas do Granola chegando sozinhas (23/10/2026)
+
+Amostra aprovada por Eduardo em 23/10/2026. Com o plano Business, o CRM busca as notas do Granola **a
+cada 10 minutos** (e no botão "Buscar agora"), sem colar. A API do Granola não diz com que template a nota
+foi feita, então o CRM separa pela **pasta** (decisão de 10/10/2026):
+
+- nota da pasta **Potencial Cliente** → aba Granola da oportunidade;
+- nota da pasta **Reunião de Resultado** → reunião do cliente no Funil do Sucesso, pronta para montar a ata.
+
+**Como configurar (uma vez, pela tela, nada no servidor).** No Granola: clique no nome da conta, embaixo à
+esquerda › Settings › Connectors › API keys › Create new key, com o escopo *Personal notes*. Crie as duas
+pastas e coloque cada reunião na pasta certa. No CRM: Configurações › Integrações › **Granola**: cole a
+chave, salve, escolha as duas pastas (a lista vem do próprio Granola), "Testar conexão" e ligue a busca.
+"Trazer notas a partir de" evita que o histórico antigo entre de uma vez; vazio, são as notas dos últimos
+30 dias.
+
+**Onde a nota entra.** O CRM casa pelos e-mails de quem participou da reunião e de quem foi convidado no
+evento da agenda, tirando o dono da nota, quem tem o mesmo domínio dele e os usuários do CRM:
+
+- reunião com o lead: o contato (ou o lead) com aquele e-mail aponta a **oportunidade em aberto**. Uma só →
+  "Chegou do Granola" na aba Granola dela;
+- Reunião de Resultado: o contato aponta o **grupo**. Um só → "Chegou do Granola" na ata do Funil do Sucesso;
+- nenhuma, ou mais de uma → fila **"Precisa de você"**, em Configurações › Integrações › Granola, com o
+  motivo. A pessoa escolhe a oportunidade (ou o cliente) e aplica, ou descarta.
+
+**Nada se aplica sozinho.** "Usar esta nota" só preenche o formulário: na aba Granola, a data, os
+participantes, o link e o resumo, e o resto segue igual (a IA sugere, a pessoa confirma a ciência da
+gravação e aplica); na ata, a data, os participantes e a transcrição, e a pessoa monta a ata e registra.
+Guardada a reunião, a nota passa a "Usada" e sai da lista. "Descartar" pede confirmação e tira do banco o
+resumo, a transcrição e os participantes; fica só o ID do Granola, para a nota não voltar na busca.
+
+- **Do lead, a transcrição nem é pedida ao Granola**: guarda-se só o resumo, como na nota colada. Da Reunião
+  de Resultado vêm o resumo e a transcrição. Tudo é dado de cliente: só no banco (`nota_do_granola`), fora
+  do histórico de alterações.
+- A chave é pessoal: com uma licença só (a do Eduardo), entram só as notas dele e as compartilhadas com ele.
+  O Granola só devolve nota que já tem o resumo da IA pronto: a reunião que acabou entra na busca seguinte.
+- Rotas: `GET /api/granola` (situação e fila), `POST /api/granola/buscar`, `GET /api/granola/pastas`,
+  `POST /api/granola/notas/{id}/destino` e `/descartar` (permissão: integrações);
+  `GET /api/oportunidades/{id}/granola` e `POST …/granola/{nota}/descartar` (permissão: gerar proposta);
+  `GET /api/sucesso/grupos/{id}/granola` e `POST …/granola/{nota}/descartar` (permissão: registrar
+  reuniões do Sucesso). A reunião guardada leva `nota_do_granola_id`.
+- O Redeploy cria a tabela `nota_do_granola` (migração `3c8e1a7b5d92`), sem tocar no que existe. Nenhuma
+  variável de ambiente nova.
 
 ## Questionário do site vira oportunidade (01/10/2026)
 

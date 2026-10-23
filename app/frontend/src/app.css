@@ -1719,6 +1719,22 @@ fieldset.lacuna-prioritaria { border: 2px dashed var(--espera); padding: var(--e
 .aviso-de-alerta ul { margin: var(--e1) 0; padding-left: var(--e4); }
 
 
+
+/* ------------------------------------------------ Granola: situação da busca e fila (23/10/2026) */
+.granola-situacao { display: grid; gap: var(--e2); border-top: 1px solid var(--borda); padding-top: var(--e4); margin-top: var(--e3); }
+.granola-fila td { vertical-align: middle; font-size: 13px; }
+.granola-fila-rolagem { overflow-x: auto; }
+.granola-fila td:first-child { min-width: 13rem; }
+.granola-fila .selecao { width: 100%; min-width: 12rem; max-width: 18rem; font-size: 13px; }
+.granola-fila-escolha { display: grid; gap: var(--e1); justify-items: start; }
+.granola-fila .acoes { white-space: nowrap; }
+.granola-chegou { display: grid; gap: var(--e2); }
+.granola-chegou-linha { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center; }
+@media (max-width: 640px) {
+  .granola-fila thead { display: none; }
+  .granola-fila td { display: block; border: 0; padding: 2px 0; }
+  .granola-fila tr { display: block; padding: var(--e2) 0; border-bottom: 1px solid var(--borda); }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -40,6 +40,10 @@ const ABA: Record<string, { rotulo: string; explicacao: string }> = {
   meta_ads: { rotulo: "Meta Ads", explicacao: "O gasto por campanha, os leads do formulário e a devolução das conversões." },
   google_ads: { rotulo: "Google Ads", explicacao: "O gasto por campanha, os leads do formulário e a devolução das conversões." },
   disparo: { rotulo: "Disparo", explicacao: "O envio automático do lembrete e do agradecimento do questionário." },
+  sdr_respostas: {
+    rotulo: "Respostas do SDR",
+    explicacao: "Como a IA responde ao lead no WhatsApp: o modo, o modelo leve e os limites por conversa.",
+  },
 };
 const MEMORIA = "crm.integracoes.aba";
 
@@ -182,6 +186,9 @@ function CartaoDeIntegracao({ grupo, aoSalvar, aoMudarRascunho }: {
           <Recebimento campos={grupo.campos.filter((c) => DO_RECEBIMENTO.includes(c.chave))} situacao={grupo.situacao}
             valorDe={valorDe} aoMudar={mudar} apagar={apagar}
             aoApagar={(chave) => { definirFeito(null); definirApagar([...apagar, chave]); }} />
+        )}
+        {grupo.situacao && !grupo.campos.some((c) => DO_RECEBIMENTO.includes(c.chave)) && (
+          <p className="campo-ajuda" role="status" style={{ margin: 0 }}>{grupo.situacao}</p>
         )}
       </div>
       <div className="perfis-acoes">

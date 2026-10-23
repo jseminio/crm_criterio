@@ -1120,7 +1120,13 @@ class MensagemResposta(Base):
     termo_nao_reconhecido: str | None = None
     tom: Tom | None = None
     entrega: str | None = None
-    """Enviada, entregue, lida ou falhou, nas mensagens da Critério pelo WhatsApp (14/10/2026)."""
+    """Enviada, entregue, lida ou falhou, nas mensagens da Critério pelo WhatsApp (14/10/2026). Nas respostas
+    da IA que não saíram (23/10/2026): rascunho, descartada ou bloqueada."""
+    custo_usd: Decimal | None = None
+    modelo: str | None = None
+    rota: str | None = None
+    """leve, principal, regra ou trava (fase 1 do SDR de IA, 23/10/2026)."""
+    observacao: str | None = None
 
 
 class ConversaResposta(Base):
@@ -1136,6 +1142,10 @@ class ConversaResposta(Base):
     nota: int | None = None
     ultima_do_lead_em: datetime | None = None
     """Abre a janela de 24 horas do WhatsApp (14/10/2026)."""
+    equipe_desde: datetime | None = None
+    """Com a equipe desde (fase 1, 23/10/2026): a IA não responde mais nesta conversa."""
+    equipe_motivo: str | None = None
+    atendida_por: str | None = None
     mensagens: list[MensagemResposta] = []
 
 

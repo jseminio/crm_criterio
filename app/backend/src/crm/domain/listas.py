@@ -389,6 +389,9 @@ class MotivoDeTransbordo(Enum):
     DUVIDA_TECNICA = "Dúvida técnica fora do roteiro"
     LEAD_IRRITADO = "Lead irritado"
     SISTEMA_FORA = "Sistema externo fora do ar"
+    # Gatilhos T8 e T9 de `sdr-ia-limites-de-atuacao.md` (fase 1 do SDR de IA, 23/10/2026).
+    SERVICO_SEM_ROTEIRO = "Serviço sem roteiro"
+    URGENCIA_LEGAL = "Urgência com prazo legal"
     OUTRO = "Outro"
 
 
@@ -399,6 +402,8 @@ class DestinoDoTransbordo(Enum):
     CONSULTORIA_C2 = "Consultoria (C2)"
     SOCIOS = "Sócios · conta grande"
     TECNICO_FISCAL = "Técnico fiscal"
+    SUCESSO_DO_CLIENTE = "Sucesso do Cliente"
+    """Gatilho T11: quem já é cliente vai para a equipe que cuida da empresa dele (23/10/2026)."""
 
 
 class AutorDaMensagem(Enum):

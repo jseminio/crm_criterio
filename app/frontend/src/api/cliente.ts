@@ -752,6 +752,17 @@ export const api = {
   conversasDoLead: (leadId: number) =>
     pedir<ConversaDoSdr[]>(`/api/sdr/leads/${leadId}/conversas`),
 
+  // Respostas do SDR de IA no WhatsApp (fase 1, 23/10/2026).
+  modoDasRespostas: () => pedir<{ modo: string }>("/api/sdr/respostas"),
+  responderAoLead: (conversaId: number, texto: string) =>
+    pedir<ConversaDoSdr>(`/api/sdr/conversas/${conversaId}/responder`, { method: "POST", body: JSON.stringify({ texto }) }),
+  devolverParaAIA: (conversaId: number) =>
+    pedir<ConversaDoSdr>(`/api/sdr/conversas/${conversaId}/devolver`, { method: "POST" }),
+  enviarRascunho: (mensagemId: number, texto?: string) =>
+    pedir<ConversaDoSdr>(`/api/sdr/mensagens/${mensagemId}/enviar`, { method: "POST", body: JSON.stringify({ texto: texto ?? null }) }),
+  descartarRascunho: (mensagemId: number) =>
+    pedir<ConversaDoSdr>(`/api/sdr/mensagens/${mensagemId}/descartar`, { method: "POST" }),
+
   parametrosDoSdr: () => pedir<ParametrosDoSdr>("/api/sdr/parametros"),
 
   gravarParametrosDoSdr: (dados: Record<string, unknown>) =>

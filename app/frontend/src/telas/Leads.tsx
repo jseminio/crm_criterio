@@ -4,9 +4,9 @@
  * vira oportunidade: o funil continua medindo proposta, não contato.
  */
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { api, ErroDaApi } from "../api/cliente";
-import type { ConversaDoSdr, LeadResumo, Listas, Pagina } from "../api/tipos";
+import type { ConversaDoSdr, LeadResumo, Listas, MensagemDoSdr, Pagina } from "../api/tipos";
 import { EscolhaDeServico } from "../componentes/CatalogoDeServicos";
 import { Etiqueta } from "../componentes/Etiqueta";
 import { PainelLateral } from "../componentes/PainelLateral";
@@ -14,6 +14,7 @@ import { PrimeiroContato, type RascunhoDoPrimeiroContato } from "../componentes/
 import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
 import { data, dataHora, prazo } from "../formato";
 import { usarDados } from "../usarDados";
+import { usarAcesso } from "../entrada";
 import { CampoDeData } from "../componentes/CampoDeData";
 
 const CAMPOS_VAZIOS = {
@@ -575,9 +576,32 @@ const ENTREGA: Record<string, string> = {
 };
 const JANELA_MS = 24 * 60 * 60 * 1000;
 
+/** Por onde a resposta da IA passou (fase 1, 23/10/2026). */
+const ROTA: Record<string, string> = {
+  leve: "modelo leve", principal: "modelo principal", regra: "regra do servidor", trava: "frase da trava",
+};
+
+const MODO: Record<string, ReactNode> = {
+  Desligado: <>Respostas da IA: <b>desligadas</b>. A equipe responde por aqui.</>,
+  Supervisionado: <>Respostas da IA: <b>supervisionadas</b>, a equipe envia cada uma.</>,
+  Automático: <>Respostas da IA: <b>automáticas</b>.</>,
+};
+
+/** US$ com vírgula; abaixo de um centavo, três casas. */
+export function custoEmDolar(valor: number): string {
+  return `US$ ${valor.toFixed(valor > 0 && valor < 0.01 ? 3 : 2).replace(".", ",")}`;
+}
+
+/** A janela vale para o lead: 24 h desde a última mensagem dele em qualquer conversa do WhatsApp (como no servidor). */
+function janelaAberta(ultimaDoLead: string | null, agora: Date): Date | null {
+  if (!ultimaDoLead) return null;
+  const ate = new Date(new Date(ultimaDoLead).getTime() + JANELA_MS);
+  return ate.getTime() > agora.getTime() ? ate : null;
+}
+
 /** A janela de 24 h do WhatsApp (14/10/2026): dentro dela vale texto livre; fora, só modelo aprovado. */
-export function JanelaDoWhatsapp({ conversa, agora = new Date() }: { conversa: ConversaDoSdr; agora?: Date }) {
-  if (conversa.canal !== "WhatsApp" || conversa.encerrada_em || !conversa.ultima_do_lead_em) return null;
+export function JanelaDoWhatsapp({ conversa, modo, agora = new Date() }: { conversa: ConversaDoSdr; modo?: string; agora?: Date }) {
+  if (conversa.canal !== "WhatsApp" || conversa.encerrada_em || conversa.equipe_desde || !conversa.ultima_do_lead_em) return null;
   const ate = new Date(new Date(conversa.ultima_do_lead_em).getTime() + JANELA_MS);
   const aberta = ate.getTime() > agora.getTime();
   return (
@@ -587,25 +611,138 @@ export function JanelaDoWhatsapp({ conversa, agora = new Date() }: { conversa: C
       ) : (
         <>⚠ Janela do WhatsApp <b>fechada desde {dataHora(ate.toISOString())}</b>: para escrever ao lead, só modelo aprovado.</>
       )}{" "}
-      Respostas automáticas: <b>desligadas</b> até a fase 1. A equipe responde pelo WhatsApp da Critério.
+      {modo ? MODO[modo] ?? null : null}
     </p>
   );
 }
 
-/** O que a IA e o lead disseram. Só leitura: quem registra é a integração do canal. */
+/** A conversa está com a equipe (fase 1): por quê, para quem e desde quando. A IA não responde mais nela. */
+function ComAEquipe({ conversa }: { conversa: ConversaDoSdr }) {
+  if (!conversa.equipe_desde) return null;
+  const destino = conversa.destino_transbordo ? <> → <b>{conversa.destino_transbordo}</b></> : null;
+  return (
+    <p className="recado recado-alcada sdr-com-a-equipe" role="status">
+      ⚑ {conversa.atendida_em ? <b>Com a equipe</b> : <b>Aguardando a equipe</b>} desde {dataHora(conversa.equipe_desde)}
+      {conversa.equipe_motivo ? <> · {conversa.equipe_motivo}</> : null}
+      {destino}.{" "}
+      {conversa.atendida_em && <>Respondida por {conversa.atendida_por ?? "alguém da equipe"} em {dataHora(conversa.atendida_em)}. </>}
+      A IA não responde mais nesta conversa.
+    </p>
+  );
+}
+
+function Mensagem({ m }: { m: MensagemDoSdr }) {
+  const naoSaiu = m.entrega === "descartada" || m.entrega === "bloqueada";
+  const rotulo = m.entrega === "bloqueada" ? "barrada pela trava, não saiu" : m.entrega === "descartada" ? "não saiu" : null;
+  return (
+    <li className={`sdr-mensagem sdr-mensagem-${m.autor === "Lead" ? "lead" : "criterio"}${naoSaiu ? " sdr-mensagem-nao-saiu" : ""}`}>
+      <span className="sdr-mensagem-autor">
+        {m.autor} · {dataHora(m.enviada_em)}
+        {m.fallback && " · não entendeu"}
+        {rotulo ? ` · ${rotulo}` : m.entrega && ` · ${ENTREGA[m.entrega] ?? m.entrega}`}
+        {m.rota && ` · ${ROTA[m.rota] ?? m.rota}`}
+        {m.custo_usd && Number(m.custo_usd) > 0 && ` · ${custoEmDolar(Number(m.custo_usd))}`}
+      </span>
+      {naoSaiu ? <s>{m.texto}</s> : m.texto}
+      {m.observacao && <span className="sdr-mensagem-nota">{m.observacao}</span>}
+    </li>
+  );
+}
+
+/** O rascunho da IA no modo supervisionado: a equipe ajusta, envia ou descarta. */
+function Rascunho({ m, aoMudar, podeEditar }: { m: MensagemDoSdr; aoMudar: (c: Promise<unknown>) => void; podeEditar: boolean }) {
+  const [texto, definirTexto] = useState(m.texto);
+  return (
+    <li className="sdr-mensagem sdr-mensagem-criterio sdr-rascunho">
+      <span className="sdr-mensagem-autor">
+        Rascunho da IA · ainda não enviado{m.rota && ` · ${ROTA[m.rota] ?? m.rota}`}
+        {m.custo_usd && Number(m.custo_usd) > 0 && ` · ${custoEmDolar(Number(m.custo_usd))}`}
+      </span>
+      <label className="visualmente-oculto" htmlFor={`rascunho-${m.id}`}>Texto do rascunho</label>
+      <textarea id={`rascunho-${m.id}`} className="entrada" rows={3} value={texto} disabled={!podeEditar}
+        onChange={(e) => definirTexto(e.target.value)} />
+      {podeEditar && (
+        <span className="sdr-rascunho-acoes">
+          <button type="button" className="botao" onClick={() => aoMudar(api.descartarRascunho(m.id))}>
+            Descartar e passar para a equipe
+          </button>
+          <button type="button" className="botao botao-secundario" disabled={!texto.trim()}
+            onClick={() => aoMudar(api.enviarRascunho(m.id, texto.trim() === m.texto ? undefined : texto.trim()))}>
+            Enviar
+          </button>
+        </span>
+      )}
+    </li>
+  );
+}
+
+/** A equipe escreve ao lead pelo CRM: o número da Critério está na API da Meta. */
+function ResponderAoLead({ conversa, ultimaDoLead, aoMudar }: {
+  conversa: ConversaDoSdr; ultimaDoLead: string | null; aoMudar: (c: Promise<unknown>) => void;
+}) {
+  const [texto, definirTexto] = useState("");
+  const ate = janelaAberta(ultimaDoLead, new Date());
+  const id = `responder-${conversa.id}`;
+  return (
+    <div className="sdr-responder">
+      <label htmlFor={id}>
+        <b>Responder ao lead</b>{" "}
+        <span className="campo-ajuda">
+          · sai pelo WhatsApp da Critério{conversa.equipe_desde ? "" : "; a IA para de responder nesta conversa"}
+        </span>
+      </label>
+      <textarea id={id} className="entrada" rows={3} value={texto} disabled={!ate} maxLength={4096}
+        onChange={(e) => definirTexto(e.target.value)} />
+      <div className="sdr-responder-rodape">
+        <span className="campo-ajuda">
+          {ate ? <>Janela do WhatsApp aberta até {dataHora(ate.toISOString())}.</> : <>⚠ Janela do WhatsApp fechada: só modelo aprovado.</>}
+        </span>
+        <span className="sdr-rascunho-acoes">
+          {conversa.equipe_desde && (
+            <button type="button" className="botao" onClick={() => aoMudar(api.devolverParaAIA(conversa.id))}>
+              Devolver para a IA
+            </button>
+          )}
+          <button type="button" className="botao botao-secundario" disabled={!ate || !texto.trim()}
+            onClick={() => aoMudar(api.responderAoLead(conversa.id, texto.trim()).then(() => definirTexto("")))}>
+            Enviar
+          </button>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** O que a IA, a equipe e o lead disseram. Na fase 1 (23/10/2026), a equipe responde, envia o rascunho da IA e
+ * devolve a conversa à IA por aqui. */
 function ConversasComAIA({ leadId }: { leadId: number }) {
+  const { pode } = usarAcesso();
+  const podeEditar = pode("sdr.editar");
   const { dados, carregando, erro, recarregar } = usarDados<ConversaDoSdr[]>(
     () => api.conversasDoLead(leadId),
     [leadId],
   );
+  const { dados: modo } = usarDados(() => api.modoDasRespostas(), []);
+  const [falha, definirFalha] = useState<string | null>(null);
+  const [ocupado, definirOcupado] = useState(false);
+
+  function aoMudar(chamada: Promise<unknown>) {
+    definirFalha(null);
+    definirOcupado(true);
+    chamada
+      .then(() => recarregar())
+      .catch((e) => definirFalha(e instanceof ErroDaApi ? e.message : "Não deu certo. Tente de novo."))
+      .finally(() => definirOcupado(false));
+  }
 
   return (
-    <section className="sdr-conversas" aria-labelledby="t-conversas">
+    <section className="sdr-conversas" aria-labelledby="t-conversas" aria-busy={ocupado}>
       <h3 className="bloco-titulo" id="t-conversas">
         Conversas com a IA
       </h3>
       {carregando && <Carregando rotulo="Carregando as conversas" />}
       {erro && !carregando && <Erro mensagem={erro} aoTentarDeNovo={recarregar} />}
+      {falha && <p className="estado-texto estado-erro" role="alert">✗ {falha}</p>}
       {!carregando && !erro && dados?.length === 0 && (
         <p className="campo-ajuda">
           Nenhuma conversa registrada. Elas aparecem aqui quando a integração do WhatsApp ou do
@@ -614,34 +751,43 @@ function ConversasComAIA({ leadId }: { leadId: number }) {
       )}
       {!carregando &&
         !erro &&
-        dados?.map((conversa) => (
-          <div key={conversa.id} className="sdr-conversa">
-            <p className="sdr-conversa-topo">
-              {conversa.canal} · começou {dataHora(conversa.iniciada_em)}{" "}
-              {conversa.desfecho ? (
-                <Etiqueta texto={conversa.desfecho} tipo="neutra" />
-              ) : (
-                <span className="etiqueta etiqueta-andamento">Em andamento</span>
-              )}
-            </p>
-            <JanelaDoWhatsapp conversa={conversa} />
-            <ol className="sdr-mensagens">
-              {conversa.mensagens.map((m) => (
-                <li
-                  key={m.id}
-                  className={`sdr-mensagem sdr-mensagem-${m.autor === "Lead" ? "lead" : "criterio"}`}
-                >
-                  <span className="sdr-mensagem-autor">
-                    {m.autor} · {dataHora(m.enviada_em)}
-                    {m.fallback && " · não entendeu"}
-                    {m.entrega && ` · ${ENTREGA[m.entrega] ?? m.entrega}`}
-                  </span>
-                  {m.texto}
-                </li>
-              ))}
-            </ol>
-          </div>
-        ))}
+        dados?.map((conversa, _, todas) => {
+          const ultimaDoLead = todas
+            .filter((c) => c.canal === "WhatsApp" && c.ultima_do_lead_em)
+            .map((c) => c.ultima_do_lead_em as string)
+            .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? null;
+          const custo = conversa.mensagens.reduce((soma, m) => soma + (m.autor === "IA" ? Number(m.custo_usd ?? 0) : 0), 0);
+          const rascunhos = conversa.mensagens.filter((m) => m.entrega === "rascunho");
+          const rascunho = rascunhos.at(-1);
+          const atual = conversa.canal === "WhatsApp" && (!conversa.desfecho || !!conversa.equipe_desde);
+          return (
+            <div key={conversa.id} className="sdr-conversa">
+              <p className="sdr-conversa-topo">
+                {conversa.canal} · começou {dataHora(conversa.iniciada_em)}{" "}
+                {conversa.equipe_desde ? (
+                  <span className="etiqueta etiqueta-espera">⚑ Com a equipe</span>
+                ) : conversa.desfecho ? (
+                  <Etiqueta texto={conversa.desfecho} tipo="neutra" />
+                ) : (
+                  <span className="etiqueta etiqueta-andamento">Em andamento</span>
+                )}
+                {custo > 0 && <span className="campo-ajuda"> · custo da IA {custoEmDolar(custo)}</span>}
+              </p>
+              <ComAEquipe conversa={conversa} />
+              <JanelaDoWhatsapp conversa={conversa} modo={modo?.modo} />
+              <ol className="sdr-mensagens">
+                {conversa.mensagens.map((m) =>
+                  m.entrega === "rascunho" ? (
+                    m === rascunho && <Rascunho key={m.id} m={m} aoMudar={aoMudar} podeEditar={podeEditar} />
+                  ) : (
+                    <Mensagem key={m.id} m={m} />
+                  ),
+                )}
+              </ol>
+              {atual && podeEditar && !rascunho && <ResponderAoLead conversa={conversa} ultimaDoLead={ultimaDoLead} aoMudar={aoMudar} />}
+            </div>
+          );
+        })}
     </section>
   );
 }

@@ -1259,6 +1259,13 @@ class ConversaDoSdr(CarimboMixin, Base):
     atendida_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     """Primeira mensagem da equipe depois do transbordo. Carimbada pelo servidor
     ao registrar essa mensagem — é o fim da espera do lead."""
+    equipe_desde: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    """Desde quando a conversa está com a equipe (fase 1, 23/10/2026). Com valor, a IA não responde mais
+    nela, e as mensagens novas do lead entram nela mesmo encerrada. "Devolver para a IA" limpa."""
+    equipe_motivo: Mapped[str | None] = mapped_column(sa.String(160))
+    """Por que foi para a equipe, na frase da tela: o motivo do transbordo ou o que a fez parar."""
+    atendida_por: Mapped[str | None] = mapped_column(sa.String(200))
+    """Quem da equipe respondeu primeiro."""
 
     nota: Mapped[int | None] = mapped_column(sa.SmallInteger)
     """CSAT de 1 a 5, dado pelo lead ao fim da conversa."""
@@ -1293,7 +1300,8 @@ class MensagemDoSdr(Base):
     externo_id: Mapped[str | None] = mapped_column(sa.String(128), unique=True, index=True)
     """O ID da mensagem no WhatsApp (14/10/2026). A Meta repete entregas: com ele, cada uma grava uma vez."""
     entrega: Mapped[str | None] = mapped_column(sa.String(20))
-    """Só nas que a Critério envia: enviada, entregue, lida ou falhou, como a Meta avisa."""
+    """Só nas que a Critério envia: enviada, entregue, lida ou falhou, como a Meta avisa. Nas respostas da IA
+    que não saíram (fase 1): rascunho (espera a equipe), descartada ou bloqueada (pela trava)."""
 
     # Só nas mensagens da IA.
     intencao: Mapped[str | None] = mapped_column(sa.String(120))
@@ -1306,6 +1314,12 @@ class MensagemDoSdr(Base):
     """A IA respondeu "não entendi" ou caiu na intenção padrão de erro."""
     termo_nao_reconhecido: Mapped[str | None] = mapped_column(sa.String(120))
     custo_usd: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 4))
+    modelo: Mapped[str | None] = mapped_column(sa.String(60))
+    """O modelo que escreveu a resposta (fase 1, 23/10/2026)."""
+    rota: Mapped[str | None] = mapped_column(sa.String(20))
+    """Por onde a resposta passou: "leve", "principal", "regra" (o servidor decidiu sem IA) ou "trava"."""
+    observacao: Mapped[str | None] = mapped_column(sa.String(300))
+    """O que o servidor anotou: por que a trava barrou, por que o rascunho foi descartado, a falha do envio."""
 
     # Só nas mensagens do lead.
     tom: Mapped[Tom | None] = mapped_column(coluna_lista(Tom))

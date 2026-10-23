@@ -8,8 +8,8 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../api/cliente";
-import type { ConversaDoSdr, LeadResumo, Listas, Pagina } from "../api/tipos";
+import { api, ErroDaApi } from "../api/cliente";
+import type { ConversaDoSdr, LeadResumo, Listas, MensagemDoSdr, Pagina } from "../api/tipos";
 import { JanelaDoWhatsapp, Leads } from "./Leads";
 
 vi.mock("../api/cliente", async () => {
@@ -22,6 +22,11 @@ vi.mock("../api/cliente", async () => {
       editarLead: vi.fn(),
       converterLead: vi.fn(),
       conversasDoLead: vi.fn().mockResolvedValue([]),
+      modoDasRespostas: vi.fn().mockResolvedValue({ modo: "Supervisionado" }),
+      responderAoLead: vi.fn(),
+      devolverParaAIA: vi.fn(),
+      enviarRascunho: vi.fn(),
+      descartarRascunho: vi.fn(),
       servicos: vi.fn().mockResolvedValue([
         { nome: "BPO Contábil e Fiscal", nome_por_extenso: null, linha: "C1", recorrente: true,
           para_quem: "Empresa que terceiriza contabilidade e fiscal.", perguntas: [{ texto: "CNPJs no escopo", direcionador: "cnpjs_no_escopo" }],
@@ -371,11 +376,11 @@ describe("conversa do WhatsApp (14/10/2026)", () => {
     ultima_do_lead_em: "2026-10-14T13:34:00Z", mensagens: [], ...extra,
   });
 
-  it("janela aberta: diz até quando e que ninguém responde sozinho", () => {
-    render(<JanelaDoWhatsapp conversa={conversa()} agora={new Date("2026-10-14T20:00:00Z")} />);
+  it("janela aberta: diz até quando e quem responde", () => {
+    render(<JanelaDoWhatsapp conversa={conversa()} modo="Supervisionado" agora={new Date("2026-10-14T20:00:00Z")} />);
     const aviso = screen.getByRole("status");
     expect(aviso).toHaveTextContent("aberta até");
-    expect(aviso).toHaveTextContent("Respostas automáticas: desligadas até a fase 1");
+    expect(aviso).toHaveTextContent("Respostas da IA: supervisionadas, a equipe envia cada uma.");
   });
 
   it("janela fechada: avisa com sinal e texto, não só cor", () => {
@@ -383,9 +388,10 @@ describe("conversa do WhatsApp (14/10/2026)", () => {
     expect(screen.getByRole("status")).toHaveTextContent("⚠ Janela do WhatsApp fechada desde");
   });
 
-  it("e-mail, conversa encerrada ou sem mensagem do lead: sem aviso", () => {
+  it("e-mail, conversa encerrada, com a equipe ou sem mensagem do lead: sem aviso", () => {
     const { container } = render(<>
       <JanelaDoWhatsapp conversa={conversa({ canal: "E-mail" })} />
+      <JanelaDoWhatsapp conversa={conversa({ equipe_desde: "2026-10-14T14:00:00Z" })} />
       <JanelaDoWhatsapp conversa={conversa({ encerrada_em: "2026-10-14T14:00:00Z" })} />
       <JanelaDoWhatsapp conversa={conversa({ ultima_do_lead_em: null })} />
     </>);
@@ -403,5 +409,109 @@ describe("conversa do WhatsApp (14/10/2026)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Abrir" }));
     expect(await screen.findByText(/✓✓ lida/)).toBeInTheDocument();
     expect(screen.getByText("SAIR")).toBeInTheDocument();
+  });
+});
+
+describe("respostas do SDR de IA (fase 1, 23/10/2026)", () => {
+  const agora = Date.now();
+  const iso = (minutos: number) => new Date(agora - minutos * 60_000).toISOString();
+  const msg = (extra: Partial<MensagemDoSdr>): MensagemDoSdr => ({
+    id: 1, autor: "IA", enviada_em: iso(5), texto: "", intencao: null, confianca: null, fallback: false,
+    termo_nao_reconhecido: null, tom: null, ...extra,
+  });
+  const conversa = (extra: Partial<ConversaDoSdr> = {}): ConversaDoSdr => ({
+    id: 9, lead_id: 1, canal: "WhatsApp", iniciada_em: iso(10), encerrada_em: null, desfecho: null,
+    motivo_transbordo: null, destino_transbordo: null, atendida_em: null, nota: null, ultima_do_lead_em: iso(2),
+    mensagens: [], ...extra,
+  });
+
+  async function abrirComConversa(c: ConversaDoSdr) {
+    vi.mocked(api.conversasDoLead).mockResolvedValue([c]);
+    await abrir([lead()]);
+    await userEvent.click(screen.getByRole("button", { name: "Abrir" }));
+  }
+
+  it("rascunho: mostra a rota e o custo e envia com o texto ajustado", async () => {
+    vi.mocked(api.enviarRascunho).mockResolvedValue(conversa());
+    await abrirComConversa(conversa({ mensagens: [
+      msg({ id: 1, autor: "Lead", texto: "Oi, vi o anúncio", enviada_em: iso(3) }),
+      msg({ id: 2, texto: "O que fez você procurar uma mudança agora?", entrega: "rascunho", rota: "leve",
+            custo_usd: "0.0046", enviada_em: iso(2) }),
+    ] }));
+    expect(await screen.findByText(/Rascunho da IA · ainda não enviado · modelo leve · US\$ 0,005/)).toBeInTheDocument();
+    expect(screen.getByText(/custo da IA US\$ 0,005/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Responder ao lead/)).not.toBeInTheDocument();  // uma ação por vez
+    const caixa = screen.getByLabelText("Texto do rascunho");
+    await userEvent.clear(caixa);
+    await userEvent.type(caixa, "Texto ajustado.");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    expect(api.enviarRascunho).toHaveBeenCalledWith(2, "Texto ajustado.");
+  });
+
+  it("rascunho sem mudança vai como a IA escreveu; descartar passa para a equipe", async () => {
+    vi.mocked(api.enviarRascunho).mockResolvedValue(conversa());
+    vi.mocked(api.descartarRascunho).mockResolvedValue(conversa());
+    await abrirComConversa(conversa({ mensagens: [msg({ id: 2, texto: "Pergunta?", entrega: "rascunho", rota: "leve" })] }));
+    await userEvent.click(await screen.findByRole("button", { name: "Enviar" }));
+    expect(api.enviarRascunho).toHaveBeenCalledWith(2, undefined);
+    await userEvent.click(screen.getByRole("button", { name: "Descartar e passar para a equipe" }));
+    expect(api.descartarRascunho).toHaveBeenCalledWith(2);
+  });
+
+  it("com a equipe: diz por quê e para quem, e a equipe responde ou devolve", async () => {
+    vi.mocked(api.responderAoLead).mockResolvedValue(conversa());
+    vi.mocked(api.devolverParaAIA).mockResolvedValue(conversa());
+    await abrirComConversa(conversa({
+      desfecho: "Passou para a equipe", encerrada_em: iso(1), equipe_desde: iso(1),
+      equipe_motivo: "Dúvida técnica do caso do lead", destino_transbordo: "Técnico fiscal",
+      mensagens: [
+        msg({ id: 1, autor: "Lead", texto: "Vale a pena eu sair do Simples Nacional?", enviada_em: iso(2) }),
+        msg({ id: 2, texto: "Essa é uma análise que nossos especialistas fazem.", entrega: "entregue", rota: "leve",
+              custo_usd: "0.004", enviada_em: iso(1) }),
+      ],
+    }));
+    const faixa = await screen.findByText(/Aguardando a equipe/);
+    expect(faixa.closest("p")).toHaveTextContent("Dúvida técnica do caso do lead → Técnico fiscal.");
+    expect(faixa.closest("p")).toHaveTextContent("A IA não responde mais nesta conversa.");
+    expect(screen.getByText("⚑ Com a equipe")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/Responder ao lead/), "Olá, aqui é o Eduardo.");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    expect(api.responderAoLead).toHaveBeenCalledWith(9, "Olá, aqui é o Eduardo.");
+    await userEvent.click(screen.getByRole("button", { name: "Devolver para a IA" }));
+    expect(api.devolverParaAIA).toHaveBeenCalledWith(9);
+  });
+
+  it("janela fechada: não deixa escrever, e diz por quê", async () => {
+    await abrirComConversa(conversa({ equipe_desde: iso(60 * 30), ultima_do_lead_em: iso(60 * 30) }));
+    expect(await screen.findByLabelText(/Responder ao lead/)).toBeDisabled();
+    expect(screen.getByText(/Janela do WhatsApp fechada: só modelo aprovado/)).toBeInTheDocument();
+  });
+
+  it("conversa nova depois de devolver: a janela vem da última mensagem do lead em qualquer conversa", async () => {
+    vi.mocked(api.conversasDoLead).mockResolvedValue([
+      conversa({ id: 8, desfecho: "Passou para a equipe", encerrada_em: iso(5), ultima_do_lead_em: iso(6) }),
+      conversa({ id: 9, iniciada_em: iso(1), ultima_do_lead_em: null }),
+    ]);
+    await abrir([lead()]);
+    await userEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    expect(await screen.findByLabelText(/Responder ao lead/)).toBeEnabled();
+  });
+
+  it("resposta barrada pela trava aparece riscada, com o motivo", async () => {
+    await abrirComConversa(conversa({ mensagens: [
+      msg({ id: 3, texto: "São R$ 800 por mês.", entrega: "bloqueada", rota: "leve",
+            observacao: "A mensagem fala de preço: a IA não informa preço, ela passa para a equipe" }),
+    ] }));
+    expect(await screen.findByText(/barrada pela trava, não saiu/)).toBeInTheDocument();
+    expect(screen.getByText("São R$ 800 por mês.").tagName).toBe("S");
+    expect(screen.getByText(/a IA não informa preço/)).toBeInTheDocument();
+  });
+
+  it("erro do servidor aparece na conversa", async () => {
+    vi.mocked(api.responderAoLead).mockRejectedValue(new ErroDaApi(409, "o lead pediu para não ser contatado"));
+    await abrirComConversa(conversa({ equipe_desde: iso(1) }));
+    await userEvent.type(await screen.findByLabelText(/Responder ao lead/), "Oi");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("o lead pediu para não ser contatado");
   });
 });

@@ -1,8 +1,8 @@
-"""Envio de modelo aprovado pelo WhatsApp, pela Cloud API da Meta (06/10/2026).
+"""Envio pelo WhatsApp, pela Cloud API da Meta (06/10/2026).
 
-Só modelo: fora da janela de 24 horas desde a última mensagem do lead, o WhatsApp não aceita texto
-livre, e o CRM ainda não recebe as respostas do lead (sem webhook), então não sabe se a janela está
-aberta. O modelo vale dentro e fora dela.
+Modelo aprovado (`enviar_modelo`) vale dentro e fora da janela de 24 horas desde a última mensagem do lead.
+Texto livre (`enviar_texto`, fase 1 do SDR de IA, 23/10/2026) só dentro dela: quem confere a janela é quem
+chama, pela `ultima_do_lead_em` da conversa, que o recebimento grava.
 
 Usa o token permanente de um usuário do sistema do Business Manager, com a permissão
 `whatsapp_business_messaging`, e o ID do número de telefone da conta (`CRM_WHATSAPP_*`).
@@ -15,7 +15,7 @@ import httpx2 as httpx
 from crm.agente.config import ConfiguracaoDoWhatsapp
 from crm.agente.envio import EnvioFalhou
 
-__all__ = ["enviar_modelo", "conferir_numero"]
+__all__ = ["enviar_modelo", "enviar_texto", "conferir_numero"]
 
 _ENVIO = "https://graph.facebook.com/{versao}/{numero}/messages"
 
@@ -63,6 +63,34 @@ def enviar_modelo(
             erro = dados.get("error") if isinstance(dados.get("error"), dict) else {}
             motivo = erro.get("message") or "sem detalhe"
             raise EnvioFalhou(f"A Meta não enviou o WhatsApp (HTTP {resposta.status_code}): {motivo}")
+        mensagens = dados.get("messages") or [{}]
+        return str(mensagens[0].get("id") or "")
+    except httpx.HTTPError as falha:
+        raise EnvioFalhou(f"Não consegui falar com a Meta: {type(falha).__name__}.") from falha
+    finally:
+        if http is None:
+            cliente.close()
+
+
+def enviar_texto(config: ConfiguracaoDoWhatsapp, *, para: str, texto: str, http: httpx.Client | None = None) -> str:
+    """Envia texto livre, sem prévia de link. Devolve o id da mensagem na Meta. Levanta `EnvioFalhou` se
+    não saiu (inclusive com a janela fechada: a Meta recusa), com o motivo da Meta e sem o token."""
+    cliente = http or httpx.Client(timeout=30.0)
+    try:
+        resposta = cliente.post(
+            _ENVIO.format(versao=config.versao, numero=config.numero_id),
+            headers={"Authorization": f"Bearer {config.token}"},
+            json={"messaging_product": "whatsapp", "recipient_type": "individual", "to": para,
+                  "type": "text", "text": {"preview_url": False, "body": texto}},
+        )
+        if resposta.status_code in (401, 403):
+            raise EnvioFalhou(
+                f"A Meta recusou o token do WhatsApp (HTTP {resposta.status_code}). Confira o token em Configurações › Integrações."
+            )
+        dados = _json(resposta)
+        if resposta.status_code != 200:
+            erro = dados.get("error") if isinstance(dados.get("error"), dict) else {}
+            raise EnvioFalhou(f"A Meta não enviou o WhatsApp (HTTP {resposta.status_code}): {erro.get('message') or 'sem detalhe'}")
         mensagens = dados.get("messages") or [{}]
         return str(mensagens[0].get("id") or "")
     except httpx.HTTPError as falha:

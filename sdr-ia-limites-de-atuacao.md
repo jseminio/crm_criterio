@@ -174,7 +174,7 @@ todas as armadilhas. **[proposta]**
 1. Aprovar ou ajustar este documento.
 2. Passo 2: inventário das fontes, com dono e status.
 3. Passo 3: modelo da ficha.
-4. Os motivos e o destino novos de transbordo entram no CRM numa demanda própria, só aditiva.
+4. Os motivos e o destino novos de transbordo entram no CRM numa demanda própria, só aditiva. **Feito em 23/10/2026** (fase 1 do SDR de IA): "Serviço sem roteiro", "Urgência com prazo legal" e o destino "Sucesso do Cliente". As regras P e os gatilhos T valem no roteador (`crm.agente.roteador_do_sdr`); o modo automático espera a aprovação deste documento.
 
 **A revalidar:** a política do WhatsApp Business (fonte de 2025/2026,
 consultada em 03/10/2026) antes de ligar o canal; e estas regras depois do

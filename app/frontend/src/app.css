@@ -1579,6 +1579,14 @@ td > .celula-fonte { display: block; }
 .recebimento-linha .entrada { flex: 1; min-width: 0; }
 .recebimento-situacao { margin: 0; }
 .sdr-janela { margin: 0 0 var(--e2); }
+/* Fase 1 do SDR de IA (23/10/2026): com a equipe, rascunho da IA, resposta da equipe. */
+.sdr-com-a-equipe { margin: 0 0 var(--e2); }
+.sdr-mensagem-nao-saiu { opacity: .7; border: 1px dashed var(--borda-forte); }
+.sdr-mensagem-nota { display: block; font-size: 11px; color: var(--texto-medio); margin-top: var(--e1); }
+.sdr-rascunho { border: 1px dashed var(--borda-forte); display: grid; gap: var(--e2); width: 100%; max-width: 90%; }
+.sdr-rascunho-acoes { display: flex; gap: var(--e2); justify-content: flex-end; flex-wrap: wrap; }
+.sdr-responder { display: grid; gap: var(--e2); margin-top: var(--e3); }
+.sdr-responder-rodape { display: flex; gap: var(--e2); justify-content: space-between; align-items: center; flex-wrap: wrap; }
 
 /* Propostas em aberto · visão gerencial (14/10/2026): temperatura em cor e em texto (o cabeçalho diz qual é). */
 .quadro-propostas { display: grid; gap: var(--e3); margin-bottom: var(--e6); }

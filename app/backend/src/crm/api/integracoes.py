@@ -19,6 +19,7 @@ import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -249,9 +250,25 @@ def _problema(campo: configuracao.Campo, valor: str) -> str | None:
         return "ID da conta de anúncios: só os números, como 1708029123631617"
     if campo.chave in ("questionario.link", "questionario.url") and not valor.startswith("https://"):
         return f"{campo.rotulo}: o endereço começa com https://"
+    if campo.chave == "sdr.teto_por_conversa" and _decimal(valor) is None:
+        return f"{campo.rotulo}: um valor em dólar maior que zero, como 0.50"
+    if campo.chave == "sdr.maximo_de_respostas" and not (valor.isdigit() and 1 <= int(valor) <= 50):
+        return f"{campo.rotulo}: um número de 1 a 50"
+    if campo.chave == "sdr.espera_segundos" and not (valor.isdigit() and int(valor) <= 300):
+        return f"{campo.rotulo}: um número de 0 a 300"
+    if campo.chave in ("sdr.modelo_leve", "sdr.modelo_leve_openai") and not re.fullmatch(r"[a-z0-9][a-z0-9.\-]{2,59}", valor):
+        return f"{campo.rotulo}: o nome do modelo, como {campo.exemplo}"
     if campo.chave == "m365.remetente" and "@" not in valor:
         return "Caixa remetente: digite um e-mail"
     return None
+
+
+def _decimal(valor: str) -> Decimal | None:
+    try:
+        numero = Decimal(valor.replace(",", "."))
+    except InvalidOperation:
+        return None
+    return numero if numero.is_finite() and Decimal(0) < numero <= Decimal(100) else None
 
 
 def _configurado(grupo: str, linhas: dict[str, configuracao.Linha]) -> bool:
@@ -265,6 +282,19 @@ def _configurado(grupo: str, linhas: dict[str, configuracao.Linha]) -> bool:
                  "google_ads.acao_reuniao", "google_ads.acao_contrato"}
     return all(l.origem != "vazio" for l in linhas.values() if configuracao.CAMPOS[l.campo.chave] in
                configuracao.catalogo.grupo(grupo).campos and l.campo.chave not in opcionais)
+
+
+def _situacao(grupo: str, sessao: Session) -> str | None:
+    if grupo == "whatsapp":
+        return situacao_do_recebimento(sessao)
+    if grupo == "sdr_respostas":
+        from crm.agente.respostas_do_sdr import situacao_das_respostas
+        from crm.agente.roteador_do_sdr import ler_configuracao_das_respostas
+        from crm.api.respostas_do_sdr import ESTADO_DAS_RESPOSTAS
+        from crm.db.base import agora
+
+        return situacao_das_respostas(sessao, agora(), ler_configuracao_das_respostas(), ESTADO_DAS_RESPOSTAS.erro())
+    return None
 
 
 def roteador_de_integracoes(
@@ -291,7 +321,7 @@ def roteador_de_integracoes(
             grupos.append(GrupoResposta(
                 chave=g.chave, titulo=g.titulo, testavel=g.testavel, envia_teste=g.chave in t.enviar,
                 configurado=_configurado(g.chave, linhas),
-                situacao=situacao_do_recebimento(sessao) if g.chave == "whatsapp" else None,
+                situacao=_situacao(g.chave, sessao),
                 campos=[CampoResposta(
                     chave=l.campo.chave, rotulo=l.campo.rotulo, segredo=l.campo.segredo, origem=l.origem,
                     valor=l.valor, final=l.final, ilegivel=l.ilegivel, padrao=l.campo.padrao,

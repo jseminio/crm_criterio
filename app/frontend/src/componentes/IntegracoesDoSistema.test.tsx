@@ -217,3 +217,33 @@ describe("Integrações em abas (15/10/2026)", () => {
     expect(screen.getByLabelText("ID do número de telefone")).toHaveValue("5555123");
   });
 });
+
+describe("Respostas do SDR (fase 1, 23/10/2026)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    vi.mocked(api.integracoes).mockResolvedValue({ grupos: [...INTEGRACOES.grupos, {
+      chave: "sdr_respostas", titulo: "Respostas do SDR", testavel: false, envia_teste: false, configurado: true,
+      alterado_por: null, alterado_em: null,
+      situacao: "Modo supervisionado: a IA rascunha e a equipe envia. Nenhuma resposta da IA nos últimos 30 dias.",
+      campos: [
+        campo("sdr.modo", "Modo das respostas", { origem: "padrão", valor: "Desligado", padrao: "Desligado",
+          opcoes: ["Desligado", "Supervisionado", "Automático"] }),
+        campo("sdr.modelo_leve", "Modelo leve da Anthropic", { origem: "padrão", valor: "claude-haiku-4-5" }),
+      ],
+    }] });
+    vi.mocked(api.salvarIntegracao).mockResolvedValue(INTEGRACOES);
+  });
+
+  it("aba própria com o modo, o modelo leve e a situação em texto, sem botão de teste", async () => {
+    render(<IntegracoesDoSistema />);
+    const c = await cartao("Respostas do SDR");
+    expect(c.getByRole("status")).toHaveTextContent("Modo supervisionado: a IA rascunha e a equipe envia.");
+    expect(c.queryByRole("button", { name: /Testar/ })).not.toBeInTheDocument();
+    await userEvent.selectOptions(c.getByLabelText(/Modo das respostas/), "Supervisionado");
+    await userEvent.click(c.getByRole("button", { name: "Salvar" }));
+    expect(api.salvarIntegracao).toHaveBeenCalledWith("sdr_respostas", expect.objectContaining({
+      valores: expect.objectContaining({ "sdr.modo": "Supervisionado" }),
+    }));
+  });
+});

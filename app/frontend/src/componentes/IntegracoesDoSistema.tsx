@@ -2,11 +2,13 @@
  * e-mail, questionário e disparo se cadastram, trocam e testam aqui, sem nada no painel do servidor.
  * Vale o que está na tela; sem valor na tela, o que veio do servidor; depois o padrão. Segredo nunca
  * volta do servidor: aparecem só os 4 últimos caracteres. A IA pode ser Anthropic ou OpenAI, com a
- * outra de reserva (07/10/2026). Desde 15/10/2026, uma aba por integração, com a situação ao lado do nome. */
+ * outra de reserva (07/10/2026). Desde 15/10/2026, uma aba por integração, com a situação ao lado do nome. O Granola
+ * (23/10/2026) escolhe as pastas na lista do próprio Granola e mostra a busca e a fila "Precisa de você". */
 
 import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { CampoDeIntegracao, GrupoDeIntegracao, Integracoes, ResultadoDoTeste } from "../api/tipos";
+import { FilaDoGranola } from "./FilaDoGranola";
 import { dataHora } from "../formato";
 import { usarDados } from "../usarDados";
 import { Etiqueta } from "./Etiqueta";
@@ -44,7 +46,9 @@ const ABA: Record<string, { rotulo: string; explicacao: string }> = {
     rotulo: "Respostas do SDR",
     explicacao: "Como a IA responde ao lead no WhatsApp: o modo, o modelo leve e os limites por conversa.",
   },
+  granola: { rotulo: "Granola", explicacao: "As notas das reuniões gravadas no Granola chegam sozinhas ao CRM, sem colar." },
 };
+const PASTAS_DO_GRANOLA = ["granola.pasta_lead", "granola.pasta_resultado"];
 const MEMORIA = "crm.integracoes.aba";
 
 function guardada(): string | null {
@@ -126,6 +130,21 @@ function CartaoDeIntegracao({ grupo, aoSalvar, aoMudarRascunho }: {
   const [teste, definirTeste] = useState<ResultadoDoTeste | null>(null);
   const [testando, definirTestando] = useState(false);
   const [para, definirPara] = useState("");
+  const ehGranola = grupo.chave === "granola";
+  const chaveDoGranola = ehGranola ? grupo.campos.find((c) => c.chave === "granola.chave") : undefined;
+  const temChave = Boolean(chaveDoGranola && chaveDoGranola.origem !== "vazio");
+  const [pastas, definirPastas] = useState<string[] | null>(null);
+  const [pastasFalhou, definirPastasFalhou] = useState<string | null>(null);
+  const [rodada, definirRodada] = useState(0);
+  useEffect(() => {
+    if (!ehGranola || !temChave) return;
+    let vivo = true;
+    api.pastasDoGranola().then(
+      (lista) => { if (vivo) { definirPastas(lista); definirPastasFalhou(null); } },
+      (f) => { if (vivo) { definirPastas(null); definirPastasFalhou(f instanceof ErroDaApi ? f.message : "falha ao ler as pastas"); } },
+    );
+    return () => { vivo = false; };
+  }, [ehGranola, temChave, chaveDoGranola?.final]);
 
   const valorDe = (c: CampoDeIntegracao) => rascunho[c.chave] ?? (c.segredo ? "" : (c.valor ?? ""));
   const mudar = (chave: string, valor: string) => {
@@ -180,6 +199,11 @@ function CartaoDeIntegracao({ grupo, aoSalvar, aoMudarRascunho }: {
         {grupo.campos.filter((c) => !DO_RECEBIMENTO.includes(c.chave)).map((c) => (
           <Campo key={c.chave} campo={c} valor={valorDe(c)} aoMudar={(v) => mudar(c.chave, v)}
             vaiApagar={apagar.includes(c.chave)}
+            lista={PASTAS_DO_GRANOLA.includes(c.chave) ? pastas : null}
+            avisoDaLista={PASTAS_DO_GRANOLA.includes(c.chave)
+              ? (!temChave ? "Salve a chave para escolher na lista de pastas do Granola."
+                : pastasFalhou ? `Não consegui ler as pastas do Granola (${pastasFalhou}). Digite o nome da pasta.` : null)
+              : null}
             aoApagar={() => { definirFeito(null); definirApagar([...apagar, c.chave]); }} />
         ))}
         {grupo.campos.some((c) => DO_RECEBIMENTO.includes(c.chave)) && (
@@ -200,6 +224,26 @@ function CartaoDeIntegracao({ grupo, aoSalvar, aoMudarRascunho }: {
             title={mudou ? "Salve antes de testar" : undefined}
             onClick={() => void rodar(() => api.testarIntegracao(grupo.chave))}>
             {testando ? "Testando…" : "Testar conexão"}
+          </button>
+        )}
+        {ehGranola && (
+          <button type="button" className="botao" disabled={testando || mudou}
+            title={mudou ? "Salve antes de buscar" : undefined}
+            onClick={() => void rodar(async () => {
+              const inicio = performance.now();
+              try {
+                const r = await api.buscarNoGranola();
+                const texto = r.erro ?? [
+                  `${r.novas} nota${r.novas === 1 ? " nova" : "s novas"}`,
+                  r.novas ? `${r.a_usar} ${r.a_usar === 1 ? "entrou sozinha" : "entraram sozinhas"}, ${r.precisam} precisa${r.precisam === 1 ? "" : "m"} de você` : null,
+                  r.aviso,
+                ].filter(Boolean).join(" · ");
+                return { ok: !r.erro, mensagem: texto, segundos: Math.round((performance.now() - inicio) / 100) / 10, em: r.em };
+              } finally {
+                definirRodada((n) => n + 1);
+              }
+            })}>
+            Buscar agora
           </button>
         )}
         {mudou && <span className="campo-ajuda">· alterações ainda não salvas</span>}
@@ -227,6 +271,7 @@ function CartaoDeIntegracao({ grupo, aoSalvar, aoMudarRascunho }: {
       )}
       {falha && <p className="estado estado-erro estado-texto" role="alert">✗ {falha}</p>}
       {feito && <p className="recado" role="status">✓ {feito}</p>}
+      {ehGranola && <FilaDoGranola rodada={rodada} />}
     </section>
   );
 }
@@ -300,11 +345,29 @@ function Recebimento({ campos, situacao, valorDe, aoMudar, apagar, aoApagar }: {
   );
 }
 
-function Campo({ campo, valor, aoMudar, vaiApagar, aoApagar }: {
+function Campo({ campo, valor, aoMudar, vaiApagar, aoApagar, lista = null, avisoDaLista = null }: {
   campo: CampoDeIntegracao; valor: string; aoMudar: (v: string) => void; vaiApagar: boolean; aoApagar: () => void;
+  /** Opções lidas na hora (as pastas do Granola); o valor atual entra na lista mesmo se não estiver nela. */
+  lista?: string[] | null;
+  avisoDaLista?: string | null;
 }) {
   const id = `campo-${campo.chave}`;
-  const ajuda = [DE_ONDE[campo.origem], campo.ajuda].filter(Boolean).join(" · ");
+  const ajuda = [DE_ONDE[campo.origem], campo.ajuda, avisoDaLista].filter(Boolean).join(" · ");
+  if (lista) {
+    const efetivo = valor || campo.padrao;
+    const opcoes = lista.includes(efetivo) || !efetivo ? lista : [efetivo, ...lista];
+    return (
+      <div style={{ display: "grid", gap: "var(--e1)" }}>
+        <label htmlFor={id}>{campo.rotulo}</label>
+        <select id={id} className="selecao" style={{ maxWidth: "18rem" }} value={efetivo} onChange={(e) => aoMudar(e.target.value)}>
+          {opcoes.map((o) => (
+            <option key={o} value={o}>{o}{lista.includes(o) ? "" : " (não existe no Granola)"}</option>
+          ))}
+        </select>
+        <span className="campo-ajuda">{ajuda}</span>
+      </div>
+    );
+  }
   if (campo.opcoes.length === 2 && campo.opcoes.includes("true")) {
     return (
       <label style={{ display: "flex", gap: "var(--e2)", alignItems: "center" }}>

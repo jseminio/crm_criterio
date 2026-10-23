@@ -1,6 +1,9 @@
 /** O acesso à API. Um lugar só, para o erro ter uma forma só. */
 
 import type {
+  BuscaDoGranola,
+  NotaDoGranola,
+  SituacaoDoGranola,
   AlertaDaIndicacao,
   IndicacaoRegistrada,
   RelatorioDoParceiro,
@@ -891,6 +894,20 @@ export const api = {
     pedir<ResultadoDoTeste>(`/api/configuracoes/integracoes/${chave}/testar`, { method: "POST" }),
   enviarTesteDeIntegracao: (chave: string, para: string) =>
     pedir<ResultadoDoTeste>(`/api/configuracoes/integracoes/${chave}/enviar-teste`, { method: "POST", body: JSON.stringify({ para }) }),
+  situacaoDoGranola: () => pedir<SituacaoDoGranola>("/api/granola"),
+  buscarNoGranola: () => pedir<BuscaDoGranola>("/api/granola/buscar", { method: "POST" }),
+  pastasDoGranola: () => pedir<string[]>("/api/granola/pastas"),
+  destinoDaNotaDoGranola: (notaId: number, destino: { oportunidade_id?: number; grupo_id?: number }) =>
+    pedir<SituacaoDoGranola>(`/api/granola/notas/${notaId}/destino`, { method: "POST", body: JSON.stringify(destino) }),
+  descartarDaFilaDoGranola: (notaId: number) =>
+    pedir<SituacaoDoGranola>(`/api/granola/notas/${notaId}/descartar`, { method: "POST" }),
+  notasDoGranolaDaOportunidade: (oportunidadeId: number) =>
+    pedir<NotaDoGranola[]>(`/api/oportunidades/${oportunidadeId}/granola`),
+  descartarNotaDaOportunidade: (oportunidadeId: number, notaId: number) =>
+    pedir<NotaDoGranola[]>(`/api/oportunidades/${oportunidadeId}/granola/${notaId}/descartar`, { method: "POST" }),
+  notasDoGranolaDoGrupo: (grupoId: number) => pedir<NotaDoGranola[]>(`/api/sucesso/grupos/${grupoId}/granola`),
+  descartarNotaDoGrupo: (grupoId: number, notaId: number) =>
+    pedir<NotaDoGranola[]>(`/api/sucesso/grupos/${grupoId}/granola/${notaId}/descartar`, { method: "POST" }),
   cadenciaDeReunioes: () => pedir<CadenciaDeReunioes>("/api/sucesso/cadencia"),
   mudarCadenciaDeReunioes: (mudanca: { cadencia?: Record<string, string[]>; intencao?: Record<string, string> }) =>
     pedir<CadenciaDeReunioes>("/api/sucesso/cadencia", { method: "PUT", body: JSON.stringify(mudanca) }),

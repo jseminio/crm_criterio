@@ -9,7 +9,11 @@ vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
   return {
     ...real,
-    api: { integracoes: vi.fn(), salvarIntegracao: vi.fn(), testarIntegracao: vi.fn(), enviarTesteDeIntegracao: vi.fn() },
+    api: {
+      integracoes: vi.fn(), salvarIntegracao: vi.fn(), testarIntegracao: vi.fn(), enviarTesteDeIntegracao: vi.fn(),
+      pastasDoGranola: vi.fn(), situacaoDoGranola: vi.fn(), buscarNoGranola: vi.fn(), destinoDaNotaDoGranola: vi.fn(),
+      descartarDaFilaDoGranola: vi.fn(),
+    },
   };
 });
 
@@ -245,5 +249,79 @@ describe("Respostas do SDR (fase 1, 23/10/2026)", () => {
     expect(api.salvarIntegracao).toHaveBeenCalledWith("sdr_respostas", expect.objectContaining({
       valores: expect.objectContaining({ "sdr.modo": "Supervisionado" }),
     }));
+  });
+});
+
+describe("Granola (23/10/2026)", () => {
+  const GRANOLA = {
+    chave: "granola", titulo: "Granola (notas das reuniões)", testavel: true, envia_teste: false, configurado: true,
+    alterado_por: "Eduardo Luiz", alterado_em: "2026-10-23T14:02:00Z",
+    campos: [
+      campo("granola.ligado", "Busca ligada", { origem: "tela", valor: "true", opcoes: ["true", "false"] }),
+      campo("granola.chave", "Chave da API do Granola", { segredo: true, origem: "tela", final: "7c1e" }),
+      campo("granola.pasta_lead", "Pasta das reuniões com o lead", { origem: "padrão", valor: "Potencial Cliente", padrao: "Potencial Cliente" }),
+      campo("granola.pasta_resultado", "Pasta das Reuniões de Resultado", { origem: "tela", valor: "Antiga", padrao: "Reunião de Resultado" }),
+      campo("granola.desde", "Trazer notas a partir de", { exemplo: "01/10/2026" }),
+    ],
+  };
+  const NOTA = {
+    id: 5, tipo: "Reunião com o lead" as const, titulo: "Conversa inicial · Empresa Exemplo", data: "2026-10-22",
+    participantes: "contato@exemplo.com.br", link: null, motivo: "Nenhum participante é contato do CRM.", resumo: "x",
+    transcricao: null, chegou_em: "2026-10-22T15:00:00Z",
+  };
+  const SITUACAO = {
+    ligada: true, proxima: "2026-10-23T17:20:00Z",
+    ultima: { em: "2026-10-23T17:10:00Z", lidas: 9, novas: 3, a_usar: 2, precisam: 1, erro: null, aviso: null },
+    precisam: [NOTA], oportunidades: [{ id: 8, nome: "Exemplo Alfa · BPO Financeiro" }], grupos: [],
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    localStorage.setItem("crm.integracoes.aba", "granola");
+    vi.mocked(api.integracoes).mockResolvedValue({ grupos: [...INTEGRACOES.grupos, GRANOLA] } as never);
+    vi.mocked(api.pastasDoGranola).mockResolvedValue(["Outras", "Potencial Cliente", "Reunião de Resultado"]);
+    vi.mocked(api.situacaoDoGranola).mockResolvedValue(SITUACAO as never);
+  });
+
+  it("as pastas vêm do Granola e a que não existe mais aparece marcada", async () => {
+    render(<IntegracoesDoSistema />);
+    const granola = within((await screen.findByRole("heading", { name: "Granola (notas das reuniões)" })).closest("section")!);
+    const lead = await granola.findByRole("combobox", { name: "Pasta das reuniões com o lead" });
+    expect(lead).toHaveValue("Potencial Cliente");
+    const res = granola.getByRole("combobox", { name: "Pasta das Reuniões de Resultado" });
+    expect(res).toHaveValue("Antiga");
+    expect(granola.getByRole("option", { name: "Antiga (não existe no Granola)" })).toBeInTheDocument();
+    await userEvent.selectOptions(res, "Reunião de Resultado");
+    await userEvent.click(granola.getByRole("button", { name: "Salvar" }));
+    expect(api.salvarIntegracao).toHaveBeenCalledWith("granola", {
+      valores: { "granola.pasta_resultado": "Reunião de Resultado" }, apagar: [] });
+  });
+
+  it("sem conseguir ler as pastas, o nome se digita", async () => {
+    vi.mocked(api.pastasDoGranola).mockRejectedValue(new Error("x"));
+    render(<IntegracoesDoSistema />);
+    const campo = await screen.findByRole("textbox", { name: "Pasta das reuniões com o lead" });
+    expect(campo).toBeInTheDocument();
+    expect(await screen.findAllByText(/Não consegui ler as pastas do Granola/)).not.toHaveLength(0);
+  });
+
+  it("mostra a situação, busca agora e resolve a fila Precisa de você", async () => {
+    vi.mocked(api.buscarNoGranola).mockResolvedValue({ em: "2026-10-23T17:12:00Z", lidas: 9, novas: 1, a_usar: 1, precisam: 0, erro: null, aviso: null });
+    vi.mocked(api.destinoDaNotaDoGranola).mockResolvedValue({ ...SITUACAO, precisam: [] } as never);
+    render(<IntegracoesDoSistema />);
+    const fila = await screen.findByRole("group", { name: "Situação da busca" });
+    expect(within(fila).getByRole("status")).toHaveTextContent("3 notas novas: 2 entraram sozinhas, 1 precisa de você.");
+    expect(within(fila).getByText("Precisa de você (1)")).toBeInTheDocument();
+    expect(within(fila).getByText(/Nenhum participante é contato do CRM/)).toBeInTheDocument();
+    const aplicar = within(fila).getByRole("button", { name: "Aplicar" });
+    expect(aplicar).toBeDisabled();
+    await userEvent.selectOptions(within(fila).getByLabelText(/Entrar em: Conversa inicial/), "8");
+    await userEvent.click(aplicar);
+    expect(api.destinoDaNotaDoGranola).toHaveBeenCalledWith(5, { oportunidade_id: 8 });
+    expect(await within(fila).findByText(/Nada esperando você/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Buscar agora" }));
+    expect(await screen.findByText(/1 nota nova · 1 entrou sozinha, 0 precisam de você/)).toBeInTheDocument();
+    expect(api.situacaoDoGranola).toHaveBeenCalledTimes(2); // a fila relê depois da busca
   });
 });

@@ -72,7 +72,9 @@ from crm.api.propostas import roteador_de_propostas
 from crm.api.busca_automatica import laco_da_busca
 from crm.agente.disparo_do_questionario import Canais
 from crm.api.disparo_do_questionario import canais_reais, laco_do_disparo
-from crm.api.integracoes import Testadores, roteador_de_integracoes
+from crm.api.integracoes import Testadores, roteador_de_integracoes, testar_granola
+from crm.api.granola import laco_do_granola, roteador_do_granola
+from crm.granola.cliente import novo_http as http_real_do_granola
 from crm.api.propostas_em_aberto import roteador_de_propostas_em_aberto
 from crm.api.kpis_lideranca import roteador_de_kpis
 from crm.api.integralidade import roteador_de_lacunas
@@ -199,11 +201,13 @@ def criar_app(
     respostas_automaticas: bool | None = None,
     ia_das_respostas: Callable[..., object] | None = None,
     envio_de_texto: Callable[[], object] | None = None,
+    http_do_granola: Callable[[], object] | None = None,
+    granola_automatico: bool | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `fabrica` e `servicos` existem para o teste usar seu
     próprio banco e um agente falso, sem chave nem rede; `tentativas`, para o
     teste controlar o relógio do bloqueio de login; `buscar_ipca`, para o teste não ir ao Banco Central;
-    `http_da_clicksign`, para o teste falar com uma Clicksign falsa."""
+    `http_da_clicksign`, para o teste falar com uma Clicksign falsa; `http_do_granola`, com um Granola falso."""
 
     @asynccontextmanager
     async def ciclo_de_vida(_: FastAPI):
@@ -252,10 +256,14 @@ def criar_app(
         respostas = asyncio.create_task(laco_das_respostas(
             _fabrica, ia_das_respostas or clientes_reais, envio_de_texto or envio_real)
         ) if com_respostas else None
+        # Notas do Granola (23/10/2026): o laço sobe no uso real e só busca com a busca ligada em
+        # Configurações › Integrações › Granola; no teste, só se pedir.
+        com_granola = granola_automatico if granola_automatico is not None else fabrica is None
+        granola = asyncio.create_task(laco_do_granola(_fabrica, http_granola)) if com_granola else None
         try:
             yield
         finally:
-            for t in (tarefa, disparo, saidas, conversoes, leads_do_meta, leads_do_google, respostas):
+            for t in (tarefa, disparo, saidas, conversoes, leads_do_meta, leads_do_google, respostas, granola):
                 if t is not None:
                     t.cancel()
                     with contextlib.suppress(asyncio.CancelledError):
@@ -265,6 +273,7 @@ def criar_app(
     # Entrada: no uso real, lida do `.env`; no teste (que passa a própria `fabrica`), só se o teste mandar.
     # `.env` que pede o modo senha sem segredo para aqui mesmo (`EntradaMalConfigurada`): a API não sobe.
     config_de_entrada = entrada if (entrada is not None or fabrica is not None) else ler_configuracao()
+    http_granola = http_do_granola or http_real_do_granola
     # Com login, sem /docs, /redoc nem /openapi.json: na internet, o mapa das rotas não fica à vista
     # de quem não entrou (#89, 05/10/2026). Sem login (só na máquina), seguem para o desenvolvimento.
     com_login = config_de_entrada is not None
@@ -378,7 +387,10 @@ def criar_app(
     # própria `fabrica`), só se o teste mandar uma busca — teste não sai para a rede.
     endereco = busca_de_endereco or (None if fabrica is not None else endereco_pelo_cnpj)
     api.include_router(roteador_de_questionarios(obter_sessao, fonte_de_questionarios or fonte_real, endereco))
-    api.include_router(roteador_de_integracoes(obter_sessao, fonte_de_questionarios or fonte_real, testadores))
+    api.include_router(roteador_de_integracoes(
+        obter_sessao, fonte_de_questionarios or fonte_real,
+        testadores or Testadores(granola=lambda _: testar_granola(http_granola))))
+    api.include_router(roteador_do_granola(obter_sessao, http_granola))
     api.include_router(roteador_do_whatsapp_recebido(obter_sessao))
     api.include_router(roteador_das_respostas(obter_sessao, envio_de_texto or envio_real))
     api.include_router(roteador_de_kpis(obter_sessao))

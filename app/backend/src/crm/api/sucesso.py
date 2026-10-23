@@ -189,6 +189,8 @@ class NovaReuniao(BaseModel):
     estrategia_e_desafios: str | None = None
     ajustes: list[NovoAjuste] = []
     oportunidades: list[NovaOportunidade] = []
+    nota_do_granola_id: int | None = None
+    """A nota que chegou sozinha do Granola e foi usada aqui: passa a "Usada" (23/10/2026)."""
 
 
 class PedidoDeAta(BaseModel):
@@ -634,6 +636,9 @@ def roteador_do_sucesso(
                 problema_na_descricao(servico, o.lacuna) if servico == OUTRO else None)
             if problema:
                 raise HTTPException(422, f"Oportunidade {n}: {problema}")
+        from crm.api.granola import usar_nota
+
+        usar_nota(sessao, corpo.nota_do_granola_id, grupo_id=grupo_id)
         reuniao = ReuniaoDeResultado(
             grupo_id=grupo_id, tipo=corpo.tipo, data=corpo.data, participantes=_texto(corpo.participantes),
             pauta=_texto(corpo.pauta), dashboard=_texto(corpo.dashboard), resumo=_texto(corpo.resumo),

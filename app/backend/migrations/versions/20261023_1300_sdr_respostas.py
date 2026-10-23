@@ -8,8 +8,8 @@ acrescenta colunas vazias:
   anotação do servidor (por que a trava barrou, por que o rascunho foi descartado).
 
 Revisão: c3e9a1f7d5b2
-Revisão anterior: 9b4e2f6a1c37
-Criada em: 2026-10-23 12:00:00
+Revisão anterior: 3c8e1a7b5d92
+Criada em: 2026-10-23 13:00:00
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = 'c3e9a1f7d5b2'
-down_revision: str | None = '9b4e2f6a1c37'
+down_revision: str | None = '3c8e1a7b5d92'
 branch_labels: str | None = None
 depends_on: str | None = None
 

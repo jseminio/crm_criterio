@@ -151,6 +151,21 @@ GRUPOS: tuple[Grupo, ...] = (
         Campo("clicksign.email_criterio", "E-mail de quem assina pela Critério", exemplo="socio@grupocriterio.com.br",
               ajuda="O nome vem de Configurações › Serviços e contratos; o e-mail, daqui."),
     )),
+    # Notas do Granola chegando sozinhas (amostra aprovada por Eduardo em 23/10/2026). A API não diz o template
+    # da nota: o CRM separa pela pasta.
+    Grupo("granola", "Granola (notas das reuniões)", (
+        Campo("granola.ligado", "Busca ligada", padrao="false", opcoes=("true", "false"),
+              ajuda="Ligada, o CRM busca as notas novas a cada 10 minutos."),
+        Campo("granola.chave", "Chave da API do Granola", segredo=True,
+              ajuda="No Granola: clique no nome da conta, embaixo à esquerda › Settings › Connectors › API keys › "
+                    "Create new key, com o escopo Personal notes. Exige o plano Business."),
+        Campo("granola.pasta_lead", "Pasta das reuniões com o lead", padrao="Potencial Cliente",
+              ajuda="A nota vai para a aba Granola da oportunidade, e a IA sugere a contextualização e o perfil."),
+        Campo("granola.pasta_resultado", "Pasta das Reuniões de Resultado", padrao="Reunião de Resultado",
+              ajuda="A nota vai para a reunião do cliente no Funil do Sucesso, pronta para montar a ata."),
+        Campo("granola.desde", "Trazer notas a partir de", exemplo="01/10/2026",
+              ajuda="Notas mais antigas ficam no Granola. Vazio: as dos últimos 30 dias."),
+    )),
     Grupo("disparo", "Disparo do lembrete e do agradecimento", (
         Campo("disparo.ligado", "Disparo ligado", variavel="CRM_DISPARO_DO_QUESTIONARIO", padrao="false",
               opcoes=("true", "false"), ajuda="A cada 10 minutos, de segunda a sexta, das 9h às 18h."),

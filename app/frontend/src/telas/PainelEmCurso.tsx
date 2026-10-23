@@ -6,15 +6,17 @@
  * da área técnica; as oportunidades marcadas viram oportunidade no Funil comercial. Uma ação principal
  * só: "Registrar reunião"; montar a ata é secundária e não grava nada. */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type {
+  NotaDoGranola,
   AjusteTecnico, FunilDoSucesso as Funil, GrupoNoFunilDoSucesso as Grupo, ReuniaoDeResultado, ResponsavelPorAjuste,
   ServicoDoCatalogo, TipoDeReuniao,
 } from "../api/tipos";
 import { CampoDeData } from "../componentes/CampoDeData";
 import { CampoDeValor } from "../componentes/CampoDeValor";
 import { Carregando, Erro } from "../componentes/estados";
+import { NotasQueChegaram } from "../componentes/NotasQueChegaram";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { usarAcesso } from "../entrada";
 import { data, dataHora, dinheiro, prazo as quandoVence } from "../formato";
@@ -211,6 +213,31 @@ export function PainelEmCurso({
   const [ocupado, definirOcupado] = useState(false);
   const [falha, definirFalha] = useState<string | null>(null);
   const [feito, definirFeito] = useState<string | null>(null);
+  const [chegadas, definirChegadas] = useState<NotaDoGranola[]>([]);
+  const [notaEmUso, definirNotaEmUso] = useState<number | null>(null);
+  useEffect(() => {
+    if (!edita) return;
+    let vivo = true;
+    api.notasDoGranolaDoGrupo(g.grupo_id).then((n) => { if (vivo) definirChegadas(n); }, () => undefined);
+    return () => { vivo = false; };
+  }, [g.grupo_id, edita]);
+  const usarNota = (n: NotaDoGranola) => {
+    definirFeito(null);
+    definirNotaEmUso(n.id);
+    definirCampos((c) => ({
+      ...c, data: n.data, participantes: n.participantes ?? c.participantes,
+      transcricao: n.transcricao ?? n.resumo ?? "",
+    }));
+  };
+  const descartarNota = async (n: NotaDoGranola) => {
+    definirFalha(null);
+    try {
+      definirChegadas(await api.descartarNotaDoGrupo(g.grupo_id, n.id));
+      if (notaEmUso === n.id) definirNotaEmUso(null);
+    } catch (e) {
+      definirFalha(e instanceof ErroDaApi ? e.message : "Não consegui descartar a nota. Tente de novo.");
+    }
+  };
   const responsaveis = usarDados<ResponsavelPorAjuste[]>(
     () => (edita ? api.responsaveisPorAjuste() : Promise.resolve([])), [edita]);
   const catalogo = usarDados<ServicoDoCatalogo[]>(() => (edita ? api.servicos() : Promise.resolve([])), [edita]);
@@ -284,6 +311,7 @@ export function PainelEmCurso({
     try {
       await api.registrarReuniao(g.grupo_id, {
         ...campos,
+        ...(notaEmUso !== null ? { nota_do_granola_id: notaEmUso } : {}),
         ajustes: ajustes.map((a) => ({ descricao: a.descricao.trim(), responsavel_email: a.responsavel_email, prazo: a.prazo || null })),
         oportunidades: vendas.map((v) => ({
           lacuna: v.lacuna.trim(), servico: v.servico, servico_tema: v.servico_tema, valor: v.valor, abrir_no_funil: v.abrir_no_funil,
@@ -295,6 +323,8 @@ export function PainelEmCurso({
       ].filter(Boolean);
       definirFeito(`Reunião ${nomeDoTipo(f, campos.tipo).toLowerCase()} de ${data(campos.data)} registrada${partes.length ? `, com ${partes.join(" e ")}` : ""}.`);
       definirCampos({ ...vazio, tipo: campos.tipo, participantes: campos.participantes, pauta: campos.pauta });
+      if (notaEmUso !== null) definirChegadas((c) => c.filter((n) => n.id !== notaEmUso));
+      definirNotaEmUso(null);
       definirAjustes([]);
       definirVendas([]);
       aoMudar();
@@ -382,6 +412,8 @@ export function PainelEmCurso({
           </div>
 
           <div className="campo-bloco ata-transcricao">
+            <NotasQueChegaram notas={chegadas} emUso={notaEmUso} aoUsar={usarNota}
+              aoDescartar={(n) => void descartarNota(n)} ocupado={montando || ocupado} />
             <label className="campo-rotulo" htmlFor="re-transcricao">Transcrição do Granola</label>
             <textarea id="re-transcricao" className="entrada" rows={5} placeholder="Cole aqui a transcrição ou as notas da reunião"
               value={campos.transcricao} onChange={(e) => mudar("transcricao", e.target.value)} />

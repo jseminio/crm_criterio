@@ -90,7 +90,14 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/servicos(/pedidos)?", _TODOS),
     # acesso e histórico
     ("GET", r"/api/acesso/catalogo", ("configuracoes.perfis",)),
-    ("GET|PUT|POST", r"/api/configuracoes/integracoes(/[a-z]+(/(testar|enviar-teste))?)?", ("configuracoes.integracoes",)),
+    ("GET|PUT|POST", r"/api/configuracoes/integracoes(/[a-z_]+(/(testar|enviar-teste))?)?", ("configuracoes.integracoes",)),
+    # Notas do Granola (23/10/2026): a busca e a fila "Precisa de você" ficam em Integrações
+    ("GET", r"/api/granola(/pastas)?", ("configuracoes.integracoes",)),
+    ("POST", r"/api/granola/(buscar|notas/\d+/(destino|descartar))", ("configuracoes.integracoes",)),
+    ("GET", r"/api/oportunidades/\d+/granola", ("funil.proposta",)),
+    ("POST", r"/api/oportunidades/\d+/granola/\d+/descartar", ("funil.proposta",)),
+    ("GET", r"/api/sucesso/grupos/\d+/granola", ("sucesso.editar",)),
+    ("POST", r"/api/sucesso/grupos/\d+/granola/\d+/descartar", ("sucesso.editar",)),
     ("GET|POST|PATCH", r"/api/acesso/(perfis|usuarios)(/\d+)?", ("configuracoes.perfis",)),
     ("POST", r"/api/acesso/usuarios/\d+/senha", ("configuracoes.perfis",)),  # redefinir a senha de alguém
     ("POST", r"/api/acesso/senha", _TODOS),  # trocar a própria senha

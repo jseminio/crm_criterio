@@ -188,3 +188,17 @@ def test_lacunas_do_grupo_e_do_registro_pela_api(cadastro):
     assert sem_filtro.status_code == 422
     assert grupo.status_code == 200 and grupo.json()["nome"] == "Cliente X"
     assert nenhum.status_code == 404 and sugestoes.status_code == 200  # a rota do id não engole as outras
+
+
+def test_contrato_recorrente_nao_cobra_o_fim_da_vigencia(cadastro):
+    """Recorrente vale por prazo indeterminado (Eduardo, 23/10/2026); o de projeto continua cobrando o fim."""
+    with Session(cadastro) as s:
+        grupo = s.query(GrupoEconomico).filter_by(nome="Cliente X").one()
+        empresa = s.query(Empresa).filter_by(grupo_id=grupo.id).one()
+        s.query(Contrato).update({"recorrente": True})
+        s.add(Contrato(grupo_id=grupo.id, empresa_id=empresa.id, situacao=SituacaoContrato.ATIVO, recorrente=False,
+                       preco_anual=D("24000"), data_inicio=date(2026, 9, 1), escopo="Projeto de valuation"))
+        s.commit()
+        r = integralidade.calcular(s)
+    fim = [c.registro for c in r.novos if c.cadastro == "Contrato" and c.campo == "Fim da vigência"]
+    assert fim == ["Cliente X · Projeto de valuation"]

@@ -208,7 +208,8 @@ def calcular(sessao: Session) -> Resultado:
             yield "Bruto ou líquido", True, c.base_do_valor is not None
             yield "CNPJ (empresa)", True, c.empresa_id is not None
             yield "Signatário", False, _tem(c.signatario)
-            yield "Fim da vigência", False, c.data_fim is not None
+            if c.recorrente is not True:  # recorrente não tem fim de vigência (Eduardo, 23/10/2026)
+                yield "Fim da vigência", False, c.data_fim is not None
         nome = f"{grupos[c.grupo_id].nome} · {c.escopo or 'contrato'}"
         dono = dono_do_grupo(c.grupo_id)
         devido("Contrato", nome, dono, c.anterior_ao_crm or not _desde_o_corte(c.criado_em), regras(), c.id,

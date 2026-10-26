@@ -33,6 +33,24 @@ async function abrir(c: Partial<ContratoDetalhe> = {}) {
   await screen.findByLabelText("Situação", { selector: "#c-situacao" });
 }
 
+describe("Contratos — recorrente sem fim de vigência (23/10/2026)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.mrr).mockResolvedValue(null as never);
+  });
+
+  it("recorrente não mostra o campo e explica o encerramento", async () => {
+    await abrir({ recorrente: true, situacao: "Ativo", data_inicio: "2026-03-01" });
+    expect(screen.queryByLabelText("Fim da vigência")).not.toBeInTheDocument();
+    expect(screen.getByText(/prazo indeterminado e termina por um evento/i)).toBeInTheDocument();
+  });
+
+  it("projeto continua com o fim da vigência", async () => {
+    await abrir({ recorrente: false });
+    expect(screen.getByLabelText("Fim da vigência")).toBeInTheDocument();
+  });
+});
+
 describe("Contratos — vigência na assinatura (25/09/2026)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

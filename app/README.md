@@ -214,6 +214,13 @@ ISO; texto), o vazio fica sempre por último, a linha de total fica no fim, fora
 ordena dentro de cada seção. Linha que abre os contratos embaixo (MRR da carteira) usa `linha`. Composição nova usa a
 mesma tabela e já nasce ordenável.
 
+## Contrato recorrente sem fim de vigência (23/10/2026)
+
+Decisão de Eduardo em 23/10/2026: o contrato **recorrente** vale por prazo indeterminado e termina por um evento de
+Encerramento. No cadastro do contrato, o campo "Fim da vigência" dá lugar a uma linha que diz isso, e a Integralidade
+do cadastro deixa de cobrar o fim nele. O contrato de **projeto** (não recorrente) continua com o campo e a cobrança.
+Nada gravado foi apagado: a Renovação e o aviso de saída seguem usando a data de fim por trás.
+
 ## Integralidade do cadastro em dois cortes: Novos e Passado (15/10/2026)
 
 Decisão de Eduardo em 15/10/2026 (troca o "só daqui para frente" de 13/10), para a equipe consertar o herdado aos
@@ -686,7 +693,7 @@ precisam estar na mesma versão do banco: a prévia recusa e diz por quê. Rotas
   Só entram campos que alimentam um indicador ou uma decisão, em oportunidade (serviço, valor, captador, tipo de
   canal, originação; envio depois de "Enviar proposta"; motivo na Perdida; contrato cadastrado na aceita
   recorrente · prioritários: temperatura e próxima ação nas abertas, porte), contrato (assinatura quando assinado,
-  valor, bruto ou líquido, CNPJ · signatário, fim), encerramento (saída, motivo, iniciativa · descrição), cliente
+  valor, bruto ou líquido, CNPJ · signatário, fim só no contrato que não é recorrente), encerramento (saída, motivo, iniciativa · descrição), cliente
   (responsável de CS, classificação · porte), empresa (CNPJ · regime, endereço) e contato (telefone ou e-mail,
   vínculo · cargo, papel). Conta só o que foi criado desde 14/10/2026 (`integralidade.DATA_DE_CORTE`); o legado
   vem num número à parte. Responde o captador, na oportunidade, e o responsável de CS do grupo no resto (o captador

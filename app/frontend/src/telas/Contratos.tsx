@@ -306,8 +306,9 @@ export function EdicaoDeContrato({
         )}
         {assinado && (
           <p className="campo-ajuda">
-            Contrato assinado: o preço e a data de fim só mudam por um evento (reajuste, expansão,
-            contração ou renovação), que guarda o valor anterior.
+            {contrato.recorrente === true
+              ? "Contrato assinado: o preço só muda por um evento (reajuste, expansão ou contração), que guarda o valor anterior."
+              : "Contrato assinado: o preço e a data de fim só mudam por um evento (reajuste, expansão, contração ou renovação), que guarda o valor anterior."}
           </p>
         )}
 
@@ -324,18 +325,29 @@ export function EdicaoDeContrato({
             />
             {marcas.aviso("data_inicio")}
           </div>
-          <div className={`campo-bloco ${marcas.classe("data_fim")}`} id={marcas.id("data_fim")}>
-            <label className="campo-rotulo" htmlFor="c-fim">
-              Fim da vigência
-            </label>
-            <CampoDeData
-              id="c-fim"
-              value={rascunho.data_fim}
-              disabled={(assinado && !!dataFimGravada) || encerrado}
-              aoMudar={(v) => mudar("data_fim", v)}
-            />
-            {marcas.aviso("data_fim")}
-          </div>
+          {/* Recorrente não tem fim de vigência (Eduardo, 23/10/2026): termina por um evento de Encerramento. */}
+          {contrato.recorrente === true ? (
+            <div className="campo-bloco">
+              <span className="campo-rotulo">Fim da vigência</span>
+              <p className="campo-ajuda" style={{ margin: 0 }}>
+                Não se aplica: o contrato recorrente vale por prazo indeterminado e termina por um evento
+                de <b>Encerramento</b>.
+              </p>
+            </div>
+          ) : (
+            <div className={`campo-bloco ${marcas.classe("data_fim")}`} id={marcas.id("data_fim")}>
+              <label className="campo-rotulo" htmlFor="c-fim">
+                Fim da vigência
+              </label>
+              <CampoDeData
+                id="c-fim"
+                value={rascunho.data_fim}
+                disabled={(assinado && !!dataFimGravada) || encerrado}
+                aoMudar={(v) => mudar("data_fim", v)}
+              />
+              {marcas.aviso("data_fim")}
+            </div>
+          )}
         </div>
 
         <div className={`campo-bloco ${marcas.classe("signatario")}`} id={marcas.id("signatario")}>

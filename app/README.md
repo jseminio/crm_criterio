@@ -16,6 +16,12 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## O "i" ao lado de Nível (21/10/2026)
+
+No painel do parceiro, o botão "i" ao lado de **Nível** abre a explicação dos três níveis (Indicador, Estruturado e
+Estratégico): o que é, como funciona, follow-up sugerido e exemplos. O nível escolhido vem primeiro, com a palavra
+"Escolhido". Abre e fecha com clique; o Esc fecha só a explicação. O texto fica em `componentes/InfoDosNiveis.tsx`.
+
 ## Follow-up de parceiros na Agenda (19/10/2026)
 
 Amostra aprovada por Eduardo em 19/10/2026. O parceiro ganha o **próximo follow-up** (o que fazer e quando), no mesmo

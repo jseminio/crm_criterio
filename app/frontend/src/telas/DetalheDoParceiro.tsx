@@ -2,11 +2,12 @@
  * indicações com a validação e o vínculo de 12 meses, ligar uma oportunidade nova e os fees do parceiro. No acordo
  * informal, a regra prometida fica registrada com quem combinou e quando: é a base da regularização. */
 
-import { useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { CadastroDoParceiro, IndicacaoDoParceiro, OportunidadeParaIndicar, ParceiroDetalhe } from "../api/tipos";
 import { CampoDeData } from "../componentes/CampoDeData";
 import { Etiqueta } from "../componentes/Etiqueta";
+import { BotaoInfoDosNiveis, InfoDosNiveis } from "../componentes/InfoDosNiveis";
 import { PainelLateral } from "../componentes/PainelLateral";
 import { RegistrarIndicacao } from "../componentes/RegistrarIndicacao";
 import { abrirParaImprimir, mesPadrao } from "../relatorioDoParceiro";
@@ -71,6 +72,8 @@ function Formulario({ parceiro, aoFechar, aoSalvar }: {
   const editavel = pode("parceiros.editar");
   const [campos, definirCampos] = useState<CadastroDoParceiro>(parceiro ? cadastroDe(parceiro) : novoComFollowUp());
   const [dataTocada, definirDataTocada] = useState(false);
+  const [infoDosNiveis, definirInfoDosNiveis] = useState(false);
+  const fecharInfoDosNiveis = useCallback(() => definirInfoDosNiveis(false), []);
   const [salvando, definirSalvando] = useState(false);
   const [falha, definirFalha] = useState<string | null>(null);
   const [atual, definirAtual] = useState<ParceiroDetalhe | null>(parceiro);
@@ -85,9 +88,12 @@ function Formulario({ parceiro, aoFechar, aoSalvar }: {
       {extra.ajuda && <p className="campo-ajuda">{extra.ajuda}</p>}
     </div>
   );
-  const escolha = (campo: keyof CadastroDoParceiro, rotulo: string, opcoes: string[]) => (
+  const escolha = (campo: keyof CadastroDoParceiro, rotulo: string, opcoes: string[], aoLadoDoRotulo?: ReactNode) => (
     <div className="campo-bloco">
-      <label className="campo-rotulo" htmlFor={`p-${campo}`}>{rotulo}</label>
+      <span className="rotulo-com-info">
+        <label className="campo-rotulo" htmlFor={`p-${campo}`}>{rotulo}</label>
+        {aoLadoDoRotulo}
+      </span>
       <select id={`p-${campo}`} className="selecao" value={campos[campo] as string} disabled={!editavel}
         onChange={(e) => {
           mudar(campo, e.target.value as never);
@@ -150,9 +156,11 @@ function Formulario({ parceiro, aoFechar, aoSalvar }: {
           {texto("socio_responsavel", "Sócio responsável", { placeholder: "Eduardo" })}
         </div>
         <div className="formulario-duplo">
-          {escolha("nivel", "Nível", NIVEIS)}
+          {escolha("nivel", "Nível", NIVEIS,
+            <BotaoInfoDosNiveis aberto={infoDosNiveis} aoAlternar={() => definirInfoDosNiveis((a) => !a)} />)}
           {escolha("etapa_manual", "Etapa marcada à mão", ETAPAS_MANUAIS)}
         </div>
+        {infoDosNiveis && <InfoDosNiveis nivel={campos.nivel} aoFechar={fecharInfoDosNiveis} />}
         <p className="campo-ajuda">
           Formalizado, Ativado, Produtivo e Dormente saem dos dados: contrato assinado, indicação validada, proposta enviada
           e seis meses sem indicação. Estratégico marcado à mão vale sobre tudo.

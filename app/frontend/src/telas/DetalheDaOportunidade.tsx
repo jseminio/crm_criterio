@@ -25,6 +25,8 @@ import { usarAcesso } from "../entrada";
 import { precoPelasParcelas } from "../parcelas";
 import { HistoricoDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 import { ConfirmacaoDeExclusao } from "../componentes/ConfirmacaoDeExclusao";
+import { DatasEPagamento, problemaNasParcelas } from "../componentes/DatasEPagamento";
+import type { ParcelaDoServico } from "../api/tipos";
 import { AvisoDeLacuna, QuadroDeLacunas, irAoCampo, marcasDeLacuna, usarLacunas } from "../componentes/Lacunas";
 
 function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
@@ -301,6 +303,8 @@ export function DetalheDaOportunidade({
   const [erro, definirErro] = useState<string | null>(null);
   const [salvando, definirSalvando] = useState(false);
   const [rascunho, definirRascunho] = useState<Record<string, string>>({});
+  // Parcelas do não recorrente (28/10/2026): uma lista, fora do rascunho de texto.
+  const [parcelas, definirParcelas] = useState<ParcelaDoServico[]>([]);
   const [convertendoEmContrato, definirConvertendoEmContrato] = useState(false);
   const [avisoDeContrato, definirAvisoDeContrato] = useState<string | null>(null);
   // Recorrente ou não (13/10/2026): perguntado antes de converter, com o tipo do serviço como sugestão.
@@ -365,6 +369,8 @@ export function DetalheDaOportunidade({
             ?? (situacaoInicial === "Em avaliação pela empresa" && d.situacao === "Enviar proposta" ? hojeIso() : ""),
           preco_mensal: d.preco_mensal ?? "",
           preco_anual: d.preco_anual ?? "",
+          data_competencia: d.data_competencia ?? "",
+          data_inicio_pagamento: d.data_inicio_pagamento ?? "",
           complexidade: d.complexidade?.toString() ?? "",
           risco_tecnico: d.risco_tecnico?.toString() ?? "",
           documentos_fiscais_mes: d.documentos_fiscais_mes?.toString() ?? "",
@@ -386,6 +392,7 @@ export function DetalheDaOportunidade({
             DIRECIONADORES_DE_PORTE.map((x) => [`origem_${x.id}`, d.origem_da_volumetria?.[x.id] ?? ""]),
           ),
         });
+        definirParcelas(d.parcelas ?? []);
       })
       .catch((f) => definirErro(f instanceof ErroDaApi ? f.message : "Falha inesperada."));
   };
@@ -435,6 +442,7 @@ export function DetalheDaOportunidade({
           rascunho[`origem_${x.id}`],
         ]),
       );
+      if (naoRecorrente) mudancas.parcelas = parcelas;
       await api.editarOportunidade(id, mudancas);
       aoSalvar();
       aoFechar();
@@ -460,6 +468,10 @@ export function DetalheDaOportunidade({
       Number(anualExibido || 0) !== Number(detalhe.preco_anual || 0));
 
   const exigeDataDeAceite = rascunho.situacao === "Aceita" && !rascunho.data_aceite;
+  // Parcelas só no não recorrente (consultoria, legalização: linha C2). Total = anual; sem ele, o mensal.
+  const naoRecorrente = detalhe?.linha_servico === "C2";
+  const totalDoServico = (anualExibido || rascunho.preco_mensal) || null;
+  const problemaDasParcelas = naoRecorrente ? problemaNasParcelas(parcelas, totalDoServico) : null;
   // Perdida pede o motivo (10/10/2026); as antigas sem motivo não travam quem só edita outro campo.
   const exigeMotivoDaPerda =
     rascunho.situacao === "Perdida" && detalhe?.situacao !== "Perdida" &&
@@ -545,7 +557,7 @@ export function DetalheDaOportunidade({
         type="button"
         className={`botao ${aba === "proposta" || aba === "granola" ? "botao-secundario" : "botao-primario"}`}
         onClick={salvar}
-        disabled={salvando || exigeDataDeAceite || exigeDataDeEnvio || exigeMotivoDaPerda || !pode("funil.editar")}
+        disabled={salvando || !!problemaDasParcelas || exigeDataDeAceite || exigeDataDeEnvio || exigeMotivoDaPerda || !pode("funil.editar")}
       >
         {salvando ? "Salvando…" : "Salvar alterações"}
       </button>
@@ -833,6 +845,17 @@ export function DetalheDaOportunidade({
                 </p>
               </div>
             )}
+
+            <DatasEPagamento
+              prefixo="d"
+              competencia={rascunho.data_competencia ?? ""}
+              inicioPagamento={rascunho.data_inicio_pagamento ?? ""}
+              naoRecorrente={naoRecorrente}
+              total={totalDoServico}
+              parcelas={parcelas}
+              aoMudarData={mudar}
+              aoMudarParcelas={definirParcelas}
+            />
 
             <div className={`campo-bloco ${marcas.classe("data_colocacao")}`} id={marcas.id("data_colocacao")}>
               <label className="campo-rotulo" htmlFor="d-originacao">

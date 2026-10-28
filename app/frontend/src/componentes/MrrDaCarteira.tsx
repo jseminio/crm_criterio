@@ -181,6 +181,7 @@ export function ComposicaoDaCarteira({ inicial }: { inicial?: Carteira }) {
 
 const PARTE: Record<string, string> = {
   somado: "no MRR", suspenso: "suspenso, à parte", sem_preco: "sem preço mensal, fora da soma",
+  a_comecar: "entra no MRR no 1º recebimento",
   encerrado: "encerrado depois do mês",
 };
 

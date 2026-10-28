@@ -129,8 +129,10 @@ def valores_sugeridos(sessao: Session, c: Contrato, hoje: date) -> dict[str, tup
     elif c.preco_mensal is not None:
         v["valor_contabil"] = (_reais(c.preco_mensal), "contrato")
         v["bruto_contabil"] = (_reais(conta.bruto_de(c.preco_mensal, imposto)), "parâmetros")
-    inicio = c.data_inicio or hoje
-    v["competencia_inicial"] = (f"{MESES[inicio.month - 1]} de {inicio.year}", "contrato" if c.data_inicio else "hoje")
+    # A competência inicial é a data de competência, quando assumimos os serviços (28/10/2026); sem ela, a assinatura.
+    inicio = c.data_competencia or c.data_inicio or hoje
+    v["competencia_inicial"] = (f"{MESES[inicio.month - 1]} de {inicio.year}",
+                                "contrato" if (c.data_competencia or c.data_inicio) else "hoje")
     v["data_extenso"] = (data_por_extenso(hoje), "hoje")
     cfg = _configuracao(sessao)
     v["vencimento"] = (str(cfg.vencimento), "configurações")

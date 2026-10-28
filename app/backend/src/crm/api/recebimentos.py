@@ -28,7 +28,9 @@ from crm.api.metas import metas_vigentes
 from crm.db.base import agora
 from crm.db.modelos import Contrato, Empresa, GrupoEconomico, ImportacaoDeRecebimentos, Recebimento
 from crm.db.saidas import efetivar_saidas
+from crm.domain.listas import SituacaoContrato
 from crm.domain import mrr as regras
+from crm.domain import parcelas as regras_de_parcelas
 from crm.domain import recebimentos as regra
 
 __all__ = ["roteador_de_recebimentos", "reconhecer"]
@@ -186,21 +188,26 @@ def carteira(sessao: Session, competencia: date, hoje: date | None = None) -> Ca
     imposto = parametros_vigentes(sessao)[1].imposto
     em_mrr = regras.em_bruto(registrados, imposto)
     parcelas = {c.id: c for c in regras.em_bruto(registrados, imposto, em_mrr=False)}
-    atual = regras.mrr_atual(em_mrr)
+    atual = regras.mrr_atual(em_mrr, hoje or date.today())
     fim = _fim_do_mes(competencia)
 
     itens: dict[int, list[ContratoDoGrupo]] = defaultdict(list)
     esperado_do_grupo: dict[int, Decimal] = defaultdict(lambda: ZERO)
     mrr_do_grupo: dict[int, Decimal] = defaultdict(lambda: ZERO)
-    partes = {i.contrato_id: i for i in regras.itens_do_mrr(em_mrr)}
+    partes = {i.contrato_id: i for i in regras.itens_do_mrr(em_mrr, hoje or date.today())}
     em_aviso, em_aviso_contratos = ZERO, 0
     for p in parcelas.values():
         esperado = ZERO
         saida = regras.saida_vigente(p)
-        if regras.fatura_entre(p, competencia, fim):
+        if p.recorrente is False and p.parcelas:
+            # Não recorrente com parcelas (28/10/2026): o caixa espera a parcela que vence no mês, sem 13ª.
+            if p.situacao is not SituacaoContrato.AGUARDANDO_ASSINATURA:
+                esperado = regras_de_parcelas.no_mes(p.parcelas, competencia)
+        elif regras.fatura_entre(p, competencia, fim):
             preco = regras.preco_em(p, min(fim, saida) if saida else fim)
             if preco and preco > 0:
-                esperado = regra.esperado_no_mes(preco, competencia, p.data_inicio, saida, p.parcelas_no_ano)
+                # A 13ª conta os avos desde a data de competência (28/10/2026); sem ela, desde a assinatura.
+                esperado = regra.esperado_no_mes(preco, competencia, p.inicio_do_servico, saida, p.parcelas_no_ano)
         item = partes.get(p.id)
         if item is None and esperado <= 0:
             continue

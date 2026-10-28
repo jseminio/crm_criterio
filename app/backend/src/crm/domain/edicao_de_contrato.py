@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from crm.db.modelos import Contrato
+from crm.domain import parcelas
 from crm.domain.listas import SituacaoContrato
 
 __all__ = ["problema_na_edicao"]
@@ -17,7 +18,12 @@ __all__ = ["problema_na_edicao"]
 def problema_na_edicao(contrato: Contrato, mudancas: dict[str, Any]) -> str | None:
     """A frase de por que a edição não pode ser feita; `None` se pode."""
     # A tela manda o rascunho inteiro: só conta o que difere do valor atual.
-    reais = {campo: valor for campo, valor in mudancas.items() if valor != getattr(contrato, campo)}
+    def comparavel(campo: str, valor: Any) -> Any:
+        # As parcelas chegam como objetos e moram no banco como texto: compara-se o mesmo JSON (28/10/2026).
+        return parcelas.gravar(parcelas.ler(valor)) if campo == "parcelas" else valor
+
+    reais = {campo: valor for campo, valor in mudancas.items()
+             if comparavel(campo, valor) != comparavel(campo, getattr(contrato, campo))}
 
     # Encerrado não se mexe mais — nem por evento, nem por edição. Sem isto, um
     # salvar voltava a situação para Ativo e destravava preço e data de fim.

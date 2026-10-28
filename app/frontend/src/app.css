@@ -1741,6 +1741,20 @@ fieldset.lacuna-prioritaria { border: 2px dashed var(--espera); padding: var(--e
 
 
 
+/* Datas e pagamento (28/10/2026): competência, início do pagamento e parcelas do não recorrente. */
+.datas-e-pagamento { border: 1px solid var(--borda); border-radius: var(--raio-md); padding: var(--e3) var(--e4); margin: 0; }
+.datas-e-pagamento > legend { padding: 0 var(--e1); }
+.parcelas-do-servico { border-top: 1px solid var(--borda); margin-top: var(--e3); padding-top: var(--e3); }
+.parcelas-topo { display: flex; align-items: flex-end; gap: var(--e3); flex-wrap: wrap; }
+.parcelas-topo .campo-bloco { flex: 0 0 160px; margin: 0; }
+.tabela-parcelas { width: 100%; margin-top: var(--e2); }
+.tabela-parcelas td, .tabela-parcelas th { padding: var(--e1) var(--e2); }
+.tabela-parcelas td:first-child { width: 44px; color: var(--texto-medio); }
+.tabela-parcelas .entrada { width: 100%; min-width: 0; }
+.parcelas-erro { color: var(--perda); }
+.parcelas-ok { color: var(--ganho); }
+
+
 /* ------------------------------------------------ Granola: situação da busca e fila (23/10/2026) */
 .granola-situacao { display: grid; gap: var(--e2); border-top: 1px solid var(--borda); padding-top: var(--e4); margin-top: var(--e3); }
 .granola-fila td { vertical-align: middle; font-size: 13px; }
@@ -1764,3 +1778,4 @@ fieldset.lacuna-prioritaria { border: 2px dashed var(--espera); padding: var(--e
     scroll-behavior: auto !important;
   }
 }
+

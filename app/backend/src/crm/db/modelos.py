@@ -475,6 +475,15 @@ class Oportunidade(CarimboMixin, Base):
     quantidade_parcelas: Mapped[int | None] = mapped_column(sa.SmallInteger)
     """Só em serviço recorrente (C1): o preço anual é mensal × parcelas, sem ajuste à mão.
     Pedido de Karine em 30/09/2026."""
+    data_competencia: Mapped[date | None] = mapped_column(sa.Date)
+    """Quando a Critério assume os serviços (28/10/2026). A 13ª proporcional conta os avos a partir dela; vazia, vale a
+    assinatura (`crm.domain.parcelas`)."""
+    data_inicio_pagamento: Mapped[date | None] = mapped_column(sa.Date)
+    """O vencimento da 1ª parcela, a data do primeiro recebimento (28/10/2026). O MRR, e o MRR novo, contam a partir
+    dela; vazia, vale a assinatura."""
+    parcelas: Mapped[list[dict] | None] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"))
+    """Só no não recorrente (28/10/2026): `[{"vencimento": "AAAA-MM-DD", "valor": "0.00"}]`, valores não
+    necessariamente iguais, somando o valor total. O recebido espera cada uma no mês do vencimento."""
     reajuste: Mapped[IndiceDeReajuste | None] = mapped_column(coluna_lista(IndiceDeReajuste))
     valor_mensalizado: Mapped[Decimal | None] = mapped_column(DINHEIRO)
 
@@ -869,6 +878,15 @@ class Contrato(CarimboMixin, Base):
     parcelas_no_ano: Mapped[int] = mapped_column(sa.SmallInteger, nullable=False, default=13, server_default="13")
     """13 por padrão (contábil, fiscal, DP e BPO Financeiro: 13ª parcela, decisões de 09 e 11/10/2026); 12 no contrato no
     formato antigo, sem 13ª (Menino da Ilha). O MRR é a parcela × parcelas ÷ 12."""
+    data_competencia: Mapped[date | None] = mapped_column(sa.Date)
+    """Quando a Critério assume os serviços (28/10/2026). A 13ª proporcional conta os avos a partir dela; vazia, vale a
+    assinatura (`crm.domain.parcelas`)."""
+    data_inicio_pagamento: Mapped[date | None] = mapped_column(sa.Date)
+    """O vencimento da 1ª parcela, a data do primeiro recebimento (28/10/2026). O MRR, e o MRR novo, contam a partir
+    dela; vazia, vale a assinatura."""
+    parcelas: Mapped[list[dict] | None] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"))
+    """Só no não recorrente (28/10/2026): `[{"vencimento": "AAAA-MM-DD", "valor": "0.00"}]`, valores não
+    necessariamente iguais, somando o valor total. O recebido espera cada uma no mês do vencimento."""
 
     situacao: Mapped[SituacaoContrato] = mapped_column(
         coluna_lista(SituacaoContrato),

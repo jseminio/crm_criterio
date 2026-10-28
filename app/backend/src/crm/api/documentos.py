@@ -80,6 +80,8 @@ TipoDoValor = Literal["data", "dinheiro", "inteiro", "texto"]
 ROTULOS: dict[str, tuple[str, TipoDoValor]] = {
     "numero": ("Número no documento", "texto"),
     "data_assinatura": ("Data da assinatura", "data"),
+    "data_competencia": ("Data de competência", "data"),
+    "data_inicio_pagamento": ("Início do pagamento", "data"),
     "cnpj": ("CNPJ do contrato", "texto"),
     "preco_mensal": ("Preço mensal", "dinheiro"),
     "base_do_valor": ("Base do valor", "texto"),
@@ -95,7 +97,8 @@ ROTULOS: dict[str, tuple[str, TipoDoValor]] = {
 }
 
 DO_CONTRATO: dict[str, str] = {
-    "data_assinatura": "data_inicio", "preco_mensal": "preco_mensal", "base_do_valor": "base_do_valor",
+    "data_assinatura": "data_inicio", "data_competencia": "data_competencia",
+    "data_inicio_pagamento": "data_inicio_pagamento", "preco_mensal": "preco_mensal", "base_do_valor": "base_do_valor",
     "parcelas_no_ano": "parcelas_no_ano", "escopo": "escopo", "data_fim": "data_fim", "renovacao": "renovacao",
     "multa_rescisoria": "multa_rescisoria", "aviso_previo_dias": "aviso_previo_dias", "signatario": "signatario",
 }
@@ -104,7 +107,7 @@ DO_CONTRATO: dict[str, str] = {
 DO_DOCUMENTO = ("numero", "data_assinatura")
 """Ficam sempre no próprio documento (número como escrito e data), em qualquer tipo."""
 
-ORDEM = ("numero", "data_assinatura", "cnpj", "preco_mensal", "base_do_valor", "parcelas_no_ano", "escopo", "data_fim",
+ORDEM = ("numero", "data_assinatura", "data_competencia", "data_inicio_pagamento", "cnpj", "preco_mensal", "base_do_valor", "parcelas_no_ano", "escopo", "data_fim",
          "vigencia", "renovacao", "multa_rescisoria", "aviso_previo_dias", "signatario", "plano")
 
 _TAMANHOS = {"escopo": 200, "renovacao": 200, "multa_rescisoria": 200, "signatario": 200}

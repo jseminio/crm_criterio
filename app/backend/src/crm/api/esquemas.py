@@ -229,6 +229,13 @@ class SugestaoDeFusao(Base):
     grupos: list[GrupoResumo]
 
 
+class ParcelaDoServico(BaseModel):
+    """Uma parcela do não recorrente (28/10/2026): vencimento e valor; os valores podem ser diferentes."""
+
+    vencimento: date
+    valor: Decimal = Field(gt=0)
+
+
 class OportunidadeResumo(Base):
     """O que cabe num cartão do funil."""
 
@@ -282,6 +289,12 @@ class MudancaDePreco(Base):
 class OportunidadeDetalhe(OportunidadeResumo):
     tem_contrato: bool = False
     """Já virou contrato: a empresa não troca mais por aqui."""
+    data_competencia: date | None = None
+    """Quando a Critério assume os serviços (28/10/2026)."""
+    data_inicio_pagamento: date | None = None
+    """O vencimento da 1ª parcela (28/10/2026): o MRR conta a partir dela."""
+    parcelas: list[ParcelaDoServico] | None = None
+    """Só no não recorrente: as parcelas, em ordem de vencimento. Vazio = sem parcelas informadas."""
     canal: str | None = None
     parceiro_id: int | None = None
     """O parceiro do Funil de Parceiros que indicou (19/10/2026)."""
@@ -369,6 +382,10 @@ class OportunidadeEdicao(BaseModel):
     """Pedida ao mover de Enviar proposta para Em avaliação (10/10/2026)."""
     preco_mensal: Decimal | None = None
     preco_anual: Decimal | None = None
+    data_competencia: date | None = None
+    data_inicio_pagamento: date | None = None
+    parcelas: list[ParcelaDoServico] | None = None
+    """Datas e parcelas (28/10/2026). Lista vazia apaga as parcelas; a soma tem de bater com o valor total."""
 
     complexidade: int | None = Field(default=None, ge=1, le=5)
     risco_tecnico: int | None = Field(default=None, ge=1, le=5)
@@ -562,6 +579,12 @@ class ContratoResumo(Base):
     empresa_nome: str | None = None
     """Razão social e nome fantasia do CNPJ do contrato, para a pesquisa da Gestão de contratos (13/10/2026)."""
     empresa_cnpj: str | None = None
+    data_competencia: date | None = None
+    """Quando a Critério assume os serviços (28/10/2026)."""
+    data_inicio_pagamento: date | None = None
+    """O vencimento da 1ª parcela (28/10/2026): o MRR conta a partir dela."""
+    parcelas: list[ParcelaDoServico] | None = None
+    """Só no não recorrente: as parcelas, em ordem de vencimento. Vazio = sem parcelas informadas."""
 
 
 class EventoDeContratoResposta(Base):
@@ -664,6 +687,10 @@ class ContratoEdicao(BaseModel):
     multa_rescisoria: str | None = Field(default=None, max_length=200)
     aviso_previo_dias: int | None = Field(default=None, ge=0, le=999)
     renovacao: str | None = Field(default=None, max_length=200)
+    data_competencia: date | None = None
+    data_inicio_pagamento: date | None = None
+    parcelas: list[ParcelaDoServico] | None = None
+    """Datas e parcelas (28/10/2026). Lista vazia apaga as parcelas; a soma tem de bater com o valor total."""
 
 
 class ExclusaoDaOportunidade(BaseModel):
@@ -695,6 +722,9 @@ class ConversaoEmContrato(BaseModel):
     signatario: str | None = Field(default=None, max_length=200)
     recorrente: bool | None = None
     """Recorrente ou não (13/10/2026). Vazio = o tipo do serviço; serviço sem tipo exige a resposta."""
+    data_competencia: date | None = None
+    data_inicio_pagamento: date | None = None
+    """Vazias, vêm da oportunidade (28/10/2026), como as parcelas."""
 
 
 class Fusao(BaseModel):

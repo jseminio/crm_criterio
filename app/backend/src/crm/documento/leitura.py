@@ -30,6 +30,9 @@ TIPOS = ("contrato", "proposta", "aditivo")
 CAMPOS: dict[str, str] = {
     "numero": "Número do documento como está escrito (ex.: CONT CCE RJ1 102.2026, PROP CCE RJ 041.2019)",
     "data_assinatura": "Data da assinatura (contrato, aditivo) ou do aceite (proposta), AAAA-MM-DD",
+    "data_competencia": "Competência em que os serviços começam (ex.: \"a partir da competência de março/2025\"), "
+                        "AAAA-MM-01; vazio se não diz",
+    "data_inicio_pagamento": "Vencimento do primeiro pagamento, AAAA-MM-DD; vazio se não diz",
     "preco_mensal": "Honorário mensal total, em reais, só o número",
     "base_do_valor": "\"bruto\" se o valor inclui os impostos, \"liquido\" se os impostos são somados, vazio se não diz",
     "parcelas_no_ano": "12 ou 13 (13 quando há 13ª parcela/honorário no fim do ano)",
@@ -120,7 +123,7 @@ def _inteiro(v: str, permitidos: tuple[int, ...] | None = None) -> str:
 def normalizar(dados: dict[str, Any]) -> dict[str, Any]:
     """Põe cada valor no formato que o CRM grava; o que não se encaixa vira vazio (a pessoa preenche à mão)."""
     tratar = {
-        "data_assinatura": _data, "data_fim": _data, "preco_mensal": _dinheiro,
+        "data_assinatura": _data, "data_fim": _data, "data_competencia": _data, "data_inicio_pagamento": _data, "preco_mensal": _dinheiro,
         "base_do_valor": lambda v: v.strip().lower().replace("í", "i") if v.strip().lower().replace("í", "i") in ("bruto", "liquido") else "",
         "parcelas_no_ano": lambda v: _inteiro(v, (12, 13)), "aviso_previo_dias": _inteiro,
     }

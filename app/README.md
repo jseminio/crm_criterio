@@ -16,6 +16,29 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Data de competência, início do pagamento e parcelas do não recorrente (28/10/2026)
+
+Pedido de Eduardo, amostra aprovada em 28/10/2026. Valem no card da oportunidade e no painel do contrato (seção
+**Datas e pagamento**); na conversão em contrato, as datas e as parcelas da proposta vão junto.
+
+- **Data de competência:** quando a Critério assume os serviços. A **13ª proporcional conta os avos a partir dela**
+  (decisão de 28/10/2026); sem ela, desde a assinatura, como antes. O contrato gerado pelo CRM usa o mês dela na
+  "competência inicial".
+- **Início do pagamento:** o vencimento da 1ª parcela, a data do primeiro recebimento. **O MRR e o MRR novo contam a
+  partir dela** (decisão de 28/10/2026); sem ela, a assinatura. Contrato assinado com o pagamento ainda por vir fica
+  fora do MRR atual, marcado "entra no MRR no 1º recebimento". O recebido só espera parcela a partir dele.
+- **Parcelas do não recorrente:** número de parcelas e, para cada uma, vencimento e valor, que podem ser diferentes.
+  A 1ª vence no início do pagamento e as seguintes mês a mês (qualquer uma pode mudar); "Dividir em partes iguais" é
+  só atalho. A soma tem de bater com o valor total (preço anual; sem ele, o mensal): a tela não salva e a API recusa
+  (422). O recebido espera cada parcela no mês do vencimento, sem 13ª. Mudar o preço sem ajustar as parcelas é
+  recusado.
+- **Leitura dos documentos antigos:** a IA lê também a data de competência e o início do pagamento, que se conferem
+  como os outros campos. As parcelas ainda se digitam.
+- **Integralidade:** data de competência e início do pagamento (e as parcelas, no não recorrente) entram como
+  **prioritários** no contrato que não é da carteira anterior ao CRM.
+- **Banco:** migração `d8b2f4a6c1e3` só acrescenta colunas vazias (`data_competencia`, `data_inicio_pagamento`,
+  `parcelas`) em `oportunidade` e `contrato`. Nada existente muda.
+
 ## O "i" ao lado de Nível (21/10/2026)
 
 No painel do parceiro, o botão "i" ao lado de **Nível** abre a explicação dos três níveis (Indicador, Estruturado e

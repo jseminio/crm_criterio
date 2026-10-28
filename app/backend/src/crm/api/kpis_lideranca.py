@@ -165,7 +165,9 @@ def calcular(sessao: Session, mes: str, hoje: date) -> KpisResposta:
     def novos_entre(a: date, b: date) -> list[tuple[Contrato, Decimal]]:
         lista = []
         for c in originais:
-            if c.data_inicio is None or not (a <= c.data_inicio <= b):
+            # O MRR novo conta na data do primeiro recebimento (início do pagamento), senão na assinatura (28/10/2026).
+            inicio = bruto[c.id].data_inicio
+            if inicio is None or not (a <= inicio <= b):
                 continue
             if c.situacao is SituacaoContrato.AGUARDANDO_ASSINATURA:
                 continue

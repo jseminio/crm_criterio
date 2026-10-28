@@ -24,6 +24,8 @@ import { contratoCombina, Destaque } from "./pesquisaDeContratos";
 import { GerarContrato } from "../componentes/GerarContrato";
 import { AssinaturaEletronica } from "../componentes/AssinaturaEletronica";
 import { DocumentosAnexados } from "../componentes/DocumentosAnexados";
+import { DatasEPagamento, problemaNasParcelas } from "../componentes/DatasEPagamento";
+import type { ParcelaDoServico } from "../api/tipos";
 
 const SITUACOES_DE_CONTRATO = ["Aguardando assinatura", "Ativo", "Suspenso", "Encerrado"];
 
@@ -64,7 +66,11 @@ export function EdicaoDeContrato({
     signatario: contrato.signatario ?? "",
     base_do_valor: contrato.base_do_valor ?? "",
     parcelas_no_ano: String(contrato.parcelas_no_ano ?? 13),
+    data_competencia: contrato.data_competencia ?? "",
+    data_inicio_pagamento: contrato.data_inicio_pagamento ?? "",
   });
+  // Parcelas do não recorrente (28/10/2026): fora do rascunho de texto, porque é uma lista.
+  const [parcelas, definirParcelas] = useState<ParcelaDoServico[]>(contrato.parcelas ?? []);
   // A alíquota vem do MRR (Parâmetros de cálculo), para mostrar quanto o líquido vale em bruto.
   const { dados: mrr } = usarDados<Mrr>(() => api.mrr(), []);
   const [erro, definirErro] = useState<string | null>(null);
@@ -102,6 +108,8 @@ export function EdicaoDeContrato({
 
   const mudar = (campo: string, valor: string) =>
     definirRascunho((atual) => ({ ...atual, [campo]: valor }));
+  const totalDoServico = (rascunho.preco_anual || rascunho.preco_mensal) || null;
+  const problemaDasParcelas = contrato.recorrente === false ? problemaNasParcelas(parcelas, totalDoServico) : null;
 
   // Assinado na Clicksign (18/10/2026): o contrato virou Ativo com a data da assinatura.
   // O PDF assinado chega na seção Documento assinado: ela recarrega.
@@ -142,7 +150,10 @@ export function EdicaoDeContrato({
         signatario: atualizado.signatario ?? "",
         base_do_valor: atualizado.base_do_valor ?? "",
         parcelas_no_ano: String(atualizado.parcelas_no_ano ?? 13),
+        data_competencia: atualizado.data_competencia ?? "",
+        data_inicio_pagamento: atualizado.data_inicio_pagamento ?? "",
       }));
+      definirParcelas(atualizado.parcelas ?? []);
     }).catch(() => undefined);
     aoSalvar();
   };
@@ -155,6 +166,7 @@ export function EdicaoDeContrato({
         Object.entries(rascunho).map(([k, v]) => [k, v === "" ? null : v]),
       );
       mudancas.parcelas_no_ano = Number(rascunho.parcelas_no_ano);
+      if (contrato.recorrente === false) mudancas.parcelas = parcelas;
       await api.editarContrato(contrato.id, mudancas);
       aoSalvar();
       aoFechar();
@@ -179,7 +191,7 @@ export function EdicaoDeContrato({
             type="button"
             className="botao botao-primario"
             onClick={salvar}
-            disabled={salvando || semAssinatura || (encerrado && rascunho.base_do_valor === (contrato.base_do_valor ?? "") && rascunho.parcelas_no_ano === String(contrato.parcelas_no_ano ?? 13))}
+            disabled={salvando || semAssinatura || !!problemaDasParcelas || (encerrado && rascunho.base_do_valor === (contrato.base_do_valor ?? "") && rascunho.parcelas_no_ano === String(contrato.parcelas_no_ano ?? 13))}
           >
             {salvando ? "Salvando…" : "Salvar alterações"}
           </button>
@@ -349,6 +361,19 @@ export function EdicaoDeContrato({
             </div>
           )}
         </div>
+
+        <DatasEPagamento
+          prefixo="c"
+          competencia={rascunho.data_competencia}
+          inicioPagamento={rascunho.data_inicio_pagamento}
+          naoRecorrente={contrato.recorrente === false}
+          total={totalDoServico}
+          parcelas={parcelas}
+          aoMudarData={mudar}
+          aoMudarParcelas={definirParcelas}
+          desabilitado={encerrado}
+          marcas={marcas}
+        />
 
         <div className={`campo-bloco ${marcas.classe("signatario")}`} id={marcas.id("signatario")}>
           <label className="campo-rotulo" htmlFor="c-signatario">

@@ -121,6 +121,7 @@ from crm.domain import agenda as regras_da_agenda
 from crm.domain import parceiros as regras_de_parceiros
 from crm.domain import eventos_de_contrato as regras_de_eventos
 from crm.domain import mrr as regras_de_mrr
+from crm.domain import parcelas as regras_de_parcelas
 from crm.domain import recortes as regras_de_recortes
 from crm.relatorios.exportacao_do_funil import LinhaDoFunil, gerar_planilha_do_funil
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
@@ -513,6 +514,22 @@ def _detalhe_de_contrato(contrato: Contrato, nome_do_grupo: str | None) -> e.Con
     if pendente is not None:
         detalhe.aprovacao_pendente = _resposta_da_aprovacao(pendente)
     return detalhe
+
+
+def _aplicar_parcelas(registro: Oportunidade | Contrato, mudancas: dict, precos_antes: tuple) -> None:
+    """Grava as parcelas que vieram (28/10/2026) e confere a soma contra o valor total, também quando só o preço
+    mudou. Lista vazia apaga as parcelas."""
+    if "parcelas" in mudancas:
+        vindas = mudancas.pop("parcelas") or []
+        registro.parcelas = regras_de_parcelas.gravar(
+            regras_de_parcelas.Parcela(p["vencimento"], Decimal(p["valor"])) for p in vindas)
+    elif (registro.preco_mensal, registro.preco_anual) == precos_antes:
+        return
+    problema = regras_de_parcelas.problema_nas_parcelas(
+        regras_de_parcelas.ler(registro.parcelas),
+        regras_de_parcelas.total_do_servico(registro.preco_anual, registro.preco_mensal))
+    if problema:
+        raise HTTPException(422, problema)
 
 
 def _resposta_da_aprovacao(p: PedidoDeAprovacao) -> e.AprovacaoResposta:
@@ -1171,7 +1188,7 @@ def _registrar(api: FastAPI) -> None:
         somados = [c for c in registrados if c.situacao in (SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO)
                    and c.preco_mensal and c.preco_mensal > 0]
         mov = regras_de_mrr.movimento(contratos, inicio, fim, dia)
-        atual = regras_de_mrr.mrr_atual(contratos)
+        atual = regras_de_mrr.mrr_atual(contratos, dia)
         completa = da_carteira > 0
         meta, alerta = metas_vigentes(sessao)["mrr"]
         return e.MrrResposta(
@@ -1417,6 +1434,8 @@ def _registrar(api: FastAPI) -> None:
         # o motivo vai para a linha do histórico, e a origem tem validação própria.
         motivo_do_preco = mudancas.pop("motivo_do_preco", None)
         origem_da_volumetria = mudancas.pop("origem_da_volumetria", None)
+        # As parcelas do não recorrente (28/10/2026) conferem a soma com o preço final, depois do recálculo do anual.
+        parcelas_vindas = {"parcelas": mudancas.pop("parcelas")} if "parcelas" in mudancas else {}
         preco_antes = (oportunidade.preco_mensal, oportunidade.preco_anual)
         servico_antes = oportunidade.servico
         situacao_antes = oportunidade.situacao
@@ -1560,6 +1579,7 @@ def _registrar(api: FastAPI) -> None:
         # pontual). Decisão de Eduardo, 26/09/2026.
         if oportunidade.situacao is Situacao.ACEITA and oportunidade.grupo.situacao is SituacaoGrupo.PROSPECT:
             oportunidade.grupo.situacao = SituacaoGrupo.CLIENTE
+        _aplicar_parcelas(oportunidade, parcelas_vindas, preco_antes)
         sessao.flush()
         return _detalhe_de(oportunidade, oportunidade.grupo.nome)
 
@@ -1640,9 +1660,17 @@ def _registrar(api: FastAPI) -> None:
             # A vigência começa na assinatura (decisão de 25/09/2026): o contrato
             # nasce sem data de início; quem assina é que a preenche.
             data_inicio=corpo.data_inicio,
+            # Datas e parcelas da proposta (28/10/2026): o que foi combinado vai junto; dá para ajustar no contrato.
+            data_competencia=corpo.data_competencia or oportunidade.data_competencia,
+            data_inicio_pagamento=corpo.data_inicio_pagamento or oportunidade.data_inicio_pagamento,
             signatario=corpo.signatario,
             situacao=SituacaoContrato.AGUARDANDO_ASSINATURA,
         )
+        # As parcelas só vão se ainda somam o valor do contrato (o preço pode ter sido ajustado na conversão).
+        if oportunidade.parcelas and recorrente is False and not regras_de_parcelas.problema_nas_parcelas(
+                regras_de_parcelas.ler(oportunidade.parcelas),
+                regras_de_parcelas.total_do_servico(contrato.preco_anual, contrato.preco_mensal)):
+            contrato.parcelas = list(oportunidade.parcelas)
         sessao.add(contrato)
         sessao.flush()
 
@@ -1706,8 +1734,11 @@ def _registrar(api: FastAPI) -> None:
         if problema:
             raise HTTPException(422, problema)
 
+        precos_antes = (contrato.preco_mensal, contrato.preco_anual)
+        parcelas_vindas = {"parcelas": mudancas.pop("parcelas")} if "parcelas" in mudancas else {}
         for campo, valor in mudancas.items():
             setattr(contrato, campo, valor)
+        _aplicar_parcelas(contrato, parcelas_vindas, precos_antes)
         # A vigência começa na assinatura: sem a data, o contrato não vira Ativo.
         # (Contrato da carteira anterior ao CRM não tem a data e não precisa dela.)
         if (

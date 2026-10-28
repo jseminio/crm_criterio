@@ -43,14 +43,15 @@ def test_conta_os_pontos_dos_campos_devidos_com_peso_e_condicao(cadastro):
     faltam = {(c.cadastro, c.campo) for c in r.novos if not c.preenchido}
     assert faltam == {
         ("Contrato", "Bruto ou líquido"), ("Contrato", "Signatário"), ("Contrato", "Fim da vigência"),
+        ("Contrato", "Data de competência"), ("Contrato", "Início do pagamento"),  # prioritários (28/10/2026)
         ("Cliente", "Classificação (classe e semáforo)"), ("Cliente", "Porte"),
         ("Empresa", "Regime tributário"), ("Empresa", "Endereço (logradouro, município e CEP)"),
         ("Oportunidade", "Motivo de perda"), ("Oportunidade", "Porte"),
         ("Contato", "Vínculo com a empresa"), ("Contato", "Cargo"), ("Contato", "Papel (decisor, influenciador…)"),
     }
-    # devidos: contrato 10 + cliente 5 + empresa 4 + oportunidade 15 + contato 6 = 40; vazios: 4 + 3 + 2 + 3 + 4 = 16
-    assert sum(c.pontos for c in r.novos) == 40
-    assert integralidade.Resultado.pendente_pct(r.novos) == D("40.0")
+    # devidos: contrato 12 + cliente 5 + empresa 4 + oportunidade 15 + contato 6 = 42; vazios: 6 + 3 + 2 + 3 + 4 = 18
+    assert sum(c.pontos for c in r.novos) == 42
+    assert integralidade.Resultado.pendente_pct(r.novos) == D("42.9")
     # perdida não cobra temperatura nem próxima ação; data de envio já é devida fora de "Enviar proposta"
     campos_da_oportunidade = {c.campo for c in r.novos if c.cadastro == "Oportunidade"}
     assert "Temperatura" not in campos_da_oportunidade and "Data de envio da proposta" in campos_da_oportunidade
@@ -71,20 +72,21 @@ def test_o_legado_fica_a_parte(cadastro):
         s.commit()
         r = integralidade.calcular(s)
     assert {c.registro for c in r.legado} == {"Prospect · Consultoria"}
-    assert integralidade.Resultado.pendente_pct(r.novos) == D("40.0")  # o legado não mexe no número principal
+    assert integralidade.Resultado.pendente_pct(r.novos) == D("42.9")  # o legado não mexe no número principal
 
 
 def test_o_card_mostra_novos_em_pct_e_a_lista_por_registro(cadastro):
     with Session(cadastro) as s:
         k = {k.chave: k for k in calcular_kpis(s, "2026-10", date(2026, 10, 20)).kpis}["integralidade"]
-    assert k.titulo == "Integralidade do cadastro" and k.valor == D("40.0")
+    assert k.titulo == "Integralidade do cadastro" and k.valor == D("42.9")
     x = k.extras
-    assert (x["novos_pendencias"], x["novos_obrigatorios"], x["novos_pontos_devidos"]) == (12, 4, 40)
+    assert (x["novos_pendencias"], x["novos_obrigatorios"], x["novos_pontos_devidos"]) == (14, 4, 42)
     assert x["passado_pendencias"] == 0 and x["passado_retrato"] is None and x["passado_consertadas"] is None
     assert "retrato do Passado ainda não foi guardado" in k.falta[0]
     # Um item por registro, com tudo o que falta nele: o obrigatório primeiro e marcado com "!".
     contrato = next(i for i in k.itens if i.grupo == "Contrato · Cliente X · BPO Contábil")
-    assert contrato.detalhe == "! Bruto ou líquido, Signatário, Fim da vigência"
+    assert contrato.detalhe == ("! Bruto ou líquido, Signatário, Fim da vigência, Data de competência, "
+                                "Início do pagamento")
     assert (contrato.corte, contrato.cadastro, contrato.responsavel) == ("Novos", "Contrato", "KN")
     assert [(f.campo, f.obrigatorio) for f in contrato.faltam][0] == ("Bruto ou líquido", True)
     assert len(k.itens) == 5  # contrato, cliente, empresa, oportunidade e contato
@@ -136,7 +138,7 @@ def test_planilha_das_pendencias(cadastro):
     assert tudo.status_code == 200 and "pendencias-de-cadastro-" in tudo.headers["content-disposition"]
     ws = load_workbook(BytesIO(tudo.content))["Pendências"]
     assert [c.value for c in ws[1]] == ["Corte", "Responsável", "Cadastro", "Registro", "Campo em falta", "Nível"]
-    assert ws.max_row == 13  # cabeçalho + 12 campos em falta
+    assert ws.max_row == 15  # cabeçalho + 14 campos em falta
     assert load_workbook(BytesIO(passado.content))["Pendências"].max_row == 1
 
 
@@ -159,7 +161,8 @@ def test_a_composicao_leva_a_chave_e_o_registro(cadastro):
     with Session(cadastro) as s:
         k = {k.chave: k for k in calcular_kpis(s, "2026-10", date(2026, 10, 20)).kpis}["integralidade"]
     contrato = next(i for i in k.itens if i.cadastro == "Contrato")
-    assert [f.chave for f in contrato.faltam] == ["base_do_valor", "signatario", "data_fim"]
+    assert [f.chave for f in contrato.faltam] == ["base_do_valor", "signatario", "data_fim", "data_competencia",
+                                                    "data_inicio_pagamento"]
     assert contrato.grupo_id is not None and contrato.registro_id == contrato.contrato_id
 
 
@@ -181,6 +184,7 @@ def test_lacunas_do_grupo_e_do_registro_pela_api(cadastro):
         sugestoes = c.get("/api/grupos/sugestoes-de-fusao")
     assert [(l["cadastro"], l["chave"]) for l in do_grupo] == [
         ("Contrato", "base_do_valor"), ("Contrato", "signatario"), ("Contrato", "data_fim"),
+        ("Contrato", "data_competencia"), ("Contrato", "data_inicio_pagamento"),
         ("Cliente", "classificacao"), ("Cliente", "porte"),
         ("Empresa", "regime_tributario"), ("Empresa", "endereco"),
     ]

@@ -44,6 +44,7 @@ from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Iterable, Protocol
 
+from crm.domain import parcelas as _p
 from crm.domain.eventos_de_contrato import encerramento_vigente, saida_vigente
 from crm.domain.listas import IniciativaDoEncerramento, SituacaoContrato, TipoDeEventoDeContrato
 
@@ -120,8 +121,14 @@ class _ContratoEmBruto:
     situacao: SituacaoContrato
     preco_mensal: Decimal | None
     data_inicio: date | None
+    """Onde o contrato começa no MRR: o início do pagamento, senão a assinatura (28/10/2026)."""
     eventos: list[_EventoEmBruto] = field(default_factory=list)
     parcelas_no_ano: int = PARCELAS_NO_ANO
+    inicio_do_servico: date | None = None
+    """De onde a 13ª proporcional conta os avos: a data de competência, senão a assinatura (28/10/2026)."""
+    recorrente: bool | None = None
+    parcelas: tuple = ()
+    """As parcelas do não recorrente (`crm.domain.parcelas.Parcela`), em bruto: o recebido as espera no vencimento."""
 
 
 def em_bruto(contratos: Iterable[_Contrato], imposto: Decimal, *, em_mrr: bool = True) -> list[_ContratoEmBruto]:
@@ -144,11 +151,15 @@ def em_bruto(contratos: Iterable[_Contrato], imposto: Decimal, *, em_mrr: bool =
         liq = getattr(c, "base_do_valor", None) == "liquido"
         n = getattr(c, "parcelas_no_ano", None) or PARCELAS_NO_ANO
         lista.append(_ContratoEmBruto(
-            c.id, c.grupo_id, c.situacao, converter(c.preco_mensal, liq, n), c.data_inicio,
+            c.id, c.grupo_id, c.situacao, converter(c.preco_mensal, liq, n), _p.inicio_do_mrr(c),
             [_EventoEmBruto(e.tipo, e.data_do_evento, converter(e.preco_mensal_anterior, liq, n),
                             converter(e.preco_mensal_novo, liq, n), e.iniciativa, e.id,
                             getattr(e, "data_da_saida", None)) for e in c.eventos],
             n,
+            _p.inicio_do_servico(c),
+            getattr(c, "recorrente", None),
+            tuple(_p.Parcela(p.vencimento, converter(p.valor, liq, 12) if not em_mrr else p.valor)
+                  for p in _p.ler(getattr(c, "parcelas", None))),
         ))
     return lista
 
@@ -198,7 +209,8 @@ class Movimento:
 @dataclass(frozen=True)
 class ItemDoMrr:
     """Um contrato na conta do MRR atual (10/10/2026): o que a lista "Ver composição" mostra.
-    `parte`: "somado" (ativo com preço), "suspenso" (à parte) ou "sem_preco" (fora da soma)."""
+    `parte`: "somado" (ativo com preço), "suspenso" (à parte), "sem_preco" (fora da soma) ou "a_comecar" (assinado,
+    com o primeiro recebimento depois de hoje: entra no MRR nele, 28/10/2026)."""
 
     parte: str
     contrato_id: int
@@ -206,13 +218,16 @@ class ItemDoMrr:
     valor: Decimal | None
 
 
-def itens_do_mrr(contratos: Iterable[_Contrato]) -> list[ItemDoMrr]:
-    """Os contratos Ativos e Suspensos e onde cada um entra. `mrr_atual` soma esta mesma lista."""
+def itens_do_mrr(contratos: Iterable[_Contrato], hoje: date | None = None) -> list[ItemDoMrr]:
+    """Os contratos Ativos e Suspensos e onde cada um entra. `mrr_atual` soma esta mesma lista.
+    Com `hoje`, o contrato cujo MRR começa depois (o início do pagamento, 28/10/2026) fica "a_comecar", fora da soma."""
     itens = []
     for c in contratos:
         if c.situacao not in (SituacaoContrato.ATIVO, SituacaoContrato.SUSPENSO):
             continue
-        if c.preco_mensal is None or c.preco_mensal <= 0:
+        if hoje is not None and c.data_inicio is not None and c.data_inicio > hoje:
+            itens.append(ItemDoMrr("a_comecar", c.id, c.grupo_id, c.preco_mensal))
+        elif c.preco_mensal is None or c.preco_mensal <= 0:
             itens.append(ItemDoMrr("sem_preco", c.id, c.grupo_id, None))
         elif c.situacao is SituacaoContrato.ATIVO:
             itens.append(ItemDoMrr("somado", c.id, c.grupo_id, c.preco_mensal))
@@ -221,11 +236,13 @@ def itens_do_mrr(contratos: Iterable[_Contrato]) -> list[ItemDoMrr]:
     return itens
 
 
-def mrr_atual(contratos: Iterable[_Contrato]) -> MrrAtual:
+def mrr_atual(contratos: Iterable[_Contrato], hoje: date | None = None) -> MrrAtual:
     valor = suspenso = ZERO
     ativos = suspensos = sem_preco = 0
     por_grupo: dict[int, Decimal] = {}
-    for item in itens_do_mrr(contratos):
+    for item in itens_do_mrr(contratos, hoje):
+        if item.parte == "a_comecar":
+            continue
         if item.parte == "sem_preco":
             sem_preco += 1
         elif item.parte == "somado":
@@ -326,7 +343,7 @@ def mrr_em(contratos: list[_Contrato], dia: date, hoje: date) -> Decimal:
     """O MRR ao fim de `dia` (`dia` ≤ hoje): o atual menos o que se moveu depois."""
     if dia > hoje:
         raise ValueError("só há MRR até hoje")
-    return mrr_atual(contratos).valor - _liquido(_fluxos(contratos, dia + timedelta(days=1), hoje))
+    return mrr_atual(contratos, hoje).valor - _liquido(_fluxos(contratos, dia + timedelta(days=1), hoje))
 
 
 def movimento(contratos: Iterable[_Contrato], de: date, ate: date, hoje: date) -> Movimento:

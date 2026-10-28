@@ -97,6 +97,9 @@ CHAVES: dict[tuple[str, str], str] = {
     ("Contrato", "CNPJ (empresa)"): "empresa_id",
     ("Contrato", "Signatário"): "signatario",
     ("Contrato", "Fim da vigência"): "data_fim",
+    ("Contrato", "Data de competência"): "data_competencia",
+    ("Contrato", "Início do pagamento"): "data_inicio_pagamento",
+    ("Contrato", "Parcelas (não recorrente)"): "parcelas",
     ("Encerramento", "Data da saída"): "data_da_saida",
     ("Encerramento", "Motivo"): "motivo_categoria",
     ("Encerramento", "Iniciativa"): "iniciativa",
@@ -210,6 +213,12 @@ def calcular(sessao: Session) -> Resultado:
             yield "Signatário", False, _tem(c.signatario)
             if c.recorrente is not True:  # recorrente não tem fim de vigência (Eduardo, 23/10/2026)
                 yield "Fim da vigência", False, c.data_fim is not None
+            # Datas e parcelas (28/10/2026): prioritárias, para a base antiga não virar pendência de uma vez.
+            if not c.anterior_ao_crm:
+                yield "Data de competência", False, c.data_competencia is not None
+                yield "Início do pagamento", False, c.data_inicio_pagamento is not None
+                if c.recorrente is False:
+                    yield "Parcelas (não recorrente)", False, bool(c.parcelas)
         nome = f"{grupos[c.grupo_id].nome} · {c.escopo or 'contrato'}"
         dono = dono_do_grupo(c.grupo_id)
         devido("Contrato", nome, dono, c.anterior_ao_crm or not _desde_o_corte(c.criado_em), regras(), c.id,

@@ -26,6 +26,12 @@ export interface GrupoResumo {
   quantas_oportunidades: number;
 }
 
+/** Uma parcela do não recorrente (28/10/2026): vencimento e valor, que podem ser diferentes entre si. */
+export interface ParcelaDoServico {
+  vencimento: string;
+  valor: string;
+}
+
 export interface OportunidadeResumo {
   id: number;
   nome: string;
@@ -88,6 +94,12 @@ export interface ExclusaoDaOportunidade {
 export interface OportunidadeDetalhe extends OportunidadeResumo {
   /** Já virou contrato: a empresa não troca mais pelo detalhe. */
   tem_contrato?: boolean;
+  /** Quando a Critério assume os serviços (28/10/2026): a 13ª conta os avos a partir dela. */
+  data_competencia?: string | null;
+  /** O vencimento da 1ª parcela (28/10/2026): o MRR conta a partir dele. */
+  data_inicio_pagamento?: string | null;
+  /** Só no não recorrente: as parcelas, em ordem de vencimento (28/10/2026). */
+  parcelas?: ParcelaDoServico[] | null;
   canal: string | null;
   /** O parceiro do Funil de Parceiros que indicou (19/10/2026). */
   parceiro_id?: number | null;
@@ -351,6 +363,12 @@ export interface ContratoResumo {
   parcelas_no_ano?: number;
   /** Recorrente ou não (13/10/2026); vazio só em contrato antigo sem serviço nem preço. */
   recorrente?: boolean | null;
+  /** Quando a Critério assume os serviços (28/10/2026): a 13ª conta os avos a partir dela. */
+  data_competencia?: string | null;
+  /** O vencimento da 1ª parcela (28/10/2026): o MRR conta a partir dele. */
+  data_inicio_pagamento?: string | null;
+  /** Só no não recorrente: as parcelas, em ordem de vencimento (28/10/2026). */
+  parcelas?: ParcelaDoServico[] | null;
   data_inicio: string | null;
   data_fim: string | null;
   situacao: string;

@@ -124,3 +124,40 @@ def test_script_falha_sai_com_1(fabrica, capsys):
     assert "falhou" in capsys.readouterr().err
     assert manutencao.main(["--listar"], fabrica=fabrica, tarefas=tarefas) == 0
     assert "PENDENTE  2026_10_05_explode" in capsys.readouterr().out
+
+
+def test_smarthis_e_cs_brasil_voltam_para_aguardando_assinatura(engine):
+    """29/10/2026: só os dois CNPJs, só se Ativos e sem evento; rodar de novo não muda nada."""
+    from datetime import date
+    from decimal import Decimal
+
+    from sqlalchemy.orm import Session
+
+    from crm.db.modelos import Contrato, Empresa, GrupoEconomico
+    from crm.domain.listas import SituacaoContrato
+    from crm.manutencao.tarefas import smarthis_e_cs_brasil_aguardando as tarefa
+
+    with Session(engine) as s:
+        g = GrupoEconomico(nome="Teste")
+        s.add(g)
+        s.flush()
+        def contrato(cnpj: str) -> Contrato:
+            e = Empresa(grupo_id=g.id, razao_social=f"Empresa {cnpj}", cnpj=cnpj)
+            s.add(e)
+            s.flush()
+            c = Contrato(grupo_id=g.id, empresa_id=e.id, situacao=SituacaoContrato.ATIVO, preco_mensal=Decimal("1000"),
+                         data_inicio=date(2026, 9, 30))
+            s.add(c)
+            s.flush()
+            return c
+        smarthis, cs, outro = contrato("29862205000168"), contrato("45216559000191"), contrato("11222333000181")
+        s.commit()
+
+        assert "2 contrato" in tarefa.executar(s)
+        s.commit()
+        for c in (smarthis, cs, outro):
+            s.refresh(c)
+        assert smarthis.situacao is cs.situacao is SituacaoContrato.AGUARDANDO_ASSINATURA
+        assert smarthis.data_inicio == date(2026, 9, 30)
+        assert outro.situacao is SituacaoContrato.ATIVO
+        assert "nada a mudar" in tarefa.executar(s)

@@ -26,7 +26,7 @@ from crm.manutencao.executor import Tarefa
 from crm.manutencao.tarefas import (
     configuracao_para_a_tela, data_de_envio_da_proposta, menino_da_ilha_em_12_parcelas, meta_de_mrr_em_13_parcelas,
     perdida_e_motivos, premissas_em_13_parcelas, retrato_da_integralidade, saida_dos_encerramentos_antigos,
-    tipo_dos_contratos,
+    smarthis_e_cs_brasil_aguardando, tipo_dos_contratos,
 )
 
 TAREFAS: list[Tarefa] = [
@@ -57,5 +57,8 @@ TAREFAS: list[Tarefa] = [
     Tarefa("2026_10_15_retrato_da_integralidade",
            "Guarda quantas pendências de cadastro o Passado tinha no dia da publicação, para contar as consertadas",
            retrato_da_integralidade.executar),
+    Tarefa("2026_10_29_smarthis_e_cs_brasil_aguardando",
+           "Volta Smarthis e CS Brasil para Aguardando assinatura: a assinatura na Clicksign não foi concluída",
+           smarthis_e_cs_brasil_aguardando.executar),
     # Acrescente no fim. Ex.: Tarefa("2026_10_06_assunto", "o que faz", modulo.executar),
 ]

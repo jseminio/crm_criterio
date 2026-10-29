@@ -2,17 +2,57 @@
  * do CRM, vários PDFs de uma vez. A IA lê cada um, diz o tipo e acha o cliente pelo número do CRM ou pelo CNPJ; a
  * pessoa confirma o vínculo e confere os campos linha a linha. A IA nunca cria cliente nem contrato sozinha. */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ErroDaApi } from "../api/cliente";
 import type { ContratoResumo, DocumentoAnexado, DocumentoComConferencia, TipoDeDocumento } from "../api/tipos";
-import { ConferenciaDoDocumento, EtiquetaDaLeitura, lendo, resumoDoArquivo, usarDocumento } from "../componentes/DocumentosAnexados";
+import { ConferenciaDoDocumento, EtiquetaDaLeitura, lendo, resumoDoArquivo, rotuloDaLeitura, usarDocumento } from "../componentes/DocumentosAnexados";
+import { ThOrdenavel, ordenar, usarOrdenacao, type Acessor } from "../componentes/Ordenacao";
 import { Modal } from "../componentes/Modal";
-import { Carregando, Erro, VazioSemDados } from "../componentes/estados";
+import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
 import { usarAcesso } from "../entrada";
 import { cnpj, data, dinheiro } from "../formato";
 import { usarDados } from "../usarDados";
+import { normalizar } from "./pesquisaDeContratos";
 
 const TIPOS: Record<TipoDeDocumento, string> = { contrato: "Contrato", proposta: "Proposta aceita", aditivo: "Aditivo" };
+
+// ── Pesquisa e ordenação da lista (amostra aprovada por Eduardo em 29/10/2026) ────────────────────────
+
+function tipoNaLista(d: DocumentoAnexado): string {
+  return lendo(d) ? "" : TIPOS[d.tipo];
+}
+
+function clienteNaLista(d: DocumentoAnexado): string {
+  return d.grupo_nome ?? d.sugestao?.grupo_nome ?? "";
+}
+
+function vinculoNaLista(d: DocumentoAnexado): string {
+  return d.contrato_id !== null ? "Contrato vinculado" : d.sugestao?.contrato_id ? "Contrato sugerido" : "Sem vínculo";
+}
+
+/** Um campo só: arquivo, cliente, razão social lida, CNPJ (com ou sem pontos), número, tipo, vínculo e situação.
+ * Várias palavras: o documento precisa ter todas. Sem acento e sem diferença de maiúscula. */
+export function documentoCombina(d: DocumentoAnexado, termo: string): boolean {
+  const palavras = normalizar(termo).split(/\s+/).filter(Boolean);
+  if (palavras.length === 0) return true;
+  const textos = [d.nome_arquivo, clienteNaLista(d), d.razao_social_lida, d.numero_no_documento, tipoNaLista(d),
+    vinculoNaLista(d), rotuloDaLeitura(d.leitura_situacao), ...d.cnpjs_lidos.map(cnpj)]
+    .filter((t): t is string => !!t).map(normalizar);
+  const digitosDosCnpjs = d.cnpjs_lidos.map((c) => c.replace(/\D/g, ""));
+  return palavras.every((p) => {
+    if (textos.some((t) => t.includes(p))) return true;
+    const digitos = p.replace(/\D/g, "");
+    return digitos.length >= 4 && /^[\d./-]+$/.test(p) && digitosDosCnpjs.some((c) => c.includes(digitos));
+  });
+}
+
+const ACESSORES: Record<string, Acessor<DocumentoAnexado>> = {
+  arquivo: (d) => d.nome_arquivo,
+  tipo: (d) => tipoNaLista(d),
+  cliente: (d) => clienteNaLista(d),
+  vinculo: (d) => vinculoNaLista(d),
+  situacao: (d) => rotuloDaLeitura(d.leitura_situacao),
+};
 
 function rotuloDoContrato(c: ContratoResumo): string {
   const valor = c.preco_mensal ? ` · ${dinheiro(c.preco_mensal)}` : "";
@@ -162,6 +202,12 @@ export function DocumentosAntigos() {
 
   const docs: DocumentoAnexado[] = lista.dados ?? [];
   const conferidos = docs.filter((d) => d.conferido_em !== null).length;
+  const [busca, definirBusca] = useState("");
+  const { ordenacao, alternar } = usarOrdenacao();
+  const visiveis = useMemo(
+    () => ordenar(docs.filter((d) => documentoCombina(d, busca)), ordenacao, ACESSORES),
+    [docs, busca, ordenacao],
+  );
 
   return (
     <div className="documentos-antigos">
@@ -196,19 +242,32 @@ export function DocumentosAntigos() {
         <VazioSemDados titulo="Nenhum documento antigo incluído" explicacao="Os PDFs enviados aqui aparecem nesta lista, com o que a IA leu." />
       )}
       {docs.length > 0 && (
+        <div className="campo">
+          <label className="campo-rotulo" htmlFor="da-busca">Pesquisar</label>
+          <input id="da-busca" className="entrada entrada-busca" type="search" value={busca}
+            onChange={(e) => definirBusca(e.target.value)} placeholder="Arquivo, cliente, CNPJ, número ou tipo"
+            aria-describedby="da-busca-ajuda" />
+          <p className="campo-ajuda" id="da-busca-ajuda" style={{ margin: 0 }}>
+            Arquivo, cliente, CNPJ (com ou sem pontos), número do documento, tipo, vínculo ou situação.
+            {busca.trim() && ` Mostrando ${visiveis.length} de ${docs.length}.`}
+          </p>
+        </div>
+      )}
+      {docs.length > 0 && visiveis.length === 0 && <VazioPorFiltro aoLimpar={() => definirBusca("")} />}
+      {visiveis.length > 0 && (
         <div className="tabela-rolagem">
           <table className="tabela" aria-label="Documentos antigos">
             <thead>
               <tr>
-                <th scope="col">Arquivo</th>
-                <th scope="col">Tipo lido</th>
-                <th scope="col">Cliente</th>
-                <th scope="col">Vínculo</th>
-                <th scope="col">Situação</th>
+                <ThOrdenavel coluna="arquivo" ordenacao={ordenacao} aoAlternar={alternar}>Arquivo</ThOrdenavel>
+                <ThOrdenavel coluna="tipo" ordenacao={ordenacao} aoAlternar={alternar}>Tipo lido</ThOrdenavel>
+                <ThOrdenavel coluna="cliente" ordenacao={ordenacao} aoAlternar={alternar}>Cliente</ThOrdenavel>
+                <ThOrdenavel coluna="vinculo" ordenacao={ordenacao} aoAlternar={alternar}>Vínculo</ThOrdenavel>
+                <ThOrdenavel coluna="situacao" ordenacao={ordenacao} aoAlternar={alternar}>Situação</ThOrdenavel>
               </tr>
             </thead>
             <tbody>
-              {docs.map((d) => (
+              {visiveis.map((d) => (
                 <tr key={d.id} className="linha-clicavel" onClick={() => definirAberto(d.id)}>
                   <td>
                     <button type="button" className="botao-link" onClick={(e) => { e.stopPropagation(); definirAberto(d.id); }}>
@@ -218,12 +277,12 @@ export function DocumentosAntigos() {
                       {d.numero_no_documento ?? ""}{d.data_do_documento ? ` · ${data(d.data_do_documento)}` : ""}
                     </span>
                   </td>
-                  <td>{lendo(d) ? "—" : TIPOS[d.tipo]}</td>
+                  <td>{tipoNaLista(d) || "—"}</td>
                   <td>
                     {d.grupo_nome ?? d.sugestao?.grupo_nome ?? <span className="celula-fonte">{d.sugestao?.motivo ?? "—"}</span>}
                     {d.cnpjs_lidos[0] && <span className="celula-fonte">{cnpj(d.cnpjs_lidos[0])}</span>}
                   </td>
-                  <td>{d.contrato_id !== null ? "Contrato vinculado" : d.sugestao?.contrato_id ? "Contrato sugerido" : "Sem vínculo"}</td>
+                  <td>{vinculoNaLista(d)}</td>
                   <td><EtiquetaDaLeitura situacao={d.leitura_situacao} /></td>
                 </tr>
               ))}

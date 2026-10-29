@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/cliente";
 import type { DocumentoAnexado, Eu } from "../api/tipos";
 import { ProvedorDeAcesso } from "../entrada";
-import { DocumentosAntigos } from "./DocumentosAntigos";
+import { DocumentosAntigos, documentoCombina } from "./DocumentosAntigos";
 
 vi.mock("../api/cliente", async () => {
   const real = await vi.importActual<typeof import("../api/cliente")>("../api/cliente");
@@ -76,5 +76,58 @@ describe("Incluir documentos antigos (18/10/2026)", () => {
     expect(screen.getByRole("option", { name: "Criar contrato anterior ao CRM" })).toBeInTheDocument();
     await userEvent.selectOptions(contrato, "11");
     expect(api.vincularDocumento).toHaveBeenCalledWith(1, { contrato_id: 11 });
+  });
+});
+
+describe("Pesquisa e ordenação (29/10/2026)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const LISTA: DocumentoAnexado[] = [
+    { ...BASE, id: 1, nome_arquivo: "Beta.pdf", sugestao: { ...BASE.sugestao!, grupo_nome: "Grupo Ômega" } },
+    { ...BASE, id: 2, nome_arquivo: "Alfa.pdf", cnpjs_lidos: ["46900393000190"], numero_no_documento: "CAC RJ 87.2026",
+      sugestao: { ...BASE.sugestao!, grupo_nome: "Yvia", contrato_id: null } },
+    { ...BASE, id: 3, nome_arquivo: "Gama.pdf", tipo: "proposta", sugestao: { ...BASE.sugestao!, grupo_nome: "Sentire" } },
+  ];
+
+  it("acha por arquivo, cliente sem acento, CNPJ com ou sem pontos, número e situação", () => {
+    expect(documentoCombina(LISTA[0], "omega")).toBe(true);
+    expect(documentoCombina(LISTA[1], "46.900.393")).toBe(true);
+    expect(documentoCombina(LISTA[1], "46900393000190")).toBe(true);
+    expect(documentoCombina(LISTA[1], "87.2026")).toBe(true);
+    expect(documentoCombina(LISTA[2], "proposta sentire")).toBe(true);
+    expect(documentoCombina(LISTA[2], "proposta yvia")).toBe(false);
+    expect(documentoCombina(LISTA[0], "conferir")).toBe(true);
+    expect(documentoCombina(LISTA[0], "")).toBe(true);
+  });
+
+  it("filtra a tabela, mostra quantos sobraram e oferece limpar quando nada sobra", async () => {
+    vi.mocked(api.documentos).mockResolvedValue(LISTA);
+    abrir();
+    await screen.findByText("Beta.pdf");
+    await userEvent.type(screen.getByLabelText("Pesquisar"), "sentire");
+    expect(screen.getByText("Gama.pdf")).toBeInTheDocument();
+    expect(screen.queryByText("Beta.pdf")).toBeNull();
+    expect(screen.getByText(/Mostrando 1 de 3/)).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Pesquisar"), " xyz");
+    await userEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(screen.getByText("Beta.pdf")).toBeInTheDocument();
+  });
+
+  it("ordena pelo título: crescente, decrescente e volta à ordem de envio", async () => {
+    vi.mocked(api.documentos).mockResolvedValue(LISTA);
+    abrir();
+    await screen.findByText("Beta.pdf");
+    const arquivos = () => screen.getAllByRole("row").slice(1).map((r) => r.querySelector("td button")?.textContent);
+    expect(arquivos()).toEqual(["Beta.pdf", "Alfa.pdf", "Gama.pdf"]);
+    await userEvent.click(screen.getByRole("button", { name: /Arquivo/ }));
+    expect(arquivos()).toEqual(["Alfa.pdf", "Beta.pdf", "Gama.pdf"]);
+    await userEvent.click(screen.getByRole("button", { name: /Arquivo/ }));
+    expect(arquivos()).toEqual(["Gama.pdf", "Beta.pdf", "Alfa.pdf"]);
+    await userEvent.click(screen.getByRole("button", { name: /Cliente/ }));
+    expect(arquivos()).toEqual(["Beta.pdf", "Gama.pdf", "Alfa.pdf"]);
+    await userEvent.click(screen.getByRole("button", { name: /Arquivo/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Arquivo/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Arquivo/ }));
+    expect(arquivos()).toEqual(["Beta.pdf", "Alfa.pdf", "Gama.pdf"]);
   });
 });

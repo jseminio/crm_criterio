@@ -25,6 +25,11 @@ const LEITURA: Record<DocumentoAnexado["leitura_situacao"], [string, string]> = 
   parada: ["Leitura parada", "perda"],
 };
 
+/** O texto da etiqueta da leitura ("Conferir", "Gravado"…): a pesquisa e a ordenação da lista usam o mesmo. */
+export function rotuloDaLeitura(situacao: DocumentoAnexado["leitura_situacao"]): string {
+  return LEITURA[situacao][0];
+}
+
 export function EtiquetaDaLeitura({ situacao }: { situacao: DocumentoAnexado["leitura_situacao"] }) {
   const [texto, tom] = LEITURA[situacao];
   return <span className={`etiqueta etiqueta-${tom}`}>{texto}</span>;

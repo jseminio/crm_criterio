@@ -67,7 +67,7 @@ def leitor_real(pdf: bytes, nome: str) -> dict:
     cliente = cliente_de(ANTHROPIC, config)
     uso = Uso(modelo=config.modelo)
     lido = regra.ler_pdf(cliente, config.modelo, pdf=pdf, nome=nome, uso=uso)
-    custo = uso.custo_usd()
+    custo = uso.custo_usd  # propriedade, não método: chamá-la derrubava toda leitura (29/10/2026)
     lido["uso"] = {"modelo": uso.modelo, "tokens_entrada": uso.tokens_entrada, "tokens_saida": uso.tokens_saida,
                    "custo_usd": str(custo) if custo is not None else None}
     return lido

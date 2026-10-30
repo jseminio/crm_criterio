@@ -34,6 +34,7 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         ("aprovar", "aprovar eventos acima da alçada"),
         ("documentos", "anexar e conferir PDF assinado e documentos antigos"),
         ("baixar", "baixar PDF assinado (contrato, proposta, aditivo)"),
+        ("exportar", "exportar para Excel"),
     )),
     ("carteira", "Saúde da carteira", (
         ("ver", "ver"), ("avaliar", "avaliar e calcular"), ("parametros", "parâmetros"), ("exportar", "exportar"),
@@ -162,6 +163,7 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("POST", r"/api/grupos/\d+/empresas", ("grupos.editar", "contatos.editar")),
     ("POST", r"/api/grupos/(\d+/fundir|fusoes/\d+/desfazer)", ("grupos.fundir",)),
     # contratos
+    ("GET", r"/api/contratos/exportar", ("contratos.exportar",)),
     ("GET", r"/api/contratos(/\d+)?", ("contratos.ver",)),
     ("PATCH", r"/api/contratos/\d+", ("contratos.editar",)),
     ("POST", r"/api/contratos/\d+/eventos", ("contratos.eventos",)),

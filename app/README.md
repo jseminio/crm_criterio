@@ -2468,6 +2468,22 @@ data; cabeçalho congelado e filtro do Excel ligado.
   tela não vai para a planilha: ordene lá, pelo filtro do Excel.
 - Só lê. Leva dado de cliente: guarde fora do repositório.
 
+## Gestão de contratos em Excel (30/10/2026)
+
+Em **Sucesso do cliente → Gestão de contratos**, o botão **Exportar para Excel** (na linha dos
+filtros, à direita) baixa `contratos-AAAA-MM-DD.xlsx` com **exatamente os contratos da tela** — a
+Situação filtrada, o que a Pesquisar achou e a ordem clicada nas colunas. Quinze colunas: Grupo,
+Empresa, CNPJ, Escopo, Situação, Recorrente, Preço mensal, Preço anual, Parcelas no ano, Assinatura
+("anterior ao CRM" quando é da carteira antiga), Data de competência, Início do pagamento, Data de
+fim, Saída anunciada e Signatário. Valor sai como número (R$) e data como data; cabeçalho congelado,
+filtro do Excel ligado e, duas linhas abaixo, o total com fórmula de soma do preço mensal e do anual.
+
+- Rota: `GET /api/contratos/exportar?situacao=…&id=…&id=…` — `id` repetido traz só esses contratos,
+  na ordem passada; sem `id`, todos os da situação, assinatura mais recente primeiro.
+- Permissão nova `contratos.exportar` ("exportar para Excel", menu Contratos). O perfil Comercial não
+  a ganha sozinho: o Administrador marca em Configurações → Perfis.
+- Só lê. Leva dado de cliente: guarde fora do repositório.
+
 ## Endereço da empresa
 
 A tabela `empresa` ganhou, em 25/09/2026, `logradouro`, `numero`, `complemento`,

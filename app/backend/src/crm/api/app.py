@@ -123,6 +123,7 @@ from crm.domain import eventos_de_contrato as regras_de_eventos
 from crm.domain import mrr as regras_de_mrr
 from crm.domain import parcelas as regras_de_parcelas
 from crm.domain import recortes as regras_de_recortes
+from crm.relatorios.exportacao_de_contratos import LinhaDeContrato, gerar_planilha_de_contratos
 from crm.relatorios.exportacao_do_funil import LinhaDoFunil, gerar_planilha_do_funil
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
@@ -1703,6 +1704,49 @@ def _registrar(api: FastAPI) -> None:
         return e.Pagina(
             total=total or 0,
             itens=[_resumo_de_contrato(c, nome) for c, nome in linhas],
+        )
+
+    # Antes de `/api/contratos/{contrato_id}`: senão "exportar" seria lido como id.
+    @api.get("/api/contratos/exportar", tags=["contratos"])
+    def exportar_contratos(
+        sessao: Session = Depends(obter_sessao, scope="function"),
+        situacao: list[SituacaoContrato] | None = Query(default=None),
+        id: list[int] | None = Query(default=None),
+    ) -> Response:
+        """A Gestão de contratos em Excel (`crm.relatorios.exportacao_de_contratos`). A pesquisa da tela
+        roda no navegador, então a tela manda os `id` que está mostrando, na ordem em que mostra; sem `id`,
+        vão todos os da situação."""
+        efetivar_saidas(sessao, date.today())
+        consulta = sa.select(Contrato, GrupoEconomico.nome).join(
+            GrupoEconomico, Contrato.grupo_id == GrupoEconomico.id
+        )
+        if situacao:
+            consulta = consulta.where(Contrato.situacao.in_(situacao))
+        if id:
+            consulta = consulta.where(Contrato.id.in_(id))
+        linhas = sessao.execute(
+            consulta.options(selectinload(Contrato.empresa))
+            .order_by(Contrato.data_inicio.desc().nulls_last(), Contrato.id.desc())
+        ).all()
+        resumos = [_resumo_de_contrato(c, nome) for c, nome in linhas]
+        if id:
+            posicao = {i: n for n, i in enumerate(id)}
+            resumos.sort(key=lambda r: posicao.get(r.id, len(posicao)))
+        conteudo = gerar_planilha_de_contratos([
+            LinhaDeContrato(
+                grupo=r.grupo_nome, empresa=r.empresa_nome, cnpj=r.empresa_cnpj, escopo=r.escopo,
+                situacao=r.situacao.value, recorrente=r.recorrente, preco_mensal=r.preco_mensal,
+                preco_anual=r.preco_anual, parcelas_no_ano=r.parcelas_no_ano, assinatura=r.data_inicio,
+                anterior_ao_crm=r.anterior_ao_crm, data_competencia=r.data_competencia,
+                data_inicio_pagamento=r.data_inicio_pagamento, data_fim=r.data_fim,
+                saida_em=r.saida_em, signatario=r.signatario,
+            )
+            for r in resumos
+        ])
+        return Response(
+            conteudo,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="contratos-{date.today():%Y-%m-%d}.xlsx"'},
         )
 
     @api.get(

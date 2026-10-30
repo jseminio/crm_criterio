@@ -630,6 +630,10 @@ export const api = {
   enderecoDaExportacaoDoFunil: (filtros: FiltrosDoFunil & { situacao?: string[] } = {}) =>
     comParametros("/api/oportunidades/exportar", { ...filtros }),
 
+  /** A planilha dos contratos que a tela mostra: os da situação filtrada, na ordem dos `id` passados. */
+  enderecoDaExportacaoDosContratos: (filtros: { situacao?: string[]; id?: number[] } = {}) =>
+    comParametros("/api/contratos/exportar", { ...filtros }),
+
   oportunidade: (id: number) => pedir<OportunidadeDetalhe>(`/api/oportunidades/${id}`),
   questionarioDaOportunidade: (id: number) =>
     pedir<QuestionarioDaOportunidade | null>(`/api/oportunidades/${id}/questionario`),

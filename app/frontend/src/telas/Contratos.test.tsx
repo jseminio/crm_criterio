@@ -14,6 +14,7 @@ vi.mock("../api/cliente", async () => {
       documentoDoContrato: vi.fn().mockReturnValue(new Promise(() => {})),
       assinaturaDoContrato: vi.fn().mockReturnValue(new Promise(() => {})),
       documentos: vi.fn().mockReturnValue(new Promise(() => {})),
+      enderecoDaExportacaoDosContratos: real.api.enderecoDaExportacaoDosContratos,
       mrr: vi.fn().mockResolvedValue(null), itensDoMovimento: vi.fn().mockResolvedValue({ de: "", ate: "", itens: [] }),
     },
   };
@@ -238,5 +239,40 @@ describe("Contratos — pesquisa (13/10/2026)", () => {
     expect(linhas()).toEqual(["Lattoog", "Sentire", "Mainô"]);
     await userEvent.click(preco);
     expect(linhas()).toEqual(["Mainô", "Sentire", "Lattoog"]);
+  });
+});
+
+describe("Contratos — exportar para Excel (30/10/2026)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.mrr).mockResolvedValue(null as never);
+  });
+
+  it("o link leva a situação filtrada e os contratos da tela, na ordem da tela", async () => {
+    vi.mocked(api.contratos).mockResolvedValue({
+      total: 2,
+      itens: [resumo({ id: 7, grupo_nome: "Alfa" }), resumo({ id: 9, grupo_nome: "Beta", escopo: "DP" })],
+    } as never);
+    render(<Contratos listas={null} />);
+    const link = await screen.findByRole("link", { name: "Exportar para Excel" });
+    expect(link).toHaveAttribute("href", "/api/contratos/exportar?id=7&id=9");
+
+    await userEvent.type(screen.getByLabelText("Pesquisar"), "Beta");
+    await waitFor(() => expect(link).toHaveAttribute("href", "/api/contratos/exportar?id=9"));
+
+    await userEvent.selectOptions(screen.getByLabelText("Situação"), "Ativo");
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Exportar para Excel" })).toHaveAttribute(
+        "href",
+        "/api/contratos/exportar?situacao=Ativo&id=9",
+      ),
+    );
+  });
+
+  it("sem contrato na tela, não há o que exportar", async () => {
+    vi.mocked(api.contratos).mockResolvedValue({ total: 0, itens: [] } as never);
+    render(<Contratos listas={null} />);
+    await screen.findByText("Nenhum contrato ainda");
+    expect(screen.queryByRole("link", { name: "Exportar para Excel" })).toBeNull();
   });
 });

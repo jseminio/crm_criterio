@@ -706,6 +706,16 @@ class ExclusaoDaOportunidade(BaseModel):
     sai_da_conversao: bool
 
 
+class ExclusaoDoContrato(BaseModel):
+    """O que sai e o que fica se o contrato for excluído (30/10/2026). Anexos e envelopes ficam."""
+
+    eventos: int
+    pedidos_de_aprovacao: int
+    documentos_gerados: int
+    anexos: int
+    envelopes: int
+
+
 class PedidoDeExclusao(BaseModel):
     motivo: str = Field(min_length=1, max_length=1000)
 

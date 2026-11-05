@@ -24,6 +24,7 @@ import type {
   Agenda,
   EnderecoDeContato,
   ExclusaoDaOportunidade,
+  ExclusaoDoContrato,
   FusaoFeita,
   EntidadeDeContato,
   EmpresaEncontrada,
@@ -995,6 +996,10 @@ export const api = {
   exclusaoDaOportunidade: (id: number) => pedir<ExclusaoDaOportunidade>(`/api/oportunidades/${id}/exclusao`),
   excluirOportunidade: (id: number, motivo: string) =>
     pedir<unknown>(`/api/oportunidades/${id}/excluir`, { method: "POST", body: JSON.stringify({ motivo }) }),
+
+  exclusaoDoContrato: (id: number) => pedir<ExclusaoDoContrato>(`/api/contratos/${id}/exclusao`),
+  excluirContrato: (id: number, motivo: string) =>
+    pedir<unknown>(`/api/contratos/${id}/excluir`, { method: "POST", body: JSON.stringify({ motivo }) }),
 
   converterEmContrato: (oportunidadeId: number, dados: Record<string, unknown> = {}) =>
     pedir<ContratoDetalhe>(`/api/oportunidades/${oportunidadeId}/converter-em-contrato`, {

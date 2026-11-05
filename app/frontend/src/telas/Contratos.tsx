@@ -21,6 +21,7 @@ import { AlteracoesDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 import { ImportarRecebimentos } from "../componentes/ImportarRecebimentos";
 import { usarAcesso } from "../entrada";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
+import { ExclusaoDeContrato } from "../componentes/ExclusaoDeContrato";
 import { contratoCombina, Destaque } from "./pesquisaDeContratos";
 import { GerarContrato } from "../componentes/GerarContrato";
 import { AssinaturaEletronica } from "../componentes/AssinaturaEletronica";
@@ -419,6 +420,7 @@ export function Contratos({ listas }: { listas: Listas | null }) {
   const [situacao, definirSituacao] = useState("");
   const [busca, definirBusca] = useState("");
   const [editando, definirEditando] = useState<ContratoResumo | null>(null);
+  const [excluindo, definirExcluindo] = useState<ContratoResumo | null>(null);
   const [versaoDoMrr, definirVersaoDoMrr] = useState(0);
   const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
   const { eu, pode } = usarAcesso();
@@ -581,11 +583,34 @@ export function Contratos({ listas }: { listas: Listas | null }) {
                   >
                     Abrir
                   </button>
+                  {pode("contratos.excluir") && (
+                    <button
+                      type="button"
+                      className="botao botao-texto-perigo"
+                      style={{ marginLeft: "var(--e1)" }}
+                      onClick={() => definirExcluindo(contrato)}
+                      aria-label={`Excluir o contrato de ${contrato.grupo_nome}${contrato.escopo ? ` (${contrato.escopo})` : ""}`}
+                    >
+                      Excluir
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {excluindo && (
+        <ExclusaoDeContrato
+          contrato={excluindo}
+          aoFechar={() => definirExcluindo(null)}
+          aoExcluir={() => {
+            definirExcluindo(null);
+            recarregar();
+            definirVersaoDoMrr((v) => v + 1);
+          }}
+        />
       )}
 
       {editando && (

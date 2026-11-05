@@ -95,6 +95,7 @@ from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, desfazer_fusao, fundir_grupos
 from crm.db import leads as regras_do_lead
 from crm.db import excluir_oportunidade as regras_da_exclusao
+from crm.db import excluir_contrato as regras_da_exclusao_do_contrato
 from crm.db.modelos import (
     PedidoDeAprovacao,
     Contrato,
@@ -1759,6 +1760,30 @@ def _registrar(api: FastAPI) -> None:
         if contrato is None:
             raise HTTPException(404, "contrato não encontrado")
         return _detalhe_de_contrato(contrato, contrato.grupo.nome)
+
+    @api.get("/api/contratos/{contrato_id}/exclusao", response_model=e.ExclusaoDoContrato, tags=["contratos"])
+    def ver_exclusao_do_contrato(
+        contrato_id: int, sessao: Session = Depends(obter_sessao, scope="function")
+    ) -> e.ExclusaoDoContrato:
+        """O que a exclusão leva junto, para a tela confirmar antes (30/10/2026)."""
+        contrato = sessao.get(Contrato, contrato_id)
+        if contrato is None:
+            raise HTTPException(404, "contrato não encontrado")
+        return e.ExclusaoDoContrato(**vars(regras_da_exclusao_do_contrato.o_que_sai(sessao, contrato)))
+
+    @api.post("/api/contratos/{contrato_id}/excluir", status_code=204, tags=["contratos"])
+    def excluir_contrato(
+        contrato_id: int, corpo: e.PedidoDeExclusao, sessao: Session = Depends(obter_sessao, scope="function")
+    ) -> None:
+        """Apaga o contrato com o motivo (`crm.db.excluir_contrato`). Irreversível: a tela mostra o que
+        sai e pede o motivo antes."""
+        contrato = sessao.get(Contrato, contrato_id)
+        if contrato is None:
+            raise HTTPException(404, "contrato não encontrado")
+        try:
+            regras_da_exclusao_do_contrato.excluir(sessao, contrato, corpo.motivo)
+        except regras_da_exclusao_do_contrato.ExclusaoRecusada as recusa:
+            raise HTTPException(409, str(recusa)) from recusa
 
     @api.patch(
         "/api/contratos/{contrato_id}", response_model=e.ContratoDetalhe, tags=["contratos"]

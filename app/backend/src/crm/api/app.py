@@ -95,6 +95,7 @@ from crm.db.base import agora
 from crm.db.grupos import FusaoInvalida, desfazer_fusao, fundir_grupos
 from crm.db import leads as regras_do_lead
 from crm.db import excluir_oportunidade as regras_da_exclusao
+from crm.db import excluir_contrato as regras_da_exclusao_do_contrato
 from crm.db.modelos import (
     PedidoDeAprovacao,
     Contrato,
@@ -123,6 +124,7 @@ from crm.domain import eventos_de_contrato as regras_de_eventos
 from crm.domain import mrr as regras_de_mrr
 from crm.domain import parcelas as regras_de_parcelas
 from crm.domain import recortes as regras_de_recortes
+from crm.relatorios.exportacao_de_contratos import LinhaDeContrato, gerar_planilha_de_contratos
 from crm.relatorios.exportacao_do_funil import LinhaDoFunil, gerar_planilha_do_funil
 from crm.domain.porte import DIRECIONADORES as DIRECIONADORES_DA_VOLUMETRIA
 from crm.domain import porte as regras_de_porte
@@ -1705,6 +1707,49 @@ def _registrar(api: FastAPI) -> None:
             itens=[_resumo_de_contrato(c, nome) for c, nome in linhas],
         )
 
+    # Antes de `/api/contratos/{contrato_id}`: senão "exportar" seria lido como id.
+    @api.get("/api/contratos/exportar", tags=["contratos"])
+    def exportar_contratos(
+        sessao: Session = Depends(obter_sessao, scope="function"),
+        situacao: list[SituacaoContrato] | None = Query(default=None),
+        id: list[int] | None = Query(default=None),
+    ) -> Response:
+        """A Gestão de contratos em Excel (`crm.relatorios.exportacao_de_contratos`). A pesquisa da tela
+        roda no navegador, então a tela manda os `id` que está mostrando, na ordem em que mostra; sem `id`,
+        vão todos os da situação."""
+        efetivar_saidas(sessao, date.today())
+        consulta = sa.select(Contrato, GrupoEconomico.nome).join(
+            GrupoEconomico, Contrato.grupo_id == GrupoEconomico.id
+        )
+        if situacao:
+            consulta = consulta.where(Contrato.situacao.in_(situacao))
+        if id:
+            consulta = consulta.where(Contrato.id.in_(id))
+        linhas = sessao.execute(
+            consulta.options(selectinload(Contrato.empresa))
+            .order_by(Contrato.data_inicio.desc().nulls_last(), Contrato.id.desc())
+        ).all()
+        resumos = [_resumo_de_contrato(c, nome) for c, nome in linhas]
+        if id:
+            posicao = {i: n for n, i in enumerate(id)}
+            resumos.sort(key=lambda r: posicao.get(r.id, len(posicao)))
+        conteudo = gerar_planilha_de_contratos([
+            LinhaDeContrato(
+                grupo=r.grupo_nome, empresa=r.empresa_nome, cnpj=r.empresa_cnpj, escopo=r.escopo,
+                situacao=r.situacao.value, recorrente=r.recorrente, preco_mensal=r.preco_mensal,
+                preco_anual=r.preco_anual, parcelas_no_ano=r.parcelas_no_ano, assinatura=r.data_inicio,
+                anterior_ao_crm=r.anterior_ao_crm, data_competencia=r.data_competencia,
+                data_inicio_pagamento=r.data_inicio_pagamento, data_fim=r.data_fim,
+                saida_em=r.saida_em, signatario=r.signatario,
+            )
+            for r in resumos
+        ])
+        return Response(
+            conteudo,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="contratos-{date.today():%Y-%m-%d}.xlsx"'},
+        )
+
     @api.get(
         "/api/contratos/{contrato_id}", response_model=e.ContratoDetalhe, tags=["contratos"]
     )
@@ -1715,6 +1760,30 @@ def _registrar(api: FastAPI) -> None:
         if contrato is None:
             raise HTTPException(404, "contrato não encontrado")
         return _detalhe_de_contrato(contrato, contrato.grupo.nome)
+
+    @api.get("/api/contratos/{contrato_id}/exclusao", response_model=e.ExclusaoDoContrato, tags=["contratos"])
+    def ver_exclusao_do_contrato(
+        contrato_id: int, sessao: Session = Depends(obter_sessao, scope="function")
+    ) -> e.ExclusaoDoContrato:
+        """O que a exclusão leva junto, para a tela confirmar antes (30/10/2026)."""
+        contrato = sessao.get(Contrato, contrato_id)
+        if contrato is None:
+            raise HTTPException(404, "contrato não encontrado")
+        return e.ExclusaoDoContrato(**vars(regras_da_exclusao_do_contrato.o_que_sai(sessao, contrato)))
+
+    @api.post("/api/contratos/{contrato_id}/excluir", status_code=204, tags=["contratos"])
+    def excluir_contrato(
+        contrato_id: int, corpo: e.PedidoDeExclusao, sessao: Session = Depends(obter_sessao, scope="function")
+    ) -> None:
+        """Apaga o contrato com o motivo (`crm.db.excluir_contrato`). Irreversível: a tela mostra o que
+        sai e pede o motivo antes."""
+        contrato = sessao.get(Contrato, contrato_id)
+        if contrato is None:
+            raise HTTPException(404, "contrato não encontrado")
+        try:
+            regras_da_exclusao_do_contrato.excluir(sessao, contrato, corpo.motivo)
+        except regras_da_exclusao_do_contrato.ExclusaoRecusada as recusa:
+            raise HTTPException(409, str(recusa)) from recusa
 
     @api.patch(
         "/api/contratos/{contrato_id}", response_model=e.ContratoDetalhe, tags=["contratos"]

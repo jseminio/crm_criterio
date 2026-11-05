@@ -34,6 +34,8 @@ MENUS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         ("aprovar", "aprovar eventos acima da alçada"),
         ("documentos", "anexar e conferir PDF assinado e documentos antigos"),
         ("baixar", "baixar PDF assinado (contrato, proposta, aditivo)"),
+        ("exportar", "exportar para Excel"),
+        ("excluir", "excluir contrato"),
     )),
     ("carteira", "Saúde da carteira", (
         ("ver", "ver"), ("avaliar", "avaliar e calcular"), ("parametros", "parâmetros"), ("exportar", "exportar"),
@@ -63,10 +65,11 @@ PERMISSOES: frozenset[str] = frozenset(f"{m}.{f}" for m, _, fs in MENUS for f, _
 def permissoes_do_comercial() -> list[str]:
     """O perfil inicial da Karine (decisão de Eduardo, 02/10/2026): o comercial inteiro, sem converter
     em contrato, sem Carteira e sem Configurações; contratos e grupos só para ver. O menu Questionários
-    entrou em 02/10/2026, também para ver. Excluir oportunidade (04/10/2026) começa só no Administrador."""
+    entrou em 02/10/2026, também para ver. Excluir oportunidade (04/10/2026) começa só no Administrador;
+    excluir contrato (30/10/2026, decisão de Karine) já nasce aqui."""
     return sorted(
         {"agenda.ver", "questionarios.ver", "contatos.ver", "contatos.editar", "contatos.excluir", "grupos.ver", "contratos.ver",
-         "abordagens.ver", "abordagens.editar", "sdr.ver", "sdr.editar", "conferencia.ver"}
+         "contratos.excluir", "abordagens.ver", "abordagens.editar", "sdr.ver", "sdr.editar", "conferencia.ver"}
         | {f"funil.{f}" for m, _, fs in MENUS if m == "funil" for f, _ in fs if f not in ("converter", "excluir")}
     )
 
@@ -162,6 +165,9 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("POST", r"/api/grupos/\d+/empresas", ("grupos.editar", "contatos.editar")),
     ("POST", r"/api/grupos/(\d+/fundir|fusoes/\d+/desfazer)", ("grupos.fundir",)),
     # contratos
+    ("GET", r"/api/contratos/exportar", ("contratos.exportar",)),
+    ("GET", r"/api/contratos/\d+/exclusao", ("contratos.excluir",)),
+    ("POST", r"/api/contratos/\d+/excluir", ("contratos.excluir",)),
     ("GET", r"/api/contratos(/\d+)?", ("contratos.ver",)),
     ("PATCH", r"/api/contratos/\d+", ("contratos.editar",)),
     ("POST", r"/api/contratos/\d+/eventos", ("contratos.eventos",)),

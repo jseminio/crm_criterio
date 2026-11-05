@@ -2468,6 +2468,40 @@ data; cabeçalho congelado e filtro do Excel ligado.
   tela não vai para a planilha: ordene lá, pelo filtro do Excel.
 - Só lê. Leva dado de cliente: guarde fora do repositório.
 
+## Gestão de contratos em Excel (30/10/2026)
+
+Em **Sucesso do cliente → Gestão de contratos**, o botão **Exportar para Excel** (na linha dos
+filtros, à direita) baixa `contratos-AAAA-MM-DD.xlsx` com **exatamente os contratos da tela** — a
+Situação filtrada, o que a Pesquisar achou e a ordem clicada nas colunas. Quinze colunas: Grupo,
+Empresa, CNPJ, Escopo, Situação, Recorrente, Preço mensal, Preço anual, Parcelas no ano, Assinatura
+("anterior ao CRM" quando é da carteira antiga), Data de competência, Início do pagamento, Data de
+fim, Saída anunciada e Signatário. Valor sai como número (R$) e data como data; cabeçalho congelado,
+filtro do Excel ligado e, duas linhas abaixo, o total com fórmula de soma do preço mensal e do anual.
+
+- Rota: `GET /api/contratos/exportar?situacao=…&id=…&id=…` — `id` repetido traz só esses contratos,
+  na ordem passada; sem `id`, todos os da situação, assinatura mais recente primeiro.
+- Permissão nova `contratos.exportar` ("exportar para Excel", menu Contratos). O perfil Comercial não
+  a ganha sozinho: o Administrador marca em Configurações → Perfis.
+- Só lê. Leva dado de cliente: guarde fora do repositório.
+
+## Excluir contrato (30/10/2026)
+
+Em **Gestão de contratos**, o botão **Excluir** (ao lado de **Abrir**) abre uma janela que mostra grupo,
+escopo e preço, diz o que sai junto e o que fica, e pede o **motivo** antes de liberar "Excluir de vez".
+Vale para **qualquer situação**, inclusive Ativo e Encerrado (decisão de Karine): o contrato some da
+carteira, do MRR e dos indicadores. Para encerrar um contrato que existiu, o caminho continua sendo o
+evento de encerramento.
+
+- Sai junto: eventos, pedidos de aprovação e documentos gerados pelo CRM.
+- Fica: grupo, empresa e a oportunidade de origem, que continua Aceita e pode virar contrato de novo.
+  PDFs anexados e envelopes do Clicksign ficam, sem apontar para o contrato.
+- O motivo vai para o Histórico de alterações (`acao` "excluiu", `tabela` "contrato"). Não se desfaz
+  pela tela.
+- Rotas: `GET /api/contratos/{id}/exclusao` (o que sai) e `POST /api/contratos/{id}/excluir`
+  (`{"motivo": "..."}`), com a permissão `contratos.excluir`, que nasce no Administrador e no
+  Comercial (migração `f1c7a3e9b5d2` acrescenta ao perfil Comercial já gravado). Regra em
+  `crm.db.excluir_contrato`.
+
 ## Endereço da empresa
 
 A tabela `empresa` ganhou, em 25/09/2026, `logradouro`, `numero`, `complemento`,

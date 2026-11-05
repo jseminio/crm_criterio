@@ -20,6 +20,8 @@ import { CampoDeData } from "../componentes/CampoDeData";
 import { AlteracoesDoRegistro } from "../componentes/HistoricoDeAlteracoes";
 import { ImportarRecebimentos } from "../componentes/ImportarRecebimentos";
 import { usarAcesso } from "../entrada";
+import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
+import { ExclusaoDeContrato } from "../componentes/ExclusaoDeContrato";
 import { contratoCombina, Destaque } from "./pesquisaDeContratos";
 import { GerarContrato } from "../componentes/GerarContrato";
 import { AssinaturaEletronica } from "../componentes/AssinaturaEletronica";
@@ -418,9 +420,10 @@ export function Contratos({ listas }: { listas: Listas | null }) {
   const [situacao, definirSituacao] = useState("");
   const [busca, definirBusca] = useState("");
   const [editando, definirEditando] = useState<ContratoResumo | null>(null);
+  const [excluindo, definirExcluindo] = useState<ContratoResumo | null>(null);
   const [versaoDoMrr, definirVersaoDoMrr] = useState(0);
   const { ordenacao, alternar: alternarOrdenacao } = usarOrdenacao();
-  const { eu } = usarAcesso();
+  const { eu, pode } = usarAcesso();
 
   const { dados, carregando, erro, recarregar } = usarDados<Pagina<ContratoResumo>>(
     () => api.contratos(situacao ? { situacao: [situacao] } : {}),
@@ -428,6 +431,14 @@ export function Contratos({ listas }: { listas: Listas | null }) {
   );
 
   const achados = (dados?.itens ?? []).filter((c) => contratoCombina(c, busca));
+  const ordenados = ordenar(achados, ordenacao, {
+    grupo: (c) => c.grupo_nome,
+    escopo: (c) => c.escopo,
+    situacao: (c) => c.situacao,
+    preco: (c) => (c.preco_mensal ? Number(c.preco_mensal) : null),
+    assinatura: (c) => c.data_inicio,
+    signatario: (c) => c.signatario,
+  });
   const somaDosAchados = achados.reduce((t, c) => t + (c.preco_mensal ? Number(c.preco_mensal) : 0), 0);
   const semDadosNenhuns = !carregando && !erro && dados?.total === 0 && situacao === "";
   const vazioPorFiltro = !carregando && !erro && !semDadosNenhuns && achados.length === 0;
@@ -481,6 +492,25 @@ export function Contratos({ listas }: { listas: Listas | null }) {
             ))}
           </select>
         </div>
+        {pode("contratos.exportar") && achados.length > 0 && (
+          <div className="campo" style={{ marginLeft: "auto" }}>
+            {/* Rótulo invisível, do tamanho dos outros: deixa o botão na mesma linha da caixa de Situação. */}
+            <span className="campo-rotulo" aria-hidden="true" style={{ visibility: "hidden" }}>
+              Exportar
+            </span>
+            {/* Exporta exatamente o que está na tela: a situação filtrada e, da pesquisa, os ids na ordem atual. */}
+            <LinkDeArquivo
+              className="botao botao-secundario"
+              href={api.enderecoDaExportacaoDosContratos({
+                situacao: situacao ? [situacao] : undefined,
+                id: ordenados.map((c) => c.id),
+              })}
+              title="Baixa em Excel os contratos que estão na tela, com empresa, CNPJ, preço anual e datas"
+            >
+              Exportar para Excel
+            </LinkDeArquivo>
+          </div>
+        )}
       </div>
 
       {carregando && <Carregando rotulo="Carregando os contratos" />}
@@ -514,14 +544,7 @@ export function Contratos({ listas }: { listas: Listas | null }) {
             </tr>
           </thead>
           <tbody>
-            {ordenar(achados, ordenacao, {
-              grupo: (c) => c.grupo_nome,
-              escopo: (c) => c.escopo,
-              situacao: (c) => c.situacao,
-              preco: (c) => (c.preco_mensal ? Number(c.preco_mensal) : null),
-              assinatura: (c) => c.data_inicio,
-              signatario: (c) => c.signatario,
-            }).map((contrato) => (
+            {ordenados.map((contrato) => (
               <tr key={contrato.id}>
                 <td>
                   <Destaque texto={contrato.grupo_nome} termo={busca} />
@@ -560,11 +583,34 @@ export function Contratos({ listas }: { listas: Listas | null }) {
                   >
                     Abrir
                   </button>
+                  {pode("contratos.excluir") && (
+                    <button
+                      type="button"
+                      className="botao botao-texto-perigo"
+                      style={{ marginLeft: "var(--e1)" }}
+                      onClick={() => definirExcluindo(contrato)}
+                      aria-label={`Excluir o contrato de ${contrato.grupo_nome}${contrato.escopo ? ` (${contrato.escopo})` : ""}`}
+                    >
+                      Excluir
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {excluindo && (
+        <ExclusaoDeContrato
+          contrato={excluindo}
+          aoFechar={() => definirExcluindo(null)}
+          aoExcluir={() => {
+            definirExcluindo(null);
+            recarregar();
+            definirVersaoDoMrr((v) => v + 1);
+          }}
+        />
       )}
 
       {editando && (

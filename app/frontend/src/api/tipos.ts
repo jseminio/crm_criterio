@@ -91,6 +91,15 @@ export interface ExclusaoDaOportunidade {
   sai_da_conversao: boolean;
 }
 
+/** O que a exclusão do contrato leva junto (30/10/2026). Anexos e envelopes ficam, sem apontar para ele. */
+export interface ExclusaoDoContrato {
+  eventos: number;
+  pedidos_de_aprovacao: number;
+  documentos_gerados: number;
+  anexos: number;
+  envelopes: number;
+}
+
 export interface OportunidadeDetalhe extends OportunidadeResumo {
   /** Já virou contrato: a empresa não troca mais pelo detalhe. */
   tem_contrato?: boolean;

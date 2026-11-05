@@ -14,6 +14,8 @@ vi.mock("../api/cliente", async () => {
       documentoDoContrato: vi.fn().mockReturnValue(new Promise(() => {})),
       assinaturaDoContrato: vi.fn().mockReturnValue(new Promise(() => {})),
       documentos: vi.fn().mockReturnValue(new Promise(() => {})),
+      enderecoDaExportacaoDosContratos: real.api.enderecoDaExportacaoDosContratos,
+      exclusaoDoContrato: vi.fn(), excluirContrato: vi.fn(),
       mrr: vi.fn().mockResolvedValue(null), itensDoMovimento: vi.fn().mockResolvedValue({ de: "", ate: "", itens: [] }),
     },
   };
@@ -238,5 +240,84 @@ describe("Contratos — pesquisa (13/10/2026)", () => {
     expect(linhas()).toEqual(["Lattoog", "Sentire", "Mainô"]);
     await userEvent.click(preco);
     expect(linhas()).toEqual(["Mainô", "Sentire", "Lattoog"]);
+  });
+});
+
+describe("Contratos — exportar para Excel (30/10/2026)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.mrr).mockResolvedValue(null as never);
+  });
+
+  it("o link leva a situação filtrada e os contratos da tela, na ordem da tela", async () => {
+    vi.mocked(api.contratos).mockResolvedValue({
+      total: 2,
+      itens: [resumo({ id: 7, grupo_nome: "Alfa" }), resumo({ id: 9, grupo_nome: "Beta", escopo: "DP" })],
+    } as never);
+    render(<Contratos listas={null} />);
+    const link = await screen.findByRole("link", { name: "Exportar para Excel" });
+    expect(link).toHaveAttribute("href", "/api/contratos/exportar?id=7&id=9");
+
+    await userEvent.type(screen.getByLabelText("Pesquisar"), "Beta");
+    await waitFor(() => expect(link).toHaveAttribute("href", "/api/contratos/exportar?id=9"));
+
+    await userEvent.selectOptions(screen.getByLabelText("Situação"), "Ativo");
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Exportar para Excel" })).toHaveAttribute(
+        "href",
+        "/api/contratos/exportar?situacao=Ativo&id=9",
+      ),
+    );
+  });
+
+  it("sem contrato na tela, não há o que exportar", async () => {
+    vi.mocked(api.contratos).mockResolvedValue({ total: 0, itens: [] } as never);
+    render(<Contratos listas={null} />);
+    await screen.findByText("Nenhum contrato ainda");
+    expect(screen.queryByRole("link", { name: "Exportar para Excel" })).toBeNull();
+  });
+});
+
+describe("Contratos — excluir contrato (30/10/2026)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.mrr).mockResolvedValue(null as never);
+  });
+
+  it("Excluir fica ao lado de Abrir, mostra o que sai e só exclui com motivo", async () => {
+    vi.mocked(api.contratos).mockResolvedValue({ total: 1, itens: [resumo({ situacao: "Ativo" })] } as never);
+    vi.mocked(api.exclusaoDoContrato).mockResolvedValue({
+      eventos: 2, pedidos_de_aprovacao: 0, documentos_gerados: 1, anexos: 1, envelopes: 0,
+    });
+    vi.mocked(api.excluirContrato).mockResolvedValue(undefined);
+    render(<Contratos listas={null} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Excluir o contrato de Alfa (BPO)" }));
+    const janela = await screen.findByRole("dialog", { name: "Excluir contrato" });
+    expect(janela).toHaveTextContent("Alfa · BPO");
+    expect(await screen.findByText(/2 eventos e 1 documento gerado/)).toBeInTheDocument();
+    expect(janela).toHaveTextContent(/sem apontar para ele: 1 PDF anexado/);
+
+    const excluir = screen.getByRole("button", { name: "Excluir de vez" });
+    expect(excluir).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("Motivo (obrigatório)"), "Cadastrado em duplicidade");
+    await userEvent.click(excluir);
+
+    expect(api.excluirContrato).toHaveBeenCalledWith(7, "Cadastrado em duplicidade");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(api.contratos).toHaveBeenCalledTimes(2);
+  });
+
+  it("Cancelar fecha sem excluir", async () => {
+    vi.mocked(api.contratos).mockResolvedValue({ total: 1, itens: [resumo()] } as never);
+    vi.mocked(api.exclusaoDoContrato).mockResolvedValue({
+      eventos: 0, pedidos_de_aprovacao: 0, documentos_gerados: 0, anexos: 0, envelopes: 0,
+    });
+    render(<Contratos listas={null} />);
+    await userEvent.click(await screen.findByRole("button", { name: /Excluir o contrato/ }));
+    expect(await screen.findByText(/Sai só o contrato/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(api.excluirContrato).not.toHaveBeenCalled();
   });
 });

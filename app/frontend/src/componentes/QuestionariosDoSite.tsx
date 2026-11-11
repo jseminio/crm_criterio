@@ -10,6 +10,7 @@ import { api, ErroDaApi } from "../api/cliente";
 import type { QuestionarioResumo } from "../api/tipos";
 import { cnpj, dataHora } from "../formato";
 import { Etiqueta } from "./Etiqueta";
+import { BotaoComparar } from "./CompararEnvios";
 import { BotaoMesclar } from "./MesclarQuestionario";
 
 const PRECISA = "Precisa de você";
@@ -118,7 +119,10 @@ export function QuestionariosDoSite({ estado, aoAbrir }: { estado: EstadoDosQues
             <tbody>
               {linhas.map((q) => (
                 <tr key={q.id}>
-                  <td>{dataHora(q.recebido_em)}</td>
+                  <td>
+                    {dataHora(q.recebido_em)}
+                    {q.numero && <span className="celula-fonte">{q.numero}</span>}
+                  </td>
                   <td>
                     {q.razao_social}
                     <span className="celula-fonte">
@@ -134,7 +138,9 @@ export function QuestionariosDoSite({ estado, aoAbrir }: { estado: EstadoDosQues
                     <span className="celula-fonte">{origemDoPorte(q)}</span>
                   </td>
                   <td>
-                    {q.situacao === PRECISA ? (
+                    {q.situacao === PRECISA && q.comparar_envios ? (
+                      <BotaoComparar q={q} aoResolver={() => void estado.recarregar()} />
+                    ) : q.situacao === PRECISA ? (
                       <>
                         <BotaoMesclar q={q} aoMesclar={() => void estado.recarregar()} />
                         {" · "}

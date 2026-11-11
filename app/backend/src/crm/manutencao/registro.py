@@ -24,8 +24,8 @@ from __future__ import annotations
 
 from crm.manutencao.executor import Tarefa
 from crm.manutencao.tarefas import (
-    configuracao_para_a_tela, data_de_envio_da_proposta, menino_da_ilha_em_12_parcelas, meta_de_mrr_em_13_parcelas,
-    perdida_e_motivos, premissas_em_13_parcelas, retrato_da_integralidade, saida_dos_encerramentos_antigos,
+    configuracao_para_a_tela, data_de_envio_da_proposta, link_do_questionario_no_crm, menino_da_ilha_em_12_parcelas,
+    meta_de_mrr_em_13_parcelas, numero_dos_questionarios, perdida_e_motivos, premissas_em_13_parcelas, retrato_da_integralidade, saida_dos_encerramentos_antigos,
     smarthis_e_cs_brasil_aguardando, tipo_dos_contratos,
 )
 
@@ -60,5 +60,11 @@ TAREFAS: list[Tarefa] = [
     Tarefa("2026_10_29_smarthis_e_cs_brasil_aguardando",
            "Volta Smarthis e CS Brasil para Aguardando assinatura: a assinatura na Clicksign não foi concluída",
            smarthis_e_cs_brasil_aguardando.executar),
+    Tarefa("2026_11_11_numero_dos_questionarios",
+           "Numera os questionários que já estavam no CRM (a partir do Q-1001) e preenche a chave de quem preencheu",
+           numero_dos_questionarios.executar),
+    Tarefa("2026_11_11_link_do_questionario_no_crm",
+           "Troca o link do questionário enviado ao lead do Netlify para o próprio CRM, se a tela ainda tiver o antigo",
+           link_do_questionario_no_crm.executar),
     # Acrescente no fim. Ex.: Tarefa("2026_10_06_assunto", "o que faz", modulo.executar),
 ]

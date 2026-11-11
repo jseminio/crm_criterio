@@ -129,6 +129,7 @@ import type {
   QuadroDePropostas,
   PreviaDaMescla,
   SugestaoDeMescla,
+  ComparacaoDosEnvios,
   ResultadoDoTeste,
   EstadoDaBusca,
   FunilDoSucesso,
@@ -647,6 +648,10 @@ export const api = {
   resolverQuestionario: (id: number, acao: "anexar" | "criar") =>
     pedir<QuestionarioResumo>(`/api/questionarios/${id}/resolver`, { method: "POST", body: JSON.stringify({ acao }) }),
   sugestoesDeMescla: (id: number) => pedir<SugestaoDeMescla[]>(`/api/questionarios/${id}/sugestoes`),
+  enviosDaEmpresa: (id: number) => pedir<ComparacaoDosEnvios>(`/api/questionarios/${id}/envios`),
+  combinarEnvios: (id: number, escolhas: Record<string, number>) =>
+    pedir<QuestionarioResumo>(`/api/questionarios/${id}/combinar`, { method: "POST", body: JSON.stringify({ escolhas }) }),
+  descartarEnvio: (id: number) => pedir<QuestionarioResumo>(`/api/questionarios/${id}/descartar`, { method: "POST" }),
   previaDaMescla: (id: number, oportunidadeId: number) =>
     pedir<PreviaDaMescla>(comParametros(`/api/questionarios/${id}/mescla`, { oportunidade_id: oportunidadeId })),
   mesclarQuestionario: (id: number, corpo: { oportunidade_id: number; usar_do_questionario: string[]; excluir_duplicada: boolean }) =>

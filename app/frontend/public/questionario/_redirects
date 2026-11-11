@@ -1,0 +1,5 @@
+# Netlify (até 11/12/2026): /questionario abre a mesma página; os arquivos pedidos em /questionario/… (ícone,
+# imagem da prévia) vêm desta pasta. No CRM quem faz isso é o nginx (app/frontend/nginx.conf).
+/questionario    /index.html    200
+/questionario/   /index.html    200
+/questionario/*  /:splat        200

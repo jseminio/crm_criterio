@@ -11,11 +11,17 @@
 - Pedido de Karine (01/10/2026): a oportunidade nasce **ligada à empresa**; a pessoa que já está na
   base (mesmo e-mail) é **reaproveitada** e só ganha o vínculo com a empresa; e o **endereço** da
   empresa vem do cadastro público do CNPJ, preenchendo só o que está vazio.
+- Decisão de Eduardo em 11/11/2026: cada envio ganha um **número** (Q-1001…) e a **chave de quem preencheu**
+  (CNPJ + primeiro nome). Se a mesma empresa já enviou antes, o envio novo **não vira nada sozinho**: fica
+  "Precisa de você" para quem resolve comparar os envios e ficar com um ou combinar os dois
+  (`crm.questionario.envios`).
 """
 
 from __future__ import annotations
 
 import re
+import threading
+import unicodedata
 from datetime import datetime
 from typing import Any
 
@@ -27,10 +33,50 @@ from crm.domain.listas import Origem, OrigemDoDado, Situacao, SituacaoDoQuestion
 from crm.questionario.endereco import BuscaDeEndereco
 from crm.questionario.leitura import Leitura, ler
 
-__all__ = ["LinhaInvalida", "importar", "anexar", "criar_nova", "leitura_de", "origem_declarada", "EM_ABERTO",
-           "CANAL_DE_COMO_CONHECEU"]
+__all__ = ["LinhaInvalida", "importar", "decidir", "anexar", "criar_nova", "leitura_de", "origem_declarada", "EM_ABERTO",
+           "CANAL_DE_COMO_CONHECEU", "PRIMEIRO_NUMERO", "proximo_numero", "chave_do_preenchedor", "numero_do_envio",
+           "outros_envios"]
 
 EM_ABERTO = (Situacao.ENVIAR_PROPOSTA, Situacao.EM_AVALIACAO, Situacao.ON_HOLD)
+
+PRIMEIRO_NUMERO = 1001
+"""O primeiro envio é o Q-1001 (decisão de Eduardo em 11/11/2026)."""
+
+_UM_NUMERO_POR_VEZ = threading.Lock()
+"""A API roda num processo só (`docker-compose.coolify.yml`): a trava basta para dois envios ao mesmo tempo não
+pegarem o mesmo número. A restrição única no banco segura o resto."""
+
+
+def proximo_numero(sessao: Session) -> int:
+    with _UM_NUMERO_POR_VEZ:
+        maior = sessao.scalar(sa.select(sa.func.max(QuestionarioRecebido.numero)))
+        return max(PRIMEIRO_NUMERO, (maior or 0) + 1)
+
+
+def numero_do_envio(numero: int | None) -> str | None:
+    return f"Q-{numero}" if numero is not None else None
+
+
+def chave_do_preenchedor(cnpj: str, nome: str | None) -> str:
+    """CNPJ + primeiro nome, sem acento e em maiúsculas: `36630332000105-ANA`."""
+    primeiro = (nome or "").strip().split(" ")[0] if (nome or "").strip() else ""
+    sem_acento = "".join(c for c in unicodedata.normalize("NFKD", primeiro) if not unicodedata.combining(c))
+    limpo = re.sub(r"[^A-Za-z0-9]", "", sem_acento).upper()[:40]
+    return f"{_digitos(cnpj)}-{limpo or 'SEMNOME'}"
+
+
+def outros_envios(sessao: Session, q: QuestionarioRecebido) -> list[QuestionarioRecebido]:
+    """Os outros envios da mesma empresa (mesmo CNPJ), fora os descartados, do mais antigo ao mais novo."""
+    return list(sessao.scalars(
+        sa.select(QuestionarioRecebido).where(
+            QuestionarioRecebido.cnpj == q.cnpj, QuestionarioRecebido.id != q.id,
+            QuestionarioRecebido.situacao != SituacaoDoQuestionario.DESCARTADO,
+        ).order_by(QuestionarioRecebido.recebido_em, QuestionarioRecebido.id)
+    ).all()) if q.id is not None else list(sessao.scalars(
+        sa.select(QuestionarioRecebido).where(
+            QuestionarioRecebido.cnpj == q.cnpj, QuestionarioRecebido.situacao != SituacaoDoQuestionario.DESCARTADO,
+        ).order_by(QuestionarioRecebido.recebido_em, QuestionarioRecebido.id)
+    ).all())
 
 
 CANAL_DE_COMO_CONHECEU: dict[str, TipoCanal | None] = {
@@ -209,10 +255,38 @@ def importar(sessao: Session, linha: dict[str, Any], buscar_endereco: BuscaDeEnd
         avaliacao_do_site=avaliacao, pdf_base64=linha.get("pdf_base64") or None,
         porte_site=_texto(linha.get("porte_sugerido") or (avaliacao or {}).get("porte_sugerido"), 20),
         situacao=SituacaoDoQuestionario.IMPORTADO, o_que_fez="",
+        chave_do_preenchedor=chave_do_preenchedor(cnpj, contato),
     )
+    q.numero = proximo_numero(sessao)
     leitura = leitura_de(q)
     q.porte_crm = leitura.porte
 
+    anteriores = outros_envios(sessao, q)
+    if anteriores:
+        ultimo = anteriores[-1]
+        mesma_pessoa = ultimo.chave_do_preenchedor == q.chave_do_preenchedor
+        q.situacao = SituacaoDoQuestionario.PRECISA_DE_VOCE
+        q.o_que_fez = (
+            f"A empresa já tinha enviado o questionário {numero_do_envio(ultimo.numero) or ''} "
+            f"({ultimo.contato_nome}, {ultimo.recebido_em:%d/%m/%Y}). "
+            + ("Mesma pessoa preenchendo de novo. " if mesma_pessoa else "")
+            + "Não criei nada: compare os envios e fique com um ou combine os dois."
+        )
+        sessao.add(q)
+        sessao.flush()
+        return q
+    decidir(sessao, q, leitura, buscar_endereco)
+    sessao.add(q)
+    sessao.flush()
+    return q
+
+
+def decidir(sessao: Session, q: QuestionarioRecebido, leitura: Leitura,
+            buscar_endereco: BuscaDeEndereco | None = None) -> None:
+    """O que o CRM faz com um envio que já pode virar oportunidade: cliente novo, grupo existente ou "Precisa de
+    você" por oportunidade aberta. Também roda depois que quem resolve combina os envios da mesma empresa."""
+    cnpj = q.cnpj
+    q.situacao, q.oportunidade_em_aberto_id = SituacaoDoQuestionario.IMPORTADO, None
     empresa = sessao.scalar(sa.select(Empresa).where(Empresa.cnpj == cnpj))
     if empresa is None:
         if not _parou_pelo_contato(sessao, q):
@@ -235,9 +309,6 @@ def importar(sessao: Session, linha: dict[str, Any], buscar_endereco: BuscaDeEnd
             q.oportunidade_id = oportunidade.id
             q.o_que_fez = (f'Entrou no grupo "{grupo.nome}"; criou a oportunidade'
                            + (" e o contato." if novo_contato else ". O contato já estava cadastrado.") + endereco)
-    sessao.add(q)
-    sessao.flush()
-    return q
 
 
 def _exigir_pendente(q: QuestionarioRecebido) -> None:

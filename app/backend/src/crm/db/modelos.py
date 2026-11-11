@@ -1485,6 +1485,15 @@ class QuestionarioRecebido(CarimboMixin, Base):
     marcado_na_origem_em: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     """Quando o Supabase aceitou a marca de importado. Vazio = a marca falhou; na próxima busca ele
     volta e o CRM só tenta marcar de novo."""
+    numero: Mapped[int | None] = mapped_column(sa.Integer, unique=True)
+    """O número do envio, mostrado como Q-1001 (decisão de Eduardo em 11/11/2026). Sequencial e único: cada clique
+    em "Enviar" ganha um, mesmo que seja a mesma pessoa preenchendo de novo."""
+    chave_do_preenchedor: Mapped[str | None] = mapped_column(sa.String(80), index=True)
+    """CNPJ + primeiro nome de quem preencheu, sem acento e em maiúsculas (`36630332000105-ANA`). Agrupa os envios
+    da mesma pessoa pela mesma empresa; não é única (quem é único é o `numero`)."""
+    combinacao: Mapped[dict | None] = mapped_column(sa.JSON().with_variant(JSONB(), "postgresql"))
+    """Quando a empresa enviou mais de uma vez e quem resolve escolheu campo a campo: de quais envios veio cada
+    campo, quem decidiu, quando, e as respostas que este envio tinha antes (nada se perde)."""
 
 
 class MatrizDeProposta(Base):

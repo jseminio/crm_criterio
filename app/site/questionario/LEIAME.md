@@ -1,5 +1,10 @@
 # Questionário para proposta — fora do Lovable (01/10/2026)
 
+> **Desde 11/11/2026 a página mora no próprio CRM:** `app/frontend/public/questionario/` e endereço
+> `https://crmcs.criterioconsultores.com.br/questionario`. O envio vai direto para a API do CRM
+> (`POST /api/questionario/envio`). O que segue abaixo (Netlify + Supabase) vale só para os links antigos
+> e será **desligado em 11/12/2026**. O comando de deploy abaixo já aponta para a pasta nova.
+
 **Configurado em 01/10/2026:** projeto Supabase `fowkrqvcawdkackanjfh` (conta da Critério), tabela criada
 com o `banco.sql`, chave publicável já na página e o CRM conectado (`definir_questionario.py`).
 Falta só publicar (passo 4).
@@ -35,7 +40,7 @@ Site: https://criterio-questionario-proposta.netlify.app (Netlify, ID `6515cf4d-
 No Terminal, depois do `git pull`:
 
 ```
-cd app/site/questionario
+cd app/frontend/public/questionario
 npx netlify-cli deploy --prod --no-build --dir . --site 6515cf4d-79c7-4b07-b448-155eb73f9171
 ```
 

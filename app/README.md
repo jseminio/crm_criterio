@@ -809,9 +809,34 @@ WhatsApp, o e-mail do Microsoft 365, o questionário e o disparo se cadastram, t
   fato respondeu (tabela da OpenAI consultada em 07/10/2026). O ensaio do SDR (`scripts/ensaio_sdr.py`)
   segue só com a Anthropic.
 
+## Questionário no próprio CRM, link único e envios numerados (11/11/2026)
+
+Proposta aprovada por Eduardo em 11/11/2026 ("aprovado, Q-1001, 30 dias").
+
+- **Endereço.** A página sai do Netlify e passa a ser servida pelo próprio CRM em
+  `https://crmcs.criterioconsultores.com.br/questionario` (nginx do `crmcs-web`, arquivos em
+  `app/frontend/public/questionario/`). Sem subdomínio novo no registro.br. `noindex` para buscadores.
+- **Link único, sem login.** O envio vai para `POST /api/questionario/envio`, a única rota pública além do
+  login (`crm.acesso.catalogo.PUBLICAS`). Proteções: consentimento obrigatório (422), CNPJ válido (422),
+  limite de 5 MB (413), 5 envios por IP a cada 10 minutos (429) e campo-armadilha contra robôs.
+  O envio é importado na hora pelo caminho de sempre (`crm.questionario.importacao.importar`).
+- **Número e chave.** Cada envio ganha número sequencial **Q-1001, Q-1002…** e a chave de quem preencheu
+  (CNPJ + primeiro nome, sem acento). O cliente vê o número na tela de confirmação.
+- **Mesma empresa enviou de novo.** Nada é substituído: o envio novo fica "Precisa de você" com o botão
+  **Comparar envios** (`componentes/CompararEnvios.tsx`, `crm.questionario.envios`). Os envios aparecem lado
+  a lado; só o que diverge pede escolha, o vazio de um é preenchido pelo outro. Saídas: "Usar só o Q-…"
+  anterior (o novo vira **Descartado**), "Usar só o Q-…" novo, ou **Importar a mescla**. A combinação guarda
+  de onde veio cada campo e as respostas de antes (`combinacao`). Nenhum envio é apagado.
+- **Banco.** Migração `a3d5f7b9c1e2` (colunas `numero`, `chave_do_preenchedor`, `combinacao`). As tarefas
+  `2026_11_11_numero_dos_questionarios` (numera os que já existem por ordem de chegada) e
+  `2026_11_11_link_do_questionario_no_crm` (troca o link do Netlify pelo do CRM na configuração) rodam
+  sozinhas no deploy.
+- **Transição.** Netlify e a busca no Supabase continuam valendo para links antigos por 30 dias; desligar
+  em **11/12/2026**.
+
 ## "Como conheceu a Critério?" no questionário (v7, 12/10/2026)
 
-- **Pergunta nova**, obrigatória, no fim da seção 1 do site (`app/site/questionario/index.html`,
+- **Pergunta nova**, obrigatória, no fim da seção 1 do site (`app/frontend/public/questionario/index.html`,
   constante `COMO_CONHECEU`; lista aprovada por Eduardo em 12/10/2026). Nas indicações aparece
   "Quem indicou?" (opcional); em "Outros", um campo de texto obrigatório. Versão do formulário: **v7**.
 - **Na importação** a escolha vira a origem da oportunidade (`crm.questionario.importacao.origem_declarada`):
@@ -1455,7 +1480,7 @@ Amostra aprovada por Eduardo em 02/10/2026. Fecha os dois itens do E4 que faltav
 e a lista do que falta para a proposta, com responsável e prazo.
 
 - **Aba Ficha** (entre "Volumetria e porte" e "Proposta"): as nove seções do questionário do site
-  (`crm.proposta.ficha`, espelho do `SECOES` de `app/site/questionario/index.html`). Cada seção diz
+  (`crm.proposta.ficha`, espelho do `SECOES` de `app/frontend/public/questionario/index.html`). Cada seção diz
   "✓ 14 de 14", "◐ 3 de 5", "✗ 0 de 7", "fora do escopo" (Folha sem DP, Financeiro sem
   Financeiro) ou "para a implantação" (seção 9). Cada resposta mostra a origem: **Questionário** e a
   data do envio, ou **Entrevista**, quem e quando. Corrigir na Ficha grava como Entrevista em

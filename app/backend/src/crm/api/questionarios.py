@@ -6,6 +6,9 @@ from __future__ import annotations
 import base64
 import binascii
 import threading
+import time
+import uuid
+from collections import defaultdict, deque
 from collections.abc import Callable, Iterator
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -13,15 +16,16 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from crm.acesso.auditoria import usuario_atual
 from crm.db.base import agora
 from crm.db.modelos import GrupoEconomico, Oportunidade, Proposta, QuestionarioRecebido
 from crm.domain.listas import Situacao, SituacaoDoQuestionario
 from crm.proposta import ficha as regras_da_ficha
-from crm.questionario import importacao, mescla
+from crm.questionario import envios, importacao, mescla
 from crm.questionario.endereco import BuscaDeEndereco
 from crm.questionario.fonte import (
     BuscaFalhou, FonteDaFuncao, FonteDeQuestionarios, FonteSupabase, e_funcao, ler_configuracao,
@@ -30,7 +34,36 @@ from crm.questionario.leitura import ROTULOS_COMPLEXIDADE, ROTULOS_RISCO, inteir
 
 __all__ = [
     "ESTADO_DA_BUSCA", "INTERVALO_DA_BUSCA", "BuscaNaoConfigurada", "executar_busca", "fonte_real", "roteador_de_questionarios",
+    "ROTA_DO_ENVIO", "LimiteDeEnvios",
 ]
+
+ROTA_DO_ENVIO = "/api/questionario/envio"
+"""A única rota que o questionário do site chama, sem login (decisão de Eduardo em 11/11/2026). Ela só grava: ler
+continua exigindo entrar no CRM."""
+
+TAMANHO_MAXIMO_DO_ENVIO = 5 * 1024 * 1024
+"""Respostas + PDF: o PDF do formulário fica em dezenas de KB; 5 MB sobra e barra abuso."""
+
+
+class LimiteDeEnvios:
+    """No máximo `envios` por IP em `janela` segundos, em memória (a API roda num processo só). Contra robô que
+    dispara o formulário em série; uma pessoa reenviando algumas vezes passa."""
+
+    def __init__(self, envios: int = 5, janela: float = 600.0) -> None:
+        self._envios, self._janela = envios, janela
+        self._trava = threading.Lock()
+        self._por_ip: dict[str, deque[float]] = defaultdict(deque)
+
+    def permite(self, ip: str, agora_s: float | None = None) -> bool:
+        t = time.monotonic() if agora_s is None else agora_s
+        with self._trava:
+            fila = self._por_ip[ip]
+            while fila and t - fila[0] > self._janela:
+                fila.popleft()
+            if len(fila) >= self._envios:
+                return False
+            fila.append(t)
+            return True
 
 
 def fonte_real() -> FonteDeQuestionarios | None:
@@ -58,6 +91,64 @@ class QuestionarioResumo(BaseModel):
     porte_crm: str | None
     porte_site: str | None
     tem_pdf: bool
+    numero: str | None = None
+    """Q-1001… (11/11/2026). Vazio só nos que chegaram antes da numeração e ainda não foram numerados."""
+    comparar_envios: bool = False
+    """Parado porque a mesma empresa já tinha enviado: a resolução é comparar os envios."""
+
+
+class EnvioDoSite(BaseModel):
+    """O que o formulário manda (os mesmos campos que gravava no Supabase)."""
+
+    versao_questionario: str = Field(default="—", max_length=60)
+    razao_social: str = Field(max_length=300)
+    cnpj: str = Field(max_length=20)
+    nome_fantasia: str | None = Field(default=None, max_length=300)
+    contato_nome: str = Field(max_length=300)
+    contato_cargo: str | None = Field(default=None, max_length=200)
+    contato_celular: str | None = Field(default=None, max_length=40)
+    contato_email: str | None = Field(default=None, max_length=300)
+    respostas: dict
+    avaliacao: dict | None = None
+    porte_sugerido: str | None = Field(default=None, max_length=40)
+    consentimento_lgpd: bool
+    consentimento_em: str | None = Field(default=None, max_length=40)
+    pdf_base64: str | None = None
+    site_da_empresa: str | None = Field(default=None, max_length=300)
+    """Campo invisível na página: pessoa nunca preenche; robô preenche e o envio é ignorado."""
+
+
+class EnvioRecebido(BaseModel):
+    numero: str | None
+
+
+class EnvioComparado(BaseModel):
+    id: int
+    numero: str | None
+    recebido_em: datetime
+    contato_nome: str
+    chave_do_preenchedor: str | None
+    situacao: str
+    oportunidade_id: int | None
+
+
+class CampoComparado(BaseModel):
+    chave: str
+    secao: int
+    rotulo: str
+    valores: dict[int, str | None]
+    estado: Literal["igual", "diferente", "completa", "vazio"]
+    sugestao: int | None
+
+
+class ComparacaoDosEnvios(BaseModel):
+    envios: list[EnvioComparado]
+    campos: list[CampoComparado]
+
+
+class PedidoDeCombinacao(BaseModel):
+    escolhas: dict[str, int] = {}
+    """Para cada campo diferente, o id do envio de onde vem."""
 
 
 class ResultadoDaBusca(BaseModel):
@@ -303,9 +394,15 @@ def roteador_de_questionarios(
     obter_sessao: Callable[[], Iterator[Session]],
     fonte: Callable[[], FonteDeQuestionarios | None] = fonte_real,
     buscar_endereco: BuscaDeEndereco | None = None,
+    limite_de_envios: LimiteDeEnvios | None = None,
 ) -> APIRouter:
     """`buscar_endereco`: endereço pelo CNPJ ao importar (Karine, 01/10/2026). None = não busca."""
     r = APIRouter(tags=["questionário"])
+    limite = limite_de_envios or LimiteDeEnvios()
+
+    def _quem() -> str:
+        entrou = usuario_atual.get()
+        return (entrou.nome or entrou.email) if entrou is not None else "quem resolve"
 
     def _resumo(sessao: Session, q: QuestionarioRecebido) -> QuestionarioResumo:
         grupo = sessao.get(GrupoEconomico, q.grupo_id) if q.grupo_id else None
@@ -315,8 +412,35 @@ def roteador_de_questionarios(
             cliente_novo=q.cliente_novo, o_que_fez=q.o_que_fez, grupo_id=q.grupo_id,
             grupo_nome=grupo.nome if grupo else None, oportunidade_id=q.oportunidade_id,
             oportunidade_em_aberto_id=q.oportunidade_em_aberto_id, porte_crm=q.porte_crm, porte_site=q.porte_site,
-            tem_pdf=bool(q.pdf_base64),
+            tem_pdf=bool(q.pdf_base64), numero=importacao.numero_do_envio(q.numero),
+            comparar_envios=envios.e_comparacao(sessao, q),
         )
+
+    @r.post(ROTA_DO_ENVIO, response_model=EnvioRecebido, status_code=201)
+    def receber_envio(corpo: EnvioDoSite, request: Request,
+                      sessao: Session = Depends(obter_sessao, scope="function")) -> EnvioRecebido:
+        """O questionário enviado pelo cliente, sem login (11/11/2026). Grava e já faz o que a busca fazia: vira
+        oportunidade, ou fica "Precisa de você" (oportunidade aberta ou outro envio da mesma empresa)."""
+        tamanho = int(request.headers.get("content-length") or 0)
+        if tamanho > TAMANHO_MAXIMO_DO_ENVIO:
+            raise HTTPException(413, "O envio passou do tamanho permitido. Baixe o PDF e mande por e-mail à Critério.")
+        if corpo.site_da_empresa:  # o campo invisível: robô
+            return EnvioRecebido(numero=None)
+        if not limite.permite(request.client.host if request.client else "?"):
+            raise HTTPException(429, "Muitos envios seguidos deste endereço. Espere alguns minutos e tente de novo.")
+        if not corpo.consentimento_lgpd:
+            raise HTTPException(422, "Para enviar, marque a autorização de uso dos dados.")
+        linha = corpo.model_dump(exclude={"site_da_empresa", "consentimento_lgpd", "consentimento_em"})
+        linha.update(id=f"crm-{uuid.uuid4().hex}", criado_em=agora().isoformat())
+        linha["respostas"] = {**corpo.respostas, "consentimento_em": corpo.consentimento_em or agora().isoformat()}
+        try:
+            q = importacao.importar(sessao, linha, buscar_endereco)
+        except (importacao.LinhaInvalida, ValueError) as falha:
+            sessao.rollback()
+            raise HTTPException(422, f"Confira os dados: {falha}.") from falha
+        q.marcado_na_origem_em = q.recebido_em  # nasceu aqui: não há marca a fazer em outro lugar
+        sessao.commit()
+        return EnvioRecebido(numero=importacao.numero_do_envio(q.numero))
 
     @r.post("/api/questionarios/buscar", response_model=ResultadoDaBusca)
     def buscar(sessao: Session = Depends(obter_sessao, scope="function")) -> ResultadoDaBusca:
@@ -454,6 +578,39 @@ def roteador_de_questionarios(
                 importacao.anexar(sessao, q)
             else:
                 importacao.criar_nova(sessao, q, buscar_endereco)
+        except ValueError as falha:
+            raise HTTPException(409, str(falha)) from falha
+        sessao.commit()
+        return _resumo(sessao, q)
+
+    @r.get("/api/questionarios/{questionario_id}/envios", response_model=ComparacaoDosEnvios)
+    def comparar(questionario_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> ComparacaoDosEnvios:
+        """Os envios da mesma empresa lado a lado, campo a campo (amostra aprovada em 11/11/2026)."""
+        c = envios.comparacao(sessao, _questionario(sessao, questionario_id))
+        return ComparacaoDosEnvios(
+            envios=[EnvioComparado(**vars(e)) for e in c.envios],
+            campos=[CampoComparado(**vars(x)) for x in c.campos],
+        )
+
+    @r.post("/api/questionarios/{questionario_id}/combinar", response_model=QuestionarioResumo)
+    def combinar(questionario_id: int, corpo: PedidoDeCombinacao,
+                 sessao: Session = Depends(obter_sessao, scope="function")) -> QuestionarioResumo:
+        """Fica com os valores escolhidos campo a campo e segue: vira oportunidade ou vai para a mescla com o card."""
+        q = _questionario(sessao, questionario_id)
+        try:
+            envios.combinar(sessao, q, corpo.escolhas, _quem(), buscar_endereco)
+        except ValueError as falha:
+            sessao.rollback()
+            raise HTTPException(409, str(falha)) from falha
+        sessao.commit()
+        return _resumo(sessao, q)
+
+    @r.post("/api/questionarios/{questionario_id}/descartar", response_model=QuestionarioResumo)
+    def descartar(questionario_id: int, sessao: Session = Depends(obter_sessao, scope="function")) -> QuestionarioResumo:
+        """Fica com o envio anterior: este é guardado e não vira nada."""
+        q = _questionario(sessao, questionario_id)
+        try:
+            envios.descartar(sessao, q, _quem())
         except ValueError as falha:
             raise HTTPException(409, str(falha)) from falha
         sessao.commit()

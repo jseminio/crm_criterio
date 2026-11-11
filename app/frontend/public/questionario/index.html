@@ -11,9 +11,9 @@
 <meta property="og:locale" content="pt_BR">
 <meta property="og:title" content="Questionário para Proposta · Critério">
 <meta property="og:description" content="Questionário para elaboração de proposta de BPO contábil, fiscal, trabalhista e financeiro.">
-<meta property="og:url" content="https://criterio-questionario-proposta.netlify.app/questionario">
-<meta property="og:image" content="https://criterio-questionario-proposta.netlify.app/og-image.png">
-<meta property="og:image:secure_url" content="https://criterio-questionario-proposta.netlify.app/og-image.png">
+<meta property="og:url" content="https://crmcs.criterioconsultores.com.br/questionario">
+<meta property="og:image" content="https://crmcs.criterioconsultores.com.br/questionario/og-image.png">
+<meta property="og:image:secure_url" content="https://crmcs.criterioconsultores.com.br/questionario/og-image.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -21,9 +21,9 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Questionário para Proposta · Critério">
 <meta name="twitter:description" content="Questionário para elaboração de proposta de BPO contábil, fiscal, trabalhista e financeiro.">
-<meta name="twitter:image" content="https://criterio-questionario-proposta.netlify.app/og-image.png">
-<link rel="icon" type="image/png" href="/apple-touch-icon.png">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="twitter:image" content="https://crmcs.criterioconsultores.com.br/questionario/og-image.png">
+<link rel="icon" type="image/png" href="/questionario/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="/questionario/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -178,6 +178,10 @@ const SUPABASE_URL = 'https://fowkrqvcawdkackanjfh.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_p4cdQND2eTHKeOjFfGV3Gw_oZ9-6tmx';
 const BANCO_CONFIGURADO = !SUPABASE_URL.startsWith('PREENCHER') && !SUPABASE_ANON_KEY.startsWith('PREENCHER');
 const TABELA = 'questionarios_proposta';
+// Desde 11/11/2026 a página é servida pelo próprio CRM (crmcs.criterioconsultores.com.br/questionario) e grava
+// direto nele. A cópia no Netlify continua gravando no Supabase até 11/12/2026, para quem recebeu o link antigo.
+const NO_CRM = !location.hostname.endsWith('netlify.app');
+const ROTA_DO_ENVIO = '/api/questionario/envio';
 const VERSAO_QUESTIONARIO = 'BPO Full 2026 v7';
 const STORAGE_KEY = 'criterio_questionario_bpo_v4';
 // Logomarca branca embutida na página: aparece mesmo se só o index.html for publicado.
@@ -644,6 +648,7 @@ function mostrarResumo(){
     <p class="h3">Escopo</p><p style="margin:0 0 18px;font-size:14px">${servicos.map(esc).join(' · ')||'—'}</p>
     <p class="h3">Pontos de atenção declarados</p>
     ${att.length?`<ul class="att">${att.map(([t,g])=>`<li><span>${esc(t)}</span><span class="tag">${esc(g)}</span></li>`).join('')}</ul>`:'<p style="font-size:14px;color:var(--muted);margin:0 0 18px">Nenhum ponto de atenção declarado.</p>'}
+    <div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden"><label for="site_da_empresa">Site da empresa</label><input type="text" id="site_da_empresa" name="site_da_empresa" tabindex="-1" autocomplete="off"></div>
     <label class="consent" id="consent-box"><input type="checkbox" id="consent" ${envio&&envio.ok?'checked disabled':''}>
       <span>Autorizo a Critério a tratar os dados informados neste questionário exclusivamente para elaborar a proposta comercial e, se contratada, planejar a implantação dos serviços, nos termos da Lei Geral de Proteção de Dados (Lei nº 13.709/2018).</span></label>
     <div class="actions">
@@ -670,7 +675,7 @@ function mostrarConfirmacao(){
   const blocos = visiveis().map(s=>({titulo:s.titulo, linhas:linhasSecao(s)})).filter(b=>b.linhas.length);
   v.innerHTML = `<h2 class="sec-h">Questionário enviado</h2>
     <p class="sec-sub">${esc(A.razao_social)} · CNPJ ${esc(A.cnpj)} · enviado em ${esc(envio.quando)}</p>
-    <div class="banner ok">Recebemos suas respostas. A equipe da Critério entrará em contato.</div>
+    <div class="banner ok">Recebemos suas respostas${envio.numero?` (envio ${esc(envio.numero)})`:''}. A equipe da Critério entrará em contato.</div>
     <p class="h3">Dados enviados</p>
     ${blocos.map(b=>`<p class="h3" style="font-size:13px">${esc(b.titulo)}</p>
       <dl style="margin:0 0 18px;font-size:14px">${b.linhas.map(([l,val])=>`<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--line,#e5eaf2)"><dt style="flex:0 0 220px;color:var(--muted)">${esc(l)}</dt><dd style="margin:0;flex:1">${esc(val)}</dd></div>`).join('')}</dl>`).join('')}
@@ -751,7 +756,7 @@ function gerarPDF(interno){
 /* ================= Envio ================= */
 async function enviar(){
   if(!$('#consent').checked){ $('#consent-box').classList.add('err'); mostrarMsg('erro','Para enviar, marque a autorização de uso dos dados.'); return; }
-  if(!BANCO_CONFIGURADO){ mostrarMsg('erro','O envio ainda não está configurado. Baixe o PDF e envie para eduardo.luiz@grupocriterio.com.br.'); return; }
+  if(!NO_CRM && !BANCO_CONFIGURADO){ mostrarMsg('erro','O envio ainda não está configurado. Baixe o PDF e envie para eduardo.luiz@grupocriterio.com.br.'); return; }
   const btn = $('#btn-enviar'); btn.disabled = true; btn.textContent = 'Enviando…';
   let pdfBase64 = null;
   try{ pdfBase64 = gerarPDF(true).output('datauristring').split(',')[1]; }catch(e){ console.warn('[Questionário] PDF não gerado para o e-mail:', e); }
@@ -768,16 +773,31 @@ async function enviar(){
     pdf_base64: pdfBase64
   };
   try{
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABELA}`, { method:'POST',
-      headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+SUPABASE_ANON_KEY, 'Content-Type':'application/json', 'Prefer':'return=minimal' },
-      body: JSON.stringify(payload) });
-    if(!r.ok){ const t = await r.text().catch(()=> ''); throw new Error(`HTTP ${r.status} ${t.slice(0,200)}`); }
-    envio = {ok:true, quando:new Date().toLocaleString('pt-BR')}; salvar();
+    let numero = null;
+    if(NO_CRM){
+      const armadilha = ($('#site_da_empresa')||{}).value || null;
+      const r = await fetch(ROTA_DO_ENVIO, { method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({...payload, site_da_empresa: armadilha}) });
+      if(!r.ok){
+        const corpo = await r.json().catch(()=>null);
+        const detalhe = corpo && typeof corpo.detail === 'string' ? corpo.detail : '';
+        if(r.status===422 || r.status===429 || r.status===413){ const e = new Error(detalhe); e.paraOCliente = detalhe; throw e; }
+        throw new Error(`HTTP ${r.status} ${detalhe.slice(0,200)}`);
+      }
+      numero = (await r.json()).numero;
+    } else {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABELA}`, { method:'POST',
+        headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+SUPABASE_ANON_KEY, 'Content-Type':'application/json', 'Prefer':'return=minimal' },
+        body: JSON.stringify(payload) });
+      if(!r.ok){ const t = await r.text().catch(()=> ''); throw new Error(`HTTP ${r.status} ${t.slice(0,200)}`); }
+    }
+    envio = {ok:true, quando:new Date().toLocaleString('pt-BR'), numero}; salvar();
     $('#status').textContent = 'Enviado à Critério';
     mostrarConfirmacao();
   }catch(e){
     console.error('[Questionário] Falha no envio:', e);
     btn.disabled = false; btn.textContent = 'Tentar enviar de novo';
+    if(e && e.paraOCliente){ mostrarMsg('erro', e.paraOCliente); return; }
     mostrarMsg('erro','Não foi possível enviar agora. Suas respostas continuam salvas neste navegador. Tente de novo ou baixe o PDF e envie para eduardo.luiz@grupocriterio.com.br.');
   }
 }

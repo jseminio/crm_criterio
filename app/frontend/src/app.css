@@ -1770,6 +1770,10 @@ fieldset.lacuna-prioritaria { border: 2px dashed var(--espera); padding: var(--e
   .granola-fila td { display: block; border: 0; padding: 2px 0; }
   .granola-fila tr { display: block; padding: var(--e2) 0; border-bottom: 1px solid var(--borda); }
 }
+/* Comparar os envios da mesma empresa (11/11/2026): o campo que diverge fica marcado e pede escolha. */
+.comparar-diferente td { background: var(--surface-sunken); }
+.comparar-diferente td:first-child { font-weight: 600; }
+.comparar-escolha { display: inline-flex; flex-wrap: wrap; gap: var(--e2); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -1778,4 +1782,3 @@ fieldset.lacuna-prioritaria { border: 2px dashed var(--espera); padding: var(--e
     scroll-behavior: auto !important;
   }
 }
-

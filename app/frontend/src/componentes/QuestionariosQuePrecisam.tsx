@@ -7,6 +7,7 @@ import { api, ErroDaApi } from "../api/cliente";
 import type { QuestionarioResumo } from "../api/tipos";
 import { cnpj, dataHora } from "../formato";
 import { usarDados } from "../usarDados";
+import { BotaoComparar } from "./CompararEnvios";
 import { BotaoMesclar } from "./MesclarQuestionario";
 
 const PRECISA = "Precisa de você";
@@ -43,14 +44,21 @@ export function QuestionariosQuePrecisam() {
               <div className="ajuste-texto">
                 <strong>{q.nome_fantasia || q.razao_social}</strong>
                 <span className="celula-fonte">
-                  CNPJ {cnpj(q.cnpj)} · {q.contato_nome} · recebido em {dataHora(q.recebido_em)}
+                  {q.numero ? `${q.numero} · ` : ""}CNPJ {cnpj(q.cnpj)} · {q.contato_nome} · recebido em {dataHora(q.recebido_em)}
                 </span>
                 <span className="celula-fonte">{q.o_que_fez}</span>
               </div>
               <div className="ajuste-acoes">
-                <BotaoMesclar q={q} classe="botao botao-secundario"
-                  aoMesclar={(texto) => { definirFeito(texto); recarregar(); }} />
-                <button type="button" className="botao botao-secundario" onClick={() => void resolver(q, "criar")}>Criar nova</button>
+                {q.comparar_envios ? (
+                  <BotaoComparar q={q} classe="botao botao-secundario"
+                    aoResolver={(texto) => { definirFeito(texto); recarregar(); }} />
+                ) : (
+                  <>
+                    <BotaoMesclar q={q} classe="botao botao-secundario"
+                      aoMesclar={(texto) => { definirFeito(texto); recarregar(); }} />
+                    <button type="button" className="botao botao-secundario" onClick={() => void resolver(q, "criar")}>Criar nova</button>
+                  </>
+                )}
               </div>
             </li>
           ))}

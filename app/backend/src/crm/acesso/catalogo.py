@@ -74,11 +74,13 @@ def permissoes_do_comercial() -> list[str]:
     )
 
 
-PUBLICAS: tuple[str, ...] = ("/api/acesso/entrada", "/api/acesso/login", "/api/whatsapp/webhook", "/api/clicksign/webhook")
+PUBLICAS: tuple[str, ...] = ("/api/acesso/entrada", "/api/acesso/login", "/api/whatsapp/webhook", "/api/clicksign/webhook",
+                            "/api/questionario/envio")
 """Sem entrada nenhuma: a tela precisa saber como entrar, e entrar, antes de ter entrado. O webhook do
 WhatsApp (14/10/2026) é chamado pela Meta, não por uma pessoa: a trava é a assinatura da entrega
 (`crm.api.whatsapp_recebido`). O da Clicksign (18/10/2026), o mesmo: a trava é o `Content-Hmac`
-(`crm.api.assinatura_de_contrato`)."""
+(`crm.api.assinatura_de_contrato`). O envio do questionário (11/11/2026) é o do cliente, pelo link único: a rota só
+grava, com limite por IP e campo-armadilha contra robô (`crm.api.questionarios.receber_envio`)."""
 
 _TODOS = ()  # qualquer pessoa que entrou
 _CARD_DO_GRUPO = ("grupos.ver", "funil.ver", "contatos.ver", "contratos.ver", "carteira.ver", "sucesso.ver",
@@ -154,8 +156,8 @@ ROTAS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("GET", r"/api/questionarios/busca", ("questionarios.ver", "funil.ver")),
     ("GET", r"/api/questionarios/\d+/respostas", ("questionarios.ver", "funil.ver")),
     ("GET", r"/api/questionarios(/\d+/pdf)?", ("funil.ver", "questionarios.ver")),
-    ("POST", r"/api/questionarios/(buscar|\d+/resolver|\d+/mesclar)", ("funil.questionarios",)),
-    ("GET", r"/api/questionarios/\d+/(sugestoes|mescla)", ("funil.questionarios",)),
+    ("POST", r"/api/questionarios/(buscar|\d+/resolver|\d+/mesclar|\d+/combinar|\d+/descartar)", ("funil.questionarios",)),
+    ("GET", r"/api/questionarios/\d+/(sugestoes|mescla|envios)", ("funil.questionarios",)),
     # grupos
     ("GET", r"/api/grupos(/sugestoes-de-fusao|/fusoes)?", ("grupos.ver", "funil.ver")),
     # o card do grupo e as lacunas do cadastro (18/10/2026): abrem de qualquer composição de indicador

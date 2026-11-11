@@ -450,7 +450,7 @@ class TestComoConheceu:
         import re
         from pathlib import Path
         from crm.questionario.importacao import CANAL_DE_COMO_CONHECEU
-        html = (Path(__file__).resolve().parents[2] / "site" / "questionario" / "index.html").read_text(encoding="utf-8")
+        html = (Path(__file__).resolve().parents[2] / "frontend" / "public" / "questionario" / "index.html").read_text(encoding="utf-8")
         bloco = re.search(r"const COMO_CONHECEU = \[(.*?)\];", html, re.S).group(1)
         assert re.findall(r"'([^']+)'", bloco) == list(CANAL_DE_COMO_CONHECEU)
 
@@ -489,6 +489,6 @@ class TestEmpresasNoEscopo:
 
     def test_formulario_deriva_os_campos_que_o_crm_le(self):
         from pathlib import Path
-        html = (Path(__file__).resolve().parents[2] / "site" / "questionario" / "index.html").read_text(encoding="utf-8")
+        html = (Path(__file__).resolve().parents[2] / "frontend" / "public" / "questionario" / "index.html").read_text(encoding="utf-8")
         for derivado in ("A.regime_tributario =", "A.faturamento_anual =", "A.cnpjs_escopo =", "A.vol.cnpjs ="):
             assert derivado in html

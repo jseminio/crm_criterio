@@ -8,6 +8,7 @@ import type { LinhaDoPainel, Listas, PainelDeQuestionarios, SecaoDeRespostas, Si
 import { EstadoDaBuscaDeQuestionarios } from "../componentes/EstadoDaBuscaDeQuestionarios";
 import { LinkDeArquivo } from "../componentes/LinkDeArquivo";
 import { Carregando, Erro, VazioPorFiltro, VazioSemDados } from "../componentes/estados";
+import { BotaoComparar } from "../componentes/CompararEnvios";
 import { BotaoMesclar } from "../componentes/MesclarQuestionario";
 import { usarAcesso } from "../entrada";
 import { cnpj, data, dataHora } from "../formato";
@@ -112,7 +113,9 @@ function Acoes({ l, aoAbrir, aoResolver }: { l: LinhaDoPainel; aoAbrir: (id: num
   if (l.situacao_do_painel === "precisa_de_voce") {
     return (
       <span className="questionario-acoes">
-        {pode("funil.questionarios") ? (
+        {pode("funil.questionarios") && l.comparar_envios ? (
+          <BotaoComparar q={l} aoResolver={aoResolver} />
+        ) : pode("funil.questionarios") ? (
           <>
             <BotaoMesclar q={l} aoMesclar={aoResolver} />
             {" · "}
@@ -274,7 +277,10 @@ export function Questionarios({ listas }: { listas: Listas | null }) {
                       onClick={() => definirAberta(aberta === l.id ? null : l.id)}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); definirAberta(aberta === l.id ? null : l.id); } }}
                     >
-                      <td className="celula-numero">{dataHora(l.recebido_em)}</td>
+                      <td className="celula-numero">
+                        {dataHora(l.recebido_em)}
+                        {l.numero && <span className="celula-fonte">{l.numero}</span>}
+                      </td>
                       <td>
                         {l.nome_fantasia || l.razao_social}
                         <span className="celula-fonte sem-quebra">CNPJ {cnpj(l.cnpj)}</span>

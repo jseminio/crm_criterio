@@ -1,7 +1,7 @@
 """A ficha da oportunidade (E4, 02/10/2026): as nove seções do questionário do site, cada resposta
 dizendo de onde veio.
 
-A definição espelha o formulário publicado ("BPO Full 2026 v7", `app/site/questionario/index.html`,
+A definição espelha o formulário publicado ("BPO Full 2026 v7", `app/frontend/public/questionario/index.html`,
 constante `SECOES`): mudou o formulário, muda esta lista. Quem responde primeiro é o cliente, no
 questionário; o que se corrige no CRM vale como **Entrevista**, com quem e quando, e a resposta
 original continua guardada no questionário recebido.

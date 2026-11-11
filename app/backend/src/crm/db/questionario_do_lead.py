@@ -12,7 +12,7 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, selectinload
 
-from crm.agente.config import LINK_DO_QUESTIONARIO_PADRAO, ler_configuracao
+from crm.agente.config import LINK_DO_QUESTIONARIO_NETLIFY, LINK_DO_QUESTIONARIO_PADRAO, ler_configuracao
 from crm.db.modelos import ConversaDoSdr, Lead, MensagemDoSdr, QuestionarioRecebido
 from crm.domain import questionario_do_lead as questionario
 from crm.domain.listas import AutorDaMensagem
@@ -29,8 +29,8 @@ __all__ = [
 
 
 def links_do_questionario() -> tuple[str, ...]:
-    """O link configurado e o padrão: quem recebeu o link antigo também recebeu o questionário."""
-    return (ler_configuracao().link_do_questionario, LINK_DO_QUESTIONARIO_PADRAO)
+    """O link configurado, o padrão e o do Netlify: quem recebeu o link antigo também recebeu o questionário."""
+    return (ler_configuracao().link_do_questionario, LINK_DO_QUESTIONARIO_PADRAO, LINK_DO_QUESTIONARIO_NETLIFY)
 
 
 def recebidos(sessao: Session) -> list[QuestionarioRecebido]:

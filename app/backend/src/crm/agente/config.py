@@ -29,9 +29,13 @@ VARIAVEIS = {
     "disparo": "CRM_DISPARO_DO_QUESTIONARIO",
 }
 
-#: O questionário de volumetria que o SDR de IA envia ao lead (decisão de Eduardo, 06/10/2026). Vai
-#: mudar para o domínio da Critério: aí basta pôr `CRM_LINK_DO_QUESTIONARIO` no `.env`.
-LINK_DO_QUESTIONARIO_PADRAO = "https://criterio-questionario-proposta.netlify.app/questionario"
+#: O questionário de volumetria que o SDR de IA envia ao lead (decisão de Eduardo, 06/10/2026). Desde 11/11/2026
+#: é servido pelo próprio CRM, num link único para todos; a tela Configurações › Integrações pode trocar.
+LINK_DO_QUESTIONARIO_PADRAO = "https://crmcs.criterioconsultores.com.br/questionario"
+
+#: O endereço anterior, no Netlify: continua no ar por 30 dias (até 11/12/2026) para quem já recebeu o link, e
+#: uma mensagem com ele ainda conta como "link enviado".
+LINK_DO_QUESTIONARIO_NETLIFY = "https://criterio-questionario-proposta.netlify.app/questionario"
 
 
 @dataclass(frozen=True)

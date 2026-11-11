@@ -82,8 +82,8 @@ def test_email_incompleto_fica_desligado(tmp_path, monkeypatch):
     config = ler_configuracao()
     assert config.email is None and config.chave is None
     assert config.modelo == "claude-sonnet-5"
-    # Sem a variável, o link do questionário é o do site atual.
-    assert config.link_do_questionario == "https://criterio-questionario-proposta.netlify.app/questionario"
+    # Sem a variável, o link do questionário é o do próprio CRM (11/11/2026).
+    assert config.link_do_questionario == "https://crmcs.criterioconsultores.com.br/questionario"
 
 
 def test_link_do_questionario_vem_do_env(tmp_path, monkeypatch):

@@ -68,7 +68,7 @@ class TestContexto:
     def test_a_marca_do_link_vira_o_endereco_configurado(self):
         prompt = f"Envie o questionário: {ensaio.MARCA_DO_LINK}"
         padrao, _ = ensaio.montar_contexto(prompt, [], HOJE)
-        assert "https://criterio-questionario-proposta.netlify.app/questionario" in padrao
+        assert "https://crmcs.criterioconsultores.com.br/questionario" in padrao
         proprio, _ = ensaio.montar_contexto(prompt, [], HOJE, "https://questionario.criterio.com.br")
         assert "https://questionario.criterio.com.br" in proprio and ensaio.MARCA_DO_LINK not in proprio
 

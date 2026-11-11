@@ -209,6 +209,9 @@ class SituacaoDoQuestionario(Enum):
     IMPORTADO = "Importado"
     PRECISA_DE_VOCE = "Precisa de você"
     """Já havia oportunidade em aberto para o CNPJ: o CRM não duplica, a pessoa escolhe."""
+    DESCARTADO = "Descartado"
+    """A mesma empresa enviou mais de uma vez e quem resolve ficou com outro envio (11/11/2026). Fica guardado,
+    não vira nada."""
 
 
 class TipoDeMatriz(Enum):

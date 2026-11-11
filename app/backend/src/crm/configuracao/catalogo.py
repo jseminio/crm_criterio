@@ -81,8 +81,8 @@ GRUPOS: tuple[Grupo, ...] = (
     )),
     Grupo("questionario", "Questionário de volumetria", (
         Campo("questionario.link", "Link enviado ao lead", variavel="CRM_LINK_DO_QUESTIONARIO",
-              padrao="https://criterio-questionario-proposta.netlify.app/questionario",
-              ajuda="Quando o questionário for para o domínio da Critério, troque aqui."),
+              padrao="https://crmcs.criterioconsultores.com.br/questionario",
+              ajuda="O mesmo link para todos; o CRM identifica cada envio pelo CNPJ e por quem preencheu."),
         Campo("questionario.url", "Endereço da busca no site", variavel="CRM_QUESTIONARIO_URL",
               exemplo="https://<projeto>.supabase.co/functions/v1/questionarios-crm"),
         Campo("questionario.chave", "Chave da busca", segredo=True, variavel="CRM_QUESTIONARIO_CHAVE"),

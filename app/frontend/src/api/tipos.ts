@@ -1389,6 +1389,37 @@ export interface QuestionarioResumo {
   porte_crm: string | null;
   porte_site: string | null;
   tem_pdf: boolean;
+  /** Q-1001… (11/11/2026). Vazio só nos antigos ainda não numerados. */
+  numero?: string | null;
+  /** Parado porque a mesma empresa já tinha enviado: resolve-se comparando os envios. */
+  comparar_envios?: boolean;
+}
+
+/** Os envios da mesma empresa lado a lado (amostra aprovada por Eduardo em 11/11/2026). */
+export interface EnvioComparado {
+  id: number;
+  numero: string | null;
+  recebido_em: string;
+  contato_nome: string;
+  chave_do_preenchedor: string | null;
+  situacao: string;
+  oportunidade_id: number | null;
+}
+
+export interface CampoComparado {
+  chave: string;
+  secao: number;
+  rotulo: string;
+  /** Por id de envio (a chave vem como texto no JSON). */
+  valores: Record<string, string | null>;
+  /** igual: todos iguais · diferente: escolher · completa: só um preencheu. */
+  estado: "igual" | "diferente" | "completa" | "vazio";
+  sugestao: number | null;
+}
+
+export interface ComparacaoDosEnvios {
+  envios: EnvioComparado[];
+  campos: CampoComparado[];
 }
 
 export type SituacaoDoPainel =

@@ -166,6 +166,19 @@ GRUPOS: tuple[Grupo, ...] = (
         Campo("granola.desde", "Trazer notas a partir de", exemplo="01/10/2026",
               ajuda="Notas mais antigas ficam no Granola. Vazio: as dos últimos 30 dias."),
     )),
+    # Formulário do site: a LP "Reforma Tributária para empresas de serviços" (15/11/2026).
+    Grupo("site", "Formulário do site (landing pages)", (
+        Campo("site.ligado", "Recebimento ligado", padrao="false", opcoes=("true", "false"),
+              ajuda="Ligado, o CRM aceita os contatos do simulador da página e cria o lead no funil. "
+                    "Desligado, recusa tudo."),
+        Campo("site.origens", "Endereço da página (origem permitida)",
+              exemplo="https://www.criterioconsultores.com.br",
+              ajuda="Só o começo do endereço: https:// + domínio, sem caminho. Mais de um, separe por vírgula. "
+                    "Pedido de outro endereço é recusado. A página envia para "
+                    "https://crmcs.criterioconsultores.com.br/api/publico/leads-do-site."),
+        Campo("site.limite_por_hora", "Envios por hora de um mesmo IP", padrao="10", exemplo="10",
+              ajuda="Passou, o CRM recusa até a hora virar. Protege contra robô."),
+    ), testavel=False),
     Grupo("disparo", "Disparo do lembrete e do agradecimento", (
         Campo("disparo.ligado", "Disparo ligado", variavel="CRM_DISPARO_DO_QUESTIONARIO", padrao="false",
               opcoes=("true", "false"), ajuda="A cada 10 minutos, de segunda a sexta, das 9h às 18h."),

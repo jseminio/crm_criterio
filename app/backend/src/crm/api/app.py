@@ -66,6 +66,7 @@ from crm.api.leads_do_meta import (
 from crm.api.conversoes import enviadores_reais, laco_das_conversoes, roteador_de_conversoes
 from crm.api.sdr import roteador as roteador_do_sdr
 from crm.api.whatsapp_recebido import roteador_do_whatsapp_recebido
+from crm.api.leads_do_site import PREFIXO as PREFIXO_PUBLICO, roteador_de_leads_do_site
 from crm.api.respostas_do_sdr import clientes_reais, envio_real, laco_das_respostas, roteador_das_respostas
 from crm.api.ficha import pendencias_de, roteador_da_ficha
 from crm.api.propostas import roteador_de_propostas
@@ -159,6 +160,18 @@ __all__ = ["criar_app", "app"]
 
 #: De onde a tela é servida durante o desenvolvimento.
 ORIGENS_PERMITIDAS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+
+class _CorsMenosOPublico(CORSMiddleware):
+    """O CORS da tela (só localhost, com credenciais) para toda a API, menos `/api/publico/`: ali cada rota
+    responde o seu, com a origem salva na tela de Integrações (`crm.api.leads_do_site`). Sem a exceção, o
+    "pode?" do navegador da landing page levaria 400 daqui antes de chegar à rota."""
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["path"].startswith(PREFIXO_PUBLICO):
+            await self.app(scope, receive, send)
+            return
+        await super().__call__(scope, receive, send)
 
 _fabrica: sessionmaker[Session] | None = None
 
@@ -352,7 +365,7 @@ def criar_app(
             usuario_atual.reset(marca)
 
     api.add_middleware(
-        CORSMiddleware,
+        _CorsMenosOPublico,
         allow_origins=ORIGENS_PERMITIDAS,
         allow_credentials=True,
         allow_methods=["*"],
@@ -395,6 +408,7 @@ def criar_app(
         testadores or Testadores(granola=lambda _: testar_granola(http_granola))))
     api.include_router(roteador_do_granola(obter_sessao, http_granola))
     api.include_router(roteador_do_whatsapp_recebido(obter_sessao))
+    api.include_router(roteador_de_leads_do_site(obter_sessao))
     api.include_router(roteador_das_respostas(obter_sessao, envio_de_texto or envio_real))
     api.include_router(roteador_de_kpis(obter_sessao))
     api.include_router(roteador_de_lacunas(obter_sessao))

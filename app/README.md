@@ -16,6 +16,32 @@ e o rascunho da abordagem — e nada sai sem a aprovação de Eduardo. Desde
 a etapa de lead voltou, as conversas são registradas e o painel mede o
 resultado (ver "SDR de IA", abaixo).
 
+## Formulário do site entrando como lead (15/11/2026) — aguardando OK de Eduardo
+
+Pedido de Eduardo em 15/11/2026: os contatos do simulador da landing page "Reforma Tributária para empresas de
+serviços" entram direto no funil, para o SDR de IA abordar pelo WhatsApp. **Abre uma porta pública do CRM.**
+
+- Rota: `POST /api/publico/leads-do-site`, **sem login**. A página envia para
+  `https://crmcs.criterioconsultores.com.br/api/publico/leads-do-site`: o nginx da tela já repassa `/api/` à
+  API, e só esse caminho exato está em `PUBLICAS` (`crm.acesso.catalogo`); o resto de `/api/` continua pedindo login.
+- Integrações › **Site**: *Recebimento ligado* (padrão desligado: 404), *Endereço da página* (as origens
+  permitidas no CORS; pedido sem `Origin` ou de outra origem leva 403) e *Envios por hora de um mesmo IP*
+  (padrão 10; passou, 429). A linha de situação mostra o último lead do site e a última recusa (sem dado).
+  O CORS geral da API (só a tela local) não se aplica a `/api/publico/`.
+- Campo isca `website`: preenchido, a resposta é a mesma de sucesso e nada é gravado.
+- Validação no servidor: `nome` obrigatório; `whatsapp` só dígitos, 10 ou 11 com DDD 11–99 (aceita o 55 na
+  frente), celular de 11 dígitos começando com 9; `email` opcional e válido; `consentimento` precisa ser `true`.
+  Recusa é 400 com o nome do campo, nunca o valor. Corpo acima de 16 KB, 413. A resposta de sucesso é
+  `201 {"recebido": true}`, sem ID e sem dizer se o WhatsApp já existia. O log só diz o motivo.
+- O lead entra com canal "Site — LP Reforma Tributária", campanha = `utm_campaign` ou "Orgânico", mídia =
+  `utm_content` ou `utm_term`, as UTMs nas colunas do lead e a observação com uma linha por item (faturamento,
+  regime, segmento, folha, clientes, estimativa, página, origem UTM, consentimento com a versão e a data).
+- **Provisório, à espera de Eduardo:** `tipo_canal` = Tráfego pago quando o `utm_medium` é de anúncio pago, senão
+  vazio; o mesmo WhatsApp não cria outro lead — o mais recente com esse número ganha a nova entrada na observação
+  e só os campos vazios (e-mail, empresa) são preenchidos.
+- O SDR de IA não aborda o lead sozinho na criação (os leads do Meta também não): o lead nasce "Novo" no funil.
+- Regra pura em `crm.domain.leads_do_site`; rota em `crm.api.leads_do_site`. Sem migração, sem variável de ambiente.
+
 ## Data de competência, início do pagamento e parcelas do não recorrente (28/10/2026)
 
 Pedido de Eduardo, amostra aprovada em 28/10/2026. Valem no card da oportunidade e no painel do contrato (seção

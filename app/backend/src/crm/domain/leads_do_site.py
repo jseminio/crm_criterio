@@ -171,7 +171,7 @@ def campos_do_lead(envio: EnvioDoSite, momento: datetime) -> dict:
 
 
 def anotacao_da_nova_entrada(envio: EnvioDoSite, momento: datetime) -> str:
-    """O bloco que se acrescenta à observação do lead que já tem este WhatsApp (proposta à espera de Eduardo)."""
+    """O bloco que se acrescenta à observação do lead que já tem este WhatsApp (decisão de Eduardo, 15/11/2026)."""
     cabeca = [f"— Nova entrada pelo site em {_quando(momento)}:", f"Nome informado: {envio.nome}"]
     if envio.empresa:
         cabeca.append(f"Empresa informada: {envio.empresa}")

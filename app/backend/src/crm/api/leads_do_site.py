@@ -14,7 +14,7 @@ travas, como no webhook do WhatsApp (`crm.api.whatsapp_recebido`):
 - a resposta nunca leva dado (nem o ID do lead, nem se o WhatsApp já existia), e o log só diz o motivo.
 
 O WhatsApp que já está num lead não cria outro: o lead mais recente com esse número ganha a nova entrada na
-observação (proposta à espera de Eduardo). A comparação é a do recebimento do WhatsApp (`chave_do_telefone`).
+observação (decisão de Eduardo, 15/11/2026). A comparação é a do recebimento do WhatsApp (`chave_do_telefone`).
 """
 
 from __future__ import annotations

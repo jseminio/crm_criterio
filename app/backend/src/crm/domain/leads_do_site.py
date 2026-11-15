@@ -31,7 +31,7 @@ ISCA = "website"
 """O campo invisível da página: gente não o vê e não o preenche; robô que preenche tudo, sim."""
 MEIOS_PAGOS = frozenset({"cpc", "ppc", "cpm", "cpv", "paid", "pago", "paid_social", "paidsocial", "paid-social",
                          "ads", "display", "anuncio", "anúncio"})
-"""`utm_medium` que diz anúncio pago. **Hipótese em teste**: a classificação do lead do site espera Eduardo."""
+"""`utm_medium` que diz anúncio pago (decisão de Eduardo, 15/11/2026: o lead do site pago é Tráfego pago)."""
 
 _FUSO = ZoneInfo("America/Sao_Paulo")
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s.]{2,}$")
@@ -127,8 +127,8 @@ def conferir(corpo: object) -> EnvioDoSite:
 
 
 def tipo_de_canal(envio: EnvioDoSite) -> TipoCanal | None:
-    """**Provisório, à espera de Eduardo:** anúncio pago (pelo `utm_medium`) entra como Tráfego pago; o resto
-    fica sem tipo de canal, com o canal "Site — LP Reforma Tributária" dizendo de onde veio."""
+    """Decisão de Eduardo em 15/11/2026: anúncio pago (pelo `utm_medium`) entra como Tráfego pago; o resto fica
+    sem tipo de canal, com o canal "Site — LP Reforma Tributária" dizendo de onde veio. Sem tipo novo "Site"."""
     return TipoCanal.TRAFEGO_PAGO if (envio.utm_medium or "").casefold() in MEIOS_PAGOS else None
 
 

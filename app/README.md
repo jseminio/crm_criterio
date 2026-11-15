@@ -37,9 +37,10 @@ Amostra da aba Site em Integrações aprovada por Eduardo em 15/11/2026; o merge
 - O lead entra com canal "Site — LP Reforma Tributária", campanha = `utm_campaign` ou "Orgânico", mídia =
   `utm_content` ou `utm_term`, as UTMs nas colunas do lead e a observação com uma linha por item (faturamento,
   regime, segmento, folha, clientes, estimativa, página, origem UTM, consentimento com a versão e a data).
-- **Provisório, à espera de Eduardo:** `tipo_canal` = Tráfego pago quando o `utm_medium` é de anúncio pago, senão
-  vazio; o mesmo WhatsApp não cria outro lead — o mais recente com esse número ganha a nova entrada na observação
-  e só os campos vazios (e-mail, empresa) são preenchidos.
+- `tipo_canal` = Tráfego pago quando o `utm_medium` é de anúncio pago, senão vazio, sem tipo novo "Site"
+  (decisão de Eduardo, 15/11/2026).
+- **Provisório, à espera de Eduardo:** o mesmo WhatsApp não cria outro lead — o mais recente com esse número ganha a
+  nova entrada na observação e só os campos vazios (e-mail, empresa) são preenchidos.
 - O SDR de IA não aborda o lead sozinho na criação (os leads do Meta também não): o lead nasce "Novo" no funil.
 - Regra pura em `crm.domain.leads_do_site`; rota em `crm.api.leads_do_site`. Sem migração, sem variável de ambiente.
 

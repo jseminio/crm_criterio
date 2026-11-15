@@ -41,6 +41,7 @@ const ABA: Record<string, { rotulo: string; explicacao: string }> = {
   questionario: { rotulo: "Questionário", explicacao: "O link enviado ao lead e a busca dos questionários respondidos no site." },
   meta_ads: { rotulo: "Meta Ads", explicacao: "O gasto por campanha, os leads do formulário e a devolução das conversões." },
   google_ads: { rotulo: "Google Ads", explicacao: "O gasto por campanha, os leads do formulário e a devolução das conversões." },
+  site: { rotulo: "Site", explicacao: "Os contatos do simulador das landing pages entram como lead no funil." },
   disparo: { rotulo: "Disparo", explicacao: "O envio automático do lembrete e do agradecimento do questionário." },
   sdr_respostas: {
     rotulo: "Respostas do SDR",

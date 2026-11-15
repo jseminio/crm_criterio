@@ -309,6 +309,10 @@ def _configurado(grupo: str, linhas: dict[str, configuracao.Linha]) -> bool:
 def _situacao(grupo: str, sessao: Session) -> str | None:
     if grupo == "whatsapp":
         return situacao_do_recebimento(sessao)
+    if grupo == "site":
+        from crm.api.leads_do_site import situacao_do_site
+
+        return situacao_do_site(sessao)
     if grupo == "sdr_respostas":
         from crm.agente.respostas_do_sdr import situacao_das_respostas
         from crm.agente.roteador_do_sdr import ler_configuracao_das_respostas

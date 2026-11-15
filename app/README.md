@@ -41,7 +41,8 @@ Amostra da aba Site em Integrações aprovada por Eduardo em 15/11/2026; o merge
   (decisão de Eduardo, 15/11/2026).
 - O mesmo WhatsApp não cria outro lead — o mais recente com esse número ganha a nova entrada na observação e só os
   campos vazios (e-mail, empresa) são preenchidos (decisão de Eduardo, 15/11/2026).
-- O SDR de IA não aborda o lead sozinho na criação (os leads do Meta também não): o lead nasce "Novo" no funil.
+- O SDR de IA não aborda o lead sozinho na criação, como os leads do Meta: o lead nasce "Novo" no funil (decisão de
+  Eduardo, 15/11/2026). Primeiro contato automático seria demanda própria (modelo aprovado na Meta e regras do SDR).
 - Regra pura em `crm.domain.leads_do_site`; rota em `crm.api.leads_do_site`. Sem migração, sem variável de ambiente.
 
 ## Data de competência, início do pagamento e parcelas do não recorrente (28/10/2026)

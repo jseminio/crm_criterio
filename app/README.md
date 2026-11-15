@@ -20,6 +20,7 @@ resultado (ver "SDR de IA", abaixo).
 
 Pedido de Eduardo em 15/11/2026: os contatos do simulador da landing page "Reforma Tributária para empresas de
 serviços" entram direto no funil, para o SDR de IA abordar pelo WhatsApp. **Abre uma porta pública do CRM.**
+Amostra da aba Site em Integrações aprovada por Eduardo em 15/11/2026; o merge espera o OK dele.
 
 - Rota: `POST /api/publico/leads-do-site`, **sem login**. A página envia para
   `https://crmcs.criterioconsultores.com.br/api/publico/leads-do-site`: o nginx da tela já repassa `/api/` à
